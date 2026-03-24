@@ -82,6 +82,17 @@
         </p>
       </div>
 
+      <!-- Tags -->
+      <div v-if="messageTags.length > 0" class="flex flex-wrap gap-1.5 mt-3">
+        <span 
+          v-for="tag in messageTags" 
+          :key="tag.id"
+          class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
+        >
+          {{ tag.name }}
+        </span>
+      </div>
+
       <!-- Media Count Badge -->
       <div v-if="message.media_count > 0" class="mt-3 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,11 +106,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Message, MessageMediaItem } from '../types'
+import type { Message, MessageMediaItem, TagItem } from '../types'
 
 interface Props {
   message: Message
   mediaItems?: MessageMediaItem[]
+  tags?: TagItem[]
 }
 
 const props = defineProps<Props>()
@@ -113,6 +125,10 @@ const maxPreviewItems = 9
 const actorInitial = computed(() => {
   if (!props.message.actor_name) return '?'
   return props.message.actor_name.charAt(0).toUpperCase()
+})
+
+const messageTags = computed(() => {
+  return props.tags || []
 })
 
 const mediaPreviewItems = computed(() => {

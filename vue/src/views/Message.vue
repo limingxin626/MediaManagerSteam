@@ -1,10 +1,10 @@
 <template>
   <div class="min-h-screen transition-colors">
-    <!-- Main Content -->
-    <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
-      <div class="mb-6">
-        <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-          <h2 class="text-3xl font-bold text-gray-900 dark:text-white">消息流</h2>
+    <!-- Fixed Search Header -->
+    <div class="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center max-w-2xl mx-auto">
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">消息流</h2>
           <!-- Search -->
           <div class="relative flex-1 max-w-md">
             <input 
@@ -24,14 +24,18 @@
           </div>
         </div>
       </div>
-      
+    </div>
+
+    <!-- Main Content with top padding for fixed header -->
+    <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 pt-24">
       <!-- Messages Feed View -->
-      <div v-if="filteredMessages.length > 0" class="flex flex-col gap-4 max-w-2xl mx-auto" ref="messagesContainer">
+      <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-2xl mx-auto" ref="messagesContainer">
         <MessageCard
-          v-for="message in filteredMessages" 
+          v-for="message in messages" 
           :key="message.id"
           :message="message"
-          :media-items="messageMediaMap[message.id]"
+          :media-items="message.media_items"
+          :tags="message.tags"
           @click="goToMessage"
         />
         <!-- 加载更多指示器 -->
@@ -46,7 +50,7 @@
       </div>
 
       <!-- Empty State -->
-      <div v-if="filteredMessages.length === 0 && !loading" class="text-center py-12">
+      <div v-if="messages.length === 0 && !loading" class="text-center py-12">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
@@ -58,10 +62,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTheme } from '../composables/useTheme'
-import { type Message, type MessageDetail } from '../types'
+import { type MessageDetail } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import ViewToggle from '../components/ViewToggle.vue'
 import type { ViewMode } from '../components/ViewToggle.vue'
@@ -74,8 +78,7 @@ defineOptions({
 const router = useRouter()
 const { initTheme } = useTheme()
 
-const messages = ref<Message[]>([])
-const messageMediaMap = ref<Record<number, any[]>>({})
+const messages = ref<MessageDetail[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
 const currentView = ref<ViewMode>('grid')
@@ -85,25 +88,18 @@ const hasMoreData = ref(true)
 const messagesContainer = ref<HTMLElement | null>(null)
 const nextCursor = ref<string | null>(null)
 
-const filteredMessages = computed(() => {
-  const query = searchQuery.value.toLowerCase()
-  if (!query) return messages.value
-  return messages.value.filter(message => {
-    const text = message.text || ''
-    const actorName = message.actor_name || ''
-    return text.toLowerCase().includes(query) ||
-      actorName.toLowerCase().includes(query)
-  })
-})
-
 const fetchMessages = async (isLoadingMore = false) => {
-  if (loading.value || !hasMoreData.value) return
+  if (loading.value) return
+  if (isLoadingMore && !hasMoreData.value) return
   
   loading.value = true
   try {
     let url = `${API_BASE_URL}/messages/with-detail?limit=${pageSize.value}`
-    if (nextCursor.value) {
+    if (isLoadingMore && nextCursor.value) {
       url += `&cursor=${encodeURIComponent(nextCursor.value)}`
+    }
+    if (searchQuery.value) {
+      url += `&query_text=${encodeURIComponent(searchQuery.value)}`
     }
     
     const response = await fetch(url)
@@ -122,12 +118,6 @@ const fetchMessages = async (isLoadingMore = false) => {
       messages.value = [...data.items.reverse(), ...messages.value]
     } else {
       messages.value = data.items.reverse()
-    }
-    
-    for (const message of data.items) {
-      if (message.media_items) {
-        messageMediaMap.value[message.id] = message.media_items
-      }
     }
     
     if (!isLoadingMore) {
@@ -152,6 +142,20 @@ const fetchMessages = async (isLoadingMore = false) => {
 const goToMessage = (messageId: number) => {
   router.push(`/message/${messageId}`)
 }
+
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+watch(searchQuery, () => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  searchTimeout = setTimeout(() => {
+    messages.value = []
+    nextCursor.value = null
+    hasMoreData.value = true
+    fetchMessages()
+  }, 300)
+})
 
 // 记录上一次滚动位置
 const lastScrollTop = ref(0)

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.models import get_db, Message, MessageMedia
+from app.models import get_db, Message, MessageMedia, Tag
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -20,6 +20,7 @@ class MessageResponse(BaseModel):
 
 class MessageDetailResponse(MessageResponse):
     media_items: List[dict]
+    tags: List[dict] = []
 
 class CursorResponse(BaseModel):
     items: List[MessageResponse]
@@ -95,6 +96,7 @@ def get_messages_with_detail(
     cursor: Optional[str] = Query(None, description="游标，格式为ISO格式的created_at时间"),
     limit: int = Query(20, ge=1, le=100),
     actor_id: Optional[int] = None,
+    query_text: Optional[str] = Query(None, description="搜索文本，匹配message.text"),
     db: Session = Depends(get_db)
 ):
     """获取消息列表，包含完整的媒体详情（基于游标的分页）"""
@@ -104,6 +106,9 @@ def get_messages_with_detail(
     
     if actor_id:
         query = query.filter(Message.actor_id == actor_id)
+    
+    if query_text:
+        query = query.filter(Message.text.ilike(f"%{query_text}%"))
     
     # 如果提供了游标，解析并使用
     if cursor:
@@ -147,6 +152,8 @@ def get_messages_with_detail(
         
         actor_name = msg.actor.name if msg.actor else None
         
+        tags = [{"id": t.id, "name": t.name, "category": t.category} for t in msg.tags]
+        
         result.append(MessageDetailResponse(
             id=msg.id,
             text=msg.text,
@@ -154,6 +161,7 @@ def get_messages_with_detail(
             actor_name=actor_name,
             media_count=len(media_items),
             media_items=media_items,
+            tags=tags,
             created_at=msg.created_at.isoformat(),
             updated_at=msg.updated_at.isoformat()
         ))
@@ -191,6 +199,8 @@ def get_message_detail(
     
     actor_name = message.actor.name if message.actor else None
     
+    tags = [{"id": t.id, "name": t.name, "category": t.category} for t in message.tags]
+    
     return MessageDetailResponse(
         id=message.id,
         text=message.text,
@@ -198,6 +208,7 @@ def get_message_detail(
         actor_name=actor_name,
         media_count=len(media_items),
         media_items=media_items,
+        tags=tags,
         created_at=message.created_at.isoformat(),
         updated_at=message.updated_at.isoformat()
     )

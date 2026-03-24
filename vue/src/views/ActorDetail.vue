@@ -12,6 +12,7 @@
         </svg>
         返回上一级
       </button>
+      </div>
 
       <!-- 加载状态 -->
       <div v-if="loading" class="text-center py-16">
@@ -150,20 +151,6 @@
             <p class="mt-4 text-lg text-gray-500 dark:text-gray-400">该演员暂未加入任何分组</p>
           </div>
         </div>
-      </div>
-
-      <!-- Actor Not Found -->
-      <div v-else class="text-center py-16">
-        <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <p class="mt-4 text-lg text-gray-500 dark:text-gray-400">未找到该演员信息</p>
-        <router-link 
-          to="/actor" 
-          class="mt-4 inline-block px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          返回演员列表
-        </router-link>
       </div>
     </div>
 

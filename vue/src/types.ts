@@ -18,6 +18,7 @@ export interface Message {
 
 export interface MessageDetail extends Message {
   media_items: MessageMediaItem[]
+  tags?: TagItem[]
 }
 
 // 演员相关类型
@@ -74,6 +75,12 @@ export interface Group {
 }
 
 // 标签相关类型
+export interface TagItem {
+  id: number
+  name: string
+  category: string | null
+}
+
 export interface Tag {
   id: number
   type: string

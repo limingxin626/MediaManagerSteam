@@ -1,18 +1,22 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 import os
 
-# 创建数据库引擎
 DATABASE_URL = "sqlite:///./db_new.sqlite3"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
-# 创建会话工厂
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 创建基础模型类
 Base = declarative_base()
+
+message_tag = Table(
+    'message_tag',
+    Base.metadata,
+    Column('message_id', Integer, ForeignKey('message.id'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tag.id'), primary_key=True)
+)
 
 class Message(Base):
     __tablename__ = "message"
@@ -25,6 +29,7 @@ class Message(Base):
     
     actor = relationship("Actor", back_populates="messages")
     message_media = relationship("MessageMedia", back_populates="message", cascade="all, delete-orphan")
+    tags = relationship("Tag", secondary=message_tag, back_populates="messages")
 
 class Actor(Base):
     __tablename__ = "actor"
@@ -37,6 +42,15 @@ class Actor(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     messages = relationship("Message", back_populates="actor")
+
+class Tag(Base):
+    __tablename__ = "tag"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(256), nullable=False, index=True)
+    category = Column(String(128), nullable=True, index=True)
+    
+    messages = relationship("Message", secondary=message_tag, back_populates="tags")
 
 class Media(Base):
     __tablename__ = "media"
