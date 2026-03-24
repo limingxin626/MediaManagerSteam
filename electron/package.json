@@ -1,0 +1,60 @@
+{
+  "name": "media-manager",
+  "version": "1.0.0",
+  "description": "Media Manager Electron App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder"
+  },
+  "keywords": [
+    "electron",
+    "vue",
+    "fastapi",
+    "media",
+    "manager"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "electron": "^40.7.0",
+    "electron-builder": "^25.0.5"
+  },
+  "build": {
+    "appId": "com.media.manager",
+    "productName": "Media Manager",
+    "directories": {
+      "output": "dist",
+      "buildResources": "resources"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": ["!*.pyc", "!__pycache__", "!*.sqlite3", "!*.pem"]
+      },
+      {
+        "from": "../vue/dist",
+        "to": "app/vue-dist"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "resources/icon.icns"
+    },
+    "linux": {
+      "target": "deb",
+      "icon": "resources/icon.png"
+    }
+  }
+}

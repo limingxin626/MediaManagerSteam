@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@plugin "@tailwindcss/typography";
+
+@theme inline {
+  --color-dark-bg: rgb(32, 32, 32);
+  --color-card-bg: rgb(32, 26, 27);
+  --color-button-success-bg: rgb(255, 169, 254);
+
+  --color-select-bg: #ffffff;
+  --color-select-bg-dark: rgb(45, 31, 42);
+  --color-select-border: #d1d5db;
+  --color-select-border-dark: #4b5563;
+  --color-select-text: #111827;
+  --color-select-text-dark: #ffffff;
+  --color-select-icon: #9ca3af;
+  --color-select-menu-bg: #ffffff;
+  --color-select-menu-bg-dark: #374151;
+  --color-select-option-active-bg: #e0e7ff;
+  --color-select-option-active-bg-dark: rgba(99, 102, 241, 0.5);
+  --color-select-option-active-text: #312e81;
+  --color-select-option-active-text-dark: #a5b4fc;
+  --color-select-selected-icon: #4f46e5;
+  --color-select-selected-icon-dark: #818cf8;
+  --color-select-focus-ring: #6366f1;
+}
+
+@variant dark (&:is(.dark *));
+
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}

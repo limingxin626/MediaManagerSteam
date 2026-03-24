@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MediaApp</string>
+    <string name="title_activity_main">MediaApp</string>
+    <string name="package_name">com.example.mediaapp</string>
+    <string name="custom_url_scheme">com.example.mediaapp</string>
+</resources>

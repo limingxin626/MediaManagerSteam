@@ -1,0 +1,12 @@
+from .actor import router as actor_router
+from .message import router as message_router
+from .media import router as media_router
+from .files import router as files_router
+
+# 所有路由列表
+all_routers = [
+    actor_router,
+    message_router,
+    media_router,
+    files_router
+]
