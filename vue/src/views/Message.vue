@@ -38,6 +38,8 @@
           :tags="message.tags"
           @click="goToMessage"
           @media-click="(index) => handleMediaClick(message.id, index)"
+          @delete="(id) => handleDeleteMessage(id)"
+          @find-messages-by-media="handleFindMessagesByMedia"
         />
         <!-- 加载更多指示器 -->
         <div v-if="loading" class="col-span-full text-center py-8">
@@ -153,6 +155,18 @@ import MediaPreview from '../components/MediaPreview.vue'
 import type { ViewMode } from '../components/ViewToggle.vue'
 import { API_BASE_URL } from '../utils/constants'
 
+// Electron API 类型声明
+declare global {
+  interface Window {
+    electronAPI?: {
+      openFileDialog: (options: { properties: string[] }) => Promise<{
+        canceled: boolean
+        filePaths: string[]
+      }>
+    }
+  }
+}
+
 defineOptions({
   name: 'Message'
 })
@@ -179,35 +193,26 @@ const newMessageText = ref('')
 const selectedFiles = ref<string[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 
-const triggerFileInput = () => {
-  // 尝试在 Electron 环境中获取完整文件路径
-  try {
-    // 检查是否在 Electron 环境中
-    const isElectron = navigator.userAgent.indexOf('Electron') > -1
-    console.log('Is Electron:', isElectron)
-    
-    if (isElectron) {
-      // 在 Electron 中，使用 dialog 模块获取完整文件路径
-      const { dialog } = require('electron')
-      dialog.showOpenDialog({
+const triggerFileInput = async () => {
+  // 检查是否在 Electron 环境中
+  const isElectron = navigator.userAgent.indexOf('Electron') > -1
+  
+  if (isElectron && window.electronAPI) {
+    // 在 Electron 中，使用 IPC 调用获取完整文件路径
+    try {
+      const result = await window.electronAPI.openFileDialog({
         properties: ['openFile', 'multiSelections']
-      }).then(result => {
-        if (!result.canceled && result.filePaths) {
-          console.log('Electron file paths:', result.filePaths)
-          selectedFiles.value = [...selectedFiles.value, ...result.filePaths]
-        }
-      }).catch(err => {
-        console.error('Error opening dialog:', err)
-        // 回退到标准文件输入
-        fileInput.value?.click()
       })
-    } else {
-      // 非 Electron 环境，使用标准文件输入
+      if (!result.canceled && result.filePaths) {
+        selectedFiles.value = [...selectedFiles.value, ...result.filePaths]
+      }
+    } catch (err) {
+      console.error('Error opening dialog:', err)
+      // 回退到标准文件输入
       fileInput.value?.click()
     }
-  } catch (error) {
-    console.error('Error in triggerFileInput:', error)
-    // 回退到标准文件输入
+  } else {
+    // 非 Electron 环境，使用标准文件输入
     fileInput.value?.click()
   }
 }
@@ -260,16 +265,31 @@ const sendMessage = async () => {
       throw new Error('Failed to send message')
     }
 
-    const newMessage = await response.json()
+    const result = await response.json()
     
-    messages.value.push(newMessage)
-    
-    newMessageText.value = ''
-    selectedFiles.value = []
-    
-    setTimeout(() => {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
-    }, 100)
+    if (result.success) {
+      // 从响应中提取 data 字段作为新消息
+      const newMessage = result.data
+      messages.value.push(newMessage)
+      
+      // 清空输入
+      newMessageText.value = ''
+      selectedFiles.value = []
+      
+      // 滚动到最新消息
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+      }, 100)
+      
+      // 显示成功提示
+      if (result.media_stats) {
+        console.log('Media stats:', result.media_stats)
+        // 可以在这里添加更友好的提示，比如显示媒体处理统计信息
+      }
+    } else {
+      // 显示错误信息
+      alert(result.message || '发送消息失败，请稍后重试')
+    }
     
   } catch (error) {
     console.error('Error sending message:', error)
@@ -367,6 +387,73 @@ const navigateToNextMessage = () => {
       previewItems.value = nextMessage.media_items
       previewStartIndex.value = 0
     }
+  }
+}
+
+const handleDeleteMessage = async (messageId: number) => {
+  // 确认删除
+  if (!confirm('确定要删除这条消息吗？')) {
+    return
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to delete message')
+    }
+
+    const result = await response.json()
+    
+    if (result.success) {
+      // 从列表中移除消息
+      messages.value = messages.value.filter(message => message.id !== messageId)
+      // 显示成功提示
+      alert('消息删除成功')
+    } else {
+      // 显示错误信息
+      alert(result.message || '删除消息失败，请稍后重试')
+    }
+    
+  } catch (error) {
+    console.error('Error deleting message:', error)
+    alert('删除消息失败，请稍后重试')
+  }
+}
+
+const handleFindMessagesByMedia = async (mediaId: number) => {
+  // 重置分页状态
+  messages.value = []
+  nextCursor.value = null
+  hasMoreData.value = true
+  
+  loading.value = true
+  try {
+    let url = `${API_BASE_URL}/messages/with-detail?limit=${pageSize.value}&media_id=${mediaId}`
+    
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error('Failed to fetch messages')
+    }
+    const data = await response.json()
+    
+    hasMoreData.value = data.has_more
+    nextCursor.value = data.next_cursor
+    
+    messages.value = data.items.reverse()
+    
+    // 滚动到顶部
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }, 100)
+    
+  } catch (error) {
+    console.error('Error fetching messages by media:', error)
+    alert('获取消息数据失败，请稍后重试')
+  } finally {
+    loading.value = false
   }
 }
 

@@ -248,3 +248,66 @@ class ThumbnailUtils:
         except Exception as e:
             logger.error(f"Failed to generate thumbnail for {source_path}: {str(e)}")
             return False
+
+
+class MediaInfoUtils:
+    """媒体信息获取工具类"""
+    
+    @staticmethod
+    def get_media_info(file_path: str, media_type: str, ffprobe_path: str = None) -> dict:
+        """
+        获取媒体的详细信息
+        
+        Args:
+            file_path: 文件路径
+            media_type: 媒体类型 ("VIDEO" 或 "IMAGE")
+            ffprobe_path: ffprobe 可执行文件路径（视频需要）
+        
+        Returns:
+            包含媒体信息的字典，包括 width, height, duration
+        """
+        info = {
+            "width": None,
+            "height": None,
+            "duration": None
+        }
+        
+        if media_type == "VIDEO" and ffprobe_path:
+            # 使用 ffprobe 获取视频属性
+            try:
+                import subprocess
+                import json
+                import sys
+                
+                encoding = 'utf-8' if sys.platform != 'win32' else 'utf-8'
+                errors = 'ignore' if sys.platform == 'win32' else 'strict'
+                
+                result = subprocess.run(
+                    [ffprobe_path, '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', file_path],
+                    capture_output=True, text=True, timeout=10, encoding=encoding, errors=errors
+                )
+                
+                if result.returncode == 0 and result.stdout:
+                    data = json.loads(result.stdout)
+                    streams = data.get('streams', [])
+                    for stream in streams:
+                        if stream.get('codec_type') == 'video':
+                            info["width"] = stream.get('width')
+                            info["height"] = stream.get('height')
+                            break
+                    format_data = data.get('format', {})
+                    if format_data.get('duration'):
+                        info["duration"] = int(float(format_data.get('duration', 0)))
+            except Exception as e:
+                logger.error(f"Failed to get video properties for {file_path}: {e}")
+                
+        elif media_type == "IMAGE":
+            # 使用 PIL 获取图片属性
+            try:
+                from PIL import Image
+                with Image.open(file_path) as img:
+                    info["width"], info["height"] = img.size
+            except Exception as e:
+                logger.error(f"Failed to get image properties for {file_path}: {e}")
+        
+        return info

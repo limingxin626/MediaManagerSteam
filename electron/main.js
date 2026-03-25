@@ -1,20 +1,26 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import url from 'url';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function createWindow() {
+  const isDev = !app.isPackaged;
+  
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
       webSecurity: false, // 必须！允许播放本地绝对路径视频
       nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true // 启用 remote 模块
+      contextIsolation: true, // 启用 contextIsolation 以使用 preload
+      preload: isDev 
+        ? path.join(__dirname, 'preload.js')
+        : path.join(process.resourcesPath, 'app', 'preload.js')
     }
   });
-
-  const isDev = !app.isPackaged;
   
   if (isDev) {
     // 开发环境：加载 Vue 的开发地址
@@ -34,6 +40,12 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow(); // 启动前端
+});
+
+// IPC 处理程序：打开文件对话框
+ipcMain.handle('dialog:openFile', async (event, options) => {
+  const result = await dialog.showOpenDialog(options);
+  return result;
 });
 
 // 当所有窗口关闭时退出应用

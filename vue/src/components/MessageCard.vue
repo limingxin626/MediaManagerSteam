@@ -5,18 +5,30 @@
   >
     <div class="p-4">
       <!-- Actor Info -->
-      <div class="flex items-center gap-3 mb-3">
-        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold">
-          {{ actorInitial }}
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold">
+            {{ actorInitial }}
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white truncate">
+              {{ message.actor_name || '未知演员' }}
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ formatDate(message.created_at) }}
+            </p>
+          </div>
         </div>
-        <div class="flex-1 min-w-0">
-          <h3 class="text-sm font-semibold text-gray-900 dark:text-white truncate">
-            {{ message.actor_name || '未知演员' }}
-          </h3>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
-            {{ formatDate(message.created_at) }}
-          </p>
-        </div>
+        <!-- Delete Button -->
+        <button 
+          @click.stop="handleDelete" 
+          class="p-1.5 text-gray-500 hover:text-red-500 transition-colors"
+          title="删除消息"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
       </div>
 
       <!-- Media Preview -->
@@ -39,8 +51,30 @@
           </div>
           
           <!-- Duration Badge -->
-          <div v-if="mediaPreviewItems[0].duration" class="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+          <div v-if="mediaPreviewItems[0].duration" class="absolute top-2 right-8 bg-black/70 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
             {{ formatDuration(mediaPreviewItems[0].duration) }}
+          </div>
+          
+          <!-- Menu Button -->
+          <div class="absolute top-2 right-2">
+            <button 
+              @click.stop="toggleMenu(0)"
+              class="w-6 h-6 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center backdrop-blur-sm transition-colors"
+            >
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+              </svg>
+            </button>
+            
+            <!-- Dropdown Menu -->
+            <div v-if="activeMenuIndex === 0" class="absolute top-8 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-10">
+              <button 
+                @click.stop="findMessagesByMedia(mediaPreviewItems[0].id)"
+                class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                查找所有message
+              </button>
+            </div>
           </div>
         </div>
         
@@ -69,8 +103,30 @@
             </div>
             
             <!-- Duration Badge -->
-            <div v-if="item.duration" class="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+            <div v-if="item.duration" class="absolute top-2 right-8 bg-black/70 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
               {{ formatDuration(item.duration) }}
+            </div>
+            
+            <!-- Menu Button -->
+            <div class="absolute top-2 right-2">
+              <button 
+                @click.stop="toggleMenu(index)"
+                class="w-6 h-6 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center backdrop-blur-sm transition-colors"
+              >
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                </svg>
+              </button>
+              
+              <!-- Dropdown Menu -->
+              <div v-if="activeMenuIndex === index" class="absolute top-8 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-10">
+                <button 
+                  @click.stop="findMessagesByMedia(item.id)"
+                  class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  查找所有message
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -106,7 +162,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Message, MessageMediaItem, TagItem } from '../types'
 
 interface Props {
@@ -120,9 +176,12 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   click: [id: number]
   'media-click': [mediaIndex: number]
+  delete: [id: number]
+  'find-messages-by-media': [mediaId: number]
 }>()
 
 const maxPreviewItems = 9
+const activeMenuIndex = ref<number | null>(null)
 
 const actorInitial = computed(() => {
   if (!props.message.actor_name) return '?'
@@ -201,5 +260,22 @@ const handleClick = () => {
 
 const handleMediaClick = (index: number) => {
   emit('media-click', index)
+}
+
+const handleDelete = () => {
+  emit('delete', props.message.id)
+}
+
+const toggleMenu = (index: number) => {
+  if (activeMenuIndex.value === index) {
+    activeMenuIndex.value = null
+  } else {
+    activeMenuIndex.value = index
+  }
+}
+
+const findMessagesByMedia = (mediaId: number) => {
+  activeMenuIndex.value = null
+  emit('find-messages-by-media', mediaId)
 }
 </script>
