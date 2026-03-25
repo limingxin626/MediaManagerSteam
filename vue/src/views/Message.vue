@@ -37,6 +37,7 @@
           :media-items="message.media_items"
           :tags="message.tags"
           @click="goToMessage"
+          @media-click="(index) => handleMediaClick(message.id, index)"
         />
         <!-- 加载更多指示器 -->
         <div v-if="loading" class="col-span-full text-center py-8">
@@ -58,6 +59,86 @@
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">还没有任何消息内容</p>
       </div>
     </div>
+
+    <MediaPreview
+      :is-open="previewOpen"
+      :items="previewItems"
+      :start-index="previewStartIndex"
+      @close="closePreview"
+      @navigate-prev="navigateToPrevMessage"
+      @navigate-next="navigateToNextMessage"
+    />
+
+    <!-- Fixed Input Area at Bottom -->
+    <div class="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg">
+      <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div class="flex gap-2 items-end max-w-2xl mx-auto">
+          <!-- Attachment Button -->
+          <button
+            @click="triggerFileInput"
+            class="flex-shrink-0 p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            title="添加附件"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          </button>
+          
+          <!-- File Input (Hidden) -->
+          <input
+            ref="fileInput"
+            type="file"
+            multiple
+            class="hidden"
+            @change="handleFileSelect"
+          />
+          
+          <!-- Text Input -->
+          <div class="flex-1 relative">
+            <textarea
+              v-model="newMessageText"
+              placeholder="输入消息..."
+              rows="1"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+              @keydown.enter.prevent="handleEnterKey"
+            />
+          </div>
+          
+          <!-- Send Button -->
+          <button
+            @click="sendMessage"
+            :disabled="!newMessageText.trim() && selectedFiles.length === 0"
+            class="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-lg transition-colors"
+            title="发送"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </button>
+        </div>
+        
+        <!-- Selected Files Preview -->
+        <div v-if="selectedFiles.length > 0" class="mt-2 max-w-2xl mx-auto">
+          <div class="flex flex-wrap gap-2">
+            <div
+              v-for="(filePath, index) in selectedFiles"
+              :key="index"
+              class="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-md text-sm"
+            >
+              <span class="text-gray-700 dark:text-gray-300 truncate max-w-xs">{{ filePath.split('\\').pop() || filePath }}</span>
+              <button
+                @click="removeFile(index)"
+                class="text-gray-500 hover:text-red-500 transition-colors"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -68,6 +149,7 @@ import { useTheme } from '../composables/useTheme'
 import { type MessageDetail } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import ViewToggle from '../components/ViewToggle.vue'
+import MediaPreview from '../components/MediaPreview.vue'
 import type { ViewMode } from '../components/ViewToggle.vue'
 import { API_BASE_URL } from '../utils/constants'
 
@@ -87,6 +169,113 @@ const pageSize = ref(20)
 const hasMoreData = ref(true)
 const messagesContainer = ref<HTMLElement | null>(null)
 const nextCursor = ref<string | null>(null)
+
+const previewOpen = ref(false)
+const previewItems = ref<any[]>([])
+const previewStartIndex = ref(0)
+const currentMessageIndex = ref(-1)
+
+const newMessageText = ref('')
+const selectedFiles = ref<string[]>([])
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const triggerFileInput = () => {
+  // 尝试在 Electron 环境中获取完整文件路径
+  try {
+    // 检查是否在 Electron 环境中
+    const isElectron = navigator.userAgent.indexOf('Electron') > -1
+    console.log('Is Electron:', isElectron)
+    
+    if (isElectron) {
+      // 在 Electron 中，使用 dialog 模块获取完整文件路径
+      const { dialog } = require('electron')
+      dialog.showOpenDialog({
+        properties: ['openFile', 'multiSelections']
+      }).then(result => {
+        if (!result.canceled && result.filePaths) {
+          console.log('Electron file paths:', result.filePaths)
+          selectedFiles.value = [...selectedFiles.value, ...result.filePaths]
+        }
+      }).catch(err => {
+        console.error('Error opening dialog:', err)
+        // 回退到标准文件输入
+        fileInput.value?.click()
+      })
+    } else {
+      // 非 Electron 环境，使用标准文件输入
+      fileInput.value?.click()
+    }
+  } catch (error) {
+    console.error('Error in triggerFileInput:', error)
+    // 回退到标准文件输入
+    fileInput.value?.click()
+  }
+}
+
+const handleFileSelect = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files) {
+    const filePaths = Array.from(target.files).map(file => {
+      // 在 Electron 中，文件对象有 path 属性，包含绝对路径
+      // 尝试不同的方式获取路径
+      const filePath = (file as any).path || (file as any).webkitRelativePath || file.name
+      console.log('File path:', filePath)
+      return filePath
+    })
+    selectedFiles.value = [...selectedFiles.value, ...filePaths]
+  }
+  target.value = ''
+}
+
+const removeFile = (index: number) => {
+  selectedFiles.value.splice(index, 1)
+}
+
+const handleEnterKey = (event: KeyboardEvent) => {
+  if (!event.shiftKey) {
+    sendMessage()
+  }
+}
+
+const sendMessage = async () => {
+  if (!newMessageText.value.trim() && selectedFiles.value.length === 0) {
+    return
+  }
+
+  try {
+    const messageData = {
+      text: newMessageText.value || null,
+      files: selectedFiles.value
+    }
+
+    const response = await fetch(`${API_BASE_URL}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(messageData)
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to send message')
+    }
+
+    const newMessage = await response.json()
+    
+    messages.value.push(newMessage)
+    
+    newMessageText.value = ''
+    selectedFiles.value = []
+    
+    setTimeout(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    }, 100)
+    
+  } catch (error) {
+    console.error('Error sending message:', error)
+    alert('发送消息失败，请稍后重试')
+  }
+}
 
 const fetchMessages = async (isLoadingMore = false) => {
   if (loading.value) return
@@ -141,6 +330,44 @@ const fetchMessages = async (isLoadingMore = false) => {
 
 const goToMessage = (messageId: number) => {
   router.push(`/message/${messageId}`)
+}
+
+const handleMediaClick = (messageId: number, mediaIndex: number) => {
+  const message = messages.value.find(m => m.id === messageId)
+  if (!message || !message.media_items) return
+  
+  currentMessageIndex.value = messages.value.findIndex(m => m.id === messageId)
+  previewItems.value = message.media_items
+  previewStartIndex.value = mediaIndex
+  previewOpen.value = true
+}
+
+const closePreview = () => {
+  previewOpen.value = false
+  previewItems.value = []
+  currentMessageIndex.value = -1
+}
+
+const navigateToPrevMessage = () => {
+  if (currentMessageIndex.value > 0) {
+    const prevMessage = messages.value[currentMessageIndex.value - 1]
+    if (prevMessage && prevMessage.media_items && prevMessage.media_items.length > 0) {
+      currentMessageIndex.value--
+      previewItems.value = prevMessage.media_items
+      previewStartIndex.value = 0
+    }
+  }
+}
+
+const navigateToNextMessage = () => {
+  if (currentMessageIndex.value < messages.value.length - 1) {
+    const nextMessage = messages.value[currentMessageIndex.value + 1]
+    if (nextMessage && nextMessage.media_items && nextMessage.media_items.length > 0) {
+      currentMessageIndex.value++
+      previewItems.value = nextMessage.media_items
+      previewStartIndex.value = 0
+    }
+  }
 }
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null

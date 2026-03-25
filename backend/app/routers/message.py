@@ -1,31 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.models import get_db, Message, MessageMedia, Tag
+from app.models import get_db, Message, MessageMedia, Tag, Media
 from typing import List, Optional
-from pydantic import BaseModel
+from app.schemas.message import MessageCreate, MessageResponse, MessageDetailResponse, CursorResponse, MessageDetailCursorResponse
+from app.utils import calculate_file_hash
 
 router = APIRouter(prefix="/messages", tags=["messages"])
-
-class MessageResponse(BaseModel):
-    id: int
-    text: Optional[str]
-    actor_id: Optional[int]
-    actor_name: Optional[str]
-    media_count: int
-    created_at: str
-    updated_at: str
-
-    class Config:
-        from_attributes = True
-
-class MessageDetailResponse(MessageResponse):
-    media_items: List[dict]
-    tags: List[dict] = []
-
-class CursorResponse(BaseModel):
-    items: List[MessageResponse]
-    next_cursor: Optional[str]
-    has_more: bool
 
 @router.get("", response_model=CursorResponse)
 def get_messages(
@@ -85,11 +65,6 @@ def get_messages(
         next_cursor=next_cursor,
         has_more=has_more
     )
-
-class MessageDetailCursorResponse(BaseModel):
-    items: List[MessageDetailResponse]
-    next_cursor: Optional[str]
-    has_more: bool
 
 @router.get("/with-detail", response_model=MessageDetailCursorResponse)
 def get_messages_with_detail(
@@ -211,4 +186,73 @@ def get_message_detail(
         tags=tags,
         created_at=message.created_at.isoformat(),
         updated_at=message.updated_at.isoformat()
+    )
+
+
+@router.post("", response_model=MessageDetailResponse)
+def create_message(
+    message_data: MessageCreate,
+    db: Session = Depends(get_db)
+):
+    """创建新消息"""
+    # 创建消息实例
+    db_message = Message(
+        text=message_data.text,
+        actor_id=message_data.actor_id
+    )
+    db.add(db_message)
+    db.flush()  # 获取 message.id 而不提交事务
+    
+    # 处理文件列表，创建 Media 实例并关联到 message
+    media_items = []
+    for i, file_path in enumerate(message_data.files):
+        # 计算文件哈希值
+        file_hash = calculate_file_hash(file_path)
+        
+        # 检查文件是否已存在（基于哈希值）
+        existing_media = db.query(Media).filter(Media.file_hash == file_hash).first()
+        if existing_media:
+            media = existing_media
+        else:
+            # 创建新的 Media 实例
+            media = Media(
+                file_path=file_path,
+                file_hash=file_hash
+                # 其他字段可以根据实际情况添加
+            )
+            db.add(media)
+            db.flush()  # 获取 media.id 而不提交事务
+        
+        # 创建 MessageMedia 关联
+        message_media = MessageMedia(
+            message_id=db_message.id,
+            media_id=media.id,
+            position=i
+        )
+        db.add(message_media)
+        
+        # 构建媒体项响应
+        media_items.append({
+            "id": media.id,
+            "file_path": media.file_path,
+            "mime_type": media.mime_type,
+            "duration": media.duration
+        })
+    
+    db.commit()
+    db.refresh(db_message)
+    
+    # 获取 actor 名称
+    actor_name = db_message.actor.name if db_message.actor else None
+    
+    return MessageDetailResponse(
+        id=db_message.id,
+        text=db_message.text,
+        actor_id=db_message.actor_id,
+        actor_name=actor_name,
+        media_count=len(media_items),
+        media_items=media_items,
+        tags=[],  # 因为没有 tag_ids
+        created_at=db_message.created_at.isoformat(),
+        updated_at=db_message.updated_at.isoformat()
     )

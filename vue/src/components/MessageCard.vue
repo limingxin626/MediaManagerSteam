@@ -22,11 +22,11 @@
       <!-- Media Preview -->
       <div v-if="message.media_count > 0" class="relative mb-2">
         <!-- Single Media: Natural aspect ratio with max height -->
-        <div v-if="mediaPreviewItems.length === 1" class="relative inline-block">
+        <div v-if="mediaPreviewItems.length === 1" class="relative inline-block" @click.stop="handleMediaClick(0)">
           <img 
             :src="`file:///E:/AskTao/data/thumbs/${mediaPreviewItems[0].id}.webp`"
             :alt="`Media 1`"
-            class="max-h-[500px] w-auto h-auto block"
+            class="max-h-[500px] w-auto h-auto block cursor-pointer"
           />
           
           <!-- Video Play Icon -->
@@ -49,8 +49,9 @@
           <div 
             v-for="(item, index) in mediaPreviewItems" 
             :key="item.id"
-            class="relative overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700"
+            class="relative overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700 cursor-pointer"
             :class="mediaItemClass"
+            @click.stop="handleMediaClick(index)"
           >
             <img 
               :src="`file:///E:/AskTao/data/thumbs/${item.id}.webp`"
@@ -118,6 +119,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   click: [id: number]
+  'media-click': [mediaIndex: number]
 }>()
 
 const maxPreviewItems = 9
@@ -195,5 +197,9 @@ const formatDate = (dateString: string) => {
 
 const handleClick = () => {
   emit('click', props.message.id)
+}
+
+const handleMediaClick = (index: number) => {
+  emit('media-click', index)
 }
 </script>
