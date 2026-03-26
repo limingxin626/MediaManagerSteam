@@ -95,7 +95,7 @@
             >
               <img
                 v-if="isImage(item.mime_type)"
-                :src="item.thumb_url || item.file_path"
+                :src="resolveUrl(item.thumb_url)"
                 class="w-full h-full object-cover"
               />
               <div
@@ -103,7 +103,7 @@
                 class="w-full h-full relative bg-gray-800"
               >
                 <img
-                  :src="item.thumb_url"
+                  :src="resolveUrl(item.thumb_url)"
                   class="w-full h-full object-cover"
                 />
                 <svg class="absolute inset-0 m-auto w-4 h-4 text-white/80" fill="currentColor" viewBox="0 0 24 24">
@@ -126,7 +126,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { MessageMediaItem } from '../types'
-import { isVideo, isImage } from '../utils/media'
+import { isVideo, isImage, resolveUrl } from '../utils/media'
 
 interface Props {
   isOpen: boolean

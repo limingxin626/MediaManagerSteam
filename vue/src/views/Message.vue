@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen transition-colors">
-    <!-- Fixed Search Header -->
-    <div class="fixed top-0 left-0 md:left-64 right-0 2xl:right-72 z-50 backdrop-blur-sm border-b shadow-sm">
+  <div class="h-screen flex flex-col 2xl:pr-72 transition-colors">
+    <!-- Search Header -->
+    <div class="shrink-0 border-b border-white/10 shadow-sm">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex gap-4 items-center max-w-2xl mx-auto">
           <h2 class="text-2xl font-bold text-white">消息流</h2>
@@ -44,118 +44,124 @@
       </div>
     </div>
 
-    <!-- Scroll sentinel for loading older messages -->
-    <div ref="topSentinel" class="h-1"></div>
+    <!-- Scrollable Content Area -->
+    <div ref="scrollContainer" class="flex-1 overflow-y-auto min-h-0 relative">
+      <!-- Scroll sentinel for loading older messages -->
+      <div ref="topSentinel" class="h-1"></div>
 
-    <!-- Main Content -->
-    <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 pt-24">
-      <!-- Loading indicator (top, for loading older) -->
-      <div v-if="loading" class="text-center py-8">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-        <p class="mt-2 text-sm text-gray-400">加载中...</p>
-      </div>
+      <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <!-- Loading skeleton (initial load) -->
+        <div v-if="loading && messages.length === 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
+          <div v-for="i in 3" :key="i" class="bg-(--color-card-bg) rounded-xl border border-white/10 p-4 animate-pulse">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-full bg-white/10"></div>
+              <div class="flex-1">
+                <div class="h-4 w-20 bg-white/10 rounded"></div>
+                <div class="h-3 w-16 bg-white/10 rounded mt-1.5"></div>
+              </div>
+            </div>
+            <div class="aspect-video bg-white/10 rounded-xl mb-2"></div>
+            <div class="h-3 w-3/4 bg-white/10 rounded"></div>
+            <div class="h-3 w-1/2 bg-white/10 rounded mt-1.5"></div>
+          </div>
+        </div>
+        <div v-if="loading && messages.length > 0" class="text-center py-4">
+          <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
 
-      <!-- No more data -->
-      <div v-if="!loading && !hasMoreData && messages.length > 0" class="text-center py-8">
-        <p class="text-sm text-gray-400">已经到底了</p>
-      </div>
+        <!-- No more data -->
+        <div v-if="!loading && !hasMoreData && messages.length > 0" class="text-center py-8">
+          <p class="text-sm text-gray-400">已经到底了</p>
+        </div>
 
-      <!-- Messages Feed -->
-      <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
-        <div
-          v-for="message in messages"
-          :key="message.id"
-          :data-message-date="message.created_at.substring(0, 10)"
-        >
-          <MessageCard
-            :message="message"
-            :media-items="message.media_items"
-            :tags="message.tags"
-            :selectable="mergeMode"
-            :selected="selectedMessageIds.has(message.id)"
-            @media-click="(index) => handleMediaClick(message.id, index)"
-            @delete="handleDeleteMessage"
-            @find-messages-by-media="handleFindMessagesByMedia"
-            @toggle-select="toggleSelectMessage"
-            @toggle-star="handleToggleStar"
-          />
+        <!-- Messages Feed -->
+        <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
+          <template
+            v-for="(message, idx) in messages"
+            :key="message.id"
+          >
+            <!-- Date separator -->
+            <div
+              v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1].created_at)"
+              class="flex items-center gap-3 py-2"
+            >
+              <div class="flex-1 h-px bg-white/10"></div>
+              <span class="text-xs text-gray-400 whitespace-nowrap">{{ formatDateLabel(message.created_at) }}</span>
+              <div class="flex-1 h-px bg-white/10"></div>
+            </div>
+            <div :data-message-date="message.created_at.substring(0, 10)">
+              <MessageCard
+                :message="message"
+                :media-items="message.media_items"
+                :tags="message.tags"
+                :selectable="mergeMode"
+                :selected="selectedMessageIds.has(message.id)"
+                @media-click="(index) => handleMediaClick(message.id, index)"
+                @delete="handleDeleteMessage"
+                @find-messages-by-media="handleFindMessagesByMedia"
+                @toggle-select="toggleSelectMessage"
+                @toggle-star="handleToggleStar"
+              />
+            </div>
+          </template>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="messages.length === 0 && !loading" class="text-center py-12">
+          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          <h3 class="mt-2 text-sm font-medium text-white">暂无消息</h3>
+          <p class="mt-1 text-sm text-gray-400">还没有任何消息内容</p>
+        </div>
+
+        <!-- Loading indicator (bottom, for loading newer) -->
+        <div v-if="loadingForward" class="text-center py-4">
+          <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
         </div>
       </div>
 
-      <!-- Empty State -->
-      <div v-if="messages.length === 0 && !loading" class="text-center py-12">
-        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+      <!-- Scroll sentinel for loading newer messages -->
+      <div ref="bottomSentinel" class="h-1"></div>
+
+      <!-- Merge action bar -->
+      <div
+        v-if="mergeMode && selectedMessageIds.size > 0"
+        class="sticky bottom-4 z-50 flex items-center justify-center pointer-events-none"
+      >
+        <div class="pointer-events-auto flex items-center gap-3 px-5 py-3 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl text-white text-sm">
+          <span>已选 {{ selectedMessageIds.size }} 条</span>
+          <button
+            @click="handleMerge"
+            :disabled="selectedMessageIds.size < 2"
+            class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 rounded-full font-medium transition-colors"
+          >
+            合并
+          </button>
+          <button
+            @click="toggleMergeMode"
+            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+
+      <!-- "回到最新" floating button -->
+      <button
+        v-if="isViewingHistory"
+        @click="backToLatest"
+        class="sticky bottom-4 left-full -translate-x-6 z-50 flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-full shadow-lg transition-colors w-fit ml-auto mr-6"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
         </svg>
-        <h3 class="mt-2 text-sm font-medium text-white">暂无消息</h3>
-        <p class="mt-1 text-sm text-gray-400">还没有任何消息内容</p>
-      </div>
-
-      <!-- Loading indicator (bottom, for loading newer) -->
-      <div v-if="loadingForward" class="text-center py-4">
-        <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
+        回到最新
+      </button>
     </div>
 
-    <!-- Scroll sentinel for loading newer messages -->
-    <div ref="bottomSentinel" class="h-1"></div>
-
-    <!-- Merge action bar -->
-    <div
-      v-if="mergeMode && selectedMessageIds.size > 0"
-      class="fixed bottom-20 left-0 md:left-64 right-0 2xl:right-72 z-50 flex items-center justify-center pointer-events-none"
-    >
-      <div class="pointer-events-auto flex items-center gap-3 px-5 py-3 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl text-white text-sm">
-        <span>已选 {{ selectedMessageIds.size }} 条</span>
-        <button
-          @click="handleMerge"
-          :disabled="selectedMessageIds.size < 2"
-          class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 rounded-full font-medium transition-colors"
-        >
-          合并
-        </button>
-        <button
-          @click="toggleMergeMode"
-          class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
-        >
-          取消
-        </button>
-      </div>
-    </div>
-
-    <!-- "回到最新" floating button -->
-    <button
-      v-if="isViewingHistory"
-      @click="backToLatest"
-      class="fixed bottom-20 right-6 2xl:right-80 z-50 flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-full shadow-lg transition-colors"
-    >
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-      </svg>
-      回到最新
-    </button>
-
-    <MediaPreview
-      :is-open="previewOpen"
-      :items="previewItems"
-      :start-index="previewStartIndex"
-      :starred="previewMessageStarred"
-      @close="closePreview"
-      @navigate-prev="navigateToPrevMessage"
-      @navigate-next="navigateToNextMessage"
-      @toggle-star="handlePreviewToggleStar"
-    />
-
-    <!-- Calendar Sidebar (wide screens only) -->
-    <aside class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-white/10 backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
-      <CalendarSidebar
-        :active-filters="calendarFilters"
-        @date-selected="handleDateSelected"
-      />
-    </aside>
-
-    <!-- Fixed Input Area at Bottom -->
-    <div class="fixed bottom-0 left-0 md:left-64 right-0 2xl:right-72 z-50 backdrop-blur-sm border-t border-white/10 shadow-lg">
+    <!-- Input Area at Bottom -->
+    <div class="shrink-0 border-t border-white/10 shadow-lg">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div class="flex gap-2 items-center max-w-2xl mx-auto">
           <!-- Attachment Button -->
@@ -224,6 +230,25 @@
         </div>
       </div>
     </div>
+
+    <MediaPreview
+      :is-open="previewOpen"
+      :items="previewItems"
+      :start-index="previewStartIndex"
+      :starred="previewMessageStarred"
+      @close="closePreview"
+      @navigate-prev="navigateToPrevMessage"
+      @navigate-next="navigateToNextMessage"
+      @toggle-star="handlePreviewToggleStar"
+    />
+
+    <!-- Calendar Sidebar (wide screens only) -->
+    <aside class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-white/10 backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
+      <CalendarSidebar
+        :active-filters="calendarFilters"
+        @date-selected="handleDateSelected"
+      />
+    </aside>
   </div>
 </template>
 
@@ -262,6 +287,7 @@ const nextCursor = ref<string | null>(null)
 const activeMediaFilter = ref<number | null>(null)
 const starredFilter = ref(false)
 
+const scrollContainer = ref<HTMLElement | null>(null)
 const topSentinel = ref<HTMLElement | null>(null)
 const bottomSentinel = ref<HTMLElement | null>(null)
 
@@ -293,6 +319,13 @@ const calendarFilters = computed(() => ({
   queryText: searchQuery.value || null,
   mediaId: activeMediaFilter.value,
 }))
+
+// --- Scroll helpers ---
+
+const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+  const el = scrollContainer.value
+  if (el) el.scrollTo({ top: el.scrollHeight, behavior })
+}
 
 // --- Calendar date jump ---
 
@@ -343,7 +376,7 @@ const handleDateSelected = async (dateStr: string) => {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     } else {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+      scrollToBottom()
     }
   } catch {
     toast.error('加载消息失败')
@@ -370,8 +403,9 @@ const fetchForwardMessages = async () => {
       starred: starredFilter.value || undefined,
     })
 
-    const previousScrollY = window.scrollY
-    const previousHeight = document.body.scrollHeight
+    const container = scrollContainer.value
+    const previousScrollY = container?.scrollTop ?? 0
+    const previousHeight = container?.scrollHeight ?? 0
 
     messages.value.push(...data.items)
     hasMoreForward.value = data.has_more
@@ -382,10 +416,11 @@ const fetchForwardMessages = async () => {
     }
 
     await nextTick()
-    // Keep scroll position stable when content is appended below
-    const scrollDelta = document.body.scrollHeight - previousHeight
-    if (scrollDelta > 0 && previousScrollY + window.innerHeight < previousHeight) {
-      window.scrollTo({ top: previousScrollY, behavior: 'auto' })
+    if (container) {
+      const scrollDelta = container.scrollHeight - previousHeight
+      if (scrollDelta > 0 && previousScrollY + container.clientHeight < previousHeight) {
+        container.scrollTo({ top: previousScrollY, behavior: 'auto' })
+      }
     }
   } catch {
     toast.error('加载消息失败')
@@ -459,7 +494,7 @@ const sendMessage = async () => {
     newMessageText.value = ''
     selectedFiles.value = []
     await nextTick()
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    scrollToBottom()
     toast.success('消息已发送')
   } catch (error) {
     toast.error('发送消息失败')
@@ -496,8 +531,9 @@ const fetchMessages = async (isLoadingMore = false) => {
     hasMoreData.value = data.has_more
     nextCursor.value = data.next_cursor
 
-    const previousScrollY = window.scrollY
-    const previousHeight = document.body.scrollHeight
+    const container = scrollContainer.value
+    const previousScrollY = container?.scrollTop ?? 0
+    const previousHeight = container?.scrollHeight ?? 0
 
     if (isLoadingMore) {
       messages.value = [...data.items.reverse(), ...messages.value]
@@ -507,10 +543,10 @@ const fetchMessages = async (isLoadingMore = false) => {
 
     await nextTick()
     if (!isLoadingMore) {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
-    } else {
-      const scrollDelta = document.body.scrollHeight - previousHeight
-      window.scrollTo({ top: previousScrollY + scrollDelta, behavior: 'auto' })
+      scrollToBottom()
+    } else if (container) {
+      const scrollDelta = container.scrollHeight - previousHeight
+      container.scrollTo({ top: previousScrollY + scrollDelta, behavior: 'auto' })
     }
   } catch (error) {
     toast.error('加载消息失败')
@@ -648,6 +684,27 @@ const handleFindMessagesByMedia = (mediaId: number) => {
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
+// --- Date helpers ---
+
+const getDateStr = (dateString: string) => dateString.substring(0, 10)
+
+const formatDateLabel = (dateString: string) => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const todayStr = now.toISOString().substring(0, 10)
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterdayStr = yesterday.toISOString().substring(0, 10)
+  const ds = dateString.substring(0, 10)
+
+  if (ds === todayStr) return '今天'
+  if (ds === yesterdayStr) return '昨天'
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${date.getMonth() + 1}月${date.getDate()}日`
+  }
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+}
+
 watch(searchQuery, () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
@@ -664,13 +721,15 @@ let bottomObserver: IntersectionObserver | null = null
 onMounted(() => {
   fetchMessages()
 
+  const root = scrollContainer.value
+
   topObserver = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting && !loading.value && hasMoreData.value) {
         fetchMessages(true)
       }
     },
-    { rootMargin: '200px' }
+    { root, rootMargin: '200px' }
   )
   if (topSentinel.value) topObserver.observe(topSentinel.value)
 
@@ -680,7 +739,7 @@ onMounted(() => {
         fetchForwardMessages()
       }
     },
-    { rootMargin: '200px' }
+    { root, rootMargin: '200px' }
   )
   if (bottomSentinel.value) bottomObserver.observe(bottomSentinel.value)
 })

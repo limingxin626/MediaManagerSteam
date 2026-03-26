@@ -95,7 +95,7 @@
             <div class="absolute top-1.5 right-1.5">
               <button
                 @click.stop="toggleMenu(index)"
-                class="w-6 h-6 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center backdrop-blur-sm transition-colors opacity-0 hover:opacity-100"
+                class="w-6 h-6 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center backdrop-blur-sm transition-colors opacity-0 group-hover:opacity-100"
                 :class="{ 'opacity-100!': activeMenuIndex === index }"
               >
                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
@@ -195,11 +195,12 @@ const remainingCount = computed(() => {
   return Math.max(0, props.mediaItems.length - maxPreviewItems)
 })
 
-// Telegram-style grid: 1→full, 2→2col, 3→1+2, 4→2x2, 5+→3col
+// Telegram-style grid: 1→full, 2→2col, 3→left big + right 2 small, 4→2x2, 5+→3col
 const mediaGridClass = computed(() => {
   const count = mediaPreviewItems.value.length
   if (count === 1) return 'grid-cols-1'
   if (count === 2) return 'grid-cols-2'
+  if (count === 3) return 'grid-cols-3 grid-rows-2'
   if (count === 4) return 'grid-cols-2'
   return 'grid-cols-3'
 })
@@ -207,7 +208,8 @@ const mediaGridClass = computed(() => {
 const mediaItemClass = (index: number) => {
   const count = mediaPreviewItems.value.length
   if (count === 1) return 'aspect-video'
-  if (count === 3 && index === 0) return 'col-span-3 aspect-video'
+  if (count === 3 && index === 0) return 'col-span-2 row-span-2'
+  if (count === 3) return 'aspect-square'
   return 'aspect-square'
 }
 
