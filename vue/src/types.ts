@@ -4,6 +4,7 @@ export interface MessageMediaItem {
   file_path: string
   mime_type: string | null
   duration: number | null
+  thumb_url: string
 }
 
 export interface Message {
@@ -12,6 +13,7 @@ export interface Message {
   actor_id: number | null
   actor_name: string | null
   media_count: number
+  starred: boolean
   created_at: string
   updated_at: string
 }
@@ -27,6 +29,7 @@ export interface Actor {
   name: string
   description: string | null
   avatar_path: string | null
+  avatar_url: string
   message_count: number
   created_at: string
   updated_at: string
@@ -52,7 +55,9 @@ export interface Media {
   height: number | null
   duration: number | null
   rating: number
+  starred: boolean
   view_count: number
+  thumb_url: string
   last_viewed_at: string | null
   created_at: string
   updated_at: string
@@ -85,6 +90,21 @@ export interface Tag {
   id: number
   type: string
   name: string
+}
+
+// 游标分页响应
+export interface CursorResponse<T> {
+  items: T[]
+  next_cursor: string | null
+  prev_cursor?: string | null
+  has_more: boolean
+  has_more_before?: boolean
+}
+
+// 日历日期统计
+export interface MessageDateCount {
+  date: string
+  count: number
 }
 
 // 通用类型

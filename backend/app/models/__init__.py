@@ -24,6 +24,7 @@ class Message(Base):
     id = Column(Integer, primary_key=True, index=True)
     text = Column(Text, nullable=True)
     actor_id = Column(Integer, ForeignKey("actor.id"), nullable=True, index=True)
+    starred = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
@@ -64,6 +65,7 @@ class Media(Base):
     height = Column(Integer, nullable=True)
     duration = Column(Integer, nullable=True)
     rating = Column(Integer, default=0, nullable=False)
+    starred = Column(Integer, default=0, nullable=False)
     view_count = Column(Integer, default=0, nullable=False)
     last_viewed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

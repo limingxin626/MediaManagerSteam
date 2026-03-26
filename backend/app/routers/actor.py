@@ -1,25 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.models import get_db, Actor, Message
+from app.models import get_db, Actor, Message, MessageMedia
 from typing import List, Optional
-from pydantic import BaseModel
+from app.schemas.actor import ActorResponse, ActorDetailResponse
 
 router = APIRouter(prefix="/actors", tags=["actors"])
 
-class ActorResponse(BaseModel):
-    id: int
-    name: str
-    description: Optional[str]
-    avatar_path: Optional[str]
-    message_count: int
-    created_at: str
-    updated_at: str
-
-    class Config:
-        from_attributes = True
-
-class ActorDetailResponse(ActorResponse):
-    messages: List[dict]
 
 @router.get("", response_model=List[ActorResponse])
 def get_actors(
@@ -30,16 +16,16 @@ def get_actors(
 ):
     """获取演员列表"""
     query = db.query(Actor)
-    
+
     if name:
         query = query.filter(Actor.name.ilike(f"%{name}%"))
-    
+
     actors = query.order_by(Actor.name).offset(skip).limit(limit).all()
-    
+
     result = []
     for actor in actors:
         message_count = db.query(Message).filter(Message.actor_id == actor.id).count()
-        
+
         result.append(ActorResponse(
             id=actor.id,
             name=actor.name,
@@ -49,8 +35,9 @@ def get_actors(
             created_at=actor.created_at.isoformat(),
             updated_at=actor.updated_at.isoformat()
         ))
-    
+
     return result
+
 
 @router.get("/{actor_id}", response_model=ActorDetailResponse)
 def get_actor_detail(
@@ -61,21 +48,21 @@ def get_actor_detail(
     actor = db.query(Actor).filter(Actor.id == actor_id).first()
     if not actor:
         raise HTTPException(status_code=404, detail="Actor not found")
-    
+
     messages = db.query(Message).filter(
         Message.actor_id == actor_id
     ).order_by(Message.created_at.desc()).all()
-    
+
     message_list = []
     for message in messages:
-        media_count = db.query(message.message_media).count()
+        media_count = db.query(MessageMedia).filter(MessageMedia.message_id == message.id).count()
         message_list.append({
             "id": message.id,
             "text": message.text,
             "media_count": media_count,
             "created_at": message.created_at.isoformat()
         })
-    
+
     return ActorDetailResponse(
         id=actor.id,
         name=actor.name,

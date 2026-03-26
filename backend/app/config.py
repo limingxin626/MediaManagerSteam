@@ -3,15 +3,7 @@
 支持通过环境变量覆盖默认配置
 """
 import os
-from enum import Enum
 from typing import Dict
-
-
-class CategoryPath(str, Enum):
-    """Category枚举，与Actor模型的category字段对应"""
-    未分类 = "未分类"
-    专业 = "专业"
-    泄密 = "泄密"
 
 
 class AppConfig:
@@ -38,13 +30,6 @@ class AppConfig:
             return "IMAGE"
         return None
     
-    # 各个category对应的子目录名
-    CATEGORY_DIRS: Dict[str, str] = {
-        "未分类": "未分类",
-        "专业": "专业",
-        "泄密": "泄密",
-    }
-    
     # 静态文件挂载配置: {服务器路径: 系统目录}
     # 服务器路径不包含 DATA_ROOT，因为它们直接映射到 category
     @classmethod
@@ -53,20 +38,7 @@ class AppConfig:
         mounts = {
             "/data": os.path.join(cls.DATA_ROOT, "data"),
         }
-        # 为每个category添加挂载
-        for category, dir_name in cls.CATEGORY_DIRS.items():
-            server_path = f"/{category}"
-            system_path = os.path.join(cls.DATA_ROOT, dir_name)
-            mounts[server_path] = system_path
         return mounts
-    
-    @classmethod
-    def get_category_root(cls, category: str) -> str:
-        """获取category的系统绝对路径"""
-        if category == "AV":
-            return "F:/AV"
-        dir_name = cls.CATEGORY_DIRS.get(category, category)
-        return os.path.join(cls.DATA_ROOT, dir_name)
     
     @classmethod
     def get_actor_folder(cls, category: str, actor_name: str) -> str:
@@ -124,6 +96,13 @@ class AppConfig:
         
         return data_root + "/" + server_path
     
+    @classmethod
+    def get_upload_dir(cls) -> str:
+        """获取手机上传文件的落地目录"""
+        from datetime import date
+        today = date.today()
+        return os.path.join(cls.DATA_ROOT, "uploads", str(today.year), f"{today.month:02d}", f"{today.day:02d}")
+
     @classmethod
     def get_thumbs_dir(cls) -> str:
         """获取缩略图目录的系统绝对路径"""

@@ -1,41 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from app.models import get_db, Media, Message, MessageMedia
-from typing import List, Optional
-from pydantic import BaseModel
+from app.models import get_db, Media, MessageMedia
+from typing import Optional
+from app.schemas.media import MediaResponse, MediaDetailResponse, MediaCursorResponse
 
 router = APIRouter(prefix="/media", tags=["media"])
-
-class MediaResponse(BaseModel):
-    id: int
-    file_path: str
-    file_size: Optional[int]
-    mime_type: Optional[str]
-    width: Optional[int]
-    height: Optional[int]
-    duration: Optional[int]
-    rating: int
-    view_count: int
-    created_at: str
-    updated_at: str
-
-    class Config:
-        from_attributes = True
-
-class MediaDetailResponse(MediaResponse):
-    messages: List[dict]
-
-class MediaCursorResponse(BaseModel):
-    items: List[MediaResponse]
-    next_cursor: Optional[str]
-    has_more: bool
 
 @router.get("", response_model=MediaCursorResponse)
 def get_media(
     cursor: Optional[str] = Query(None, description="游标，格式为'created_at|position'"),
     limit: int = Query(20, ge=1, le=100),
     message_id: Optional[int] = None,
+    starred: Optional[bool] = Query(None),
     db: Session = Depends(get_db)
 ):
     """获取媒体列表（基于MessageMedia的游标分页）"""
@@ -62,11 +38,12 @@ def get_media(
                 height=item.height,
                 duration=item.duration,
                 rating=item.rating,
+                starred=bool(item.starred),
                 view_count=item.view_count,
                 created_at=item.created_at.isoformat(),
                 updated_at=item.updated_at.isoformat()
             ))
-        
+
         return MediaCursorResponse(
             items=result,
             next_cursor=None,
@@ -75,7 +52,10 @@ def get_media(
     else:
         # 基于MessageMedia的游标分页
         query = db.query(Media).join(MessageMedia)
-        
+
+        if starred is not None:
+            query = query.filter(Media.starred == (1 if starred else 0))
+
         # 如果提供了游标，解析并使用
         if cursor:
             try:
@@ -126,11 +106,12 @@ def get_media(
                 height=item.height,
                 duration=item.duration,
                 rating=item.rating,
+                starred=bool(item.starred),
                 view_count=item.view_count,
                 created_at=item.created_at.isoformat(),
                 updated_at=item.updated_at.isoformat()
             ))
-        
+
         return MediaCursorResponse(
             items=result,
             next_cursor=next_cursor,
@@ -173,11 +154,28 @@ def get_media_detail(
         height=media.height,
         duration=media.duration,
         rating=media.rating,
+        starred=bool(media.starred),
         view_count=media.view_count,
         messages=messages,
         created_at=media.created_at.isoformat(),
         updated_at=media.updated_at.isoformat()
     )
+
+@router.put("/{media_id}/starred")
+def toggle_media_starred(
+    media_id: int,
+    starred: bool = Query(...),
+    db: Session = Depends(get_db)
+):
+    """切换媒体收藏状态"""
+    media = db.query(Media).filter(Media.id == media_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    media.starred = 1 if starred else 0
+    db.commit()
+
+    return {"starred": starred}
 
 @router.put("/{media_id}/rating")
 def update_media_rating(

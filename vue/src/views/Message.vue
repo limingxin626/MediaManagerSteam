@@ -1,54 +1,84 @@
 <template>
   <div class="min-h-screen transition-colors">
     <!-- Fixed Search Header -->
-    <div class="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+    <div class="fixed top-0 left-0 md:left-64 right-0 2xl:right-72 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center max-w-2xl mx-auto">
+        <div class="flex gap-4 items-center max-w-2xl mx-auto">
           <h2 class="text-2xl font-bold text-gray-900 dark:text-white">消息流</h2>
+          <!-- Merge toggle -->
+          <button
+            @click="toggleMergeMode"
+            class="px-3 py-1.5 text-sm rounded-lg transition-colors"
+            :class="mergeMode
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'"
+          >
+            {{ mergeMode ? '取消合并' : '合并' }}
+          </button>
+          <!-- Starred filter -->
+          <button
+            @click="starredFilter = !starredFilter; resetAndFetch()"
+            class="p-1.5 rounded-lg transition-colors"
+            :class="starredFilter
+              ? 'text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20'
+              : 'text-gray-400 hover:text-yellow-400 bg-gray-100 dark:bg-gray-800'"
+            title="仅看收藏"
+          >
+            <svg class="w-5 h-5" :fill="starredFilter ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+          </button>
           <!-- Search -->
           <div class="relative flex-1 max-w-md">
-            <input 
+            <input
               v-model="searchQuery"
-              type="text" 
-              placeholder="搜索消息..." 
+              type="text"
+              placeholder="搜索消息..."
               class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
             <svg class="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-
-          <div class="flex items-center gap-3">
-            <!-- View Toggle -->
-            <ViewToggle v-model="currentView" />
-          </div>
         </div>
       </div>
     </div>
 
-    <!-- Main Content with top padding for fixed header -->
+    <!-- Scroll sentinel for loading older messages -->
+    <div ref="topSentinel" class="h-1"></div>
+
+    <!-- Main Content -->
     <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 pt-24">
-      <!-- Messages Feed View -->
-      <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-2xl mx-auto" ref="messagesContainer">
-        <MessageCard
-          v-for="message in messages" 
+      <!-- Loading indicator (top, for loading older) -->
+      <div v-if="loading" class="text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">加载中...</p>
+      </div>
+
+      <!-- No more data -->
+      <div v-if="!loading && !hasMoreData && messages.length > 0" class="text-center py-8">
+        <p class="text-sm text-gray-500 dark:text-gray-400">已经到底了</p>
+      </div>
+
+      <!-- Messages Feed -->
+      <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
+        <div
+          v-for="message in messages"
           :key="message.id"
-          :message="message"
-          :media-items="message.media_items"
-          :tags="message.tags"
-          @click="goToMessage"
-          @media-click="(index) => handleMediaClick(message.id, index)"
-          @delete="(id) => handleDeleteMessage(id)"
-          @find-messages-by-media="handleFindMessagesByMedia"
-        />
-        <!-- 加载更多指示器 -->
-        <div v-if="loading" class="col-span-full text-center py-8">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">加载中...</p>
-        </div>
-        <!-- 没有更多数据提示 -->
-        <div v-if="!loading && !hasMoreData" class="col-span-full text-center py-8">
-          <p class="text-sm text-gray-500 dark:text-gray-400">已经到底了</p>
+          :data-message-date="message.created_at.substring(0, 10)"
+        >
+          <MessageCard
+            :message="message"
+            :media-items="message.media_items"
+            :tags="message.tags"
+            :selectable="mergeMode"
+            :selected="selectedMessageIds.has(message.id)"
+            @media-click="(index) => handleMediaClick(message.id, index)"
+            @delete="handleDeleteMessage"
+            @find-messages-by-media="handleFindMessagesByMedia"
+            @toggle-select="toggleSelectMessage"
+            @toggle-star="handleToggleStar"
+          />
         </div>
       </div>
 
@@ -60,19 +90,72 @@
         <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无消息</h3>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">还没有任何消息内容</p>
       </div>
+
+      <!-- Loading indicator (bottom, for loading newer) -->
+      <div v-if="loadingForward" class="text-center py-4">
+        <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
     </div>
+
+    <!-- Scroll sentinel for loading newer messages -->
+    <div ref="bottomSentinel" class="h-1"></div>
+
+    <!-- Merge action bar -->
+    <div
+      v-if="mergeMode && selectedMessageIds.size > 0"
+      class="fixed bottom-20 left-0 md:left-64 right-0 2xl:right-72 z-50 flex items-center justify-center pointer-events-none"
+    >
+      <div class="pointer-events-auto flex items-center gap-3 px-5 py-3 bg-gray-900/90 dark:bg-gray-800/95 backdrop-blur-sm rounded-full shadow-xl text-white text-sm">
+        <span>已选 {{ selectedMessageIds.size }} 条</span>
+        <button
+          @click="handleMerge"
+          :disabled="selectedMessageIds.size < 2"
+          class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 rounded-full font-medium transition-colors"
+        >
+          合并
+        </button>
+        <button
+          @click="toggleMergeMode"
+          class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
+        >
+          取消
+        </button>
+      </div>
+    </div>
+
+    <!-- "回到最新" floating button -->
+    <button
+      v-if="isViewingHistory"
+      @click="backToLatest"
+      class="fixed bottom-20 right-6 2xl:right-80 z-50 flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-full shadow-lg transition-colors"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+      </svg>
+      回到最新
+    </button>
 
     <MediaPreview
       :is-open="previewOpen"
       :items="previewItems"
       :start-index="previewStartIndex"
+      :starred="previewMessageStarred"
       @close="closePreview"
       @navigate-prev="navigateToPrevMessage"
       @navigate-next="navigateToNextMessage"
+      @toggle-star="handlePreviewToggleStar"
     />
 
+    <!-- Calendar Sidebar (wide screens only) -->
+    <aside class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
+      <CalendarSidebar
+        :active-filters="calendarFilters"
+        @date-selected="handleDateSelected"
+      />
+    </aside>
+
     <!-- Fixed Input Area at Bottom -->
-    <div class="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg">
+    <div class="fixed bottom-0 left-0 md:left-64 right-0 2xl:right-72 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div class="flex gap-2 items-end max-w-2xl mx-auto">
           <!-- Attachment Button -->
@@ -85,7 +168,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
             </svg>
           </button>
-          
+
           <!-- File Input (Hidden) -->
           <input
             ref="fileInput"
@@ -94,7 +177,7 @@
             class="hidden"
             @change="handleFileSelect"
           />
-          
+
           <!-- Text Input -->
           <div class="flex-1 relative">
             <textarea
@@ -105,7 +188,7 @@
               @keydown.enter.prevent="handleEnterKey"
             />
           </div>
-          
+
           <!-- Send Button -->
           <button
             @click="sendMessage"
@@ -118,7 +201,7 @@
             </svg>
           </button>
         </div>
-        
+
         <!-- Selected Files Preview -->
         <div v-if="selectedFiles.length > 0" class="mt-2 max-w-2xl mx-auto">
           <div class="flex flex-wrap gap-2">
@@ -145,15 +228,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useTheme } from '../composables/useTheme'
-import { type MessageDetail } from '../types'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { type MessageDetail, type MessageMediaItem } from '../types'
 import MessageCard from '../components/MessageCard.vue'
-import ViewToggle from '../components/ViewToggle.vue'
 import MediaPreview from '../components/MediaPreview.vue'
-import type { ViewMode } from '../components/ViewToggle.vue'
-import { API_BASE_URL } from '../utils/constants'
+import CalendarSidebar from '../components/CalendarSidebar.vue'
+import { api } from '../composables/useApi'
+import { useToast } from '../composables/useToast'
 
 // Electron API 类型声明
 declare global {
@@ -167,38 +248,165 @@ declare global {
   }
 }
 
-defineOptions({
-  name: 'Message'
-})
+defineOptions({ name: 'Message' })
 
-const router = useRouter()
-const { initTheme } = useTheme()
+const toast = useToast()
 
 const messages = ref<MessageDetail[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
-const currentView = ref<ViewMode>('grid')
 
-const pageSize = ref(20)
+const pageSize = 20
 const hasMoreData = ref(true)
-const messagesContainer = ref<HTMLElement | null>(null)
 const nextCursor = ref<string | null>(null)
+const activeMediaFilter = ref<number | null>(null)
+const starredFilter = ref(false)
+
+const topSentinel = ref<HTMLElement | null>(null)
+const bottomSentinel = ref<HTMLElement | null>(null)
 
 const previewOpen = ref(false)
-const previewItems = ref<any[]>([])
+const previewItems = ref<MessageMediaItem[]>([])
 const previewStartIndex = ref(0)
 const currentMessageIndex = ref(-1)
+
+const previewMessageStarred = computed(() => {
+  if (currentMessageIndex.value < 0) return false
+  return messages.value[currentMessageIndex.value]?.starred ?? false
+})
 
 const newMessageText = ref('')
 const selectedFiles = ref<string[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 
+// --- Merge selection mode ---
+const mergeMode = ref(false)
+const selectedMessageIds = ref<Set<number>>(new Set())
+
+// --- Forward (newer) pagination state ---
+const forwardCursor = ref<string | null>(null)
+const hasMoreForward = ref(false)
+const loadingForward = ref(false)
+const isViewingHistory = ref(false)
+
+const calendarFilters = computed(() => ({
+  queryText: searchQuery.value || null,
+  mediaId: activeMediaFilter.value,
+}))
+
+// --- Calendar date jump ---
+
+const handleDateSelected = async (dateStr: string) => {
+  // Check if any loaded message is on this date
+  const target = messages.value.find(m => m.created_at.startsWith(dateStr))
+  if (target) {
+    const el = document.querySelector(`[data-message-date="${dateStr}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    return
+  }
+
+  // Load messages up to the end of the selected date (desc order, like default)
+  // Use next day T00:00:00 as cursor so created_at < next day covers the whole day
+  const nextDay = new Date(dateStr + 'T00:00:00')
+  nextDay.setDate(nextDay.getDate() + 1)
+  const cursorValue = nextDay.toISOString().slice(0, 19) // YYYY-MM-DDTHH:MM:SS
+
+  loading.value = true
+  try {
+    const data = await api.get<{
+      items: MessageDetail[]
+      next_cursor: string | null
+      has_more: boolean
+    }>('/messages/with-detail', {
+      cursor: cursorValue,
+      limit: pageSize,
+      query_text: searchQuery.value || undefined,
+      media_id: activeMediaFilter.value ?? undefined,
+      starred: starredFilter.value || undefined,
+    })
+
+    // desc order returned, reverse for chat layout (newest at bottom)
+    messages.value = data.items.reverse()
+    hasMoreData.value = data.has_more
+    nextCursor.value = data.next_cursor
+
+    // There are newer messages after this date
+    const today = new Date().toISOString().slice(0, 10)
+    hasMoreForward.value = dateStr < today
+    forwardCursor.value = messages.value.length
+      ? messages.value[messages.value.length - 1].created_at
+      : null
+    isViewingHistory.value = hasMoreForward.value
+
+    await nextTick()
+    const el = document.querySelector(`[data-message-date="${dateStr}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } else {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    }
+  } catch {
+    toast.error('加载消息失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchForwardMessages = async () => {
+  if (loadingForward.value || !hasMoreForward.value || !forwardCursor.value) return
+
+  loadingForward.value = true
+  try {
+    const data = await api.get<{
+      items: MessageDetail[]
+      next_cursor: string | null
+      has_more: boolean
+    }>('/messages/with-detail', {
+      cursor: forwardCursor.value,
+      direction: 'forward',
+      limit: pageSize,
+      query_text: searchQuery.value || undefined,
+      media_id: activeMediaFilter.value ?? undefined,
+      starred: starredFilter.value || undefined,
+    })
+
+    const previousScrollY = window.scrollY
+    const previousHeight = document.body.scrollHeight
+
+    messages.value.push(...data.items)
+    hasMoreForward.value = data.has_more
+    forwardCursor.value = data.next_cursor
+
+    if (!data.has_more) {
+      isViewingHistory.value = false
+    }
+
+    await nextTick()
+    // Keep scroll position stable when content is appended below
+    const scrollDelta = document.body.scrollHeight - previousHeight
+    if (scrollDelta > 0 && previousScrollY + window.innerHeight < previousHeight) {
+      window.scrollTo({ top: previousScrollY, behavior: 'auto' })
+    }
+  } catch {
+    toast.error('加载消息失败')
+  } finally {
+    loadingForward.value = false
+  }
+}
+
+const backToLatest = () => {
+  isViewingHistory.value = false
+  hasMoreForward.value = false
+  forwardCursor.value = null
+  resetAndFetch()
+}
+
+// --- File input ---
+
 const triggerFileInput = async () => {
-  // 检查是否在 Electron 环境中
   const isElectron = navigator.userAgent.indexOf('Electron') > -1
-  
+
   if (isElectron && window.electronAPI) {
-    // 在 Electron 中，使用 IPC 调用获取完整文件路径
     try {
       const result = await window.electronAPI.openFileDialog({
         properties: ['openFile', 'multiSelections']
@@ -208,11 +416,9 @@ const triggerFileInput = async () => {
       }
     } catch (err) {
       console.error('Error opening dialog:', err)
-      // 回退到标准文件输入
       fileInput.value?.click()
     }
   } else {
-    // 非 Electron 环境，使用标准文件输入
     fileInput.value?.click()
   }
 }
@@ -221,11 +427,7 @@ const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files) {
     const filePaths = Array.from(target.files).map(file => {
-      // 在 Electron 中，文件对象有 path 属性，包含绝对路径
-      // 尝试不同的方式获取路径
-      const filePath = (file as any).path || (file as any).webkitRelativePath || file.name
-      console.log('File path:', filePath)
-      return filePath
+      return (file as any).path || (file as any).webkitRelativePath || file.name
     })
     selectedFiles.value = [...selectedFiles.value, ...filePaths]
   }
@@ -236,6 +438,8 @@ const removeFile = (index: number) => {
   selectedFiles.value.splice(index, 1)
 }
 
+// --- Send message ---
+
 const handleEnterKey = (event: KeyboardEvent) => {
   if (!event.shiftKey) {
     sendMessage()
@@ -243,119 +447,84 @@ const handleEnterKey = (event: KeyboardEvent) => {
 }
 
 const sendMessage = async () => {
-  if (!newMessageText.value.trim() && selectedFiles.value.length === 0) {
-    return
-  }
+  if (!newMessageText.value.trim() && selectedFiles.value.length === 0) return
 
   try {
-    const messageData = {
+    const result = await api.post<MessageDetail>('/messages', {
       text: newMessageText.value || null,
       files: selectedFiles.value
-    }
-
-    const response = await fetch(`${API_BASE_URL}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(messageData)
     })
 
-    if (!response.ok) {
-      throw new Error('Failed to send message')
-    }
-
-    const result = await response.json()
-    
-    if (result.success) {
-      // 从响应中提取 data 字段作为新消息
-      const newMessage = result.data
-      messages.value.push(newMessage)
-      
-      // 清空输入
-      newMessageText.value = ''
-      selectedFiles.value = []
-      
-      // 滚动到最新消息
-      setTimeout(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
-      }, 100)
-      
-      // 显示成功提示
-      if (result.media_stats) {
-        console.log('Media stats:', result.media_stats)
-        // 可以在这里添加更友好的提示，比如显示媒体处理统计信息
-      }
-    } else {
-      // 显示错误信息
-      alert(result.message || '发送消息失败，请稍后重试')
-    }
-    
+    messages.value.push(result)
+    newMessageText.value = ''
+    selectedFiles.value = []
+    await nextTick()
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    toast.success('消息已发送')
   } catch (error) {
-    console.error('Error sending message:', error)
-    alert('发送消息失败，请稍后重试')
+    toast.error('发送消息失败')
   }
+}
+
+// --- Fetch messages (unified) ---
+
+const resetAndFetch = (params?: { mediaId?: number }) => {
+  messages.value = []
+  nextCursor.value = null
+  hasMoreData.value = true
+  activeMediaFilter.value = params?.mediaId ?? null
+  fetchMessages()
 }
 
 const fetchMessages = async (isLoadingMore = false) => {
   if (loading.value) return
   if (isLoadingMore && !hasMoreData.value) return
-  
+
   loading.value = true
   try {
-    let url = `${API_BASE_URL}/messages/with-detail?limit=${pageSize.value}`
-    if (isLoadingMore && nextCursor.value) {
-      url += `&cursor=${encodeURIComponent(nextCursor.value)}`
-    }
-    if (searchQuery.value) {
-      url += `&query_text=${encodeURIComponent(searchQuery.value)}`
-    }
-    
-    const response = await fetch(url)
-    if (!response.ok) {
-      throw new Error('Failed to fetch messages')
-    }
-    const data = await response.json()
-    
+    const data = await api.get<{ items: MessageDetail[]; next_cursor: string | null; has_more: boolean }>(
+      '/messages/with-detail',
+      {
+        limit: pageSize,
+        cursor: isLoadingMore ? nextCursor.value : undefined,
+        query_text: searchQuery.value || undefined,
+        media_id: activeMediaFilter.value ?? undefined,
+        starred: starredFilter.value || undefined,
+      },
+    )
+
     hasMoreData.value = data.has_more
     nextCursor.value = data.next_cursor
-    
+
     const previousScrollY = window.scrollY
     const previousHeight = document.body.scrollHeight
-    
+
     if (isLoadingMore) {
       messages.value = [...data.items.reverse(), ...messages.value]
     } else {
       messages.value = data.items.reverse()
     }
-    
+
+    await nextTick()
     if (!isLoadingMore) {
-      setTimeout(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
-      }, 100)
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
     } else {
-      setTimeout(() => {
-        const newHeight = document.body.scrollHeight
-        const scrollDelta = newHeight - previousHeight
-        window.scrollTo({ top: previousScrollY + scrollDelta, behavior: 'auto' })
-      }, 100)
+      const scrollDelta = document.body.scrollHeight - previousHeight
+      window.scrollTo({ top: previousScrollY + scrollDelta, behavior: 'auto' })
     }
   } catch (error) {
-    console.error('Error fetching messages:', error)
-    alert('获取消息数据失败，请稍后重试')
+    toast.error('加载消息失败')
   } finally {
     loading.value = false
   }
 }
 
-const goToMessage = (messageId: number) => {
-  router.push(`/message/${messageId}`)
-}
+// --- Media preview ---
 
 const handleMediaClick = (messageId: number, mediaIndex: number) => {
   const message = messages.value.find(m => m.id === messageId)
-  if (!message || !message.media_items) return
-  
+  if (!message?.media_items) return
+
   currentMessageIndex.value = messages.value.findIndex(m => m.id === messageId)
   previewItems.value = message.media_items
   previewStartIndex.value = mediaIndex
@@ -368,156 +537,157 @@ const closePreview = () => {
   currentMessageIndex.value = -1
 }
 
+const handlePreviewToggleStar = () => {
+  if (currentMessageIndex.value < 0) return
+  const msg = messages.value[currentMessageIndex.value]
+  if (msg) handleToggleStar(msg.id)
+}
+
 const navigateToPrevMessage = () => {
-  if (currentMessageIndex.value > 0) {
-    const prevMessage = messages.value[currentMessageIndex.value - 1]
-    if (prevMessage && prevMessage.media_items && prevMessage.media_items.length > 0) {
-      currentMessageIndex.value--
-      previewItems.value = prevMessage.media_items
-      previewStartIndex.value = 0
+  for (let i = currentMessageIndex.value - 1; i >= 0; i--) {
+    const msg = messages.value[i]
+    if (msg?.media_items?.length) {
+      currentMessageIndex.value = i
+      previewItems.value = msg.media_items
+      previewStartIndex.value = msg.media_items.length - 1
+      return
     }
   }
 }
 
 const navigateToNextMessage = () => {
-  if (currentMessageIndex.value < messages.value.length - 1) {
-    const nextMessage = messages.value[currentMessageIndex.value + 1]
-    if (nextMessage && nextMessage.media_items && nextMessage.media_items.length > 0) {
-      currentMessageIndex.value++
-      previewItems.value = nextMessage.media_items
+  for (let i = currentMessageIndex.value + 1; i < messages.value.length; i++) {
+    const msg = messages.value[i]
+    if (msg?.media_items?.length) {
+      currentMessageIndex.value = i
+      previewItems.value = msg.media_items
       previewStartIndex.value = 0
+      return
     }
   }
 }
+
+// --- Star toggle ---
+
+const handleToggleStar = async (messageId: number) => {
+  const msg = messages.value.find(m => m.id === messageId)
+  if (!msg) return
+
+  try {
+    const updated = await api.patch<MessageDetail>(`/messages/${messageId}`, {
+      starred: !msg.starred,
+    })
+    msg.starred = updated.starred
+  } catch {
+    toast.error('操作失败')
+  }
+}
+
+// --- Delete ---
 
 const handleDeleteMessage = async (messageId: number) => {
-  // 确认删除
-  if (!confirm('确定要删除这条消息吗？')) {
+  if (!confirm('确定要删除这条消息吗？')) return
+
+  try {
+    await api.del(`/messages/${messageId}`)
+    messages.value = messages.value.filter((m: MessageDetail) => m.id !== messageId)
+    toast.success('消息已删除')
+  } catch (error) {
+    toast.error('删除消息失败')
+  }
+}
+
+// --- Merge ---
+
+const toggleMergeMode = () => {
+  mergeMode.value = !mergeMode.value
+  selectedMessageIds.value.clear()
+}
+
+const toggleSelectMessage = (id: number) => {
+  if (selectedMessageIds.value.has(id)) {
+    selectedMessageIds.value.delete(id)
+  } else {
+    selectedMessageIds.value.add(id)
+  }
+}
+
+const handleMerge = async () => {
+  if (selectedMessageIds.value.size < 2) {
+    toast.error('请至少选择两条消息')
     return
   }
+  if (!confirm(`确定要合并这 ${selectedMessageIds.value.size} 条消息吗？合并后不可撤销。`)) return
 
   try {
-    const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
-      method: 'DELETE'
+    const merged = await api.post<MessageDetail>('/messages/merge', {
+      message_ids: Array.from(selectedMessageIds.value),
     })
 
-    if (!response.ok) {
-      throw new Error('Failed to delete message')
-    }
+    // 移除被合并的消息，替换为合并结果
+    const mergedIds = selectedMessageIds.value
+    const firstIdx = messages.value.findIndex(m => mergedIds.has(m.id))
+    messages.value = messages.value.filter(m => !mergedIds.has(m.id))
+    messages.value.splice(firstIdx >= 0 ? firstIdx : 0, 0, merged)
 
-    const result = await response.json()
-    
-    if (result.success) {
-      // 从列表中移除消息
-      messages.value = messages.value.filter(message => message.id !== messageId)
-      // 显示成功提示
-      alert('消息删除成功')
-    } else {
-      // 显示错误信息
-      alert(result.message || '删除消息失败，请稍后重试')
-    }
-    
+    mergeMode.value = false
+    selectedMessageIds.value.clear()
+    toast.success('消息合并成功')
   } catch (error) {
-    console.error('Error deleting message:', error)
-    alert('删除消息失败，请稍后重试')
+    toast.error('合并消息失败')
   }
 }
 
-const handleFindMessagesByMedia = async (mediaId: number) => {
-  // 重置分页状态
-  messages.value = []
-  nextCursor.value = null
-  hasMoreData.value = true
-  
-  loading.value = true
-  try {
-    let url = `${API_BASE_URL}/messages/with-detail?limit=${pageSize.value}&media_id=${mediaId}`
-    
-    const response = await fetch(url)
-    if (!response.ok) {
-      throw new Error('Failed to fetch messages')
-    }
-    const data = await response.json()
-    
-    hasMoreData.value = data.has_more
-    nextCursor.value = data.next_cursor
-    
-    messages.value = data.items.reverse()
-    
-    // 滚动到顶部
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }, 100)
-    
-  } catch (error) {
-    console.error('Error fetching messages by media:', error)
-    alert('获取消息数据失败，请稍后重试')
-  } finally {
-    loading.value = false
-  }
+// --- Find by media ---
+
+const handleFindMessagesByMedia = (mediaId: number) => {
+  resetAndFetch({ mediaId })
 }
+
+// --- Search debounce ---
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 watch(searchQuery, () => {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
+  if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
-    messages.value = []
-    nextCursor.value = null
-    hasMoreData.value = true
-    fetchMessages()
+    activeMediaFilter.value = null
+    resetAndFetch()
   }, 300)
 })
 
-// 记录上一次滚动位置
-const lastScrollTop = ref(0)
+// --- Infinite scroll via IntersectionObserver ---
 
-// 节流函数
-const throttle = (func: Function, delay: number) => {
-  let lastCall = 0
-  return function(...args: any[]) {
-    const now = Date.now()
-    if (now - lastCall < delay) {
-      return
-    }
-    lastCall = now
-    func.apply(this, args)
-  }
-}
-
-const handleScroll = throttle(() => {
-  const windowScrollTop = window.scrollY
-  
-  const isNearTop = windowScrollTop <= window.innerHeight * 2
-  const isScrollingUp = windowScrollTop < lastScrollTop.value
-  
-  if (isNearTop && isScrollingUp && !loading.value && hasMoreData.value) {
-    fetchMessages(true)
-  }
-  
-  lastScrollTop.value = windowScrollTop
-}, 300)
+let topObserver: IntersectionObserver | null = null
+let bottomObserver: IntersectionObserver | null = null
 
 onMounted(() => {
-  initTheme()
   fetchMessages()
-  
-  // 添加滚动事件监听
-  if (messagesContainer.value) {
-    messagesContainer.value.addEventListener('scroll', handleScroll)
-  }
-  // 也监听窗口滚动，以防容器本身不滚动
-  window.addEventListener('scroll', handleScroll)
+
+  topObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && !loading.value && hasMoreData.value) {
+        fetchMessages(true)
+      }
+    },
+    { rootMargin: '200px' }
+  )
+  if (topSentinel.value) topObserver.observe(topSentinel.value)
+
+  bottomObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && !loadingForward.value && hasMoreForward.value) {
+        fetchForwardMessages()
+      }
+    },
+    { rootMargin: '200px' }
+  )
+  if (bottomSentinel.value) bottomObserver.observe(bottomSentinel.value)
 })
 
 onUnmounted(() => {
-  // 移除滚动事件监听
-  if (messagesContainer.value) {
-    messagesContainer.value.removeEventListener('scroll', handleScroll)
-  }
-  window.removeEventListener('scroll', handleScroll)
+  topObserver?.disconnect()
+  bottomObserver?.disconnect()
+  if (searchTimeout) clearTimeout(searchTimeout)
 })
-
 </script>

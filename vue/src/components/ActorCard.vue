@@ -7,7 +7,7 @@
     <!-- Thumbnail -->
     <div class="bg-gray-100 dark:bg-gray-700 overflow-hidden aspect-[3/4]">
       <img 
-        :src="`file:///E:/AskTao/data/actor_cover/${actor.id}.webp`" 
+        :src="resolveUrl(actor.avatar_url)" 
         :alt="actor.name" 
         class="w-full h-full object-cover"
       />
@@ -69,7 +69,7 @@
 
 <script setup lang="ts">
 import type { Actor } from '../types'
-import { API_BASE_URL } from '../utils/constants'
+import { resolveUrl } from '../utils/media'
 
 interface Props {
   actor: Actor

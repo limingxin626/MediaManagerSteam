@@ -1,8 +1,11 @@
+import time
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from typing import List, Dict, Any, Optional
 import os
 import shutil
 from pydantic import BaseModel
+from app.config import config
+from app.schemas.file import FileUploadResponse
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -229,3 +232,31 @@ async def upload_file(
     - path: 上传后的文件路径
     """
     return FileManager.upload_file(file, path)
+
+
+@router.post("/upload-media", response_model=FileUploadResponse, status_code=201, summary="上传媒体文件")
+async def upload_media(file: UploadFile = File(...)):
+    """
+    上传媒体文件（图片/视频），自动存入按日期组织的目录。
+    返回的 file_path 可直接用于 POST /messages 的 files 字段。
+    """
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if not ext:
+        raise HTTPException(status_code=400, detail="无法识别文件扩展名")
+
+    upload_dir = config.get_upload_dir()
+    os.makedirs(upload_dir, exist_ok=True)
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    dest_path = os.path.join(upload_dir, f"{timestamp}{ext}")
+    counter = 1
+    while os.path.exists(dest_path):
+        dest_path = os.path.join(upload_dir, f"{timestamp}_{counter}{ext}")
+        counter += 1
+    try:
+        with open(dest_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+    finally:
+        await file.close()
+
+    return FileUploadResponse(message="上传成功", path=dest_path)

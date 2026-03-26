@@ -1,360 +1,402 @@
-import os
-import mimetypes
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.models import get_db, Message, MessageMedia, Tag, Media
 from typing import List, Optional
-from app.schemas.message import MessageCreate, MessageResponse, MessageDetailResponse, CursorResponse, MessageDetailCursorResponse
-from app.utils import calculate_file_hash, ThumbnailUtils, MediaInfoUtils
-from app.config import config
+
+from app.models import get_db, Message, MessageMedia, message_tag
+from app.schemas.message import (
+    MessageCreate, MessageUpdate, MessageMerge,
+    MessageResponse, MessageDetailResponse,
+    MessageMediaItem, MessageTagItem,
+    CursorResponse, MessageDetailCursorResponse,
+    MessageDateCount, MessageDatesResponse,
+    MEDIA_PREVIEW_LIMIT,
+)
+from app.services.message_service import sync_tags_from_text, reorder_message_media
+from app.services.media_service import process_file
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
-@router.get("", response_model=CursorResponse)
-def get_messages(
-    cursor: Optional[str] = Query(None, description="游标，格式为ISO格式的created_at时间"),
-    limit: int = Query(20, ge=1, le=100),
-    actor_id: Optional[int] = None,
-    db: Session = Depends(get_db)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _parse_cursor(cursor: Optional[str]) -> Optional[datetime]:
+    if not cursor:
+        return None
+    try:
+        return datetime.fromisoformat(cursor)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid cursor format")
+
+
+def _build_detail_query(
+    db: Session,
+    actor_id: Optional[int],
+    query_text: Optional[str],
+    media_id: Optional[int],
+    tag_id: Optional[int],
+    starred: Optional[bool] = None,
 ):
-    """获取消息列表（基于游标的分页）"""
-    from datetime import datetime
-    
+    """공통 필터만 적용한 Message 쿼리를 반환 (정렬·커서 없음)."""
     query = db.query(Message)
-    
     if actor_id:
         query = query.filter(Message.actor_id == actor_id)
-    
-    # 如果提供了游标，解析并使用
-    if cursor:
-        try:
-            cursor_time = datetime.fromisoformat(cursor)
-            query = query.filter(Message.created_at < cursor_time)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid cursor format")
-    
-    # 按时间倒序排序
-    query = query.order_by(Message.created_at.desc())
-    
-    # 获取比请求多一条记录，用于判断是否有更多数据
-    messages = query.limit(limit + 1).all()
-    
-    has_more = len(messages) > limit
-    items = messages[:limit]
-    
-    # 计算下一个游标
-    next_cursor = None
-    if has_more and items:
-        next_cursor = items[-1].created_at.isoformat()
-    
-    # 构建响应
-    result = []
-    for msg in items:
-        media_count = db.query(MessageMedia).filter(MessageMedia.message_id == msg.id).count()
-        actor_name = msg.actor.name if msg.actor else None
-        
-        result.append(MessageResponse(
+    if query_text:
+        query = query.filter(Message.text.ilike(f"%{query_text}%"))
+    if media_id:
+        query = query.join(MessageMedia).filter(MessageMedia.media_id == media_id)
+    if tag_id:
+        query = query.join(message_tag, Message.id == message_tag.c.message_id).filter(
+            message_tag.c.tag_id == tag_id
+        )
+    if starred is not None:
+        query = query.filter(Message.starred == (1 if starred else 0))
+    return query
+
+
+def _build_message_query(
+    db: Session,
+    actor_id: Optional[int],
+    query_text: Optional[str],
+    media_id: Optional[int],
+    tag_id: Optional[int],
+    cursor_time: Optional[datetime],
+    starred: Optional[bool] = None,
+):
+    """공통 필터·정렬을 적용한 Message 쿼리를 반환한다."""
+    query = db.query(Message)
+
+    if actor_id:
+        query = query.filter(Message.actor_id == actor_id)
+    if query_text:
+        query = query.filter(Message.text.ilike(f"%{query_text}%"))
+    if media_id:
+        query = query.join(MessageMedia).filter(MessageMedia.media_id == media_id)
+    if tag_id:
+        query = query.join(message_tag, Message.id == message_tag.c.message_id).filter(
+            message_tag.c.tag_id == tag_id
+        )
+    if starred is not None:
+        query = query.filter(Message.starred == (1 if starred else 0))
+    if cursor_time:
+        query = query.filter(Message.created_at < cursor_time)
+
+    return query.order_by(Message.created_at.desc())
+
+
+def _paginate(query, limit: int):
+    """返回 (items, has_more, next_cursor)。"""
+    rows = query.limit(limit + 1).all()
+    has_more = len(rows) > limit
+    items = rows[:limit]
+    next_cursor = items[-1].created_at.isoformat() if has_more and items else None
+    return items, has_more, next_cursor
+
+
+def _media_items_for(db: Session, message_id: int, limit: Optional[int] = MEDIA_PREVIEW_LIMIT) -> List[MessageMediaItem]:
+    query = (
+        db.query(MessageMedia)
+        .filter(MessageMedia.message_id == message_id)
+        .order_by(MessageMedia.position)
+    )
+    if limit is not None:
+        query = query.limit(limit)
+    relations = query.all()
+    return [
+        MessageMediaItem(
+            id=r.media.id,
+            file_path=r.media.file_path,
+            mime_type=r.media.mime_type,
+            duration=r.media.duration,
+        )
+        for r in relations
+        if r.media
+    ]
+
+
+def _build_detail_response(db: Session, msg: Message, media_limit: Optional[int] = MEDIA_PREVIEW_LIMIT) -> MessageDetailResponse:
+    media_items = _media_items_for(db, msg.id, limit=media_limit)
+    tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in msg.tags]
+    actor_name = msg.actor.name if msg.actor else None
+    return MessageDetailResponse(
+        id=msg.id,
+        text=msg.text,
+        actor_id=msg.actor_id,
+        actor_name=actor_name,
+        media_count=len(media_items),
+        starred=bool(msg.starred),
+        media_items=media_items,
+        tags=tags,
+        created_at=msg.created_at.isoformat(),
+        updated_at=msg.updated_at.isoformat(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+@router.get("", response_model=CursorResponse)
+def get_messages(
+    cursor: Optional[str] = Query(None, description="游标，ISO 格式的 created_at"),
+    limit: int = Query(20, ge=1, le=100),
+    actor_id: Optional[int] = None,
+    starred: Optional[bool] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """获取消息列表（游标分页）"""
+    cursor_time = _parse_cursor(cursor)
+    query = _build_message_query(db, actor_id, None, None, None, cursor_time, starred=starred)
+    items, has_more, next_cursor = _paginate(query, limit)
+
+    # 批量查 media_count，避免 N+1
+    ids = [m.id for m in items]
+    counts = dict(
+        db.query(MessageMedia.message_id, func.count())
+        .filter(MessageMedia.message_id.in_(ids))
+        .group_by(MessageMedia.message_id)
+        .all()
+    ) if ids else {}
+
+    result = [
+        MessageResponse(
             id=msg.id,
             text=msg.text,
             actor_id=msg.actor_id,
-            actor_name=actor_name,
-            media_count=media_count,
+            actor_name=msg.actor.name if msg.actor else None,
+            media_count=counts.get(msg.id, 0),
+            starred=bool(msg.starred),
             created_at=msg.created_at.isoformat(),
-            updated_at=msg.updated_at.isoformat()
-        ))
-    
-    return CursorResponse(
-        items=result,
-        next_cursor=next_cursor,
-        has_more=has_more
+            updated_at=msg.updated_at.isoformat(),
+        )
+        for msg in items
+    ]
+    return CursorResponse(items=result, next_cursor=next_cursor, has_more=has_more)
+
+
+@router.get("/dates", response_model=MessageDatesResponse)
+def get_message_dates(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    actor_id: Optional[int] = None,
+    query_text: Optional[str] = Query(None),
+    media_id: Optional[int] = Query(None),
+    tag_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """获取指定月份中有消息的日期及数量"""
+    date_label = func.strftime('%Y-%m-%d', Message.created_at).label('date_str')
+    query = db.query(date_label, func.count().label('cnt'))
+
+    if actor_id:
+        query = query.filter(Message.actor_id == actor_id)
+    if query_text:
+        query = query.filter(Message.text.ilike(f"%{query_text}%"))
+    if media_id:
+        query = query.join(MessageMedia, Message.id == MessageMedia.message_id).filter(MessageMedia.media_id == media_id)
+    if tag_id:
+        query = query.join(message_tag, Message.id == message_tag.c.message_id).filter(
+            message_tag.c.tag_id == tag_id
+        )
+
+    query = query.filter(
+        func.strftime('%Y', Message.created_at) == str(year),
+        func.strftime('%m', Message.created_at) == str(month).zfill(2),
     )
+
+    rows = query.group_by(date_label).all()
+    dates = [MessageDateCount(date=row.date_str, count=row.cnt) for row in rows]
+    return MessageDatesResponse(dates=dates)
+
 
 @router.get("/with-detail", response_model=MessageDetailCursorResponse)
 def get_messages_with_detail(
-    cursor: Optional[str] = Query(None, description="游标，格式为ISO格式的created_at时间"),
+    cursor: Optional[str] = Query(None, description="游标，ISO 格式的 created_at"),
+    direction: Optional[str] = Query(None, description="分页方向: 'forward' 加载更新的消息（cursor 之后）"),
     limit: int = Query(20, ge=1, le=100),
     actor_id: Optional[int] = None,
-    query_text: Optional[str] = Query(None, description="搜索文本，匹配message.text"),
-    media_id: Optional[int] = Query(None, description="媒体ID，查询包含该媒体的所有消息"),
-    db: Session = Depends(get_db)
+    query_text: Optional[str] = Query(None, description="搜索文本，匹配 message.text"),
+    media_id: Optional[int] = Query(None, description="媒体 ID，查询包含该媒体的所有消息"),
+    tag_id: Optional[int] = Query(None, description="标签 ID，查询包含该标签的所有消息"),
+    starred: Optional[bool] = Query(None, description="是否收藏"),
+    db: Session = Depends(get_db),
 ):
-    """获取消息列表，包含完整的媒体详情（基于游标的分页）"""
-    from datetime import datetime
-    
-    query = db.query(Message)
-    
-    if actor_id:
-        query = query.filter(Message.actor_id == actor_id)
-    
-    if query_text:
-        query = query.filter(Message.text.ilike(f"%{query_text}%"))
-    
-    # 如果提供了媒体ID，过滤包含该媒体的消息
-    if media_id:
-        query = query.join(MessageMedia).filter(MessageMedia.media_id == media_id)
-    
-    # 如果提供了游标，解析并使用
-    if cursor:
-        try:
-            cursor_time = datetime.fromisoformat(cursor)
-            query = query.filter(Message.created_at < cursor_time)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid cursor format")
-    
-    # 按时间倒序排序
-    query = query.order_by(Message.created_at.desc())
-    
-    # 获取比请求多一条记录，用于判断是否有更多数据
-    messages = query.limit(limit + 1).all()
-    
-    has_more = len(messages) > limit
-    items = messages[:limit]
-    
-    # 计算下一个游标
-    next_cursor = None
-    if has_more and items:
-        next_cursor = items[-1].created_at.isoformat()
-    
-    # 构建响应
-    result = []
-    for msg in items:
-        media_relations = db.query(MessageMedia).filter(
-            MessageMedia.message_id == msg.id
-        ).order_by(MessageMedia.position).limit(9).all()
-        
-        media_items = []
-        for relation in media_relations:
-            media = relation.media
-            if media:
-                media_items.append({
-                    "id": media.id,
-                    "file_path": media.file_path,
-                    "mime_type": media.mime_type,
-                    "duration": media.duration
-                })
-        
-        actor_name = msg.actor.name if msg.actor else None
-        
-        tags = [{"id": t.id, "name": t.name, "category": t.category} for t in msg.tags]
-        
-        result.append(MessageDetailResponse(
-            id=msg.id,
-            text=msg.text,
-            actor_id=msg.actor_id,
-            actor_name=actor_name,
-            media_count=len(media_items),
-            media_items=media_items,
-            tags=tags,
-            created_at=msg.created_at.isoformat(),
-            updated_at=msg.updated_at.isoformat()
-        ))
-    
-    return MessageDetailCursorResponse(
-        items=result,
-        next_cursor=next_cursor,
-        has_more=has_more
-    )
+    """获取消息列表，含完整媒体详情（游标分页）"""
+
+    if direction == "forward" and cursor:
+        pivot = _parse_cursor(cursor)
+        op = Message.created_at > pivot
+        query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred)
+        query = query.filter(op).order_by(Message.created_at.asc())
+        rows = query.limit(limit + 1).all()
+        has_more = len(rows) > limit
+        items = rows[:limit]
+
+        base = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred)
+        has_more_before = base.filter(Message.created_at < pivot).first() is not None
+
+        result = [_build_detail_response(db, msg) for msg in items]
+        return MessageDetailCursorResponse(
+            items=result,
+            next_cursor=items[-1].created_at.isoformat() if has_more and items else None,
+            prev_cursor=items[0].created_at.isoformat() if items else None,
+            has_more=has_more,
+            has_more_before=has_more_before,
+        )
+
+    # 默认：向后（desc）分页
+    cursor_time = _parse_cursor(cursor)
+    query = _build_message_query(db, actor_id, query_text, media_id, tag_id, cursor_time, starred=starred)
+    items, has_more, next_cursor = _paginate(query, limit)
+
+    result = [_build_detail_response(db, msg) for msg in items]
+    return MessageDetailCursorResponse(items=result, next_cursor=next_cursor, has_more=has_more)
+
 
 @router.get("/{message_id}", response_model=MessageDetailResponse)
 def get_message_detail(
     message_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """获取消息详情"""
+    """获取单条消息详情"""
     message = db.query(Message).filter(Message.id == message_id).first()
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
-    
-    media_relations = db.query(MessageMedia).filter(
-        MessageMedia.message_id == message_id
-    ).order_by(MessageMedia.position).limit(9).all()
-    
-    media_items = []
-    for relation in media_relations:
-        media = relation.media
-        if media:
-            media_items.append({
-                "id": media.id,
-                "file_path": media.file_path,
-                "mime_type": media.mime_type,
-                "duration": media.duration
-            })
-    
-    actor_name = message.actor.name if message.actor else None
-    
-    tags = [{"id": t.id, "name": t.name, "category": t.category} for t in message.tags]
-    
-    return MessageDetailResponse(
-        id=message.id,
-        text=message.text,
-        actor_id=message.actor_id,
-        actor_name=actor_name,
-        media_count=len(media_items),
-        media_items=media_items,
-        tags=tags,
-        created_at=message.created_at.isoformat(),
-        updated_at=message.updated_at.isoformat()
-    )
+    return _build_detail_response(db, message, media_limit=None)
 
 
-@router.post("", response_model=dict)
+@router.post("", response_model=MessageDetailResponse, status_code=201)
 def create_message(
     message_data: MessageCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """创建新消息"""
-    try:
-        # 创建消息实例
-        db_message = Message(
-            text=message_data.text,
-            actor_id=message_data.actor_id
-        )
-        db.add(db_message)
-        db.flush()  # 获取 message.id 而不提交事务
-        
-        # 处理文件列表，创建 Media 实例并关联到 message
-        media_items = []
-        new_media_count = 0
-        existing_media_count = 0
-        
-        for i, file_path in enumerate(message_data.files):
-            # 计算文件哈希值
-            if not os.path.exists(file_path):
-                continue
-            file_hash = calculate_file_hash(file_path)
-            
-            # 检查文件是否已存在（基于哈希值）
-            existing_media = db.query(Media).filter(Media.file_hash == file_hash).first()
-            if existing_media:
-                media = existing_media
-                existing_media_count += 1
-            else:
-                # 获取文件基本信息
-                file_size = os.path.getsize(file_path)
-                mime_type, _ = mimetypes.guess_type(file_path)
-                media_type = config.get_media_type(file_path)
-                
-                # 获取媒体详细信息（width, height, duration）
-                media_info = MediaInfoUtils.get_media_info(file_path, media_type, config.FFPROBE_PATH)
-                
-                # 创建新的 Media 实例
-                media = Media(
-                    file_path=file_path,
-                    file_hash=file_hash,
-                    file_size=file_size,
-                    mime_type=mime_type or 'application/octet-stream',
-                    width=media_info["width"],
-                    height=media_info["height"],
-                    duration=media_info["duration"]
-                )
-                db.add(media)
-                db.flush()  # 获取 media.id 而不提交事务
-                
-                # 生成缩略图
-                try:
-                    thumb_path = config.get_thumbnail_path(media.id)
-                    ThumbnailUtils.generate_thumbnail(file_path, thumb_path, media_type, config.FFMPEG_PATH)
-                except Exception as e:
-                    print(f"Failed to generate thumbnail: {e}")
-                
-                new_media_count += 1
-            
-            # 创建 MessageMedia 关联
-            message_media = MessageMedia(
-                message_id=db_message.id,
-                media_id=media.id,
-                position=i
-            )
-            db.add(message_media)
-            
-            # 构建媒体项响应
-            media_items.append({
-                "id": media.id,
-                "file_path": media.file_path,
-                "mime_type": media.mime_type,
-                "duration": media.duration
-            })
-        
-        db.commit()
-        db.refresh(db_message)
-        
-        # 获取 actor 名称
-        actor_name = db_message.actor.name if db_message.actor else None
-        
-        # 构建消息响应
-        message_response = MessageDetailResponse(
-            id=db_message.id,
-            text=db_message.text,
-            actor_id=db_message.actor_id,
-            actor_name=actor_name,
-            media_count=len(media_items),
-            media_items=media_items,
-            tags=[],  # 因为没有 tag_ids
-            created_at=db_message.created_at.isoformat(),
-            updated_at=db_message.updated_at.isoformat()
-        )
-        
-        # 返回包含额外信息的响应
-        return {
-            "success": True,
-            "message": "消息创建成功",
-            "data": message_response,
-            "media_stats": {
-                "new": new_media_count,
-                "existing": existing_media_count,
-                "total": len(media_items)
-            }
-        }
-    except Exception as e:
-        # 回滚事务
-        db.rollback()
-        # 返回错误信息
-        return {
-            "success": False,
-            "message": f"消息创建失败: {str(e)}",
-            "data": None,
-            "media_stats": {
-                "new": 0,
-                "existing": 0,
-                "total": 0
-            }
-        }
+    db_message = Message(text=message_data.text, actor_id=message_data.actor_id)
+    db.add(db_message)
+    db.flush()
+
+    sync_tags_from_text(db, db_message, message_data.text)
+
+    position = 0
+    for file_path in message_data.files:
+        result = process_file(db, file_path, db_message.id, position)
+        if result is not None:
+            position += 1
+
+    db.commit()
+    db.refresh(db_message)
+    return _build_detail_response(db, db_message)
 
 
-@router.delete("/{message_id}", response_model=dict)
+@router.patch("/{message_id}", response_model=MessageDetailResponse)
+def update_message(
+    message_id: int,
+    update_data: MessageUpdate,
+    db: Session = Depends(get_db),
+):
+    """更新消息：文字、actor、媒体顺序"""
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if update_data.text is not None:
+        message.text = update_data.text
+        sync_tags_from_text(db, message, update_data.text)
+
+    if update_data.actor_id is not None:
+        message.actor_id = update_data.actor_id
+
+    if update_data.starred is not None:
+        message.starred = 1 if update_data.starred else 0
+
+    if update_data.media_order is not None:
+        if not reorder_message_media(db, message_id, update_data.media_order):
+            raise HTTPException(status_code=422, detail="media_order 包含不属于该消息的 media_id")
+
+    db.commit()
+    db.refresh(message)
+    return _build_detail_response(db, message)
+
+
+@router.post("/merge", response_model=MessageDetailResponse)
+def merge_messages(
+    merge_data: MessageMerge,
+    db: Session = Depends(get_db),
+):
+    """合并多条消息：文本拼接、媒体合并到第一条消息，删除其余消息。"""
+    ids = merge_data.message_ids
+    if len(ids) < 2:
+        raise HTTPException(status_code=422, detail="至少需要两条消息才能合并")
+
+    # 按 created_at 排序获取所有消息
+    msgs = (
+        db.query(Message)
+        .filter(Message.id.in_(ids))
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+    if len(msgs) != len(ids):
+        raise HTTPException(status_code=404, detail="部分消息不存在")
+
+    target = msgs[0]
+    others = msgs[1:]
+
+    # 合并文本
+    texts = [m.text for m in msgs if m.text]
+    if texts:
+        target.text = "\n".join(texts)
+        sync_tags_from_text(db, target, target.text)
+
+    # 合并媒体：把其他消息的 media 接到 target 后面
+    max_pos = (
+        db.query(func.coalesce(func.max(MessageMedia.position), -1))
+        .filter(MessageMedia.message_id == target.id)
+        .scalar()
+    )
+    next_pos = max_pos + 1
+
+    for other in others:
+        relations = (
+            db.query(MessageMedia)
+            .filter(MessageMedia.message_id == other.id)
+            .order_by(MessageMedia.position)
+            .all()
+        )
+        for rel in relations:
+            rel.message_id = target.id
+            rel.position = next_pos
+            next_pos += 1
+
+    # 合并 tags（去重）
+    all_tags = {t.id: t for t in target.tags}
+    for other in others:
+        for t in other.tags:
+            all_tags[t.id] = t
+    target.tags = list(all_tags.values())
+
+    # 删除其余消息
+    other_ids = [m.id for m in others]
+    db.execute(message_tag.delete().where(message_tag.c.message_id.in_(other_ids)))
+    db.query(Message).filter(Message.id.in_(other_ids)).delete(synchronize_session="fetch")
+
+    db.commit()
+    db.refresh(target)
+    return _build_detail_response(db, target, media_limit=None)
+
+
+@router.delete("/{message_id}", status_code=204)
 def delete_message(
     message_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """删除消息"""
-    try:
-        # 查找消息
-        message = db.query(Message).filter(Message.id == message_id).first()
-        if not message:
-            return {
-                "success": False,
-                "message": "消息不存在",
-                "data": None
-            }
-        
-        # 删除相关的 MessageMedia 记录
-        db.query(MessageMedia).filter(MessageMedia.message_id == message_id).delete()
-        
-        # 删除消息
-        db.delete(message)
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "消息删除成功",
-            "data": None
-        }
-    except Exception as e:
-        # 回滚事务
-        db.rollback()
-        # 返回错误信息
-        return {
-            "success": False,
-            "message": f"删除消息失败: {str(e)}",
-            "data": None
-        }
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    db.query(MessageMedia).filter(MessageMedia.message_id == message_id).delete()
+    db.delete(message)
+    db.commit()
