@@ -187,11 +187,13 @@
           <!-- Text Input -->
           <div class="flex-1 relative">
             <textarea
+              ref="textareaRef"
               v-model="newMessageText"
               placeholder="输入消息..."
               rows="1"
-              class="w-full px-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-              @keydown.enter.prevent="handleEnterKey"
+              class="w-full px-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none max-h-32 overflow-y-auto"
+              @keydown.enter="handleEnterKey"
+              @input="autoResize"
             />
           </div>
 
@@ -304,6 +306,7 @@ const previewMessageStarred = computed(() => {
 const newMessageText = ref('')
 const selectedFiles = ref<string[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 // --- Merge selection mode ---
 const mergeMode = ref(false)
@@ -476,9 +479,16 @@ const removeFile = (index: number) => {
 // --- Send message ---
 
 const handleEnterKey = (event: KeyboardEvent) => {
-  if (!event.shiftKey) {
-    sendMessage()
-  }
+  if (event.shiftKey) return // Shift+Enter: allow newline
+  event.preventDefault()
+  sendMessage()
+}
+
+const autoResize = () => {
+  const el = textareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
 }
 
 const sendMessage = async () => {
@@ -493,6 +503,7 @@ const sendMessage = async () => {
     messages.value.push(result)
     newMessageText.value = ''
     selectedFiles.value = []
+    if (textareaRef.value) textareaRef.value.style.height = 'auto'
     await nextTick()
     scrollToBottom()
     toast.success('消息已发送')
