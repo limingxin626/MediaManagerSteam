@@ -1,17 +1,17 @@
 <template>
   <div class="min-h-screen transition-colors">
     <!-- Fixed Search Header -->
-    <div class="fixed top-0 left-0 md:left-64 right-0 2xl:right-72 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+    <div class="fixed top-0 left-0 md:left-64 right-0 2xl:right-72 z-50 backdrop-blur-sm border-b shadow-sm">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex gap-4 items-center max-w-2xl mx-auto">
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">消息流</h2>
+          <h2 class="text-2xl font-bold text-white">消息流</h2>
           <!-- Merge toggle -->
           <button
             @click="toggleMergeMode"
             class="px-3 py-1.5 text-sm rounded-lg transition-colors"
             :class="mergeMode
               ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'"
+              : 'bg-white/10 text-gray-300 hover:bg-white/20'"
           >
             {{ mergeMode ? '取消合并' : '合并' }}
           </button>
@@ -20,8 +20,8 @@
             @click="starredFilter = !starredFilter; resetAndFetch()"
             class="p-1.5 rounded-lg transition-colors"
             :class="starredFilter
-              ? 'text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20'
-              : 'text-gray-400 hover:text-yellow-400 bg-gray-100 dark:bg-gray-800'"
+              ? 'text-yellow-400 bg-yellow-900/20'
+              : 'text-gray-400 hover:text-yellow-400 bg-white/10'"
             title="仅看收藏"
           >
             <svg class="w-5 h-5" :fill="starredFilter ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
@@ -34,7 +34,7 @@
               v-model="searchQuery"
               type="text"
               placeholder="搜索消息..."
-              class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              class="w-full pl-10 pr-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
             <svg class="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -52,12 +52,12 @@
       <!-- Loading indicator (top, for loading older) -->
       <div v-if="loading" class="text-center py-8">
         <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">加载中...</p>
+        <p class="mt-2 text-sm text-gray-400">加载中...</p>
       </div>
 
       <!-- No more data -->
       <div v-if="!loading && !hasMoreData && messages.length > 0" class="text-center py-8">
-        <p class="text-sm text-gray-500 dark:text-gray-400">已经到底了</p>
+        <p class="text-sm text-gray-400">已经到底了</p>
       </div>
 
       <!-- Messages Feed -->
@@ -87,8 +87,8 @@
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无消息</h3>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">还没有任何消息内容</p>
+        <h3 class="mt-2 text-sm font-medium text-white">暂无消息</h3>
+        <p class="mt-1 text-sm text-gray-400">还没有任何消息内容</p>
       </div>
 
       <!-- Loading indicator (bottom, for loading newer) -->
@@ -105,7 +105,7 @@
       v-if="mergeMode && selectedMessageIds.size > 0"
       class="fixed bottom-20 left-0 md:left-64 right-0 2xl:right-72 z-50 flex items-center justify-center pointer-events-none"
     >
-      <div class="pointer-events-auto flex items-center gap-3 px-5 py-3 bg-gray-900/90 dark:bg-gray-800/95 backdrop-blur-sm rounded-full shadow-xl text-white text-sm">
+      <div class="pointer-events-auto flex items-center gap-3 px-5 py-3 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl text-white text-sm">
         <span>已选 {{ selectedMessageIds.size }} 条</span>
         <button
           @click="handleMerge"
@@ -147,7 +147,7 @@
     />
 
     <!-- Calendar Sidebar (wide screens only) -->
-    <aside class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
+    <aside class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-white/10 backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
       <CalendarSidebar
         :active-filters="calendarFilters"
         @date-selected="handleDateSelected"
@@ -155,16 +155,16 @@
     </aside>
 
     <!-- Fixed Input Area at Bottom -->
-    <div class="fixed bottom-0 left-0 md:left-64 right-0 2xl:right-72 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg">
+    <div class="fixed bottom-0 left-0 md:left-64 right-0 2xl:right-72 z-50 backdrop-blur-sm border-t border-white/10 shadow-lg">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <div class="flex gap-2 items-end max-w-2xl mx-auto">
+        <div class="flex gap-2 items-center max-w-2xl mx-auto">
           <!-- Attachment Button -->
           <button
             @click="triggerFileInput"
-            class="flex-shrink-0 p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            class="flex-shrink-0 p-2 text-gray-400 hover:text-indigo-400 hover:bg-white/10 rounded-lg transition-colors"
             title="添加附件"
           >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
             </svg>
           </button>
@@ -184,7 +184,7 @@
               v-model="newMessageText"
               placeholder="输入消息..."
               rows="1"
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+              class="w-full px-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
               @keydown.enter.prevent="handleEnterKey"
             />
           </div>
@@ -193,7 +193,7 @@
           <button
             @click="sendMessage"
             :disabled="!newMessageText.trim() && selectedFiles.length === 0"
-            class="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-lg transition-colors"
+            class="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
             title="发送"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,9 +208,9 @@
             <div
               v-for="(filePath, index) in selectedFiles"
               :key="index"
-              class="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-md text-sm"
+              class="inline-flex items-center gap-1 px-2 py-1 bg-white/10 rounded-md text-sm"
             >
-              <span class="text-gray-700 dark:text-gray-300 truncate max-w-xs">{{ filePath.split('\\').pop() || filePath }}</span>
+              <span class="text-gray-300 truncate max-w-xs">{{ filePath.split('\\').pop() || filePath }}</span>
               <button
                 @click="removeFile(index)"
                 class="text-gray-500 hover:text-red-500 transition-colors"

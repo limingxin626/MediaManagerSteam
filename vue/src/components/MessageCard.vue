@@ -1,6 +1,6 @@
 <template>
   <div
-    class="group bg-(--color-card-bg) rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer"
+    class="group bg-(--color-card-bg) rounded-xl shadow-sm border border-white/10 overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer"
     :class="{ 'ring-2 ring-indigo-500 border-indigo-500': props.selected }"
     @click="handleClick"
   >
@@ -15,7 +15,7 @@
             class="shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors"
             :class="props.selected
               ? 'bg-indigo-600 border-indigo-600 text-white'
-              : 'border-gray-300 dark:border-gray-600 hover:border-indigo-400'"
+              : 'border-gray-600 hover:border-indigo-400'"
           >
             <svg v-if="props.selected" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
@@ -25,10 +25,10 @@
             {{ actorInitial }}
           </div>
           <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white truncate">
+            <h3 class="text-sm font-semibold text-white truncate">
               {{ message.actor_name || '未知' }}
             </h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
+            <p class="text-xs text-gray-400">
               {{ formatDate(message.created_at) }}
             </p>
           </div>
@@ -48,7 +48,7 @@
           </button>
           <button
             @click.stop="handleDelete"
-            class="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+            class="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
             title="删除消息"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,7 +67,7 @@
           <div
             v-for="(item, index) in mediaPreviewItems"
             :key="item.id"
-            class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer"
+            class="relative overflow-hidden bg-gray-800 cursor-pointer"
             :class="mediaItemClass(index)"
             @click.stop="handleMediaClick(index)"
           >
@@ -103,10 +103,10 @@
                 </svg>
               </button>
 
-              <div v-if="activeMenuIndex === index" class="absolute top-8 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-10">
+              <div v-if="activeMenuIndex === index" class="absolute top-8 right-0 bg-gray-800 rounded-lg shadow-lg border border-white/10 py-1 min-w-[140px] z-10">
                 <button
                   @click.stop="findMessagesByMedia(item.id)"
-                  class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  class="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/10 transition-colors"
                 >
                   查找所有message
                 </button>
@@ -126,7 +126,7 @@
 
       <!-- Message Text -->
       <div v-if="message.text" class="mb-2">
-        <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line line-clamp-4">{{ message.text }}</p>
+        <p class="text-sm text-gray-300 whitespace-pre-line line-clamp-4">{{ message.text }}</p>
       </div>
 
       <!-- Tags & Media count row -->
@@ -134,11 +134,11 @@
         <span
           v-for="tag in messageTags"
           :key="tag.id"
-          class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+          class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-900/30 text-indigo-300"
         >
           {{ tag.name }}
         </span>
-        <span v-if="message.media_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 ml-auto">
+        <span v-if="message.media_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500 ml-auto">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>

@@ -1,6 +1,6 @@
 <template>
   <div class="calendar-sidebar">
-    <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">日历</h3>
+    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">日历</h3>
     <VCalendar
       :attributes="calendarAttributes"
       :is-dark="isDark"
@@ -36,7 +36,7 @@ const dateCounts = ref<MessageDateCount[]>([])
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth() + 1)
 
-const isDark = computed(() => document.documentElement.classList.contains('dark'))
+const isDark = computed(() => true)
 
 const calendarAttributes = computed(() => {
   const attrs: any[] = []
@@ -118,9 +118,9 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* Dark mode overrides */
-:root.dark .calendar-sidebar :deep(.vc-container) {
-  --vc-text-color: theme('colors.gray.100');
+/* Dark mode overrides - always active */
+.calendar-sidebar :deep(.vc-container) {
+  --vc-text-color: var(--color-gray-100);
   --vc-bg: transparent;
 }
 </style>
