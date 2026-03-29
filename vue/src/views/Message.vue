@@ -101,6 +101,7 @@
                 @find-messages-by-media="handleFindMessagesByMedia"
                 @toggle-select="toggleSelectMessage"
                 @toggle-star="handleToggleStar"
+                @toggle-media-star="handleToggleMediaStar"
               />
             </div>
           </template>
@@ -584,10 +585,51 @@ const closePreview = () => {
   currentMessageIndex.value = -1
 }
 
-const handlePreviewToggleStar = () => {
-  if (currentMessageIndex.value < 0) return
-  const msg = messages.value[currentMessageIndex.value]
-  if (msg) handleToggleStar(msg.id)
+const handlePreviewToggleStar = async (mediaId: number) => {
+  try {
+    const currentItem = previewItems.value.find(item => item.id === mediaId)
+    if (!currentItem) return
+    
+    const newStarredState = !currentItem.starred
+    await api.put(`/media/${mediaId}/starred?starred=${newStarredState}`)
+    
+    // 更新当前预览项的状态
+    currentItem.starred = newStarredState
+    
+    // 更新消息中的媒体项状态
+    if (currentMessageIndex.value >= 0) {
+      const msg = messages.value[currentMessageIndex.value]
+      if (msg?.media_items) {
+        const mediaItem = msg.media_items.find(item => item.id === mediaId)
+        if (mediaItem) {
+          mediaItem.starred = newStarredState
+        }
+      }
+    }
+  } catch (error) {
+    console.error('切换收藏状态失败:', error)
+    toast.error('操作失败')
+  }
+}
+
+const handleToggleMediaStar = async (mediaId: number) => {
+  try {
+    // 找到包含该媒体的消息
+    for (const message of messages.value) {
+      if (message.media_items) {
+        const mediaItem = message.media_items.find(item => item.id === mediaId)
+        if (mediaItem) {
+          const newStarredState = !mediaItem.starred
+          await api.put(`/media/${mediaId}/starred?starred=${newStarredState}`)
+          mediaItem.starred = newStarredState
+          return
+        }
+      }
+    }
+  } catch (error) {
+    console.error('切换媒体收藏状态失败:', error)
+    toast.error('操作失败')
+  }
 }
 
 const navigateToPrevMessage = () => {

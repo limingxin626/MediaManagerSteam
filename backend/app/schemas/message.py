@@ -23,6 +23,7 @@ class MessageMediaItem(BaseModel):
     mime_type: Optional[str] = None
     duration: Optional[int] = None
     thumb_url: str = ""
+    starred: bool = False
 
     @model_validator(mode="after")
     def _fill_thumb_url(self):

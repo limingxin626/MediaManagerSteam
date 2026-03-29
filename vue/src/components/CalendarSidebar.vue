@@ -2,15 +2,14 @@
   <div class="calendar-sidebar">
     <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">日历</h3>
     <VCalendar
-      :attributes="calendarAttributes"
-      :is-dark="isDark"
-      borderless
-      transparent
-      expanded
-      title-position="left"
-      @dayclick="onDayClick"
-      @update:pages="onPageChange"
-    />
+  :attributes="calendarAttributes"
+  :is-dark="isDark"
+  borderless
+  transparent
+  expanded
+  title-position="left"
+  @dayclick="onDayClick"
+/>
   </div>
 </template>
 
@@ -64,6 +63,7 @@ const calendarAttributes = computed(() => {
 })
 
 const fetchDates = async () => {
+  console.log('fetchDates called with:', currentYear.value, currentMonth.value)
   try {
     const data = await api.get<{ dates: MessageDateCount[] }>('/messages/dates', {
       year: currentYear.value,
@@ -84,19 +84,6 @@ const onDayClick = (day: any) => {
     emit('date-selected', dateStr)
   }
 }
-
-const onPageChange = (pages: any[]) => {
-  if (pages.length > 0) {
-    const page = pages[0]
-    currentYear.value = page.year
-    currentMonth.value = page.month
-    fetchDates()
-  }
-}
-
-watch(() => props.activeFilters, () => {
-  fetchDates()
-}, { deep: true })
 
 onMounted(() => {
   fetchDates()

@@ -5,6 +5,7 @@ export interface MessageMediaItem {
   mime_type: string | null
   duration: number | null
   thumb_url: string
+  starred?: boolean
 }
 
 export interface Message {

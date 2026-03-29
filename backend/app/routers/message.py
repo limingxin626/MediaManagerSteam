@@ -111,6 +111,7 @@ def _media_items_for(db: Session, message_id: int, limit: Optional[int] = MEDIA_
             file_path=r.media.file_path,
             mime_type=r.media.mime_type,
             duration=r.media.duration,
+            starred=bool(r.media.starred),
         )
         for r in relations
         if r.media
