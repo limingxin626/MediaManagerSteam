@@ -57,7 +57,8 @@ fun TelegramVideoPlayer(
         ExoPlayer.Builder(context).build().apply {
             val uri = when {
                 videoPath.startsWith("content://") -> android.net.Uri.parse(videoPath)
-                videoPath.startsWith("http://") || videoPath.startsWith("https://") -> android.net.Uri.parse(videoPath)
+                videoPath.startsWith("http://") || videoPath.startsWith("https://") ->
+                    android.net.Uri.parse(videoPath.replace("#", "%23"))
                 else -> android.net.Uri.fromFile(File(videoPath))
             }
             setMediaItem(MediaItem.fromUri(uri))
@@ -313,7 +314,8 @@ fun VideoPlayer(
             .apply {
                 val uri = when {
                     videoPath.startsWith("content://") -> android.net.Uri.parse(videoPath)
-                    videoPath.startsWith("http://") || videoPath.startsWith("https://") -> android.net.Uri.parse(videoPath)
+                    videoPath.startsWith("http://") || videoPath.startsWith("https://") ->
+                        android.net.Uri.parse(videoPath.replace(" ", "%20"))
                     else -> android.net.Uri.fromFile(File(videoPath))
                 }
                 val mediaItem = MediaItem.fromUri(uri)
@@ -495,7 +497,8 @@ fun FullscreenVideoPlayer(
             .apply {
                 val uri = when {
                     videoPath.startsWith("content://") -> android.net.Uri.parse(videoPath)
-                    videoPath.startsWith("http://") || videoPath.startsWith("https://") -> android.net.Uri.parse(videoPath)
+                    videoPath.startsWith("http://") || videoPath.startsWith("https://") ->
+                        android.net.Uri.parse(videoPath.replace(" ", "%20"))
                     else -> android.net.Uri.fromFile(File(videoPath))
                 }
                 val mediaItem = MediaItem.fromUri(uri)

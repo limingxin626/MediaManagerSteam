@@ -69,7 +69,10 @@ class HomeViewModel(
             )
         }
 
-        _groups.value = groups
+        // "全部" stays first, rest sorted by message count descending
+        val allGroup = groups.first()
+        val tagGroups = groups.drop(1).sortedByDescending { it.messageCount }
+        _groups.value = listOf(allGroup) + tagGroups
         _isLoading.value = false
     }
 

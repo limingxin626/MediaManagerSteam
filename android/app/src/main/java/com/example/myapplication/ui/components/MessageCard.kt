@@ -237,6 +237,138 @@ fun MessageCard(
 }
 
 /**
+ * 布局规格：描述每种媒体数量的网格行结构
+ */
+private data class GridLayoutSpec(
+    val rows: List<List<Int>>,       // 每行的宽度权重列表
+    val rowHeightWeights: List<Int>, // 行高度权重
+    val totalHeightDp: Int           // 总高度
+)
+
+private fun getGridLayout(count: Int): GridLayoutSpec = when (count) {
+    2 -> GridLayoutSpec(
+        rows = listOf(listOf(1, 1)),
+        rowHeightWeights = listOf(1),
+        totalHeightDp = 240
+    )
+    4 -> GridLayoutSpec(
+        rows = listOf(listOf(1, 1), listOf(1, 1)),
+        rowHeightWeights = listOf(1, 1),
+        totalHeightDp = 400
+    )
+    5 -> GridLayoutSpec(
+        rows = listOf(listOf(1, 1), listOf(1, 1), listOf(1)),
+        rowHeightWeights = listOf(1, 1, 1),
+        totalHeightDp = 500
+    )
+    6 -> GridLayoutSpec(                              // 2x3
+        rows = listOf(listOf(1, 1), listOf(1, 1), listOf(1, 1)),
+        rowHeightWeights = listOf(1, 1, 1),
+        totalHeightDp = 500
+    )
+    7 -> GridLayoutSpec(                              // 2+2+3
+        rows = listOf(listOf(1, 1), listOf(1, 1), listOf(1, 1, 1)),
+        rowHeightWeights = listOf(3, 3, 2),
+        totalHeightDp = 500
+    )
+    8 -> GridLayoutSpec(                              // 2+3+3
+        rows = listOf(listOf(1, 1), listOf(1, 1, 1), listOf(1, 1, 1)),
+        rowHeightWeights = listOf(3, 2, 2),
+        totalHeightDp = 500
+    )
+    9 -> GridLayoutSpec(                              // 3+3+3
+        rows = listOf(listOf(1, 1, 1), listOf(1, 1, 1), listOf(1, 1, 1)),
+        rowHeightWeights = listOf(1, 1, 1),
+        totalHeightDp = 500
+    )
+    10 -> GridLayoutSpec(                             // 2+2+3+3
+        rows = listOf(listOf(1, 1), listOf(1, 1), listOf(1, 1, 1), listOf(1, 1, 1)),
+        rowHeightWeights = listOf(3, 3, 2, 2),
+        totalHeightDp = 560
+    )
+    else -> GridLayoutSpec(
+        rows = listOf(listOf(1, 1), listOf(1, 1)),
+        rowHeightWeights = listOf(1, 1),
+        totalHeightDp = 400
+    )
+}
+
+/**
+ * 通用行布局网格渲染器
+ */
+@Composable
+private fun RowBasedGrid(
+    displayMedia: List<Media>,
+    totalMedia: Int,
+    maxDisplay: Int,
+    layout: GridLayoutSpec,
+    messageId: Long,
+    onMediaClick: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val extraCount = totalMedia - maxDisplay
+    var mediaIndex = 0
+    val totalItems = displayMedia.size
+
+    Column(modifier = modifier.height(layout.totalHeightDp.dp)) {
+        layout.rows.forEachIndexed { rowIndex, widthWeights ->
+            if (rowIndex > 0) {
+                Spacer(modifier = Modifier.height(2.dp))
+            }
+            Row(modifier = Modifier.weight(layout.rowHeightWeights[rowIndex].toFloat())) {
+                widthWeights.forEachIndexed { colIndex, widthWeight ->
+                    if (colIndex > 0) {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                    if (mediaIndex < totalItems) {
+                        val media = displayMedia[mediaIndex]
+                        val isLastCell = mediaIndex == totalItems - 1
+                        mediaIndex++
+
+                        if (isLastCell && extraCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(widthWeight.toFloat())
+                                    .fillMaxHeight()
+                            ) {
+                                MediaThumbnailItem(
+                                    media = media,
+                                    messageId = messageId,
+                                    onClick = { onMediaClick(media.id) },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "+$extraCount",
+                                        color = Color.White,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        } else {
+                            MediaThumbnailItem(
+                                media = media,
+                                messageId = messageId,
+                                onClick = { onMediaClick(media.id) },
+                                modifier = Modifier
+                                    .weight(widthWeight.toFloat())
+                                    .fillMaxHeight()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * 媒体缩略图网格
  */
 @Composable
@@ -246,8 +378,8 @@ private fun MediaThumbnailGrid(
     onMediaClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val displayMedia = mediaList.take(4)
-    val extraCount = mediaList.size - 4
+    val displayMedia = mediaList.take(10)
+    val extraCount = mediaList.size - 10
 
     when (displayMedia.size) {
         1 -> {
@@ -260,11 +392,9 @@ private fun MediaThumbnailGrid(
             }
             val clampedRatio = aspectRatio.coerceIn(0.5f, 2.5f)
             val density = androidx.compose.ui.platform.LocalDensity.current
-            // 用 remember(media0.id) 保证 widthPx 在相同 media 的 recompose 间不被重置
             var widthPx by remember(media0.id) { mutableStateOf(0) }
             val maxHeightDp = 360.dp
             val maxHeightPx = with(density) { maxHeightDp.toPx() }
-            // widthPx 未知时用 maxHeight * ratio 作为初始高度占位，避免从 0 高度跳变
             val effectiveWidthPx = if (widthPx > 0) widthPx.toFloat() else maxHeightPx * clampedRatio
             val naturalHeightPx = effectiveWidthPx / clampedRatio
             val finalHeightPx = naturalHeightPx.coerceAtMost(maxHeightPx)
@@ -282,31 +412,9 @@ private fun MediaThumbnailGrid(
                 )
             }
         }
-        2 -> {
-            // 两图：水平排列各50%
-            Row(modifier = modifier.height(160.dp)) {
-                MediaThumbnailItem(
-                    media = displayMedia[0],
-                    messageId = messageId,
-                    onClick = { onMediaClick(displayMedia[0].id) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                )
-                Spacer(modifier = Modifier.width(2.dp))
-                MediaThumbnailItem(
-                    media = displayMedia[1],
-                    messageId = messageId,
-                    onClick = { onMediaClick(displayMedia[1].id) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                )
-            }
-        }
         3 -> {
             // 三图：左侧50%1张，右侧50%两张上下排列
-            Row(modifier = modifier.height(200.dp)) {
+            Row(modifier = modifier.height(220.dp)) {
                 MediaThumbnailItem(
                     media = displayMedia[0],
                     messageId = messageId,
@@ -342,68 +450,16 @@ private fun MediaThumbnailGrid(
             }
         }
         else -> {
-            // 四图+：2x2网格
-            Column(modifier = modifier.height(200.dp)) {
-                Row(modifier = Modifier.weight(1f)) {
-                    MediaThumbnailItem(
-                        media = displayMedia[0],
-                        messageId = messageId,
-                        onClick = { onMediaClick(displayMedia[0].id) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    )
-                    Spacer(modifier = Modifier.width(2.dp))
-                    MediaThumbnailItem(
-                        media = displayMedia[1],
-                        messageId = messageId,
-                        onClick = { onMediaClick(displayMedia[1].id) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(modifier = Modifier.weight(1f)) {
-                    MediaThumbnailItem(
-                        media = displayMedia[2],
-                        messageId = messageId,
-                        onClick = { onMediaClick(displayMedia[2].id) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    )
-                    Spacer(modifier = Modifier.width(2.dp))
-                    // 第4格：如果有更多，显示+N蒙层
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    ) {
-                        MediaThumbnailItem(
-                            media = displayMedia[3],
-                            messageId = messageId,
-                            onClick = { onMediaClick(displayMedia[3].id) },
-                                modifier = Modifier.fillMaxSize()
-                        )
-                        if (extraCount > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "+$extraCount",
-                                    color = Color.White,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            // 2, 4-10+: 使用通用行布局引擎
+            RowBasedGrid(
+                displayMedia = displayMedia,
+                totalMedia = mediaList.size,
+                maxDisplay = 10,
+                layout = getGridLayout(displayMedia.size),
+                messageId = messageId,
+                onMediaClick = onMediaClick,
+                modifier = modifier
+            )
         }
     }
 }
