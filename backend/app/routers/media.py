@@ -9,6 +9,7 @@ router = APIRouter(prefix="/media", tags=["media"])
 @router.get("", response_model=MediaCursorResponse)
 def get_media(
     cursor: Optional[str] = Query(None, description="游标，格式为'created_at|position'"),
+    direction: Optional[str] = Query(None, description="分页方向: 'forward' 加载更新的媒体"),
     limit: int = Query(20, ge=1, le=100),
     message_id: Optional[int] = None,
     starred: Optional[bool] = Query(None),
@@ -63,37 +64,63 @@ def get_media(
                 if len(parts) == 2:
                     cursor_time = datetime.fromisoformat(parts[0])
                     cursor_position = int(parts[1])
-                    # 使用复合条件：created_at < cursor_time 或 (created_at = cursor_time AND position < cursor_position)
-                    query = query.filter(
-                        (MessageMedia.created_at < cursor_time) | 
-                        ((MessageMedia.created_at == cursor_time) & (MessageMedia.position < cursor_position))
-                    )
+
+                    if direction == 'forward':
+                        # 向前加载：更新的媒体
+                        query = query.filter(
+                            (MessageMedia.created_at > cursor_time) |
+                            ((MessageMedia.created_at == cursor_time) & (MessageMedia.position > cursor_position))
+                        )
+                        query = query.order_by(MessageMedia.created_at.asc(), MessageMedia.position.asc())
+                    else:
+                        # 向后加载：更旧的媒体
+                        query = query.filter(
+                            (MessageMedia.created_at < cursor_time) |
+                            ((MessageMedia.created_at == cursor_time) & (MessageMedia.position < cursor_position))
+                        )
+                        query = query.order_by(MessageMedia.created_at.desc(), MessageMedia.position.desc())
                 else:
                     cursor_time = datetime.fromisoformat(cursor)
-                    query = query.filter(MessageMedia.created_at < cursor_time)
+                    if direction == 'forward':
+                        query = query.filter(MessageMedia.created_at > cursor_time)
+                        query = query.order_by(MessageMedia.created_at.asc(), MessageMedia.position.asc())
+                    else:
+                        query = query.filter(MessageMedia.created_at < cursor_time)
+                        query = query.order_by(MessageMedia.created_at.desc(), MessageMedia.position.desc())
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid cursor format")
-        
-        # 按MessageMedia.created_at和position倒序排序
-        query = query.order_by(MessageMedia.created_at.desc(), MessageMedia.position.desc())
-        
+        else:
+            # 没有游标时，默认倒序（最新的在前）
+            query = query.order_by(MessageMedia.created_at.desc(), MessageMedia.position.desc())
+
         # 获取比请求多一条记录，用于判断是否有更多数据
         media_items = query.limit(limit + 1).all()
-        
+
         has_more = len(media_items) > limit
         items = media_items[:limit]
-        
-        # 计算下一个游标
+
+        # 计算游标
         next_cursor = None
+        prev_cursor = None
+
         if has_more and items:
-            # 获取最后一个media对应的MessageMedia信息
-            last_media_id = items[-1].id
-            last_mm = db.query(MessageMedia).filter(
-                MessageMedia.media_id == last_media_id
-            ).order_by(MessageMedia.created_at.desc()).first()
-            if last_mm:
-                next_cursor = f"{last_mm.created_at.isoformat()}|{last_mm.position}"
-        
+            if direction == 'forward':
+                # 向前加载，最后一个是最新的，用它作为下一个游标
+                last_media_id = items[-1].id
+                last_mm = db.query(MessageMedia).filter(
+                    MessageMedia.media_id == last_media_id
+                ).order_by(MessageMedia.created_at.asc()).first()
+                if last_mm:
+                    next_cursor = f"{last_mm.created_at.isoformat()}|{last_mm.position}"
+            else:
+                # 向后加载，最后一个是最旧的，用它作为下一个游标
+                last_media_id = items[-1].id
+                last_mm = db.query(MessageMedia).filter(
+                    MessageMedia.media_id == last_media_id
+                ).order_by(MessageMedia.created_at.desc()).first()
+                if last_mm:
+                    next_cursor = f"{last_mm.created_at.isoformat()}|{last_mm.position}"
+
         # 构建响应
         result = []
         for item in items:
@@ -115,7 +142,9 @@ def get_media(
         return MediaCursorResponse(
             items=result,
             next_cursor=next_cursor,
-            has_more=has_more
+            prev_cursor=prev_cursor,
+            has_more=has_more,
+            has_more_before=False
         )
 
 @router.get("/{media_id}", response_model=MediaDetailResponse)
@@ -202,9 +231,105 @@ def increment_view_count(
     media = db.query(Media).filter(Media.id == media_id).first()
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
-    
+
     media.view_count += 1
     media.last_viewed_at = db.func.current_timestamp()
     db.commit()
-    
+
     return {"message": "View count updated", "view_count": media.view_count}
+
+
+@router.get("/around/{media_id}", response_model=MediaCursorResponse)
+def get_media_around(
+    media_id: int,
+    limit: int = Query(40, ge=1, le=100),
+    starred: Optional[bool] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """以指定媒体为中心，向前/向后加载媒体"""
+    from datetime import datetime
+
+    # 找到目标媒体对应的 MessageMedia 记录
+    target_mm = db.query(MessageMedia).filter(
+        MessageMedia.media_id == media_id
+    ).order_by(MessageMedia.created_at.desc()).first()
+
+    if not target_mm:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    half_limit = limit // 2
+
+    # 构建基础查询
+    def build_base_query():
+        query = db.query(Media).join(MessageMedia)
+        if starred is not None:
+            query = query.filter(Media.starred == (1 if starred else 0))
+        return query
+
+    # 向后加载：更旧的媒体（created_at < target.created_at 或 created_at = target.created_at 且 position < target.position）
+    older_query = build_base_query().filter(
+        (MessageMedia.created_at < target_mm.created_at) |
+        ((MessageMedia.created_at == target_mm.created_at) & (MessageMedia.position < target_mm.position))
+    ).order_by(MessageMedia.created_at.desc(), MessageMedia.position.desc())
+    older = older_query.limit(half_limit + 1).all()
+    has_more_older = len(older) > half_limit
+    older = older[:half_limit]
+
+    # 向前加载：更新的媒体（created_at > target.created_at 或 created_at = target.created_at 且 position > target.position）
+    newer_query = build_base_query().filter(
+        (MessageMedia.created_at > target_mm.created_at) |
+        ((MessageMedia.created_at == target_mm.created_at) & (MessageMedia.position > target_mm.position))
+    ).order_by(MessageMedia.created_at.asc(), MessageMedia.position.asc())
+    newer = newer_query.limit(half_limit + 1).all()
+    has_more_newer = len(newer) > half_limit
+    newer = newer[:half_limit]
+
+    # 获取目标媒体
+    target_media = db.query(Media).filter(Media.id == media_id).first()
+
+    # 合并结果：older(旧) + [target] + newer(新)
+    # 按时间正序排列（旧 → 新）
+    media_items = list(reversed(older)) + [target_media] + newer
+
+    # 构建响应
+    result = []
+    for item in media_items:
+        result.append(MediaResponse(
+            id=item.id,
+            file_path=item.file_path,
+            file_size=item.file_size,
+            mime_type=item.mime_type,
+            width=item.width,
+            height=item.height,
+            duration=item.duration,
+            rating=item.rating,
+            starred=bool(item.starred),
+            view_count=item.view_count,
+            created_at=item.created_at.isoformat(),
+            updated_at=item.updated_at.isoformat()
+        ))
+
+    # 计算游标
+    next_cursor = None
+    if has_more_older and older:
+        last_mm = db.query(MessageMedia).filter(
+            MessageMedia.media_id == older[-1].id
+        ).order_by(MessageMedia.created_at.desc()).first()
+        if last_mm:
+            next_cursor = f"{last_mm.created_at.isoformat()}|{last_mm.position}"
+
+    prev_cursor = None
+    if has_more_newer and newer:
+        last_mm = db.query(MessageMedia).filter(
+            MessageMedia.media_id == newer[-1].id
+        ).order_by(MessageMedia.created_at.asc()).first()
+        if last_mm:
+            prev_cursor = f"{last_mm.created_at.isoformat()}|{last_mm.position}"
+
+    return MediaCursorResponse(
+        items=result,
+        next_cursor=next_cursor,
+        prev_cursor=prev_cursor,
+        has_more=has_more_older,
+        has_more_before=has_more_newer,
+    )

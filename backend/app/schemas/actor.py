@@ -24,3 +24,10 @@ class ActorResponse(BaseModel):
 
 class ActorDetailResponse(ActorResponse):
     messages: List[dict]
+
+
+class ActorSyncResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    avatar: Optional[str] = None

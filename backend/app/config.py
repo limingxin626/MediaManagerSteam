@@ -36,7 +36,8 @@ class AppConfig:
     def get_static_mounts(cls) -> Dict[str, str]:
         """获取静态文件挂载配置"""
         mounts = {
-            "/data": os.path.join(cls.DATA_ROOT, "data"),
+            "/asktao": cls.DATA_ROOT,
+            "/av": "F:/AV",
         }
         return mounts
     
@@ -66,6 +67,34 @@ class AppConfig:
     def get_actor_avatar_path(cls, actor_id: int) -> str:
         """获取指定演员ID的头像系统绝对路径"""
         return os.path.join(cls.get_actor_cover_dir(), f"{actor_id}.webp")
+    
+    @classmethod
+    def to_url_path(cls, file_path: str) -> str:
+        """将系统绝对路径转换为服务器URL路径
+        
+        例如: E:/AskTao/data/video.mp4 -> /asktao/data/video.mp4
+              F:/AV/movie.mp4 -> /av/movie.mp4
+        """
+        if not file_path:
+            return ""
+        
+        # 统一使用正斜杠
+        normalized_path = file_path.replace("\\", "/")
+        
+        # 遍历所有挂载点，找到匹配的并转换
+        for url_prefix, system_path in cls.get_static_mounts().items():
+            normalized_mount = system_path.replace("\\", "/")
+            # 处理路径匹配（不区分大小写）
+            if normalized_path.lower().startswith(normalized_mount.lower()):
+                # 替换挂载路径为URL前缀
+                relative_path = normalized_path[len(normalized_mount):]
+                # 确保relative_path以/开头
+                if relative_path and not relative_path.startswith("/"):
+                    relative_path = "/" + relative_path
+                return url_prefix + relative_path
+        
+        # 如果没有匹配到任何挂载点，返回原路径
+        return file_path
 
 
 # 创建全局配置实例

@@ -2,9 +2,24 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.models import get_db, Actor, Message, MessageMedia
 from typing import List, Optional
-from app.schemas.actor import ActorResponse, ActorDetailResponse
+from app.schemas.actor import ActorResponse, ActorDetailResponse, ActorSyncResponse
 
 router = APIRouter(prefix="/actors", tags=["actors"])
+
+
+@router.get("/sync", response_model=List[ActorSyncResponse])
+def sync_actors(db: Session = Depends(get_db)):
+    """全量同步：返回所有演员（供 Android 拉取）"""
+    actors = db.query(Actor).order_by(Actor.name).all()
+    return [
+        ActorSyncResponse(
+            id=a.id,
+            name=a.name,
+            description=a.description,
+            avatar=f"/asktao/data/actor_cover/{a.id}.webp" if a.avatar_path else None,
+        )
+        for a in actors
+    ]
 
 
 @router.get("", response_model=List[ActorResponse])

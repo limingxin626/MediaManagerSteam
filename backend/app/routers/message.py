@@ -11,6 +11,7 @@ from app.schemas.message import (
     MessageMediaItem, MessageTagItem,
     CursorResponse, MessageDetailCursorResponse,
     MessageDateCount, MessageDatesResponse,
+    MessageSyncMediaItem, MessageSyncResponse,
     MEDIA_PREVIEW_LIMIT,
 )
 from app.services.message_service import sync_tags_from_text, reorder_message_media
@@ -213,6 +214,51 @@ def get_message_dates(
     return MessageDatesResponse(dates=dates)
 
 
+@router.get("/sync", response_model=List[MessageSyncResponse])
+def sync_messages(db: Session = Depends(get_db)):
+    """全量同步：返回所有消息的完整详情（含 media 元数据和 tag）"""
+    messages = db.query(Message).order_by(Message.created_at.desc()).all()
+    results = []
+    for msg in messages:
+        relations = (
+            db.query(MessageMedia)
+            .filter(MessageMedia.message_id == msg.id)
+            .order_by(MessageMedia.position)
+            .all()
+        )
+        media_items = [
+            MessageSyncMediaItem(
+                id=r.media.id,
+                file_path=r.media.file_path,
+                file_hash=r.media.file_hash or "",
+                file_size=r.media.file_size,
+                mime_type=r.media.mime_type,
+                width=r.media.width,
+                height=r.media.height,
+                duration=r.media.duration,
+                rating=r.media.rating or 0,
+                starred=bool(r.media.starred),
+                position=r.position,
+            )
+            for r in relations
+            if r.media
+        ]
+        tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in msg.tags]
+        actor_name = msg.actor.name if msg.actor else None
+        results.append(MessageSyncResponse(
+            id=msg.id,
+            text=msg.text,
+            actor_id=msg.actor_id,
+            actor_name=actor_name,
+            starred=bool(msg.starred),
+            created_at=msg.created_at.isoformat(),
+            updated_at=msg.updated_at.isoformat(),
+            media_items=media_items,
+            tags=tags,
+        ))
+    return results
+
+
 @router.get("/with-detail", response_model=MessageDetailCursorResponse)
 def get_messages_with_detail(
     cursor: Optional[str] = Query(None, description="游标，ISO 格式的 created_at"),
@@ -386,6 +432,74 @@ def merge_messages(
     db.commit()
     db.refresh(target)
     return _build_detail_response(db, target, media_limit=None)
+
+
+@router.get("/around/{message_id}", response_model=MessageDetailCursorResponse)
+def get_messages_around(
+    message_id: int,
+    limit: int = Query(20, ge=1, le=100),
+    actor_id: Optional[int] = None,
+    query_text: Optional[str] = Query(None),
+    media_id: Optional[int] = Query(None),
+    tag_id: Optional[int] = Query(None),
+    starred: Optional[bool] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """以指定消息为中心，向前/向后加载消息"""
+    # 找到目标消息
+    target = db.query(Message).filter(Message.id == message_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    half_limit = limit // 2
+
+    # 构建基础查询（不含排序和游标）
+    def build_base_query():
+        query = db.query(Message)
+        if actor_id:
+            query = query.filter(Message.actor_id == actor_id)
+        if query_text:
+            query = query.filter(Message.text.ilike(f"%{query_text}%"))
+        if media_id:
+            query = query.join(MessageMedia).filter(MessageMedia.media_id == media_id)
+        if tag_id:
+            query = query.join(message_tag, Message.id == message_tag.c.message_id).filter(
+                message_tag.c.tag_id == tag_id
+            )
+        if starred is not None:
+            query = query.filter(Message.starred == (1 if starred else 0))
+        return query
+
+    # 向后加载：更旧的消息（created_at < target.created_at）
+    older_query = build_base_query().filter(
+        Message.created_at < target.created_at
+    ).order_by(Message.created_at.desc())
+    older = older_query.limit(half_limit + 1).all()
+    has_more_older = len(older) > half_limit
+    older = older[:half_limit]
+
+    # 向前加载：更新的消息（created_at > target.created_at）
+    newer_query = build_base_query().filter(
+        Message.created_at > target.created_at
+    ).order_by(Message.created_at.asc())
+    newer = newer_query.limit(half_limit + 1).all()
+    has_more_newer = len(newer) > half_limit
+    newer = newer[:half_limit]
+
+    # 合并结果：older(旧) + [target] + newer(新)
+    # 按时间正序排列（旧 → 新），方便聊天界面展示
+    messages = list(reversed(older)) + [target] + newer
+
+    # 构建响应
+    result = [_build_detail_response(db, msg, media_limit=None) for msg in messages]
+
+    return MessageDetailCursorResponse(
+        items=result,
+        next_cursor=older[-1].created_at.isoformat() if has_more_older and older else None,
+        prev_cursor=newer[-1].created_at.isoformat() if has_more_newer and newer else None,
+        has_more=has_more_older,
+        has_more_before=has_more_newer,
+    )
 
 
 @router.delete("/{message_id}", status_code=204)

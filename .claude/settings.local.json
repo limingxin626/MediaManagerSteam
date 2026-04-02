@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find C:Usersjieli4DesktopCodeMediaManagerSteamvue -name PWA*.md -o -name *.env* -type f)",
+      "Bash(git add:*)"
+    ]
+  }
+}
