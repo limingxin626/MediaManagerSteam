@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew assembleDebug)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew assembleDebug)",
+      "WebSearch",
+      "Bash(cmd.exe /c \"cd /d C:\\\\Users\\\\jieli4\\\\Desktop\\\\Code\\\\MediaManager && gradlew.bat assembleDebug 2>&1\")",
+      "Bash(cmd.exe /c \"cd /d C:\\\\Users\\\\jieli4\\\\Desktop\\\\Code\\\\MediaManager && gradlew.bat assembleDebug > build_output.txt 2>&1 & type build_output.txt\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\jieli4\\\\Desktop\\\\Code\\\\MediaManager''; .\\\\gradlew.bat assembleDebug 2>&1\")",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\")"
+    ]
+  }
+}
