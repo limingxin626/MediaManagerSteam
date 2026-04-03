@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Table
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Table, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -84,6 +84,22 @@ class MessageMedia(Base):
     
     message = relationship("Message", back_populates="message_media")
     media = relationship("Media", back_populates="message_media")
+
+
+class SyncLog(Base):
+    __tablename__ = "sync_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    entity_type = Column(String(32), nullable=False)   # MESSAGE | ACTOR | MEDIA | TAG
+    entity_id = Column(Integer, nullable=False)
+    operation = Column(String(16), nullable=False)      # UPSERT | DELETE
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_sync_log_timestamp_id", "timestamp", "id"),
+        Index("ix_sync_log_entity", "entity_type", "entity_id"),
+    )
+
 
 def get_db():
     db = SessionLocal()

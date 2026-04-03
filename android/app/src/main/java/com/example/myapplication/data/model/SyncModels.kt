@@ -38,6 +38,9 @@ sealed class SyncResult {
     }
 
     data class Error(val message: String) : SyncResult()
+
+    /** 增量同步返回 410：需要全量同步 */
+    object NeedFullSync : SyncResult()
 }
 
 /**
@@ -74,4 +77,22 @@ data class RemoteTagItem(
     val id: Long,
     val name: String,
     val category: String?
+)
+
+/**
+ * 对应后端 GET /sync/changes 响应
+ */
+data class RemoteChangesResponse(
+    val changes: List<RemoteChangeItem>,
+    val next_cursor: String?,
+    val has_more: Boolean,
+    val server_time: String
+)
+
+data class RemoteChangeItem(
+    val entity_type: String,
+    val entity_id: Long,
+    val operation: String,   // UPSERT | DELETE
+    val timestamp: String,
+    val data: Map<String, Any?>?  // 完整实体快照（DELETE 时为 null）
 )

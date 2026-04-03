@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.WindowInsets
@@ -48,6 +50,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
+import com.example.myapplication.data.service.SyncWorker
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.navigation.navigateToMediaFullscreen
 import com.example.myapplication.ui.screens.actor.ActorListScreen
@@ -159,6 +162,21 @@ class MainActivity : ComponentActivity() {
 
         // 初始化数据库
         databaseManager = DatabaseManager.getInstance(this)
+
+        // 调度后台定期同步（15 分钟，WiFi 下执行）
+        SyncWorker.schedulePeriodicSync(this)
+
+        // 网络恢复时立即触发同步
+        val networkMonitor = databaseManager.networkMonitor
+        var wasConnected = networkMonitor.isWifiConnected.value
+        lifecycleScope.launch {
+            networkMonitor.isWifiConnected.collect { connected ->
+                if (connected && !wasConnected) {
+                    SyncWorker.scheduleImmediateSync(this@MainActivity)
+                }
+                wasConnected = connected
+            }
+        }
 
         setContent {
             MyApplicationTheme {

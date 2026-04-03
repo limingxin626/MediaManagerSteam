@@ -396,6 +396,205 @@ class MessageRepository(
         }
     }
 
+    /**
+     * 增量同步：拉取 since 之后的变更日志并应用到本地。
+     * - 410 响应 → 返回 SyncResult.NeedFullSync，调用方应回退到 syncFromRemote()
+     * - has_more=true → 递归拉取直到完成
+     */
+    suspend fun syncIncremental(since: String): SyncResult = withContext(Dispatchers.IO) {
+        var cursor = since
+        var totalInserted = 0
+        var totalUpdated = 0
+        var totalDeleted = 0
+
+        while (true) {
+            val response = try {
+                syncService.getChanges(since = cursor)
+            } catch (e: Exception) {
+                Log.e(TAG, "增量同步网络请求失败: ${e.message}", e)
+                return@withContext SyncResult.Error(e.message ?: "网络错误")
+            }
+
+            // 410 → 需要全量同步
+            if (response.code() == 410) {
+                Log.w(TAG, "增量同步返回 410，需要全量同步")
+                return@withContext SyncResult.NeedFullSync
+            }
+
+            if (!response.isSuccessful) {
+                return@withContext SyncResult.Error("服务器返回 ${response.code()}")
+            }
+
+            val body = response.body() ?: return@withContext SyncResult.Error("响应体为空")
+            val validActorIds = actorDao.getAllActorIdsSync().toSet()
+
+            for (change in body.changes) {
+                try {
+                    when (change.operation.uppercase()) {
+                        "DELETE" -> {
+                            when (change.entity_type.uppercase()) {
+                                "MESSAGE" -> {
+                                    messageDao.deleteMessageTagsByMessageId(change.entity_id)
+                                    messageDao.deleteMessageMediaByMessageId(change.entity_id)
+                                    messageDao.deleteMessage(change.entity_id)
+                                }
+                                "ACTOR" -> actorDao.deleteActorById(change.entity_id)
+                                "MEDIA" -> mediaDao.deleteMediaById(change.entity_id)
+                                "TAG" -> tagDao.deleteTagById(change.entity_id)
+                            }
+                            totalDeleted++
+                        }
+                        "UPSERT" -> {
+                            val data = change.data ?: continue
+                            when (change.entity_type.uppercase()) {
+                                "MESSAGE" -> {
+                                    val remote = parseRemoteMessage(data) ?: continue
+                                    applyRemoteMessage(remote, validActorIds)
+                                    totalInserted++
+                                }
+                                "ACTOR" -> {
+                                    val actor = parseRemoteActor(data) ?: continue
+                                    actorDao.insertActor(actor.toLocalActor())
+                                    totalInserted++
+                                }
+                                "TAG" -> {
+                                    val tag = parseRemoteTag(data) ?: continue
+                                    tagDao.insertTag(Tag(id = tag.id, name = tag.name, category = tag.category))
+                                    totalInserted++
+                                }
+                                "MEDIA" -> {
+                                    // Media 由后端管理，只更新评分/收藏等元数据
+                                    val rm = parseRemoteMediaItem(data) ?: continue
+                                    val media = Media(
+                                        id = rm.id,
+                                        remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
+                                        remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url),
+                                        fileHash = rm.file_hash ?: "unknown_${rm.id}",
+                                        fileSize = rm.file_size,
+                                        mimeType = rm.mime_type,
+                                        width = rm.width,
+                                        height = rm.height,
+                                        durationMs = rm.duration?.toLong()?.times(1000),
+                                        rating = rm.rating,
+                                        starred = rm.starred,
+                                    )
+                                    val inserted = mediaDao.insertMediaIgnore(media)
+                                    if (inserted == -1L) mediaDao.updateMedia(media)
+                                    totalInserted++
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理变更失败 [${change.operation} ${change.entity_type} #${change.entity_id}]: ${e.message}")
+                }
+            }
+
+            // 更新 cursor 为 server_time
+            cursor = body.server_time
+
+            if (!body.has_more) break
+        }
+
+        Log.d(TAG, "增量同步完成：新增/更新 ${totalInserted + totalUpdated}，删除 $totalDeleted")
+        SyncResult.Success(totalInserted, totalUpdated, totalDeleted)
+    }
+
+    private fun applyRemoteMessage(remote: RemoteMessage, validActorIds: Set<Long>) {
+        val createdAtMs = parseIsoToMs(remote.created_at)
+        val updatedAtMs = parseIsoToMs(remote.updated_at)
+        val safeActorId = if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
+        val message = Message(
+            id = remote.id,
+            text = remote.text,
+            actorId = safeActorId,
+            starred = remote.starred,
+            createdAt = createdAtMs,
+            updatedAt = updatedAtMs,
+        )
+        messageDao.insertMessage(message)
+        messageDao.deleteMessageMediaByMessageId(remote.id)
+        for (rm in remote.media_items) {
+            messageDao.insertMessageMedia(MessageMedia(messageId = remote.id, mediaId = rm.id, position = rm.position))
+        }
+        messageDao.deleteMessageTagsByMessageId(remote.id)
+        for (rt in remote.tags) {
+            messageDao.insertMessageTag(MessageTag(messageId = remote.id, tagId = rt.id))
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseRemoteMessage(data: Map<String, Any?>): RemoteMessage? = try {
+        val mediaRaw = data["media_items"] as? List<Map<String, Any?>> ?: emptyList()
+        val tagsRaw = data["tags"] as? List<Map<String, Any?>> ?: emptyList()
+        RemoteMessage(
+            id = (data["id"] as? Double)?.toLong() ?: return null,
+            text = data["text"] as? String,
+            actor_id = (data["actor_id"] as? Double)?.toLong(),
+            actor_name = data["actor_name"] as? String,
+            starred = data["starred"] as? Boolean ?: false,
+            created_at = data["created_at"] as? String ?: return null,
+            updated_at = data["updated_at"] as? String ?: return null,
+            media_items = mediaRaw.mapNotNull { parseRemoteMediaItem(it) },
+            tags = tagsRaw.mapNotNull { parseRemoteTagItem(it) },
+        )
+    } catch (e: Exception) {
+        Log.e(TAG, "parseRemoteMessage 失败: ${e.message}")
+        null
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseRemoteMediaItem(data: Map<String, Any?>): RemoteMediaItem? = try {
+        RemoteMediaItem(
+            id = (data["id"] as? Double)?.toLong() ?: return null,
+            file_url = data["file_url"] as? String ?: "",
+            file_hash = data["file_hash"] as? String,
+            file_size = (data["file_size"] as? Double)?.toLong(),
+            mime_type = data["mime_type"] as? String,
+            width = (data["width"] as? Double)?.toInt(),
+            height = (data["height"] as? Double)?.toInt(),
+            duration = (data["duration"] as? Double)?.toInt(),
+            rating = (data["rating"] as? Double)?.toInt() ?: 0,
+            starred = data["starred"] as? Boolean ?: false,
+            thumb_url = data["thumb_url"] as? String ?: "",
+            position = (data["position"] as? Double)?.toInt() ?: 0,
+        )
+    } catch (e: Exception) {
+        null
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseRemoteActor(data: Map<String, Any?>): RemoteActor? = try {
+        RemoteActor(
+            id = (data["id"] as? Double)?.toLong() ?: return null,
+            name = data["name"] as? String ?: return null,
+            description = data["description"] as? String,
+            avatar = data["avatar"] as? String,
+        )
+    } catch (e: Exception) {
+        null
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseRemoteTagItem(data: Map<String, Any?>): RemoteTagItem? = try {
+        RemoteTagItem(
+            id = (data["id"] as? Double)?.toLong() ?: return null,
+            name = data["name"] as? String ?: return null,
+            category = data["category"] as? String,
+        )
+    } catch (e: Exception) {
+        null
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseRemoteTag(data: Map<String, Any?>): RemoteTagItem? = parseRemoteTagItem(data)
+
+    private fun parseIsoToMs(iso: String): Long = try {
+        LocalDateTime.parse(iso).toInstant(ZoneOffset.UTC).toEpochMilli()
+    } catch (_: Exception) {
+        System.currentTimeMillis()
+    }
+
     companion object {
         private const val TAG = "MessageRepository"
         val TAG_PATTERN = Regex("""#([\w\u4e00-\u9fff\u3400-\u4dbf-]+)""")

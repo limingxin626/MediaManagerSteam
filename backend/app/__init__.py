@@ -6,6 +6,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from app.routers import all_routers
 from app.config import config
+from app.services.sync_log_service import register_sync_listeners
 
 # 配置日志
 log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
@@ -56,3 +57,10 @@ for server_path, system_path in config.get_static_mounts().items():
 # 注册所有路由
 for router in all_routers:
     app.include_router(router)
+
+# 注册 SyncLog 事件监听器
+register_sync_listeners()
+
+# 确保新表（如 sync_log）存在
+from app.models import Base, engine
+Base.metadata.create_all(bind=engine, checkfirst=True)

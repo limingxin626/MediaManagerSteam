@@ -9,6 +9,7 @@ import com.example.myapplication.data.repository.MediaRepository
 import com.example.myapplication.data.repository.TagRepository
 import com.example.myapplication.data.repository.SyncOutboxRepository
 import com.example.myapplication.data.repository.MessageRepository
+import com.example.myapplication.data.service.NetworkMonitor
 
 /**
  * 数据库管理器
@@ -21,14 +22,14 @@ class DatabaseManager private constructor(context: Context) {
 
     // 数据库实例
     private val database = AppDatabase.getDatabase(context)
-    
+
     // DAO实例
     private val actorDao = database.actorDao()
     private val mediaDao = database.mediaDao()
     private val tagDao = database.tagDao()
     private val syncOutboxDao = database.syncOutboxDao()
     private val messageDao = database.messageDao()
-    
+
     // Repository实例
     val syncOutboxRepository = SyncOutboxRepository(syncOutboxDao)
 
@@ -36,11 +37,14 @@ class DatabaseManager private constructor(context: Context) {
     val mediaRepository = MediaRepository(mediaDao, syncOutboxRepository)
     val tagRepository = TagRepository(tagDao)
     val messageRepository = MessageRepository(messageDao, mediaDao, tagDao, actorDao, syncOutboxRepository)
-    
+
+    // 网络监听
+    val networkMonitor = NetworkMonitor(appContext)
+
     companion object {
         @Volatile
         private var INSTANCE: DatabaseManager? = null
-        
+
         fun getInstance(context: Context): DatabaseManager {
             return INSTANCE ?: synchronized(this) {
                 val instance = DatabaseManager(context.applicationContext)
