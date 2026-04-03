@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -217,8 +218,8 @@ fun MyApplicationApp(
     // 判断当前路由是否在底部导航栏中
     val showBottomBar = currentRoute in listOf(
         Routes.HOME,
+        Routes.ACTOR_LIST,
         Routes.MEDIA_LIST,
-        Routes.TAG_LIST,
         Routes.SETTINGS
     )
 
@@ -326,21 +327,19 @@ fun AppNavHost(
             )
         }
 
-        // 演员列表 - 从右侧滑入
+        // 演员列表 - 无动画（底部导航标签页）
         composable(
             Routes.ACTOR_LIST,
-            enterTransition = { NavigationAnimations.slideInFromRight() },
-            exitTransition = { NavigationAnimations.slideOutToLeft() },
-            popEnterTransition = { NavigationAnimations.slideInFromLeft() },
-            popExitTransition = { NavigationAnimations.slideOutToRight() }
+            enterTransition = { NavigationAnimations.noAnimation() },
+            exitTransition = { NavigationAnimations.noExitAnimation() },
+            popEnterTransition = { NavigationAnimations.noAnimation() },
+            popExitTransition = { NavigationAnimations.noExitAnimation() }
         ) {
             ActorListScreen(
                 viewModel = actorViewModel!!,
-                onActorClick = { actor ->
-                    navController.navigate(Routes.actorDetail(actor.id))
-                },
-                onAddActor = {
-                    navController.navigate(Routes.ACTOR_ADD)
+                onNavigateToMessages = { actorId ->
+                    if (actorId == null) navController.navigate(Routes.messageList(null))
+                    else navController.navigate(Routes.messageListByActor(actorId))
                 }
             )
         }
@@ -388,6 +387,48 @@ fun AppNavHost(
             DisposableEffect(Unit) {
                 onDispose {
                     messageViewModel!!.setTagId(null)
+                }
+            }
+
+            MessageListScreen(
+                viewModel = messageViewModel!!,
+                databaseManager = databaseManager,
+                onMessageClick = { messageId ->
+                    navController.navigate(Routes.messageDetail(messageId))
+                },
+                onEditMessage = { messageId ->
+                    navController.navigate(Routes.messageEdit(messageId))
+                },
+                onMediaClick = { mediaId, messageId, mediaList ->
+                    navController.navigateToMediaFullscreen(mediaId, mediaList, messageId)
+                }
+            )
+        }
+
+        // 按演员过滤的消息列表 - 从右侧滑入
+        composable(
+            Routes.MESSAGE_LIST_BY_ACTOR,
+            arguments = listOf(
+                navArgument("actorId") {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                }
+            ),
+            enterTransition = { NavigationAnimations.slideInFromRight() },
+            exitTransition = { NavigationAnimations.slideOutToLeft() },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { NavigationAnimations.slideOutToRight() }
+        ) { backStackEntry ->
+            val actorId = backStackEntry.arguments?.getLong("actorId") ?: -1L
+            val effectiveActorId = if (actorId == -1L) null else actorId
+
+            LaunchedEffect(effectiveActorId) {
+                messageViewModel!!.setActorId(effectiveActorId)
+            }
+
+            DisposableEffect(Unit) {
+                onDispose {
+                    messageViewModel!!.setActorId(null)
                 }
             }
 
@@ -636,8 +677,8 @@ enum class AppDestinations(
     val route: String
 ) {
     HOME("主页", Icons.Default.Home, Routes.HOME),
+    ACTORS("演员", Icons.Default.Person, Routes.ACTOR_LIST),
     MEDIA("媒体", Icons.Default.PlayArrow, Routes.MEDIA_LIST),
-    TAGS("标签", Icons.Default.Star, Routes.TAG_LIST),
     SETTINGS("设置", Icons.Default.Settings, Routes.SETTINGS),
 }
 

@@ -35,18 +35,21 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
     // 标签过滤
     private val _tagId = MutableStateFlow<Long?>(null)
 
+    // 演员过滤
+    private val _actorId = MutableStateFlow<Long?>(null)
+
     // 分页消息列表
     @OptIn(ExperimentalCoroutinesApi::class)
-    val messagesPaged: Flow<PagingData<MessageWithDetails>> = combine(_searchQuery, _tagId) { query, tagId ->
-        Pair(query, tagId)
-    }.flatMapLatest { (query, tagId) ->
+    val messagesPaged: Flow<PagingData<MessageWithDetails>> = combine(_searchQuery, _tagId, _actorId) { query, tagId, actorId ->
+        Triple(query, tagId, actorId)
+    }.flatMapLatest { (query, tagId, actorId) ->
         Pager(
             config = PagingConfig(pageSize = 30, prefetchDistance = 10),
             pagingSourceFactory = {
-                if (tagId != null) {
-                    messageRepository.getMessagesByTagPaged(tagId, query)
-                } else {
-                    messageRepository.getMessagesPaged(query)
+                when {
+                    actorId != null -> messageRepository.getMessagesByActorPaged(actorId, query)
+                    tagId != null   -> messageRepository.getMessagesByTagPaged(tagId, query)
+                    else            -> messageRepository.getMessagesPaged(query)
                 }
             }
         ).flow
@@ -75,6 +78,13 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
      */
     fun setTagId(tagId: Long?) {
         _tagId.value = tagId
+    }
+
+    /**
+     * 设置演员过滤
+     */
+    fun setActorId(actorId: Long?) {
+        _actorId.value = actorId
     }
 
     /**

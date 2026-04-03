@@ -90,6 +90,31 @@ class MessageRepository(
     }
 
     /**
+     * 获取按演员过滤的分页消息列表
+     */
+    fun getMessagesByActorPaged(actorId: Long, query: String): PagingSource<Int, MessageWithDetails> {
+        return if (query.isBlank()) {
+            messageDao.getMessagesByActorPaged(actorId)
+        } else {
+            messageDao.searchMessagesByActorPaged(actorId, query)
+        }
+    }
+
+    /**
+     * 获取指定演员的消息数量
+     */
+    suspend fun getMessageCountByActor(actorId: Long): Int {
+        return messageDao.getMessageCountByActor(actorId)
+    }
+
+    /**
+     * 获取指定演员的最新消息（用于 group 预览）
+     */
+    suspend fun getLastMessageByActor(actorId: Long): MessageWithDetails? {
+        return messageDao.getLastMessageByActor(actorId)
+    }
+
+    /**
      * 获取标签的最新消息（用于 group 预览）
      */
     suspend fun getLastMessageForTag(tagId: Long): MessageWithDetails? {

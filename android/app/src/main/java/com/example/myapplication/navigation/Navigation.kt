@@ -46,6 +46,7 @@ object Routes {
 
     // 消息相关
     const val MESSAGE_LIST = "messages?tagId={tagId}"
+    const val MESSAGE_LIST_BY_ACTOR = "messages_by_actor?actorId={actorId}"
     const val MESSAGE_DETAIL = "message/{messageId}"
     const val MESSAGE_EDIT = "message/edit?messageId={messageId}"
     const val MESSAGE_ADD = "message/add"
@@ -56,6 +57,11 @@ object Routes {
     fun messageList(tagId: Long? = null): String {
         return if (tagId != null) "messages?tagId=$tagId" else "messages?tagId=-1"
     }
+
+    /**
+     * 构建按演员过滤的消息列表路由
+     */
+    fun messageListByActor(actorId: Long) = "messages_by_actor?actorId=$actorId"
     
     /**
      * 构建带参数的演员详情路由

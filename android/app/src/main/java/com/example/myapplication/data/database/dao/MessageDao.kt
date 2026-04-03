@@ -170,4 +170,21 @@ interface MessageDao {
 
     @Query("DELETE FROM message_tag WHERE messageId = :messageId AND tagId = :tagId")
     suspend fun deleteMessageTag(messageId: Long, tagId: Long)
+
+    // ==================== Actor-filtered Paging 查询 ====================
+
+    @Transaction
+    @Query("SELECT * FROM messages WHERE actorId = :actorId ORDER BY createdAt DESC")
+    fun getMessagesByActorPaged(actorId: Long): PagingSource<Int, MessageWithDetails>
+
+    @Transaction
+    @Query("SELECT * FROM messages WHERE actorId = :actorId AND text LIKE '%' || :query || '%' ORDER BY createdAt DESC")
+    fun searchMessagesByActorPaged(actorId: Long, query: String): PagingSource<Int, MessageWithDetails>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE actorId = :actorId")
+    suspend fun getMessageCountByActor(actorId: Long): Int
+
+    @Transaction
+    @Query("SELECT * FROM messages WHERE actorId = :actorId ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getLastMessageByActor(actorId: Long): MessageWithDetails?
 }
