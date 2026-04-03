@@ -61,8 +61,8 @@
               </div>
             </div>
             <!-- Duration -->
-            <div v-if="item.duration" class="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-              {{ formatDuration(item.duration) }}
+            <div v-if="item.duration_ms" class="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+              {{ formatDuration(item.duration_ms) }}
             </div>
             <!-- Star toggle -->
             <button
@@ -210,7 +210,7 @@ const openPreview = (item: Media) => {
     id: m.id,
     file_path: m.file_path,
     mime_type: m.mime_type,
-    duration: m.duration,
+    duration_ms: m.duration_ms,
     thumb_url: m.thumb_url,
     starred: m.starred
   }))

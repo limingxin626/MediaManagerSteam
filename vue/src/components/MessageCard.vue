@@ -87,8 +87,8 @@
             </div>
 
             <!-- Duration badge -->
-            <div v-if="item.duration" class="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
-              {{ formatDuration(item.duration) }}
+            <div v-if="item.duration_ms" class="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
+              {{ formatDuration(item.duration_ms) }}
             </div>
 
             <!-- Star and Menu Buttons -->

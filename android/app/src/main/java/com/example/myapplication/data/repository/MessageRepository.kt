@@ -13,6 +13,12 @@ import com.example.myapplication.data.database.entities.MessageWithDetails
 import com.example.myapplication.data.database.entities.SyncOutboxItem
 import com.example.myapplication.data.database.entities.Tag
 import com.example.myapplication.data.model.MessageSortBy
+import com.example.myapplication.data.model.RemoteActor
+import com.example.myapplication.data.model.RemoteChangeItem
+import com.example.myapplication.data.model.RemoteChangesResponse
+import com.example.myapplication.data.model.RemoteMediaItem
+import com.example.myapplication.data.model.RemoteMessage
+import com.example.myapplication.data.model.RemoteTagItem
 import com.example.myapplication.data.model.SyncResult
 import com.example.myapplication.data.service.SyncConfig
 import com.example.myapplication.data.service.SyncNetwork
@@ -349,7 +355,7 @@ class MessageRepository(
                             mimeType = rm.mime_type,
                             width = rm.width,
                             height = rm.height,
-                            durationMs = rm.duration?.toLong()?.times(1000),
+                            durationMs = rm.duration_ms?.toLong(),
                             rating = rm.rating,
                             starred = rm.starred,
                         )
@@ -499,7 +505,7 @@ class MessageRepository(
                                         mimeType = rm.mime_type,
                                         width = rm.width,
                                         height = rm.height,
-                                        durationMs = rm.duration?.toLong()?.times(1000),
+                                        durationMs = rm.duration_ms?.toLong(),
                                         rating = rm.rating,
                                         starred = rm.starred,
                                     )
@@ -525,7 +531,7 @@ class MessageRepository(
         SyncResult.Success(totalInserted, totalUpdated, totalDeleted)
     }
 
-    private fun applyRemoteMessage(remote: RemoteMessage, validActorIds: Set<Long>) {
+    private suspend fun applyRemoteMessage(remote: RemoteMessage, validActorIds: Set<Long>) {
         val createdAtMs = parseIsoToMs(remote.created_at)
         val updatedAtMs = parseIsoToMs(remote.updated_at)
         val safeActorId = if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
@@ -549,66 +555,82 @@ class MessageRepository(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun parseRemoteMessage(data: Map<String, Any?>): RemoteMessage? = try {
-        val mediaRaw = data["media_items"] as? List<Map<String, Any?>> ?: emptyList()
-        val tagsRaw = data["tags"] as? List<Map<String, Any?>> ?: emptyList()
-        RemoteMessage(
-            id = (data["id"] as? Double)?.toLong() ?: return null,
-            text = data["text"] as? String,
-            actor_id = (data["actor_id"] as? Double)?.toLong(),
-            actor_name = data["actor_name"] as? String,
-            starred = data["starred"] as? Boolean ?: false,
-            created_at = data["created_at"] as? String ?: return null,
-            updated_at = data["updated_at"] as? String ?: return null,
-            media_items = mediaRaw.mapNotNull { parseRemoteMediaItem(it) },
-            tags = tagsRaw.mapNotNull { parseRemoteTagItem(it) },
-        )
-    } catch (e: Exception) {
-        Log.e(TAG, "parseRemoteMessage 失败: ${e.message}")
-        null
+    private fun parseRemoteMessage(data: Map<String, Any?>): RemoteMessage? {
+        return try {
+            val mediaRaw = data["media_items"] as? List<Map<String, Any?>> ?: emptyList()
+            val tagsRaw = data["tags"] as? List<Map<String, Any?>> ?: emptyList()
+            val id = (data["id"] as? Double)?.toLong() ?: return null
+            val createdAt = data["created_at"] as? String ?: return null
+            val updatedAt = data["updated_at"] as? String ?: return null
+            RemoteMessage(
+                id = id,
+                text = data["text"] as? String,
+                actor_id = (data["actor_id"] as? Double)?.toLong(),
+                actor_name = data["actor_name"] as? String,
+                starred = data["starred"] as? Boolean ?: false,
+                created_at = createdAt,
+                updated_at = updatedAt,
+                media_items = mediaRaw.mapNotNull { parseRemoteMediaItem(it) },
+                tags = tagsRaw.mapNotNull { parseRemoteTagItem(it) },
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "parseRemoteMessage 失败: ${e.message}")
+            null
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun parseRemoteMediaItem(data: Map<String, Any?>): RemoteMediaItem? = try {
-        RemoteMediaItem(
-            id = (data["id"] as? Double)?.toLong() ?: return null,
-            file_url = data["file_url"] as? String ?: "",
-            file_hash = data["file_hash"] as? String,
-            file_size = (data["file_size"] as? Double)?.toLong(),
-            mime_type = data["mime_type"] as? String,
-            width = (data["width"] as? Double)?.toInt(),
-            height = (data["height"] as? Double)?.toInt(),
-            duration = (data["duration"] as? Double)?.toInt(),
-            rating = (data["rating"] as? Double)?.toInt() ?: 0,
-            starred = data["starred"] as? Boolean ?: false,
-            thumb_url = data["thumb_url"] as? String ?: "",
-            position = (data["position"] as? Double)?.toInt() ?: 0,
-        )
-    } catch (e: Exception) {
-        null
+    private fun parseRemoteMediaItem(data: Map<String, Any?>): RemoteMediaItem? {
+        return try {
+            val id = (data["id"] as? Double)?.toLong() ?: return null
+            RemoteMediaItem(
+                id = id,
+                file_url = data["file_url"] as? String ?: "",
+                file_hash = data["file_hash"] as? String,
+                file_size = (data["file_size"] as? Double)?.toLong(),
+                mime_type = data["mime_type"] as? String,
+                width = (data["width"] as? Double)?.toInt(),
+                height = (data["height"] as? Double)?.toInt(),
+                duration_ms = (data["duration_ms"] as? Double)?.toInt(),
+                rating = (data["rating"] as? Double)?.toInt() ?: 0,
+                starred = data["starred"] as? Boolean ?: false,
+                thumb_url = data["thumb_url"] as? String ?: "",
+                position = (data["position"] as? Double)?.toInt() ?: 0,
+            )
+        } catch (e: Exception) {
+            null
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun parseRemoteActor(data: Map<String, Any?>): RemoteActor? = try {
-        RemoteActor(
-            id = (data["id"] as? Double)?.toLong() ?: return null,
-            name = data["name"] as? String ?: return null,
-            description = data["description"] as? String,
-            avatar = data["avatar"] as? String,
-        )
-    } catch (e: Exception) {
-        null
+    private fun parseRemoteActor(data: Map<String, Any?>): RemoteActor? {
+        return try {
+            val id = (data["id"] as? Double)?.toLong() ?: return null
+            val name = data["name"] as? String ?: return null
+            RemoteActor(
+                id = id,
+                name = name,
+                description = data["description"] as? String,
+                avatar = data["avatar"] as? String,
+            )
+        } catch (e: Exception) {
+            null
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun parseRemoteTagItem(data: Map<String, Any?>): RemoteTagItem? = try {
-        RemoteTagItem(
-            id = (data["id"] as? Double)?.toLong() ?: return null,
-            name = data["name"] as? String ?: return null,
-            category = data["category"] as? String,
-        )
-    } catch (e: Exception) {
-        null
+    private fun parseRemoteTagItem(data: Map<String, Any?>): RemoteTagItem? {
+        return try {
+            val id = (data["id"] as? Double)?.toLong() ?: return null
+            val name = data["name"] as? String ?: return null
+            RemoteTagItem(
+                id = id,
+                name = name,
+                category = data["category"] as? String,
+            )
+        } catch (e: Exception) {
+            null
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

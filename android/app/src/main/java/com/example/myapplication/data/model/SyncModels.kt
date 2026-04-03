@@ -66,7 +66,7 @@ data class RemoteMediaItem(
     val mime_type: String?,
     val width: Int?,
     val height: Int?,
-    val duration: Int?,
+    val duration_ms: Int?,
     val rating: Int,
     val starred: Boolean,
     val thumb_url: String,

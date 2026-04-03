@@ -3,7 +3,7 @@ export interface MessageMediaItem {
   id: number
   file_path: string
   mime_type: string | null
-  duration: number | null
+  duration_ms: number | null
   thumb_url: string
   starred?: boolean
 }
@@ -54,7 +54,7 @@ export interface Media {
   mime_type: string | null
   width: number | null
   height: number | null
-  duration: number | null
+  duration_ms: number | null
   rating: number
   starred: boolean
   view_count: number

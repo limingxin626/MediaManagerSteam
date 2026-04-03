@@ -29,6 +29,7 @@ class SettingsViewModel(
                     _syncState.value = SyncUiState.Error("演员同步失败: ${r.message}")
                     return@launch
                 }
+                else -> {}
             }
 
             // 同步 Message (含 Media/Tag)
@@ -38,6 +39,7 @@ class SettingsViewModel(
                     _syncState.value = SyncUiState.Error("消息同步失败: ${r.message}\n${results.joinToString("\n")}")
                     return@launch
                 }
+                else -> {}
             }
 
             _syncState.value = SyncUiState.Success(results.joinToString("\n"))
