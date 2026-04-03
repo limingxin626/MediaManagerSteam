@@ -65,6 +65,15 @@ fun MessageListScreen(
         derivedStateOf { listState.firstVisibleItemIndex > 2 }
     }
 
+    // 发送完成时（sendingMessages 从非空变为空）立即滚到底部，避免 Paging 刷新引起跳动
+    val prevSendingCount = remember { mutableStateOf(0) }
+    LaunchedEffect(sendingMessages.size) {
+        if (prevSendingCount.value > 0 && sendingMessages.isEmpty()) {
+            listState.scrollToItem(0)
+        }
+        prevSendingCount.value = sendingMessages.size
+    }
+
     // 日期格式化
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
