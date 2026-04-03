@@ -12,12 +12,9 @@ import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.database.entities.Message
 import com.example.myapplication.data.database.entities.MessageWithDetails
-import com.example.myapplication.data.model.MediaUploadState
 import com.example.myapplication.data.model.ProgressRequestBody
-import com.example.myapplication.data.model.SendStatus
-import com.example.myapplication.data.model.SendingMessage
 import com.example.myapplication.data.repository.MessageRepository
-import com.example.myapplication.data.service.CreateMessageRequest
+import com.example.myapplication.data.service.MessageSyncRequest
 import com.example.myapplication.data.service.SyncNetwork
 import com.example.myapplication.utils.MediaFileInfo
 import com.example.myapplication.utils.MediaFilePicker
@@ -32,11 +29,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.MultipartBody
 import java.io.File
-import java.util.UUID
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 /**
  * 消息视图模型
@@ -72,10 +70,6 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
     // UI状态
     private val _uiState = MutableStateFlow(UIState())
     val uiState: StateFlow<UIState> = _uiState.asStateFlow()
-
-    // 发送中的消息（乐观更新列表）
-    private val _sendingMessages = MutableStateFlow<Map<String, SendingMessage>>(emptyMap())
-    val sendingMessages: StateFlow<Map<String, SendingMessage>> = _sendingMessages.asStateFlow()
 
     fun searchMessages(query: String) { _searchQuery.value = query }
     fun clearSearch() { _searchQuery.value = "" }
@@ -115,7 +109,8 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
 
     /**
      * 发送消息（文本 + 媒体附件）
-     * 完全绕过 Outbox：直接 HTTP 上传 + 创建消息，本地乐观写入供即时反馈。
+     * Android 直接创建完整 Message 记录（sendStatus=PUSHING），立刻进入 paging。
+     * 后台上传文件并推送给后端，后端接受客户端 ID。
      */
     fun sendMessage(
         text: String,
@@ -125,20 +120,19 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val tempId = UUID.randomUUID().toString()
         viewModelScope.launch {
             val filePicker = MediaFilePicker(context)
             val thumbnailGenerator = ThumbnailGenerator(context)
 
-            // Step 1: 乐观写入 Room（sendStatus=PENDING）
+            // Step 1: 本地创建完整记录，sendStatus=PUSHING，立刻进入 paging
             val localMessageId = messageRepository.createMessage(
-                Message(text = text.ifBlank { null }, sendStatus = Message.MSG_STATUS_PENDING),
+                Message(text = text.ifBlank { null }, sendStatus = Message.MSG_STATUS_PUSHING),
                 immediateSync = false
             )
             parseAndAttachTags(text, localMessageId, databaseManager)
 
-            // 写入每个媒体到本地 Room
-            val initialStates = mutableListOf<MediaUploadState>()
+            // Step 2: 创建 Media + MessageMedia junctions
+            val localMediaInfos = mutableListOf<Pair<MediaFileInfo, String?>>()
             for ((index, mediaFileInfo) in mediaList.withIndex()) {
                 val localPath = filePicker.copyFileToAppStorage(mediaFileInfo.uri, mediaFileInfo.fileName)
                 val fileHash = filePicker.computeBlake2bHash(mediaFileInfo.uri) ?: mediaFileInfo.uri.toString()
@@ -158,168 +152,121 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                 )
                 val mediaId = databaseManager.mediaRepository.insertMedia(media)
                 messageRepository.addMediaToMessage(localMessageId, mediaId, position = index)
-                initialStates.add(MediaUploadState(
-                    mediaFileInfo = mediaFileInfo,
-                    localMediaId = mediaId,
-                    localFilePath = localPath
-                ))
+                localMediaInfos.add(mediaFileInfo to localPath)
             }
+            // ↑ 至此消息已在 paging 中可见（带本地缩略图，状态 PUSHING）
 
-            // 注册到 _sendingMessages
-            _sendingMessages.update { it + (tempId to SendingMessage(
-                tempId = tempId,
-                localMessageId = localMessageId,
-                text = text.ifBlank { null },
-                actorId = null,
-                mediaStates = initialStates,
-                status = SendStatus.UPLOADING
-            )) }
-
-            // Step 2: 并行上传所有媒体
+            // Step 3: 后台上传 + 推送
             try {
-                val uploadedStates = coroutineScope {
-                    initialStates.mapIndexed { idx, state ->
-                        async { uploadWithProgress(tempId, idx, state) }
+                // 并行上传文件
+                val serverPaths = coroutineScope {
+                    localMediaInfos.map { (info, path) ->
+                        async { uploadFile(info, path) }
                     }.awaitAll()
                 }
-
-                val failedCount = uploadedStates.count { it.error != null }
-                if (failedCount > 0) {
-                    messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_FAILED)
-                    _sendingMessages.update { map ->
-                        val c = map[tempId] ?: return@update map
-                        map + (tempId to c.copy(status = SendStatus.FAILED, error = "上传失败 $failedCount 个文件", mediaStates = uploadedStates))
-                    }
-                    onError("上传失败 $failedCount 个文件")
+                if (serverPaths.any { it == null } && localMediaInfos.isNotEmpty()) {
+                    messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PUSH_FAILED)
+                    onError("上传失败")
                     return@launch
                 }
 
-                // Step 3: POST /messages 创建消息
-                _sendingMessages.update { map ->
-                    val c = map[tempId] ?: return@update map
-                    map + (tempId to c.copy(status = SendStatus.CREATING, mediaStates = uploadedStates))
+                // 构建 created_at ISO 字符串
+                val msg = messageRepository.getMessageById(localMessageId)
+                val createdAtIso = msg?.let {
+                    Instant.ofEpochMilli(it.createdAt)
+                        .atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                 }
 
-                val serverMessage = SyncNetwork.createMessageService.createMessage(
-                    CreateMessageRequest(
+                // 调用新接口
+                val response = SyncNetwork.messageSyncService.createFromClient(
+                    MessageSyncRequest(
+                        id = localMessageId,
                         text = text.ifBlank { null },
                         actor_id = null,
-                        files = uploadedStates.mapNotNull { it.serverPath }
+                        created_at = createdAtIso,
+                        files = serverPaths.filterNotNull()
                     )
                 )
 
-                // Step 4: 替换本地临时 ID
-                messageRepository.replaceWithServerId(localMessageId, serverMessage)
-
-                // Step 5: 清除发送中状态
-                _sendingMessages.update { it - tempId }
+                // 更新远程 URL + 标记 SYNCED
+                messageRepository.applyRemoteUrls(localMessageId, response)
                 onSuccess()
             } catch (e: Exception) {
                 Log.e(TAG, "sendMessage 失败: ${e.message}", e)
-                messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_FAILED)
-                _sendingMessages.update { map ->
-                    val c = map[tempId] ?: return@update map
-                    map + (tempId to c.copy(status = SendStatus.FAILED, error = e.message))
-                }
-                onError("发送失败: ${e.message}")
+                messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PUSH_FAILED)
+                onError("同步失败: ${e.message}")
             }
-        }
-    }
-
-    /** 上传单个媒体文件并实时回报进度 */
-    private suspend fun uploadWithProgress(
-        tempId: String,
-        mediaIndex: Int,
-        state: MediaUploadState
-    ): MediaUploadState {
-        val filePath = state.localFilePath ?: return state.copy(error = "文件路径为空")
-        val file = File(filePath)
-        if (!file.exists()) return state.copy(error = "文件不存在: $filePath")
-
-        return try {
-            val mimeType = state.mediaFileInfo.mimeType ?: "application/octet-stream"
-            val progressBody = ProgressRequestBody(file, mimeType) { progress ->
-                val map = _sendingMessages.value
-                val current = map[tempId] ?: return@ProgressRequestBody
-                val updatedStates = current.mediaStates.toMutableList()
-                if (mediaIndex < updatedStates.size) {
-                    updatedStates[mediaIndex] = updatedStates[mediaIndex].copy(uploadProgress = progress)
-                    _sendingMessages.value = map + (tempId to current.copy(mediaStates = updatedStates))
-                }
-            }
-            val filePart = MultipartBody.Part.createFormData(
-                name = "file",
-                filename = state.mediaFileInfo.fileName,
-                body = progressBody
-            )
-            val response = SyncNetwork.uploadService.uploadMedia(filePart)
-            state.copy(serverPath = response.path, uploadProgress = 1f, error = null)
-        } catch (e: Exception) {
-            Log.e(TAG, "uploadMedia 失败 [${state.mediaFileInfo.fileName}]: ${e.message}", e)
-            state.copy(error = e.message)
         }
     }
 
     /**
-     * 重试发送失败的消息（只重传 serverPath == null 的媒体）
+     * 重试推送失败的消息（重新上传所有本地媒体并调用 create-from-client）
      */
-    fun retryMessage(tempId: String) {
-        val sending = _sendingMessages.value[tempId] ?: return
+    fun retrySync(messageId: Long) {
         viewModelScope.launch {
-            _sendingMessages.update { map ->
-                map + (tempId to sending.copy(status = SendStatus.UPLOADING, error = null))
-            }
+            messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PUSHING)
             try {
-                val uploadedStates = coroutineScope {
-                    sending.mediaStates.mapIndexed { idx, state ->
-                        async {
-                            if (state.serverPath == null) uploadWithProgress(tempId, idx, state) else state
-                        }
+                val mediaList = messageRepository.getMediaByMessageId(messageId)
+                val serverPaths = coroutineScope {
+                    mediaList.map { media ->
+                        async { uploadFileFromMedia(media) }
                     }.awaitAll()
                 }
 
-                val failedCount = uploadedStates.count { it.error != null }
-                if (failedCount > 0) {
-                    _sendingMessages.update { map ->
-                        val c = map[tempId] ?: return@update map
-                        map + (tempId to c.copy(status = SendStatus.FAILED, error = "上传失败 $failedCount 个文件", mediaStates = uploadedStates))
-                    }
-                    return@launch
+                val msg = messageRepository.getMessageById(messageId)
+                val createdAtIso = msg?.let {
+                    Instant.ofEpochMilli(it.createdAt)
+                        .atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                 }
 
-                _sendingMessages.update { map ->
-                    val c = map[tempId] ?: return@update map
-                    map + (tempId to c.copy(status = SendStatus.CREATING, mediaStates = uploadedStates))
-                }
-
-                val serverMessage = SyncNetwork.createMessageService.createMessage(
-                    CreateMessageRequest(
-                        text = sending.text,
-                        actor_id = sending.actorId,
-                        files = uploadedStates.mapNotNull { it.serverPath }
+                // 幂等：后端发现 ID 已存在则返回现有记录
+                val response = SyncNetwork.messageSyncService.createFromClient(
+                    MessageSyncRequest(
+                        id = messageId,
+                        text = msg?.text,
+                        actor_id = msg?.actorId,
+                        created_at = createdAtIso,
+                        files = serverPaths.filterNotNull()
                     )
                 )
-                messageRepository.replaceWithServerId(sending.localMessageId, serverMessage)
-                _sendingMessages.update { it - tempId }
+                messageRepository.applyRemoteUrls(messageId, response)
             } catch (e: Exception) {
-                Log.e(TAG, "retryMessage 失败: ${e.message}", e)
-                messageRepository.updateSendStatus(sending.localMessageId, Message.MSG_STATUS_FAILED)
-                _sendingMessages.update { map ->
-                    val c = map[tempId] ?: return@update map
-                    map + (tempId to c.copy(status = SendStatus.FAILED, error = e.message))
-                }
+                Log.e(TAG, "retrySync 失败: ${e.message}", e)
+                messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PUSH_FAILED)
             }
         }
     }
 
-    /**
-     * 取消发送中的消息（删除本地临时记录）
-     */
-    fun cancelSending(tempId: String) {
-        val sending = _sendingMessages.value[tempId] ?: return
-        viewModelScope.launch {
-            messageRepository.deleteMessage(sending.localMessageId)
-            _sendingMessages.update { it - tempId }
+    /** 上传单个媒体文件，返回服务器路径 */
+    private suspend fun uploadFile(mediaFileInfo: MediaFileInfo, localPath: String?): String? {
+        if (localPath == null) return null
+        val file = File(localPath)
+        if (!file.exists()) return null
+        return try {
+            val body = ProgressRequestBody(file, mediaFileInfo.mimeType ?: "application/octet-stream") { }
+            val part = MultipartBody.Part.createFormData("file", mediaFileInfo.fileName, body)
+            SyncNetwork.uploadService.uploadMedia(part).path
+        } catch (e: Exception) {
+            Log.e(TAG, "uploadFile 失败 [${mediaFileInfo.fileName}]: ${e.message}", e)
+            null
+        }
+    }
+
+    /** 从已有 Media 实体上传文件 */
+    private suspend fun uploadFileFromMedia(media: Media): String? {
+        val path = media.localMediaPath ?: return null
+        val file = File(path)
+        if (!file.exists()) return null
+        return try {
+            val mimeType = media.mimeType ?: "application/octet-stream"
+            val body = ProgressRequestBody(file, mimeType) { }
+            val part = MultipartBody.Part.createFormData("file", file.name, body)
+            SyncNetwork.uploadService.uploadMedia(part).path
+        } catch (e: Exception) {
+            Log.e(TAG, "uploadFileFromMedia 失败: ${e.message}", e)
+            null
         }
     }
 

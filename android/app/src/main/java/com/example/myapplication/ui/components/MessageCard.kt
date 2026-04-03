@@ -1,10 +1,9 @@
 package com.example.myapplication.ui.components
 
 import com.example.myapplication.data.database.entities.Media
+import com.example.myapplication.data.database.entities.Message
 import com.example.myapplication.data.database.entities.MessageWithDetails
 import com.example.myapplication.data.database.entities.Tag
-import com.example.myapplication.data.model.SendStatus
-import com.example.myapplication.data.model.SendingMessage
 import com.example.myapplication.ui.theme.TextSecondary
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -50,12 +49,11 @@ import java.util.*
 fun MessageCard(
     messageWithDetails: MessageWithDetails,
     modifier: Modifier = Modifier,
-    sendingState: SendingMessage? = null,
     onMediaClick: (mediaId: Long, mediaList: List<Media>) -> Unit = { _, _ -> },
     onEditClick: (Long) -> Unit = {},
     onDeleteClick: (Long) -> Unit = {},
     onToggleStarred: (Long) -> Unit = {},
-    onRetry: ((String) -> Unit)? = null
+    onRetrySync: ((Long) -> Unit)? = null
 ) {
     val message = messageWithDetails.message
     val mediaList = messageWithDetails.mediaList
@@ -85,48 +83,14 @@ fun MessageCard(
         Column(modifier = Modifier.fillMaxWidth()) {
             // 缩略图网格区域
             if (mediaList.isNotEmpty()) {
-                Box {
-                    MediaThumbnailGrid(
-                        mediaList = mediaList,
-                        messageId = message.id,
-                        onMediaClick = { mediaId -> onMediaClick(mediaId, mediaList) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    )
-                    // 上传进度遮罩（UPLOADING 状态）
-                    if (sendingState?.status == SendStatus.UPLOADING) {
-                        val totalCount = sendingState.mediaStates.size.coerceAtLeast(1)
-                        val uploadedCount = sendingState.mediaStates.count { it.serverPath != null }
-                        val overallProgress = sendingState.mediaStates
-                            .map { it.uploadProgress }
-                            .average()
-                            .toFloat()
-                            .coerceIn(0f, 1f)
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .background(Color.Black.copy(alpha = 0.35f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(
-                                    progress = { overallProgress },
-                                    modifier = Modifier.size(36.dp),
-                                    color = Color.White,
-                                    strokeWidth = 3.dp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "$uploadedCount / $totalCount",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-                }
+                MediaThumbnailGrid(
+                    mediaList = mediaList,
+                    messageId = message.id,
+                    onMediaClick = { mediaId -> onMediaClick(mediaId, mediaList) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                )
             }
 
             // 文本和元信息
@@ -187,82 +151,76 @@ fun MessageCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 左侧：演员名 + 时间 或 发送状态
-                    if (sendingState != null && sendingState.status != SendStatus.DONE) {
-                        when (sendingState.status) {
-                            SendStatus.UPLOADING, SendStatus.CREATING -> {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(12.dp),
-                                        strokeWidth = 1.5.dp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    val label = if (sendingState.status == SendStatus.UPLOADING) {
-                                        val total = sendingState.mediaStates.size
-                                        val done = sendingState.mediaStates.count { it.serverPath != null }
-                                        "上传中 $done/$total"
-                                    } else "创建中..."
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
-                            SendStatus.FAILED -> {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = "发送失败",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.error,
-                                        fontSize = 12.sp
-                                    )
-                                    if (onRetry != null) {
-                                        Text(
-                                            text = "· 重试",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontSize = 12.sp,
-                                            modifier = Modifier.clickable { onRetry(sendingState.tempId) }
-                                        )
-                                    }
-                                }
-                            }
-                            else -> {}
-                        }
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            if (actor != null) {
-                                Text(
-                                    text = actor.name,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 12.sp
+                    // 左侧：根据 sendStatus 显示不同内容
+                    when (message.sendStatus) {
+                        Message.MSG_STATUS_PUSHING -> {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(12.dp),
+                                    strokeWidth = 1.5.dp,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "·",
+                                    text = "同步中...",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = TextSecondary,
                                     fontSize = 12.sp
                                 )
                             }
-                            Text(
-                                text = formattedTime,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextSecondary,
-                                fontSize = 12.sp
-                            )
+                        }
+                        Message.MSG_STATUS_PUSH_FAILED -> {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "同步失败",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 12.sp
+                                )
+                                if (onRetrySync != null) {
+                                    Text(
+                                        text = "· 重试",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.clickable { onRetrySync(message.id) }
+                                    )
+                                }
+                            }
+                        }
+                        else -> {
+                            // SYNCED: 正常显示演员名 + 时间
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (actor != null) {
+                                    Text(
+                                        text = actor.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = "·",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Text(
+                                    text = formattedTime,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
 

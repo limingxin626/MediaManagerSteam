@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from app.models import get_db, Message, MessageMedia, message_tag
 from app.schemas.message import (
-    MessageCreate, MessageUpdate, MessageMerge,
+    MessageCreate, MessageCreateFromClient, MessageUpdate, MessageMerge,
     MessageResponse, MessageDetailResponse,
     MessageMediaItem, MessageTagItem,
     CursorResponse, MessageDetailCursorResponse,
@@ -128,6 +128,33 @@ def _build_detail_response(db: Session, msg: Message, media_limit: Optional[int]
         tags=tags,
         created_at=msg.created_at.isoformat(),
         updated_at=msg.updated_at.isoformat(),
+    )
+
+
+def _build_sync_response(db: Session, db_message: Message) -> MessageSyncResponse:
+    """构建 MessageSyncResponse，供 create_message 和 create_message_from_client 共用。"""
+    relations = (
+        db.query(MessageMedia)
+        .filter(MessageMedia.message_id == db_message.id)
+        .order_by(MessageMedia.position)
+        .all()
+    )
+    media_items = [
+        MessageSyncMediaItem.model_validate(r.media, position=r.position)
+        for r in relations
+        if r.media
+    ]
+    tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in db_message.tags]
+    return MessageSyncResponse(
+        id=db_message.id,
+        text=db_message.text,
+        actor_id=db_message.actor_id,
+        actor_name=db_message.actor.name if db_message.actor else None,
+        starred=bool(db_message.starred),
+        created_at=db_message.created_at.isoformat(),
+        updated_at=db_message.updated_at.isoformat(),
+        media_items=media_items,
+        tags=tags,
     )
 
 
@@ -317,30 +344,50 @@ def create_message(
 
     db.commit()
     db.refresh(db_message)
+    return _build_sync_response(db, db_message)
 
-    relations = (
-        db.query(MessageMedia)
-        .filter(MessageMedia.message_id == db_message.id)
-        .order_by(MessageMedia.position)
-        .all()
+
+@router.post("/create-from-client", response_model=MessageSyncResponse, status_code=201)
+def create_message_from_client(
+    message_data: MessageCreateFromClient,
+    db: Session = Depends(get_db),
+):
+    """客户端主导创建消息：接受客户端提供的 ID，幂等"""
+    # 幂等：ID 已存在直接返回
+    existing = db.query(Message).filter(Message.id == message_data.id).first()
+    if existing:
+        return _build_sync_response(db, existing)
+
+    # 解析 created_at
+    created_at = None
+    if message_data.created_at:
+        try:
+            created_at = datetime.fromisoformat(message_data.created_at)
+        except ValueError:
+            pass
+    if created_at is None:
+        created_at = datetime.utcnow()
+
+    db_message = Message(
+        id=message_data.id,
+        text=message_data.text,
+        actor_id=message_data.actor_id,
+        created_at=created_at,
     )
-    media_items = [
-        MessageSyncMediaItem.model_validate(r.media, position=r.position)
-        for r in relations
-        if r.media
-    ]
-    tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in db_message.tags]
-    return MessageSyncResponse(
-        id=db_message.id,
-        text=db_message.text,
-        actor_id=db_message.actor_id,
-        actor_name=db_message.actor.name if db_message.actor else None,
-        starred=bool(db_message.starred),
-        created_at=db_message.created_at.isoformat(),
-        updated_at=db_message.updated_at.isoformat(),
-        media_items=media_items,
-        tags=tags,
-    )
+    db.add(db_message)
+    db.flush()
+
+    sync_tags_from_text(db, db_message, message_data.text)
+
+    position = 0
+    for file_path in message_data.files:
+        result = process_file(db, file_path, db_message.id, position)
+        if result is not None:
+            position += 1
+
+    db.commit()
+    db.refresh(db_message)
+    return _build_sync_response(db, db_message)
 
 
 @router.patch("/{message_id}", response_model=MessageDetailResponse)

@@ -36,7 +36,7 @@ class DatabaseManager private constructor(context: Context) {
     val actorRepository = ActorRepository(actorDao, syncOutboxRepository)
     val mediaRepository = MediaRepository(mediaDao, syncOutboxRepository)
     val tagRepository = TagRepository(tagDao)
-    val messageRepository = MessageRepository(messageDao, mediaDao, tagDao, actorDao, syncOutboxRepository)
+    val messageRepository = MessageRepository(messageDao, mediaDao, tagDao, actorDao, syncOutboxRepository, database)
 
     // 网络监听
     val networkMonitor = NetworkMonitor(appContext)

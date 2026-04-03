@@ -37,8 +37,8 @@ data class Message(
     val sendStatus: String = MSG_STATUS_SYNCED
 ) {
     companion object {
-        const val MSG_STATUS_PENDING = "PENDING"
         const val MSG_STATUS_SYNCED  = "SYNCED"
-        const val MSG_STATUS_FAILED  = "FAILED"
+        const val MSG_STATUS_PUSHING = "PUSHING"
+        const val MSG_STATUS_PUSH_FAILED = "PUSH_FAILED"
     }
 }

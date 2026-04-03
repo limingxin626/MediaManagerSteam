@@ -20,8 +20,6 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
-import com.example.myapplication.data.database.entities.Message
-import com.example.myapplication.data.database.entities.MessageWithDetails
 import com.example.myapplication.ui.components.*
 import com.example.myapplication.ui.theme.InstagramGradientMiddle
 import com.example.myapplication.ui.viewmodel.MessageViewModel
@@ -55,7 +53,6 @@ fun MessageListScreen(
     val uiState by viewModel.uiState.collectAsState(initial = UIState())
     val pagingItems = viewModel.messagesPaged.collectAsLazyPagingItems()
     val searchQuery by viewModel.searchQuery.collectAsState(initial = "")
-    val sendingMessages by viewModel.sendingMessages.collectAsState()
 
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -120,7 +117,7 @@ fun MessageListScreen(
                     EmptyState(message = "加载失败: ${refreshState.error.localizedMessage}")
                 }
 
-                refreshState is LoadState.NotLoading && pagingItems.itemCount == 0 && sendingMessages.isEmpty() -> {
+                refreshState is LoadState.NotLoading && pagingItems.itemCount == 0 -> {
                     EmptyState(
                         message = if (searchQuery.isNotBlank()) {
                             "没有找到符合条件的消息"
@@ -144,41 +141,6 @@ fun MessageListScreen(
                             end = 8.dp
                         )
                     ) {
-                        // 发送中的消息（reverseLayout 下 index=0 显示在视觉最底部，即最新位置）
-                        val sendingList = sendingMessages.values.sortedByDescending { it.createdAt }
-                        items(
-                            count = sendingList.size,
-                            key = { index -> "sending_${sendingList[index].tempId}" }
-                        ) { index ->
-                            val sending = sendingList[index]
-                            val placeholder = MessageWithDetails(
-                                message = com.example.myapplication.data.database.entities.Message(
-                                    id = sending.localMessageId,
-                                    text = sending.text,
-                                    createdAt = sending.createdAt
-                                ),
-                                mediaList = sending.mediaStates.mapNotNull { state ->
-                                    state.localFilePath?.let { path ->
-                                        com.example.myapplication.data.database.entities.Media(
-                                            fileHash = state.mediaFileInfo.fileName,
-                                            localMediaPath = path,
-                                            mimeType = state.mediaFileInfo.mimeType
-                                        )
-                                    }
-                                }
-                            )
-                            MessageCard(
-                                messageWithDetails = placeholder,
-                                sendingState = sending,
-                                onMediaClick = { _, _ -> },
-                                onEditClick = {},
-                                onDeleteClick = { viewModel.cancelSending(sending.tempId) },
-                                onToggleStarred = {},
-                                onRetry = { tempId -> viewModel.retryMessage(tempId) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
                         items(
                             count = pagingItems.itemCount,
                             key = { index -> pagingItems[index]?.message?.id ?: index }
@@ -206,6 +168,7 @@ fun MessageListScreen(
                                     onEditClick = { onEditMessage(it) },
                                     onDeleteClick = { viewModel.deleteMessage(it) },
                                     onToggleStarred = { viewModel.toggleStarred(it) },
+                                    onRetrySync = { viewModel.retrySync(it) },
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }

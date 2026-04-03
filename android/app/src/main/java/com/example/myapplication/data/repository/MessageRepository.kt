@@ -23,8 +23,10 @@ import com.example.myapplication.data.model.SyncResult
 import com.example.myapplication.data.service.SyncConfig
 import com.example.myapplication.data.service.SyncNetwork
 import com.example.myapplication.data.service.buildFullUrl
-import com.example.myapplication.data.service.MessageDetailRemote
+import com.example.myapplication.data.service.MessageSyncResponse
 import androidx.paging.PagingSource
+import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -40,7 +42,8 @@ class MessageRepository(
     private val mediaDao: MediaDao,
     private val tagDao: TagDao,
     private val actorDao: ActorDao,
-    private val outboxRepository: SyncOutboxRepository? = null
+    private val outboxRepository: SyncOutboxRepository? = null,
+    private val database: RoomDatabase? = null
 ) {
 
     /**
@@ -236,38 +239,33 @@ class MessageRepository(
     }
 
     /**
-     * 用后端返回的真实 ID 替换本地临时消息记录。
-     * 以 file_hash（Blake2b）匹配本地 Media ↔ 服务器 Media id。
+     * 推送成功后，用服务器返回的信息更新本地 Media 远程 URL + 补充 tags + 标记 SYNCED
      */
-    suspend fun replaceWithServerId(localMessageId: Long, serverMessage: MessageDetailRemote) {
-        val updatedAtMs = parseIsoToMs(serverMessage.updated_at)
-
-        // 1. 原地把 Message.id 更新为服务器 ID（ON UPDATE CASCADE 自动级联更新 junction 表）
-        messageDao.updateMessageId(
-            oldId = localMessageId,
-            newId = serverMessage.id,
-            status = Message.MSG_STATUS_SYNCED,
-            updatedAt = updatedAtMs
-        )
-
-        // 2. 遍历服务器 media_items，更新本地 Media 的远程 URL
-        for (rm in serverMessage.media_items) {
-            val hash = rm.file_hash ?: continue
-            val localMedia = mediaDao.getMediaByHash(hash) ?: continue
-            mediaDao.updateMedia(
-                localMedia.copy(
-                    remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
-                    remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url)
+    suspend fun applyRemoteUrls(messageId: Long, response: MessageSyncResponse) {
+        val txBody: suspend () -> Unit = {
+            for (rm in response.media_items) {
+                val hash = rm.file_hash ?: continue
+                val localMedia = mediaDao.getMediaByHash(hash) ?: continue
+                mediaDao.updateMedia(
+                    localMedia.copy(
+                        remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
+                        remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url)
+                    )
                 )
-            )
+            }
+            val existingTagIds = messageDao.getMessageTagIdsByMessageId(messageId).toSet()
+            for (rt in response.tags) {
+                if (rt.id !in existingTagIds) {
+                    messageDao.insertMessageTag(MessageTag(messageId = messageId, tagId = rt.id))
+                }
+            }
+            messageDao.updateSendStatus(messageId, Message.MSG_STATUS_SYNCED)
         }
 
-        // 3. 关联标签（MessageTag 已由 CASCADE 更新 messageId，只需补充服务器新增的 tag）
-        val existingTagIds = messageDao.getMessageTagIdsByMessageId(serverMessage.id).toSet()
-        for (rt in serverMessage.tags) {
-            if (rt.id !in existingTagIds) {
-                messageDao.insertMessageTag(MessageTag(messageId = serverMessage.id, tagId = rt.id))
-            }
+        if (database != null) {
+            database.withTransaction { txBody() }
+        } else {
+            txBody()
         }
     }
     

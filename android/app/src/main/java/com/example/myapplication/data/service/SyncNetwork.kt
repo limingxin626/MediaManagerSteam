@@ -31,8 +31,8 @@ object SyncNetwork {
         retrofit.create(MediaUploadService::class.java)
     }
 
-    val createMessageService: CreateMessageService by lazy {
-        retrofit.create(CreateMessageService::class.java)
+    val messageSyncService: MessageSyncService by lazy {
+        retrofit.create(MessageSyncService::class.java)
     }
 
     private fun ensureTrailingSlash(baseUrl: String): String {
@@ -40,24 +40,21 @@ object SyncNetwork {
     }
 }
 
-interface CreateMessageService {
-    @POST("messages")
-    suspend fun createMessage(@Body request: CreateMessageRequest): MessageDetailRemote
+interface MessageSyncService {
+    @POST("messages/create-from-client")
+    suspend fun createFromClient(@Body request: MessageSyncRequest): MessageSyncResponse
 }
 
-data class CreateMessageRequest(
-    val text: String?,
-    val actor_id: Long?,
-    val files: List<String>
-)
-
-data class MessageDetailRemote(
+data class MessageSyncRequest(
     val id: Long,
     val text: String?,
     val actor_id: Long?,
-    val starred: Boolean,
-    val created_at: String,
-    val updated_at: String,
+    val created_at: String?,
+    val files: List<String>
+)
+
+data class MessageSyncResponse(
+    val id: Long,
     val media_items: List<RemoteMediaItem>,
     val tags: List<RemoteTagItem>
 )

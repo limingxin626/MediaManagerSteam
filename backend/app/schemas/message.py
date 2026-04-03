@@ -12,6 +12,14 @@ class MessageCreate(BaseModel):
     files: List[str] = []
 
 
+class MessageCreateFromClient(BaseModel):
+    id: int                            # 客户端提供的 Message ID
+    text: Optional[str] = None
+    actor_id: Optional[int] = None
+    created_at: Optional[str] = None   # ISO 时间戳
+    files: List[str] = []              # upload-media 返回的服务器文件路径
+
+
 class MessageUpdate(BaseModel):
     text: Optional[str] = None
     actor_id: Optional[int] = None
