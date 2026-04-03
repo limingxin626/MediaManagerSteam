@@ -1,7 +1,11 @@
 package com.example.myapplication.data.service
 
+import com.example.myapplication.data.model.RemoteMediaItem
+import com.example.myapplication.data.model.RemoteTagItem
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Body
+import retrofit2.http.POST
 
 /**
  * 远程同步通用工具
@@ -23,10 +27,40 @@ object SyncNetwork {
         retrofit.create(SyncPushService::class.java)
     }
 
+    val uploadService: MediaUploadService by lazy {
+        retrofit.create(MediaUploadService::class.java)
+    }
+
+    val createMessageService: CreateMessageService by lazy {
+        retrofit.create(CreateMessageService::class.java)
+    }
+
     private fun ensureTrailingSlash(baseUrl: String): String {
         return if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
     }
 }
+
+interface CreateMessageService {
+    @POST("messages")
+    suspend fun createMessage(@Body request: CreateMessageRequest): MessageDetailRemote
+}
+
+data class CreateMessageRequest(
+    val text: String?,
+    val actor_id: Long?,
+    val files: List<String>
+)
+
+data class MessageDetailRemote(
+    val id: Long,
+    val text: String?,
+    val actor_id: Long?,
+    val starred: Boolean,
+    val created_at: String,
+    val updated_at: String,
+    val media_items: List<RemoteMediaItem>,
+    val tags: List<RemoteTagItem>
+)
 
 /**
  * 将相对路径拼成完整 URL。

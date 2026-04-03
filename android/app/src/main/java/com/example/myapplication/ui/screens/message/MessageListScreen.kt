@@ -53,6 +53,7 @@ fun MessageListScreen(
     val uiState by viewModel.uiState.collectAsState(initial = UIState())
     val pagingItems = viewModel.messagesPaged.collectAsLazyPagingItems()
     val searchQuery by viewModel.searchQuery.collectAsState(initial = "")
+    val sendingMessages by viewModel.sendingMessages.collectAsState()
 
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -117,7 +118,7 @@ fun MessageListScreen(
                     EmptyState(message = "加载失败: ${refreshState.error.localizedMessage}")
                 }
 
-                refreshState is LoadState.NotLoading && pagingItems.itemCount == 0 -> {
+                refreshState is LoadState.NotLoading && pagingItems.itemCount == 0 && sendingMessages.isEmpty() -> {
                     EmptyState(
                         message = if (searchQuery.isNotBlank()) {
                             "没有找到符合条件的消息"
@@ -141,12 +142,41 @@ fun MessageListScreen(
                             end = 8.dp
                         )
                     ) {
+                        // 发送中的消息（reverseLayout 下 index=0 显示在视觉最底部，即最新位置）
+                        val sendingList = sendingMessages.values.sortedByDescending { it.createdAt }
+                        val sendingLocalIds = sendingMessages.values.map { it.localMessageId }.toSet()
+                        items(
+                            count = sendingList.size,
+                            key = { index -> "sending_${sendingList[index].tempId}" }
+                        ) { index ->
+                            val sending = sendingList[index]
+                            // 找到对应的本地 Message（通过 pagingItems 无法直接拿到，用 PENDING 消息在列表中的条目展示）
+                            // 使用 MessageCard 的 sendingState 覆盖普通渲染
+                            val matchedItem = (0 until pagingItems.itemCount)
+                                .firstNotNullOfOrNull { i ->
+                                    pagingItems[i]?.takeIf { it.message.id == sending.localMessageId }
+                                }
+                            if (matchedItem != null) {
+                                MessageCard(
+                                    messageWithDetails = matchedItem,
+                                    sendingState = sending,
+                                    onMediaClick = { mediaId, mediaList -> onMediaClick(mediaId, matchedItem.message.id, mediaList) },
+                                    onEditClick = {},
+                                    onDeleteClick = { viewModel.cancelSending(sending.tempId) },
+                                    onToggleStarred = {},
+                                    onRetry = { tempId -> viewModel.retryMessage(tempId) },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+
                         items(
                             count = pagingItems.itemCount,
                             key = { index -> pagingItems[index]?.message?.id ?: index }
                         ) { index ->
                             val item = pagingItems[index]
-                            if (item != null) {
+                            // 跳过发送中的消息（已在上方单独渲染，避免重复）
+                            if (item != null && item.message.id !in sendingLocalIds) {
                                 // 日期分隔符：比较当前和下一条（index+1 方向是更旧的）
                                 val currentDate = dateFormatter.format(Date(item.message.createdAt))
                                 val nextItem = if (index + 1 < pagingItems.itemCount) pagingItems[index + 1] else null

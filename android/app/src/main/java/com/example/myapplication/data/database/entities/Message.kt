@@ -33,5 +33,12 @@ data class Message(
     val starred: Boolean = false,
     val source: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
-)
+    val updatedAt: Long = System.currentTimeMillis(),
+    val sendStatus: String = MSG_STATUS_SYNCED
+) {
+    companion object {
+        const val MSG_STATUS_PENDING = "PENDING"
+        const val MSG_STATUS_SYNCED  = "SYNCED"
+        const val MSG_STATUS_FAILED  = "FAILED"
+    }
+}

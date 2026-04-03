@@ -23,6 +23,7 @@ import com.example.myapplication.data.model.SyncResult
 import com.example.myapplication.data.service.SyncConfig
 import com.example.myapplication.data.service.SyncNetwork
 import com.example.myapplication.data.service.buildFullUrl
+import com.example.myapplication.data.service.MessageDetailRemote
 import androidx.paging.PagingSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -163,9 +164,10 @@ class MessageRepository(
     }
     
     /**
-     * 创建消息
+     * 创建消息（本地立即生效）
+     * @param immediateSync 是否立即推送到后端，含媒体的新消息应传 false，由调用方在所有关联完成后统一推送
      */
-    suspend fun createMessage(message: Message): Long {
+    suspend fun createMessage(message: Message, immediateSync: Boolean = true): Long {
         val insertedId = messageDao.insertMessage(message)
 
         if (insertedId > 0) {
@@ -175,13 +177,20 @@ class MessageRepository(
                 entityId = insertedId,
                 payloadJson = Gson().toJson(payload)
             )
+            if (immediateSync) {
+                try {
+                    outboxRepository?.syncToServer()
+                } catch (e: Exception) {
+                    Log.w(TAG, "createMessage 立即推送失败，将由后台任务重试: ${e.message}")
+                }
+            }
         }
 
         return insertedId
     }
-    
+
     /**
-     * 更新消息
+     * 更新消息（本地立即生效，随后立即推送到后端）
      */
     suspend fun updateMessage(message: Message) {
         val updatedMessage = message.copy(updatedAt = System.currentTimeMillis())
@@ -193,11 +202,16 @@ class MessageRepository(
                 entityId = updatedMessage.id,
                 payloadJson = Gson().toJson(updatedMessage)
             )
+            try {
+                outboxRepository?.syncToServer()
+            } catch (e: Exception) {
+                Log.w(TAG, "updateMessage 立即推送失败，将由后台任务重试: ${e.message}")
+            }
         }
     }
-    
+
     /**
-     * 删除消息
+     * 删除消息（本地立即生效，随后立即推送到后端）
      */
     suspend fun deleteMessage(messageId: Long) {
         // CASCADE handles junction table cleanup automatically
@@ -208,11 +222,74 @@ class MessageRepository(
                 entityType = SyncOutboxItem.ENTITY_MESSAGE,
                 entityId = messageId
             )
+            try {
+                outboxRepository?.syncToServer()
+            } catch (e: Exception) {
+                Log.w(TAG, "deleteMessage 立即推送失败，将由后台任务重试: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 更新消息发送状态
+     */
+    suspend fun updateSendStatus(messageId: Long, status: String) {
+        messageDao.updateSendStatus(messageId, status)
+    }
+
+    /**
+     * 用后端返回的真实 ID 替换本地临时消息记录。
+     * 以 file_hash（Blake2b）匹配本地 Media ↔ 服务器 Media id。
+     */
+    suspend fun replaceWithServerId(localMessageId: Long, serverMessage: MessageDetailRemote) {
+        // 1. 删除 junction 记录（不 cascade 删 Media）
+        messageDao.deleteMessageTagsByMessageId(localMessageId)
+        messageDao.deleteMessageMediaByMessageId(localMessageId)
+        // 2. 删除本地临时 Message
+        messageDao.deleteMessage(localMessageId)
+
+        // 3. 插入以服务器 ID 为 PK 的 Message
+        val createdAtMs = parseIsoToMs(serverMessage.created_at)
+        val updatedAtMs = parseIsoToMs(serverMessage.updated_at)
+        val serverMsg = Message(
+            id = serverMessage.id,
+            text = serverMessage.text,
+            actorId = serverMessage.actor_id,
+            starred = serverMessage.starred,
+            createdAt = createdAtMs,
+            updatedAt = updatedAtMs,
+            sendStatus = Message.MSG_STATUS_SYNCED
+        )
+        messageDao.insertMessage(serverMsg)
+
+        // 4. 遍历服务器 media_items，更新本地 Media URL 并关联
+        for ((position, rm) in serverMessage.media_items.withIndex()) {
+            val hash = rm.file_hash ?: continue
+            val localMedia = mediaDao.getMediaByHash(hash)
+            if (localMedia != null) {
+                val updated = localMedia.copy(
+                    remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
+                    remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url)
+                )
+                mediaDao.updateMedia(updated)
+                messageDao.insertMessageMedia(
+                    MessageMedia(
+                        messageId = serverMessage.id,
+                        mediaId = localMedia.id,
+                        position = rm.position.takeIf { it >= 0 } ?: position
+                    )
+                )
+            }
+        }
+
+        // 5. 关联标签
+        for (rt in serverMessage.tags) {
+            messageDao.insertMessageTag(MessageTag(messageId = serverMessage.id, tagId = rt.id))
         }
     }
     
     /**
-     * 切换消息收藏状态
+     * 切换消息收藏状态（本地立即生效，随后立即推送到后端）
      */
     suspend fun toggleStarred(messageId: Long) {
         val message = messageDao.getMessageById(messageId)
@@ -229,6 +306,12 @@ class MessageRepository(
                     entityId = updated.id,
                     payloadJson = Gson().toJson(updated)
                 )
+                // 立即推送，失败时 outbox 保留记录供 WorkManager 补推
+                try {
+                    outboxRepository?.syncToServer()
+                } catch (e: Exception) {
+                    Log.w(TAG, "toggleStarred 立即推送失败，将由后台任务重试: ${e.message}")
+                }
             }
         }
     }
@@ -640,6 +723,15 @@ class MessageRepository(
         LocalDateTime.parse(iso).toInstant(ZoneOffset.UTC).toEpochMilli()
     } catch (_: Exception) {
         System.currentTimeMillis()
+    }
+
+    /** 立即将 outbox 中的待推送变更同步到后端 */
+    suspend fun syncNow() {
+        try {
+            outboxRepository?.syncToServer()
+        } catch (e: Exception) {
+            Log.w(TAG, "syncNow 推送失败，将由后台任务重试: ${e.message}")
+        }
     }
 
     companion object {
