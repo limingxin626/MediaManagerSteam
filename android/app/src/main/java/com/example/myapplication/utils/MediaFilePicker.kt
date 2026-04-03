@@ -180,7 +180,7 @@ class MediaFilePicker(private val context: Context) {
      */
     fun computeBlake2bHash(uri: Uri): String? {
         return try {
-            val digest = Blake2bDigest(256)
+            val digest = Blake2bDigest(512)
             val buffer = ByteArray(8192)
             context.contentResolver.openInputStream(uri)?.use { input ->
                 var bytesRead: Int
