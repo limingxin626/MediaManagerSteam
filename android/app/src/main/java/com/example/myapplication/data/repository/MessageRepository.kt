@@ -240,49 +240,34 @@ class MessageRepository(
      * 以 file_hash（Blake2b）匹配本地 Media ↔ 服务器 Media id。
      */
     suspend fun replaceWithServerId(localMessageId: Long, serverMessage: MessageDetailRemote) {
-        // 1. 删除 junction 记录（不 cascade 删 Media）
-        messageDao.deleteMessageTagsByMessageId(localMessageId)
-        messageDao.deleteMessageMediaByMessageId(localMessageId)
-        // 2. 删除本地临时 Message
-        messageDao.deleteMessage(localMessageId)
-
-        // 3. 插入以服务器 ID 为 PK 的 Message
-        val createdAtMs = parseIsoToMs(serverMessage.created_at)
         val updatedAtMs = parseIsoToMs(serverMessage.updated_at)
-        val serverMsg = Message(
-            id = serverMessage.id,
-            text = serverMessage.text,
-            actorId = serverMessage.actor_id,
-            starred = serverMessage.starred,
-            createdAt = createdAtMs,
-            updatedAt = updatedAtMs,
-            sendStatus = Message.MSG_STATUS_SYNCED
-        )
-        messageDao.insertMessage(serverMsg)
 
-        // 4. 遍历服务器 media_items，更新本地 Media URL 并关联
-        for ((position, rm) in serverMessage.media_items.withIndex()) {
+        // 1. 原地把 Message.id 更新为服务器 ID（ON UPDATE CASCADE 自动级联更新 junction 表）
+        messageDao.updateMessageId(
+            oldId = localMessageId,
+            newId = serverMessage.id,
+            status = Message.MSG_STATUS_SYNCED,
+            updatedAt = updatedAtMs
+        )
+
+        // 2. 遍历服务器 media_items，更新本地 Media 的远程 URL
+        for (rm in serverMessage.media_items) {
             val hash = rm.file_hash ?: continue
-            val localMedia = mediaDao.getMediaByHash(hash)
-            if (localMedia != null) {
-                val updated = localMedia.copy(
+            val localMedia = mediaDao.getMediaByHash(hash) ?: continue
+            mediaDao.updateMedia(
+                localMedia.copy(
                     remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
                     remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url)
                 )
-                mediaDao.updateMedia(updated)
-                messageDao.insertMessageMedia(
-                    MessageMedia(
-                        messageId = serverMessage.id,
-                        mediaId = localMedia.id,
-                        position = rm.position.takeIf { it >= 0 } ?: position
-                    )
-                )
-            }
+            )
         }
 
-        // 5. 关联标签
+        // 3. 关联标签（MessageTag 已由 CASCADE 更新 messageId，只需补充服务器新增的 tag）
+        val existingTagIds = messageDao.getMessageTagIdsByMessageId(serverMessage.id).toSet()
         for (rt in serverMessage.tags) {
-            messageDao.insertMessageTag(MessageTag(messageId = serverMessage.id, tagId = rt.id))
+            if (rt.id !in existingTagIds) {
+                messageDao.insertMessageTag(MessageTag(messageId = serverMessage.id, tagId = rt.id))
+            }
         }
     }
     
