@@ -2,20 +2,34 @@
 应用配置模块 - 集中管理所有路径和配置
 支持通过环境变量覆盖默认配置
 """
+import logging
 import os
 from typing import Dict
+
+logger = logging.getLogger(__name__)
 
 
 class AppConfig:
     """应用配置类"""
-    
+
     # 基础数据目录 - 可通过环境变量 ASKTAO_DATA_ROOT 覆盖
     DATA_ROOT: str = os.getenv("ASKTAO_DATA_ROOT", "E:/AskTao")
-    
+
     # ffmpeg/ffprobe 路径 - 可通过环境变量覆盖
     FFMPEG_PATH: str = os.getenv("FFMPEG_PATH", "C:/Users/christluck/Documents/ffmpeg/bin/ffmpeg.exe")
     FFPROBE_PATH: str = os.getenv("FFPROBE_PATH", "C:/Users/christluck/Documents/ffmpeg/bin/ffprobe.exe")
     
+    @classmethod
+    def check_paths(cls) -> None:
+        """启动时检查关键路径是否存在，不存在则打印 warning。"""
+        for label, path in [("FFMPEG_PATH", cls.FFMPEG_PATH), ("FFPROBE_PATH", cls.FFPROBE_PATH)]:
+            if not os.path.isfile(path):
+                logger.warning(
+                    "%s 指向的文件不存在: %s — 缩略图生成和媒体信息提取将静默失败。"
+                    " 请通过环境变量设置正确路径。",
+                    label, path,
+                )
+
     # 支持的媒体文件扩展名（统一管理）
     VIDEO_EXTENSIONS: set = {".mp4"}
     IMAGE_EXTENSIONS: set = {".jpg", ".jpeg", ".png", ".gif"}

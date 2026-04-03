@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.models import get_db, Actor, Message, MessageMedia
 from typing import List, Optional
 from app.schemas.actor import ActorResponse, ActorDetailResponse, ActorSyncResponse
@@ -36,17 +37,28 @@ def get_actors(
         query = query.filter(Actor.name.ilike(f"%{name}%"))
 
     actors = query.order_by(Actor.name).offset(skip).limit(limit).all()
+    if not actors:
+        return []
+
+    actor_ids = [a.id for a in actors]
+
+    # 批量获取各演员的消息数，避免 N+1
+    counts = (
+        db.query(Message.actor_id, func.count(Message.id).label("cnt"))
+        .filter(Message.actor_id.in_(actor_ids))
+        .group_by(Message.actor_id)
+        .all()
+    )
+    count_map = {row.actor_id: row.cnt for row in counts}
 
     result = []
     for actor in actors:
-        message_count = db.query(Message).filter(Message.actor_id == actor.id).count()
-
         result.append(ActorResponse(
             id=actor.id,
             name=actor.name,
             description=actor.description,
             avatar_path=actor.avatar_path,
-            message_count=message_count,
+            message_count=count_map.get(actor.id, 0),
             created_at=actor.created_at.isoformat(),
             updated_at=actor.updated_at.isoformat()
         ))
@@ -68,13 +80,25 @@ def get_actor_detail(
         Message.actor_id == actor_id
     ).order_by(Message.created_at.desc()).all()
 
+    if messages:
+        message_ids = [m.id for m in messages]
+        # 批量获取各消息的媒体数，避免 N+1
+        media_counts = (
+            db.query(MessageMedia.message_id, func.count(MessageMedia.id).label("cnt"))
+            .filter(MessageMedia.message_id.in_(message_ids))
+            .group_by(MessageMedia.message_id)
+            .all()
+        )
+        media_count_map = {row.message_id: row.cnt for row in media_counts}
+    else:
+        media_count_map = {}
+
     message_list = []
     for message in messages:
-        media_count = db.query(MessageMedia).filter(MessageMedia.message_id == message.id).count()
         message_list.append({
             "id": message.id,
             "text": message.text,
-            "media_count": media_count,
+            "media_count": media_count_map.get(message.id, 0),
             "created_at": message.created_at.isoformat()
         })
 

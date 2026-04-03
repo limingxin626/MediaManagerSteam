@@ -17,6 +17,7 @@ class SyncChangeItem(BaseModel):
 class SyncChangesResponse(BaseModel):
     changes: List[SyncChangeItem]
     next_cursor: Optional[str] = None
+    next_cursor_id: Optional[int] = None  # 复合游标第二维：最后一条 SyncLog.id
     has_more: bool
     server_time: str
 

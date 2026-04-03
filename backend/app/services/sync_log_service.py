@@ -33,19 +33,24 @@ _local = threading.local()
 # ---------------------------------------------------------------------------
 
 _subscribers: list[asyncio.Queue] = []
+_subscribers_lock = threading.Lock()
+
+_SSE_QUEUE_MAXSIZE = 100
 
 
 def subscribe() -> asyncio.Queue:
-    q: asyncio.Queue = asyncio.Queue()
-    _subscribers.append(q)
+    q: asyncio.Queue = asyncio.Queue(maxsize=_SSE_QUEUE_MAXSIZE)
+    with _subscribers_lock:
+        _subscribers.append(q)
     return q
 
 
 def unsubscribe(q: asyncio.Queue) -> None:
-    try:
-        _subscribers.remove(q)
-    except ValueError:
-        pass
+    with _subscribers_lock:
+        try:
+            _subscribers.remove(q)
+        except ValueError:
+            pass
 
 
 def _broadcast(entity_type: str, entity_id: int, operation: str, timestamp: str) -> None:
@@ -55,11 +60,24 @@ def _broadcast(entity_type: str, entity_id: int, operation: str, timestamp: str)
         "operation": operation,
         "timestamp": timestamp,
     }
-    for q in list(_subscribers):
+    stale: list[asyncio.Queue] = []
+    with _subscribers_lock:
+        snapshot = list(_subscribers)
+    for q in snapshot:
         try:
             q.put_nowait(event_data)
+        except asyncio.QueueFull:
+            # 队列满说明客户端已失联，标记为需清除
+            stale.append(q)
         except Exception:
-            pass
+            stale.append(q)
+    if stale:
+        with _subscribers_lock:
+            for q in stale:
+                try:
+                    _subscribers.remove(q)
+                except ValueError:
+                    pass
 
 
 # ---------------------------------------------------------------------------

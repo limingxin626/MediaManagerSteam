@@ -139,10 +139,15 @@ def _fetch_snapshot(db: Session, entity_type: str, entity_id: int) -> Optional[D
 @router.get("/sync/changes", response_model=SyncChangesResponse)
 def get_sync_changes(
     since: Optional[str] = Query(None, description="ISO timestamp 游标，为空则返回 410 要求全量同步"),
+    since_id: int = Query(0, description="复合游标：上次最后一条 SyncLog.id，与 since 配合使用"),
     limit: int = Query(500, ge=1, le=1000),
     db: Session = Depends(get_db),
 ):
-    """增量拉取变更日志。since 为空或超过保留期返回 410，客户端应回退到全量同步。"""
+    """增量拉取变更日志。since 为空或超过保留期返回 410，客户端应回退到全量同步。
+
+    游标格式升级为 (timestamp, id) 复合游标，避免同一 timestamp 多行时跳页：
+    过滤条件等价于 (timestamp > since_dt) OR (timestamp = since_dt AND id > since_id)。
+    """
     server_time = datetime.utcnow().isoformat()
 
     if not since:
@@ -159,9 +164,13 @@ def get_sync_changes(
     if since_dt < cutoff:
         raise HTTPException(status_code=410, detail="since 超过保留期（90天），请执行全量同步")
 
+    # 复合游标过滤：(timestamp > since_dt) OR (timestamp = since_dt AND id > since_id)
     rows = (
         db.query(SyncLog)
-        .filter(SyncLog.timestamp > since_dt)
+        .filter(
+            (SyncLog.timestamp > since_dt) |
+            ((SyncLog.timestamp == since_dt) & (SyncLog.id > since_id))
+        )
         .order_by(SyncLog.timestamp.asc(), SyncLog.id.asc())
         .limit(limit + 1)
         .all()
@@ -194,11 +203,19 @@ def get_sync_changes(
             data=data,
         ))
 
-    next_cursor = deduped[-1].timestamp.isoformat() if has_more and deduped else None
+    # 下一页游标：使用 (timestamp, id) 复合值
+    if has_more and deduped:
+        last = deduped[-1]
+        next_cursor = last.timestamp.isoformat()
+        next_cursor_id = last.id
+    else:
+        next_cursor = None
+        next_cursor_id = None
 
     return SyncChangesResponse(
         changes=changes,
         next_cursor=next_cursor,
+        next_cursor_id=next_cursor_id,
         has_more=has_more,
         server_time=server_time,
     )
@@ -213,12 +230,16 @@ def apply_sync_changes(
     body: SyncApplyRequest,
     db: Session = Depends(get_db),
 ):
-    """接收 Android 客户端推送的变更，按序应用。Last-write-wins by updated_at。"""
+    """接收 Android 客户端推送的变更，按序应用。Last-write-wins by updated_at。
+
+    整个批次在单一事务中执行：全部成功才 commit，任意失败则全量 rollback。
+    """
     applied = 0
     failed = 0
+    errors = []
 
-    for item in body.changes:
-        try:
+    try:
+        for item in body.changes:
             entity_type = item.entityType.upper()
             operation = item.operation.upper()
             entity_id = item.entityId
@@ -230,16 +251,19 @@ def apply_sync_changes(
                 _apply_upsert(db, entity_type, entity_id, payload)
             else:
                 logger.warning("未知 operation: %s", operation)
+                errors.append(f"未知 operation: {operation}")
                 failed += 1
                 continue
 
-            db.commit()
             applied += 1
-        except Exception as e:
-            logger.error("apply_sync_changes 处理失败 [%s %s #%s]: %s",
-                         item.operation, item.entityType, item.entityId, e)
-            db.rollback()
-            failed += 1
+
+        db.commit()
+    except Exception as e:
+        logger.error("apply_sync_changes 批量提交失败，全量 rollback: %s", e)
+        db.rollback()
+        # 整批失败：已计数的均视为失败
+        failed += applied
+        applied = 0
 
     return SyncApplyResponse(applied=applied, failed=failed)
 
@@ -287,7 +311,7 @@ def _upsert_message(db: Session, entity_id: int, payload: dict) -> None:
             return
         if "text" in payload:
             existing.text = payload["text"]
-            sync_tags_from_text(db, existing, existing.text)
+            sync_tags_from_text(db, existing, existing.text, merge=True)
         if "actorId" in payload or "actor_id" in payload:
             existing.actor_id = payload.get("actorId") or payload.get("actor_id")
         if "starred" in payload:
@@ -306,7 +330,7 @@ def _upsert_message(db: Session, entity_id: int, payload: dict) -> None:
         )
         db.add(msg)
         db.flush()
-        sync_tags_from_text(db, msg, msg.text)
+        sync_tags_from_text(db, msg, msg.text, merge=True)
 
 
 def _upsert_actor(db: Session, entity_id: int, payload: dict) -> None:

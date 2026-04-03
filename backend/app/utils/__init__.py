@@ -45,27 +45,34 @@ class FileUtils:
 def calculate_file_hash(file_path: str, size_threshold: int = 100 * 1024 * 1024) -> str | None:
     """
     计算文件哈希值
-    
+
     Args:
         file_path: 文件路径
-        size_threshold: 文件大小阈值（字节），小于此值的文件计算blake2b，大于等于此值的文件使用文件大小作为hash
-    
+        size_threshold: 大文件阈值（字节）。小于此值全量 blake2b；大于等于此值则采样
+                        首尾各 4MB 计算 blake2b，避免不同大文件因大小相同而误判为重复。
+
     Returns:
         文件哈希值字符串
     """
+    SAMPLE_SIZE = 4 * 1024 * 1024  # 4MB
     try:
-        # 获取文件大小
         file_size = os.path.getsize(file_path)
 
-        # 当文件小于阈值的时候计算hash，否则hash就等于文件大小
         if file_size < size_threshold:
-            # 小于阈值的文件直接读取到内存计算blake2b hash
             logger.info(f"Calculating blake2b hash for {file_path} (size: {file_size} bytes)")
             with open(file_path, 'rb') as f:
                 return hashlib.blake2b(f.read()).hexdigest()
         else:
-            # 大于等于阈值的文件使用文件大小作为hash
-            return str(file_size)
+            # 大文件：采样首尾各 4MB，前缀加文件大小以降低碰撞概率
+            logger.info(f"Sampling hash for large file {file_path} (size: {file_size} bytes)")
+            h = hashlib.blake2b()
+            h.update(str(file_size).encode())
+            with open(file_path, 'rb') as f:
+                h.update(f.read(SAMPLE_SIZE))
+                if file_size > SAMPLE_SIZE * 2:
+                    f.seek(-SAMPLE_SIZE, 2)
+                    h.update(f.read(SAMPLE_SIZE))
+            return h.hexdigest()
     except Exception as e:
         logger.error(f"Failed to calculate file hash for {file_path}: {str(e)}")
         return None
