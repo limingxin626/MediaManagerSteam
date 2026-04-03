@@ -71,7 +71,7 @@ class Media(Base):
     mime_type = Column(String(100), nullable=True)
     width = Column(Integer, nullable=True)
     height = Column(Integer, nullable=True)
-    duration = Column(Integer, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
     rating = Column(Integer, default=0, nullable=False)
     starred = Column(Integer, default=0, nullable=False)
     view_count = Column(Integer, default=0, nullable=False)

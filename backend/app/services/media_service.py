@@ -44,7 +44,7 @@ def process_file(db: Session, file_path: str, message_id: int, position: int) ->
         mime_type=mime_type or 'application/octet-stream',
         width=media_info["width"],
         height=media_info["height"],
-        duration=media_info["duration"],
+        duration_ms=media_info["duration_ms"],
     )
     db.add(media)
     db.flush()

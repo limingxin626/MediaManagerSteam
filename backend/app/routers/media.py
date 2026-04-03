@@ -28,22 +28,7 @@ def get_media(
         media = db.query(Media).filter(Media.id.in_(media_ids)).all()
         
         # 对于固定message_id的情况，返回简单的列表
-        result = []
-        for item in media:
-            result.append(MediaResponse(
-                id=item.id,
-                file_path=item.file_path,
-                file_size=item.file_size,
-                mime_type=item.mime_type,
-                width=item.width,
-                height=item.height,
-                duration=item.duration,
-                rating=item.rating,
-                starred=bool(item.starred),
-                view_count=item.view_count,
-                created_at=item.created_at.isoformat(),
-                updated_at=item.updated_at.isoformat()
-            ))
+        result = [MediaResponse.model_validate(item) for item in media]
 
         return MediaCursorResponse(
             items=result,
@@ -122,22 +107,7 @@ def get_media(
                     next_cursor = f"{last_mm.created_at.isoformat()}|{last_mm.position}"
 
         # 构建响应
-        result = []
-        for item in items:
-            result.append(MediaResponse(
-                id=item.id,
-                file_path=item.file_path,
-                file_size=item.file_size,
-                mime_type=item.mime_type,
-                width=item.width,
-                height=item.height,
-                duration=item.duration,
-                rating=item.rating,
-                starred=bool(item.starred),
-                view_count=item.view_count,
-                created_at=item.created_at.isoformat(),
-                updated_at=item.updated_at.isoformat()
-            ))
+        result = [MediaResponse.model_validate(item) for item in items]
 
         return MediaCursorResponse(
             items=result,
@@ -174,21 +144,7 @@ def get_media_detail(
             "created_at": message.created_at.isoformat()
         })
     
-    return MediaDetailResponse(
-        id=media.id,
-        file_path=media.file_path,
-        file_size=media.file_size,
-        mime_type=media.mime_type,
-        width=media.width,
-        height=media.height,
-        duration=media.duration,
-        rating=media.rating,
-        starred=bool(media.starred),
-        view_count=media.view_count,
-        messages=messages,
-        created_at=media.created_at.isoformat(),
-        updated_at=media.updated_at.isoformat()
-    )
+    return MediaDetailResponse.model_validate(media, messages=messages)
 
 @router.put("/{media_id}/starred")
 def toggle_media_starred(
@@ -292,22 +248,7 @@ def get_media_around(
     media_items = list(reversed(older)) + [target_media] + newer
 
     # 构建响应
-    result = []
-    for item in media_items:
-        result.append(MediaResponse(
-            id=item.id,
-            file_path=item.file_path,
-            file_size=item.file_size,
-            mime_type=item.mime_type,
-            width=item.width,
-            height=item.height,
-            duration=item.duration,
-            rating=item.rating,
-            starred=bool(item.starred),
-            view_count=item.view_count,
-            created_at=item.created_at.isoformat(),
-            updated_at=item.updated_at.isoformat()
-        ))
+    result = [MediaResponse.model_validate(item) for item in media_items]
 
     # 计算游标
     next_cursor = None

@@ -341,13 +341,13 @@ class MediaInfoUtils:
         获取媒体的详细信息
 
         Returns:
-            dict with keys: width, height, duration, bitrate, fps, codec, has_audio, taken_at, gps
-            当前只有 width/height/duration 会写入数据库，其余字段供将来使用。
+            dict with keys: width, height, duration_ms, bitrate, fps, codec, has_audio, taken_at, gps
+            当前只有 width/height/duration_ms 会写入数据库，其余字段供将来使用。
         """
         info = {
             "width": None,
             "height": None,
-            "duration": None,
+            "duration_ms": None,
             "bitrate": None,
             "fps": None,
             "codec": None,
@@ -379,7 +379,7 @@ class MediaInfoUtils:
 
                 format_data = data.get('format', {})
                 if format_data.get('duration'):
-                    info["duration"] = round(float(format_data['duration']))
+                    info["duration_ms"] = round(float(format_data['duration']) * 1000)  # 转换为毫秒
                 if format_data.get('bit_rate'):
                     info["bitrate"] = int(format_data['bit_rate'])
 
@@ -418,14 +418,14 @@ class MediaInfoUtils:
                             if data:
                                 fmt_dur = data.get('format', {}).get('duration')
                                 if fmt_dur:
-                                    info["duration"] = round(float(fmt_dur))
+                                    info["duration_ms"] = round(float(fmt_dur))
                         # fallback: PIL 帧累加
-                        if info["duration"] is None and hasattr(img, 'n_frames') and img.n_frames > 1:
+                        if info["duration_ms"] is None and hasattr(img, 'n_frames') and img.n_frames > 1:
                             total_ms = 0
                             for frame_idx in range(img.n_frames):
                                 img.seek(frame_idx)
                                 total_ms += img.info.get('duration', 100)
-                            info["duration"] = round(total_ms / 1000)
+                            info["duration_ms"] = total_ms  # 已经是毫秒
             except Exception as e:
                 logger.error(f"Failed to get image properties for {file_path}: {e}")
 

@@ -1,5 +1,6 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 from typing import List, Optional
+from datetime import datetime
 from app.config import config
 
 
@@ -11,13 +12,20 @@ class MediaResponse(BaseModel):
     mime_type: Optional[str] = None
     width: Optional[int] = None
     height: Optional[int] = None
-    duration: Optional[int] = None
+    duration_ms: Optional[int] = None
     rating: int
     starred: bool = False
     view_count: int
     thumb_url: str = ""
     created_at: str
     updated_at: str
+
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def convert_datetime_to_str(cls, v):
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
 
     class Config:
         from_attributes = True
@@ -35,6 +43,9 @@ class MediaResponse(BaseModel):
 
 class MediaDetailResponse(MediaResponse):
     messages: List[dict]
+
+    class Config:
+        from_attributes = True
 
 
 class MediaCursorResponse(BaseModel):

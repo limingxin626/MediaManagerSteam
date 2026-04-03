@@ -1,5 +1,6 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 from typing import List, Optional
+from datetime import datetime
 from app.config import config
 
 MEDIA_PREVIEW_LIMIT = 9  # 消息内媒体预览上限（3×3 宫格）
@@ -23,7 +24,7 @@ class MessageMediaItem(BaseModel):
     file_path: str
     file_url: str = ""
     mime_type: Optional[str] = None
-    duration: Optional[int] = None
+    duration_ms: Optional[int] = None
     thumb_url: str = ""
     starred: bool = False
 
@@ -36,6 +37,9 @@ class MessageMediaItem(BaseModel):
         if not self.file_url and self.file_path:
             self.file_url = config.to_url_path(self.file_path)
         return self
+
+    class Config:
+        from_attributes = True
 
 
 class MessageTagItem(BaseModel):
@@ -53,6 +57,13 @@ class MessageResponse(BaseModel):
     starred: bool = False
     created_at: str
     updated_at: str
+
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def convert_datetime_to_str(cls, v):
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
 
     class Config:
         from_attributes = True
@@ -99,7 +110,7 @@ class MessageSyncMediaItem(BaseModel):
     mime_type: Optional[str] = None
     width: Optional[int] = None
     height: Optional[int] = None
-    duration: Optional[int] = None
+    duration_ms: Optional[int] = None
     rating: int = 0
     starred: bool = False
     thumb_url: str = ""
@@ -113,6 +124,9 @@ class MessageSyncMediaItem(BaseModel):
             self.file_url = config.to_url_path(self.file_path)
         return self
 
+    class Config:
+        from_attributes = True
+
 
 class MessageSyncResponse(BaseModel):
     id: int
@@ -124,6 +138,13 @@ class MessageSyncResponse(BaseModel):
     updated_at: str
     media_items: List[MessageSyncMediaItem]
     tags: List[MessageTagItem] = []
+
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def convert_datetime_to_str(cls, v):
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
 
     class Config:
         from_attributes = True

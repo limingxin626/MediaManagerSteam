@@ -63,7 +63,3 @@ register_sync_listeners()
 
 # 检查 ffmpeg/ffprobe 路径
 config.check_paths()
-
-# 确保新表（如 sync_log）存在
-from app.models import Base, engine
-Base.metadata.create_all(bind=engine, checkfirst=True)

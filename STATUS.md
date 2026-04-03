@@ -12,7 +12,6 @@ SQLite 不支持 `ALTER TABLE ADD CONSTRAINT`，需通过重建表来添加。
 
 **需添加的约束/索引：**
 - `tag.name` — UNIQUE
-- `actor.name` — UNIQUE
 - `message_media(message_id, position)` — UNIQUE
 - `message_media(created_at, position)` — 复合索引 `ix_mm_created_at_position`
 
@@ -61,7 +60,7 @@ WHERE file_hash GLOB '[0-9]*' AND CAST(file_hash AS INTEGER) = file_size;
 
 ## 🟡 中优先级（工程改进）
 
-### 5. 引入 Alembic 迁移管理（B-12）
+### 5. 引入 Alembic 迁移管理（B-12）✅ 后端已完成。
 
 现在靠 `create_all(checkfirst=True)` 管理 schema，无版本追踪。
 
@@ -99,9 +98,6 @@ WHERE file_hash GLOB '[0-9]*' AND CAST(file_hash AS INTEGER) = file_size;
 
 **待做：** Media 表加 `has_thumbnail` 字段，或返回统一占位图 URL。
 
-### 10. ffmpeg 环境变量配置
-
-已在启动时打 warning，但生产部署时应通过 `.env` 或系统环境变量设置正确路径：
 
 ```
 FFMPEG_PATH=<your ffmpeg path>

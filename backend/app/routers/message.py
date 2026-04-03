@@ -107,13 +107,7 @@ def _media_items_for(db: Session, message_id: int, limit: Optional[int] = MEDIA_
         query = query.limit(limit)
     relations = query.all()
     return [
-        MessageMediaItem(
-            id=r.media.id,
-            file_path=r.media.file_path,
-            mime_type=r.media.mime_type,
-            duration=r.media.duration,
-            starred=bool(r.media.starred),
-        )
+        MessageMediaItem.model_validate(r.media)
         for r in relations
         if r.media
     ]
@@ -227,19 +221,7 @@ def sync_messages(db: Session = Depends(get_db)):
             .all()
         )
         media_items = [
-            MessageSyncMediaItem(
-                id=r.media.id,
-                file_path=r.media.file_path,
-                file_hash=r.media.file_hash or "",
-                file_size=r.media.file_size,
-                mime_type=r.media.mime_type,
-                width=r.media.width,
-                height=r.media.height,
-                duration=r.media.duration,
-                rating=r.media.rating or 0,
-                starred=bool(r.media.starred),
-                position=r.position,
-            )
+            MessageSyncMediaItem.model_validate(r.media, position=r.position)
             for r in relations
             if r.media
         ]
