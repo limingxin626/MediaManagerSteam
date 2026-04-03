@@ -76,11 +76,11 @@ interface MessageDao {
     // ==================== Paging 查询 ====================
 
     @Transaction
-    @Query("SELECT * FROM messages ORDER BY createdAt DESC")
+    @Query("SELECT * FROM messages WHERE sendStatus != 'PENDING' ORDER BY createdAt DESC")
     fun getMessagesPaged(): PagingSource<Int, MessageWithDetails>
 
     @Transaction
-    @Query("SELECT * FROM messages WHERE text LIKE '%' || :query || '%' ORDER BY createdAt DESC")
+    @Query("SELECT * FROM messages WHERE sendStatus != 'PENDING' AND text LIKE '%' || :query || '%' ORDER BY createdAt DESC")
     fun searchMessagesPaged(query: String): PagingSource<Int, MessageWithDetails>
 
     // ==================== Tag-filtered Paging 查询 ====================
@@ -89,7 +89,7 @@ interface MessageDao {
     @Query("""
         SELECT m.* FROM messages m
         INNER JOIN message_tag mt ON m.id = mt.messageId
-        WHERE mt.tagId = :tagId
+        WHERE mt.tagId = :tagId AND m.sendStatus != 'PENDING'
         ORDER BY m.createdAt DESC
     """)
     fun getMessagesByTagPaged(tagId: Long): PagingSource<Int, MessageWithDetails>
@@ -98,7 +98,7 @@ interface MessageDao {
     @Query("""
         SELECT m.* FROM messages m
         INNER JOIN message_tag mt ON m.id = mt.messageId
-        WHERE mt.tagId = :tagId AND m.text LIKE '%' || :query || '%'
+        WHERE mt.tagId = :tagId AND m.sendStatus != 'PENDING' AND m.text LIKE '%' || :query || '%'
         ORDER BY m.createdAt DESC
     """)
     fun searchMessagesByTagPaged(tagId: Long, query: String): PagingSource<Int, MessageWithDetails>
@@ -180,11 +180,11 @@ interface MessageDao {
     // ==================== Actor-filtered Paging 查询 ====================
 
     @Transaction
-    @Query("SELECT * FROM messages WHERE actorId = :actorId ORDER BY createdAt DESC")
+    @Query("SELECT * FROM messages WHERE actorId = :actorId AND sendStatus != 'PENDING' ORDER BY createdAt DESC")
     fun getMessagesByActorPaged(actorId: Long): PagingSource<Int, MessageWithDetails>
 
     @Transaction
-    @Query("SELECT * FROM messages WHERE actorId = :actorId AND text LIKE '%' || :query || '%' ORDER BY createdAt DESC")
+    @Query("SELECT * FROM messages WHERE actorId = :actorId AND sendStatus != 'PENDING' AND text LIKE '%' || :query || '%' ORDER BY createdAt DESC")
     fun searchMessagesByActorPaged(actorId: Long, query: String): PagingSource<Int, MessageWithDetails>
 
     @Query("SELECT COUNT(*) FROM messages WHERE actorId = :actorId")
