@@ -170,19 +170,17 @@ class MessageRepository(
     suspend fun createMessage(message: Message, immediateSync: Boolean = true): Long {
         val insertedId = messageDao.insertMessage(message)
 
-        if (insertedId > 0) {
+        if (insertedId > 0 && immediateSync) {
             val payload = message.copy(id = insertedId)
             outboxRepository?.enqueueUpsert(
                 entityType = SyncOutboxItem.ENTITY_MESSAGE,
                 entityId = insertedId,
                 payloadJson = Gson().toJson(payload)
             )
-            if (immediateSync) {
-                try {
-                    outboxRepository?.syncToServer()
-                } catch (e: Exception) {
-                    Log.w(TAG, "createMessage 立即推送失败，将由后台任务重试: ${e.message}")
-                }
+            try {
+                outboxRepository?.syncToServer()
+            } catch (e: Exception) {
+                Log.w(TAG, "createMessage 立即推送失败，将由后台任务重试: ${e.message}")
             }
         }
 
