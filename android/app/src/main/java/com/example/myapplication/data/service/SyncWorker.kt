@@ -43,29 +43,19 @@ class SyncWorker(
             // Push 失败不阻止 pull
         }
 
-        // 2. Pull incremental (or full)
+        // 2. Pull incremental（无 lastSyncTime 时跳过，需用户手动触发全量）
         val lastSyncTime = prefs.getString(KEY_LAST_SYNC_TIME, null)
-        val pullResult = if (lastSyncTime != null) {
-            db.messageRepository.syncIncremental(lastSyncTime)
-        } else {
-            db.messageRepository.syncFromRemote()
+        if (lastSyncTime == null) {
+            Log.d(TAG, "无同步游标，跳过增量拉取（请在设置页手动执行全量同步）")
+            return Result.success()
         }
 
-        return when (pullResult) {
+        return when (val pullResult = db.messageRepository.syncIncremental(lastSyncTime)) {
             is SyncResult.NeedFullSync -> {
-                Log.w(TAG, "增量同步返回 410，执行全量同步")
-                when (val fullResult = db.messageRepository.syncFromRemote()) {
-                    is SyncResult.Success -> {
-                        saveServerTime(prefs)
-                        Log.d(TAG, "全量同步完成: ${fullResult.totalAffected} 条")
-                        Result.success()
-                    }
-                    is SyncResult.Error -> {
-                        Log.e(TAG, "全量同步失败: ${fullResult.message}")
-                        Result.retry()
-                    }
-                    else -> Result.retry()
-                }
+                // 410：游标过期，不自动全量，提示用户手动操作
+                Log.w(TAG, "增量同步返回 410（游标已过期），请在设置页手动执行全量同步")
+                prefs.edit().remove(KEY_LAST_SYNC_TIME).apply()
+                Result.success()
             }
             is SyncResult.Success -> {
                 saveServerTime(prefs)

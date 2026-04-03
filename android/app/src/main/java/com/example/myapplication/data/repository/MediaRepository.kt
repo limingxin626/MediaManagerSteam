@@ -1,5 +1,6 @@
 package com.example.myapplication.data.repository
 
+import android.util.Log
 import com.example.myapplication.data.database.dao.MediaDao
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.database.entities.SyncOutboxItem
@@ -63,11 +64,16 @@ class MediaRepository(
                 entityId = insertedId,
                 payloadJson = Gson().toJson(payload)
             )
+            try {
+                outboxRepository?.syncToServer()
+            } catch (e: Exception) {
+                Log.w(TAG, "insertMedia 立即推送失败，将由后台任务重试: ${e.message}")
+            }
         }
 
         return insertedId
     }
-    
+
     suspend fun insertMediaList(mediaList: List<Media>): List<Long> {
         val ids = mediaDao.insertMediaList(mediaList)
 
@@ -81,10 +87,15 @@ class MediaRepository(
                 )
             }
         }
+        try {
+            outboxRepository?.syncToServer()
+        } catch (e: Exception) {
+            Log.w(TAG, "insertMediaList 立即推送失败，将由后台任务重试: ${e.message}")
+        }
 
         return ids
     }
-    
+
     suspend fun updateMedia(media: Media) {
         // 更新时间戳
         val updatedMedia = media.copy(updatedAt = System.currentTimeMillis())
@@ -96,9 +107,14 @@ class MediaRepository(
                 entityId = updatedMedia.id,
                 payloadJson = Gson().toJson(updatedMedia)
             )
+            try {
+                outboxRepository?.syncToServer()
+            } catch (e: Exception) {
+                Log.w(TAG, "updateMedia 立即推送失败，将由后台任务重试: ${e.message}")
+            }
         }
     }
-    
+
     suspend fun deleteMedia(media: Media) {
         // 删除媒体时，关联关系会因为外键约束自动删除
         mediaDao.deleteMedia(media)
@@ -108,9 +124,14 @@ class MediaRepository(
                 entityType = SyncOutboxItem.ENTITY_MEDIA,
                 entityId = media.id
             )
+            try {
+                outboxRepository?.syncToServer()
+            } catch (e: Exception) {
+                Log.w(TAG, "deleteMedia 立即推送失败，将由后台任务重试: ${e.message}")
+            }
         }
     }
-    
+
     suspend fun deleteMediaById(id: Long) {
         mediaDao.deleteMediaById(id)
 
@@ -119,9 +140,14 @@ class MediaRepository(
                 entityType = SyncOutboxItem.ENTITY_MEDIA,
                 entityId = id
             )
+            try {
+                outboxRepository?.syncToServer()
+            } catch (e: Exception) {
+                Log.w(TAG, "deleteMediaById 立即推送失败，将由后台任务重试: ${e.message}")
+            }
         }
     }
-    
+
     suspend fun deleteAllMedia() {
         val allMedia = mediaDao.getAllMediaSync()
         mediaDao.deleteAllMedia()
@@ -133,6 +159,11 @@ class MediaRepository(
                     entityId = media.id
                 )
             }
+        }
+        try {
+            outboxRepository?.syncToServer()
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteAllMedia 立即推送失败，将由后台任务重试: ${e.message}")
         }
     }
 
@@ -150,6 +181,11 @@ class MediaRepository(
                 entityId = updated.id,
                 payloadJson = Gson().toJson(updated)
             )
+            try {
+                outboxRepository?.syncToServer()
+            } catch (e: Exception) {
+                Log.w(TAG, "toggleMediaStarred 立即推送失败，将由后台任务重试: ${e.message}")
+            }
         }
     }
 
@@ -162,6 +198,18 @@ class MediaRepository(
                 updatedAt = System.currentTimeMillis()
             )
             mediaDao.updateMedia(updatedMedia)
+            if (updatedMedia.id > 0) {
+                outboxRepository?.enqueueUpsert(
+                    entityType = SyncOutboxItem.ENTITY_MEDIA,
+                    entityId = updatedMedia.id,
+                    payloadJson = Gson().toJson(updatedMedia)
+                )
+                try {
+                    outboxRepository?.syncToServer()
+                } catch (e: Exception) {
+                    Log.w(TAG, "updateMediaRating 立即推送失败，将由后台任务重试: ${e.message}")
+                }
+            }
         }
     }
 

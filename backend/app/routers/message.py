@@ -297,7 +297,7 @@ def get_message_detail(
     return _build_detail_response(db, message, media_limit=None)
 
 
-@router.post("", response_model=MessageDetailResponse, status_code=201)
+@router.post("", response_model=MessageSyncResponse, status_code=201)
 def create_message(
     message_data: MessageCreate,
     db: Session = Depends(get_db),
@@ -317,7 +317,30 @@ def create_message(
 
     db.commit()
     db.refresh(db_message)
-    return _build_detail_response(db, db_message)
+
+    relations = (
+        db.query(MessageMedia)
+        .filter(MessageMedia.message_id == db_message.id)
+        .order_by(MessageMedia.position)
+        .all()
+    )
+    media_items = [
+        MessageSyncMediaItem.model_validate(r.media, position=r.position)
+        for r in relations
+        if r.media
+    ]
+    tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in db_message.tags]
+    return MessageSyncResponse(
+        id=db_message.id,
+        text=db_message.text,
+        actor_id=db_message.actor_id,
+        actor_name=db_message.actor.name if db_message.actor else None,
+        starred=bool(db_message.starred),
+        created_at=db_message.created_at.isoformat(),
+        updated_at=db_message.updated_at.isoformat(),
+        media_items=media_items,
+        tags=tags,
+    )
 
 
 @router.patch("/{message_id}", response_model=MessageDetailResponse)
