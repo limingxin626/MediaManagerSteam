@@ -466,13 +466,13 @@ fun AppNavHost(
             )
         }
 
-        // 全屏媒体查看器（图片/视频）- 共享元素过渡 + 淡入淡出
+        // 全屏媒体查看器（图片/视频）- 右侧滑入/滑出，避免 fadeOut 时原生 PlayerView 残留
         composable(
             route = Routes.MEDIA_FULLSCREEN,
-            enterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(300)) },
-            exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(300)) },
-            popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(300)) },
-            popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(300)) },
+            enterTransition = { NavigationAnimations.slideInFromRight() },
+            exitTransition = { NavigationAnimations.slideOutToLeft() },
+            popEnterTransition = { NavigationAnimations.slideInFromLeft() },
+            popExitTransition = { NavigationAnimations.slideOutToRight() },
             arguments = listOf(
                 navArgument("mediaId") { type = NavType.LongType },
                 navArgument("mediaIdListJson") {
