@@ -82,12 +82,15 @@ class ThumbnailUtils:
     """缩略图生成工具类"""
     
     @staticmethod
-    def generate_image_thumbnail(source_path: str, thumb_path: str, max_size: int = 300) -> bool:
-        """使用 PIL 为静态图片生成缩略图"""
+    def generate_image_thumbnail(source_path: str, thumb_path: str, min_size: int = 300) -> bool:
+        """使用 PIL 为静态图片生成缩略图，最短边至少为 min_size"""
         try:
-            from PIL import Image
+            from PIL import Image, ImageOps
             
             with Image.open(source_path) as img:
+                # 根据 EXIF 方向信息自动旋转图片（处理手机拍摄图片的旋转问题）
+                img = ImageOps.exif_transpose(img)
+                
                 # 转换为RGB模式（处理RGBA等格式）
                 if img.mode in ('RGBA', 'LA', 'P'):
                     background = Image.new('RGB', img.size, (255, 255, 255))
@@ -98,9 +101,17 @@ class ThumbnailUtils:
                 elif img.mode != 'RGB':
                     img = img.convert('RGB')
                 
-                # 缩放并保存为 WEBP 格式
-                if max_size > 0:
-                    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                # 缩放：最短边至少为 min_size，保持宽高比（小图不放大）
+                if min_size > 0:
+                    width, height = img.size
+                    short_edge = min(width, height)
+                    # 只有原图短边大于 min_size 才需要缩小
+                    if short_edge > min_size:
+                        scale = min_size / short_edge
+                        new_width = int(width * scale)
+                        new_height = int(height * scale)
+                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
                 img.save(thumb_path, 'WEBP', quality=90)
             
             logger.info(f"Generated image thumbnail: {thumb_path}")
@@ -114,16 +125,17 @@ class ThumbnailUtils:
             return False
     
     @staticmethod
-    def generate_video_thumbnail(source_path: str, thumb_path: str, ffmpeg_path: str, max_size: int = 300) -> bool:
+    def generate_video_thumbnail(source_path: str, thumb_path: str, ffmpeg_path: str, min_size: int = 300) -> bool:
         """使用 ffmpeg 为视频生成缩略图，thumbnail 滤镜失败时 fallback 到取第一帧
 
         Args:
             source_path: 源视频文件路径
             thumb_path: 缩略图输出路径
             ffmpeg_path: ffmpeg 可执行文件路径
-            max_size: 缩略图最大尺寸
+            min_size: 缩略图最短边大小
         """
-        scale = f'scale={max_size}:{max_size}:force_original_aspect_ratio=decrease'
+        # scale=w:h:force_original_aspect_ratio=increase 确保最短边至少为 min_size
+        scale = f'scale={min_size}:{min_size}:force_original_aspect_ratio=increase'
         # 优先用 thumbnail 滤镜选取代表帧
         cmd = [
             ffmpeg_path,
@@ -142,10 +154,12 @@ class ThumbnailUtils:
 
             # fallback：取第一帧（适用于极短视频）
             logger.warning(f"thumbnail filter failed, falling back to first frame: {source_path}")
+            # scale=w:h:force_original_aspect_ratio=increase 确保最短边至少为 min_size
+            scale_fallback = f'scale={min_size}:{min_size}:force_original_aspect_ratio=increase'
             cmd_fallback = [
                 ffmpeg_path,
                 '-i', source_path,
-                '-vf', scale,
+                '-vf', scale_fallback,
                 '-frames:v', '1',
                 '-y',
                 thumb_path
@@ -167,14 +181,14 @@ class ThumbnailUtils:
             return False
     
     @staticmethod
-    def generate_gif_thumbnail(source_path: str, thumb_path: str, ffmpeg_path: str, max_size: int = 300) -> bool:
+    def generate_gif_thumbnail(source_path: str, thumb_path: str, ffmpeg_path: str, min_size: int = 300) -> bool:
         """使用 ffmpeg 为 GIF 生成动态 webp 缩略图
 
         Args:
             source_path: 源GIF文件路径
             thumb_path: 缩略图输出路径（.webp）
             ffmpeg_path: ffmpeg 可执行文件路径
-            max_size: 缩略图最大尺寸
+            min_size: 缩略图最短边大小
         """
         try:
             from PIL import Image
@@ -184,12 +198,19 @@ class ThumbnailUtils:
                 width, height = img.size
 
             vf_filters = []
-            # 只有超过 max_size 才需要缩放
-            if width > max_size or height > max_size:
-                if width > height:
-                    vf_filters.append(f'scale={max_size}:-1')
+            # 缩放：最短边至少为 min_size，保持宽高比（小图不放大）
+            short_edge = min(width, height)
+            if short_edge > min_size:
+                # 只有原图短边大于 min_size 才需要缩小
+                if width < height:
+                    # 竖图：宽是短边
+                    new_width = min_size
+                    new_height = int(height * min_size / width)
                 else:
-                    vf_filters.append(f'scale=-1:{max_size}')
+                    # 横图或正方形：高是短边
+                    new_height = min_size
+                    new_width = int(width * min_size / height)
+                vf_filters.append(f'scale={new_width}:{new_height}')
 
             cmd = [
                 ffmpeg_path,
@@ -224,7 +245,7 @@ class ThumbnailUtils:
         thumb_path: str,
         media_type: str,
         ffmpeg_path: str,
-        max_size: int = 300
+        min_size: int = 300
     ) -> bool:
         """为媒体生成缩略图
         
@@ -233,7 +254,7 @@ class ThumbnailUtils:
             thumb_path: 缩略图保存路径
             media_type: 媒体类型 ("VIDEO"/"IMAGE")
             ffmpeg_path: ffmpeg 可执行文件路径
-            max_size: 缩略图最大边长（默认300像素）
+            min_size: 缩略图最短边大小（默认300像素）
         
         Returns:
             是否生成成功
@@ -241,16 +262,16 @@ class ThumbnailUtils:
         try:
             if media_type == "VIDEO":
                 # 视频：使用 ffmpeg 提取帧并生成缩略图
-                return ThumbnailUtils.generate_video_thumbnail(source_path, thumb_path, ffmpeg_path, max_size)
+                return ThumbnailUtils.generate_video_thumbnail(source_path, thumb_path, ffmpeg_path, min_size)
             else:
                 # 图片：根据格式选择处理方式
                 ext = os.path.splitext(source_path)[1].lower()
                 if ext == ".gif":
                     # GIF：使用 ffmpeg 保持动画
-                    return ThumbnailUtils.generate_gif_thumbnail(source_path, thumb_path, ffmpeg_path, max_size)
+                    return ThumbnailUtils.generate_gif_thumbnail(source_path, thumb_path, ffmpeg_path, min_size)
                 else:
                     # 普通图片：使用 PIL
-                    return ThumbnailUtils.generate_image_thumbnail(source_path, thumb_path, max_size)
+                    return ThumbnailUtils.generate_image_thumbnail(source_path, thumb_path, min_size)
                     
         except Exception as e:
             logger.error(f"Failed to generate thumbnail for {source_path}: {str(e)}")
