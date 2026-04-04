@@ -25,18 +25,16 @@ def sync_actors(db: Session = Depends(get_db)):
 
 @router.get("", response_model=List[ActorResponse])
 def get_actors(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
     name: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """获取演员列表"""
+    """获取演员列表（返回所有有消息的演员）"""
     query = db.query(Actor)
 
     if name:
         query = query.filter(Actor.name.ilike(f"%{name}%"))
 
-    actors = query.order_by(Actor.name).offset(skip).limit(limit).all()
+    actors = query.all()
     if not actors:
         return []
 
@@ -53,15 +51,20 @@ def get_actors(
 
     result = []
     for actor in actors:
-        result.append(ActorResponse(
-            id=actor.id,
-            name=actor.name,
-            description=actor.description,
-            avatar_path=actor.avatar_path,
-            message_count=count_map.get(actor.id, 0),
-            created_at=actor.created_at.isoformat(),
-            updated_at=actor.updated_at.isoformat()
-        ))
+        message_count = count_map.get(actor.id, 0)
+        if message_count > 0:
+            result.append(ActorResponse(
+                id=actor.id,
+                name=actor.name,
+                description=actor.description,
+                avatar_path=actor.avatar_path,
+                message_count=message_count,
+                created_at=actor.created_at.isoformat(),
+                updated_at=actor.updated_at.isoformat()
+            ))
+
+    # 按消息数量倒序排列
+    result.sort(key=lambda x: x.message_count, reverse=True)
 
     return result
 
