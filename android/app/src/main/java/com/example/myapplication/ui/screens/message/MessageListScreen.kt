@@ -160,16 +160,8 @@ fun MessageListScreen(
                                 val nextItem = if (index + 1 < pagingItems.itemCount) pagingItems[index + 1] else null
                                 val nextDate = nextItem?.let { dateFormatter.format(Date(it.message.createdAt)) }
 
-                                // 在 reverseLayout 中，index+1 是视觉上方（更旧的消息）
-                                // 当日期不同时，在当前消息上方显示日期分隔符
-                                if (nextDate != null && currentDate != nextDate) {
-                                    DateSeparator(date = currentDate)
-                                }
-                                // 最旧的一条也显示日期
-                                if (nextDate == null && index == pagingItems.itemCount - 1) {
-                                    DateSeparator(date = currentDate)
-                                }
-
+                                // reverseLayout 中，同一 item 块内先写的在视觉下方，后写的在上方
+                                // 所以先放 MessageCard，再放 DateSeparator，日期才会出现在消息上方
                                 MessageCard(
                                     messageWithDetails = item,
                                     onMediaClick = { mediaId, mediaList -> onMediaClick(mediaId, item.message.id, mediaList) },
@@ -179,6 +171,15 @@ fun MessageListScreen(
                                     onRetrySync = { viewModel.retrySync(it) },
                                     modifier = Modifier.fillMaxWidth()
                                 )
+
+                                // 当日期变化时，在当前消息上方显示日期分隔符
+                                if (nextDate != null && currentDate != nextDate) {
+                                    DateSeparator(date = currentDate)
+                                }
+                                // 最旧的一条也显示日期
+                                if (nextDate == null && index == pagingItems.itemCount - 1) {
+                                    DateSeparator(date = currentDate)
+                                }
                             }
                         }
 

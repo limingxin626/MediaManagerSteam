@@ -177,17 +177,65 @@ class MediaFilePicker(private val context: Context) {
     
     /**
      * 使用BLAKE2b计算文件内容哈希
+     * 与 Backend 逻辑一致：
+     *   < 100MB → 全量 blake2b
+     *   >= 100MB → blake2b(文件大小字符串 + 前4MB + 后4MB)
      */
     fun computeBlake2bHash(uri: Uri): String? {
+        val sizeThreshold = 100L * 1024 * 1024 // 100MB
+        val sampleSize = 4 * 1024 * 1024 // 4MB
+
         return try {
+            val fileSize = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                cursor.moveToFirst()
+                if (sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L
+            } ?: -1L
+
             val digest = Blake2bDigest(512)
-            val buffer = ByteArray(8192)
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    digest.update(buffer, 0, bytesRead)
+
+            if (fileSize >= sizeThreshold && fileSize > 0) {
+                // 大文件：采样首尾各 4MB，前缀加文件大小（与 Backend 一致）
+                val sizeBytes = fileSize.toString().toByteArray(Charsets.UTF_8)
+                digest.update(sizeBytes, 0, sizeBytes.size)
+
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    val headBuf = ByteArray(sampleSize)
+                    var totalRead = 0
+                    while (totalRead < sampleSize) {
+                        val n = input.read(headBuf, totalRead, sampleSize - totalRead)
+                        if (n == -1) break
+                        totalRead += n
+                    }
+                    digest.update(headBuf, 0, totalRead)
+
+                    if (fileSize > sampleSize * 2) {
+                        val skip = fileSize - sampleSize * 2
+                        var skipped = 0L
+                        while (skipped < skip) {
+                            skipped += input.skip(skip - skipped).coerceAtLeast(1)
+                        }
+                        val tailBuf = ByteArray(sampleSize)
+                        var tailRead = 0
+                        while (tailRead < sampleSize) {
+                            val n = input.read(tailBuf, tailRead, sampleSize - tailRead)
+                            if (n == -1) break
+                            tailRead += n
+                        }
+                        digest.update(tailBuf, 0, tailRead)
+                    }
+                }
+            } else {
+                // 小文件：全量读取
+                val buffer = ByteArray(8192)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        digest.update(buffer, 0, bytesRead)
+                    }
                 }
             }
+
             val result = ByteArray(digest.digestSize)
             digest.doFinal(result, 0)
             result.joinToString("") { "%02x".format(it) }
