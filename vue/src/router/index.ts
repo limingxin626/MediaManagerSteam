@@ -17,6 +17,11 @@ const routes = [
     component: () => import('../views/Media.vue')
   },
   {
+    path: '/media/feed',
+    name: 'MediaFeed',
+    component: () => import('../views/MediaFeed.vue')
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('../views/NotFound.vue')

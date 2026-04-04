@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.models import get_db, Media, MessageMedia
+from app.models import get_db, Media, MessageMedia, Message, message_tag
 from typing import Optional
 from app.schemas.media import MediaResponse, MediaDetailResponse, MediaCursorResponse
 
@@ -15,7 +15,7 @@ def get_media(
     starred: Optional[bool] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """获取媒体列表（基于MessageMedia的游标分页）"""
+    """获取媒体列表（游标分页，显示所有媒体）"""
     from datetime import datetime
     
     if message_id:
@@ -36,83 +36,52 @@ def get_media(
             has_more=False
         )
     else:
-        # 基于MessageMedia的游标分页
-        query = db.query(Media).join(MessageMedia)
+        # 直接查 Media 表，显示所有媒体（包括孤立媒体）
+        query = db.query(Media)
 
         if starred is not None:
             query = query.filter(Media.starred == (1 if starred else 0))
 
-        # 如果提供了游标，解析并使用
+        # 游标格式："{created_at}|{id}"
         if cursor:
             try:
                 parts = cursor.split('|')
-                if len(parts) == 2:
-                    cursor_time = datetime.fromisoformat(parts[0])
-                    cursor_position = int(parts[1])
+                cursor_time = datetime.fromisoformat(parts[0])
+                cursor_id = int(parts[1])
 
-                    if direction == 'forward':
-                        # 向前加载：更新的媒体
-                        query = query.filter(
-                            (MessageMedia.created_at > cursor_time) |
-                            ((MessageMedia.created_at == cursor_time) & (MessageMedia.position > cursor_position))
-                        )
-                        query = query.order_by(MessageMedia.created_at.asc(), MessageMedia.position.asc())
-                    else:
-                        # 向后加载：更旧的媒体
-                        query = query.filter(
-                            (MessageMedia.created_at < cursor_time) |
-                            ((MessageMedia.created_at == cursor_time) & (MessageMedia.position < cursor_position))
-                        )
-                        query = query.order_by(MessageMedia.created_at.desc(), MessageMedia.position.desc())
+                if direction == 'forward':
+                    query = query.filter(
+                        (Media.created_at > cursor_time) |
+                        ((Media.created_at == cursor_time) & (Media.id > cursor_id))
+                    )
+                    query = query.order_by(Media.created_at.asc(), Media.id.asc())
                 else:
-                    cursor_time = datetime.fromisoformat(cursor)
-                    if direction == 'forward':
-                        query = query.filter(MessageMedia.created_at > cursor_time)
-                        query = query.order_by(MessageMedia.created_at.asc(), MessageMedia.position.asc())
-                    else:
-                        query = query.filter(MessageMedia.created_at < cursor_time)
-                        query = query.order_by(MessageMedia.created_at.desc(), MessageMedia.position.desc())
-            except ValueError:
+                    query = query.filter(
+                        (Media.created_at < cursor_time) |
+                        ((Media.created_at == cursor_time) & (Media.id < cursor_id))
+                    )
+                    query = query.order_by(Media.created_at.desc(), Media.id.desc())
+            except (ValueError, IndexError):
                 raise HTTPException(status_code=400, detail="Invalid cursor format")
         else:
-            # 没有游标时，默认倒序（最新的在前）
-            query = query.order_by(MessageMedia.created_at.desc(), MessageMedia.position.desc())
+            query = query.order_by(Media.created_at.desc(), Media.id.desc())
 
-        # 获取比请求多一条记录，用于判断是否有更多数据
         media_items = query.limit(limit + 1).all()
 
         has_more = len(media_items) > limit
         items = media_items[:limit]
 
-        # 计算游标
         next_cursor = None
-        prev_cursor = None
-
         if has_more and items:
-            if direction == 'forward':
-                # 向前加载，最后一个是最新的，用它作为下一个游标
-                last_media_id = items[-1].id
-                last_mm = db.query(MessageMedia).filter(
-                    MessageMedia.media_id == last_media_id
-                ).order_by(MessageMedia.created_at.asc()).first()
-                if last_mm:
-                    next_cursor = f"{last_mm.created_at.isoformat()}|{last_mm.position}"
-            else:
-                # 向后加载，最后一个是最旧的，用它作为下一个游标
-                last_media_id = items[-1].id
-                last_mm = db.query(MessageMedia).filter(
-                    MessageMedia.media_id == last_media_id
-                ).order_by(MessageMedia.created_at.desc()).first()
-                if last_mm:
-                    next_cursor = f"{last_mm.created_at.isoformat()}|{last_mm.position}"
+            last = items[-1]
+            next_cursor = f"{last.created_at.isoformat()}|{last.id}"
 
-        # 构建响应
         result = [MediaResponse.model_validate(item) for item in items]
 
         return MediaCursorResponse(
             items=result,
             next_cursor=next_cursor,
-            prev_cursor=prev_cursor,
+            prev_cursor=None,
             has_more=has_more,
             has_more_before=False
         )
@@ -146,7 +115,57 @@ def get_media_detail(
     
     return MediaDetailResponse.model_validate(media, messages=messages)
 
-@router.put("/{media_id}/starred")
+
+@router.get("/feed", response_model=MediaCursorResponse)
+def get_media_feed(
+    cursor: Optional[int] = Query(None, description="游标：message_media.id"),
+    limit: int = Query(40, ge=1, le=100),
+    tag_id: Optional[int] = Query(None),
+    actor_id: Optional[int] = Query(None),
+    starred: Optional[bool] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """按 MessageMedia 展开的媒体流（Telegram风格，媒体可重复），支持 tag/actor 筛选"""
+    query = (
+        db.query(Media, MessageMedia)
+        .join(MessageMedia, MessageMedia.media_id == Media.id)
+        .join(Message, Message.id == MessageMedia.message_id)
+    )
+
+    if tag_id is not None:
+        query = query.filter(
+            Message.id.in_(
+                db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
+            )
+        )
+
+    if actor_id is not None:
+        query = query.filter(Message.actor_id == actor_id)
+
+    if starred is not None:
+        query = query.filter(Media.starred == (1 if starred else 0))
+
+    if cursor is not None:
+        query = query.filter(MessageMedia.id < cursor)
+
+    query = query.order_by(MessageMedia.id.desc())
+
+    rows = query.limit(limit + 1).all()
+
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+
+    next_cursor = str(rows[-1][1].id) if has_more and rows else None
+
+    result = [MediaResponse.model_validate(media) for media, _ in rows]
+
+    return MediaCursorResponse(
+        items=result,
+        next_cursor=next_cursor,
+        has_more=has_more,
+    )
+
+
 def toggle_media_starred(
     media_id: int,
     starred: bool = Query(...),
