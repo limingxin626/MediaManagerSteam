@@ -131,6 +131,12 @@ def _build_detail_response(db: Session, msg: Message, media_limit: Optional[int]
     )
 
 
+def _sync_media_item(r) -> MessageSyncMediaItem:
+    item = MessageSyncMediaItem.model_validate(r.media)
+    item.position = r.position
+    return item
+
+
 def _build_sync_response(db: Session, db_message: Message) -> MessageSyncResponse:
     """构建 MessageSyncResponse，供 create_message 和 create_message_from_client 共用。"""
     relations = (
@@ -140,7 +146,7 @@ def _build_sync_response(db: Session, db_message: Message) -> MessageSyncRespons
         .all()
     )
     media_items = [
-        MessageSyncMediaItem.model_validate(r.media, position=r.position)
+        _sync_media_item(r)
         for r in relations
         if r.media
     ]
@@ -248,7 +254,7 @@ def sync_messages(db: Session = Depends(get_db)):
             .all()
         )
         media_items = [
-            MessageSyncMediaItem.model_validate(r.media, position=r.position)
+            _sync_media_item(r)
             for r in relations
             if r.media
         ]
