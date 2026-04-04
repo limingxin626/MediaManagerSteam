@@ -30,6 +30,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.PlayerView
 import java.io.File
 import kotlinx.coroutines.delay
@@ -54,7 +55,18 @@ fun TelegramVideoPlayer(
     val coroutineScope = rememberCoroutineScope()
 
     val exoPlayer = remember(videoPath) {
-        ExoPlayer.Builder(context).build().apply {
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                5_000,   // minBufferMs（默认 50_000）
+                15_000,  // maxBufferMs（默认 50_000）
+                1_000,   // bufferForPlaybackMs（默认 2_500）
+                2_000    // bufferForPlaybackAfterRebufferMs（默认 5_000）
+            )
+            .build()
+        ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .build()
+            .apply {
             val uri = when {
                 videoPath.startsWith("content://") -> android.net.Uri.parse(videoPath)
                 videoPath.startsWith("http://") || videoPath.startsWith("https://") ->
@@ -145,18 +157,27 @@ fun TelegramVideoPlayer(
                 }
             }
     ) {
-        // 视频画面 — useController=false，画面永不变灰
+        // 视频画面 — useController=false + 移除控制器视图，防止闪现
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
+                    // 先禁用控制器，再设置 player
+                    useController = false
+                    controllerAutoShow = false
+                    setControllerVisibilityListener(
+                        PlayerView.ControllerVisibilityListener { /* no-op */ }
+                    )
+                    // 隐藏默认控制器的根视图
+                    (findViewById<android.view.View>(androidx.media3.ui.R.id.exo_controller)
+                        as? android.view.ViewGroup)?.visibility = android.view.View.GONE
+
                     player = exoPlayer
                     layoutParams = FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
-                    useController = false
                     this.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                 }
             },
             modifier = Modifier.fillMaxSize()

@@ -12,7 +12,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
@@ -290,7 +289,7 @@ private fun MediaViewerContent(
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 0 // 不预创建相邻页，避免多个 ExoPlayer 同时占用内存
+            beyondViewportPageCount = 0 // 只保留当前页的 ExoPlayer，避免 OOM
         ) { page ->
             val media = mediaList[page]
             val isVideo = media.mimeType?.startsWith("video/") == true
@@ -298,41 +297,13 @@ private fun MediaViewerContent(
             if (isVideo) {
                 val path = media.filePath
                 if (path != null) {
-                    if (isCurrentPage) {
-                        TelegramVideoPlayer(
-                            videoPath = path,
-                            autoPlay = true,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(bottom = if (mediaList.size > 1) 76.dp else 0.dp)
-                        )
-                    } else {
-                        // 非当前页：只显示缩略图，不创建 ExoPlayer 以节省内存
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(bottom = if (mediaList.size > 1) 76.dp else 0.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val thumbPath = media.thumbnailPath ?: media.filePath
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(thumbPath)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = null,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            // 播放图标
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(64.dp)
-                            )
-                        }
-                    }
+                    TelegramVideoPlayer(
+                        videoPath = path,
+                        autoPlay = isCurrentPage,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = if (mediaList.size > 1) 76.dp else 0.dp)
+                    )
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("无法加载视频", color = Color.White)
