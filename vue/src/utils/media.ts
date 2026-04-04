@@ -20,5 +20,6 @@ export function isImage(mimeType: string | null): boolean {
 
 /** Resolve a backend-relative URL (e.g. /data/thumbs/1.webp) to a full URL */
 export function resolveUrl(path: string): string {
-  return `${API_BASE_URL}${path}`
+  // 对 URL 进行编码处理，特别是对 # 字符进行编码
+  return `${API_BASE_URL}${path.replace(/#/g, '%23')}`
 }

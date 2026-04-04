@@ -188,7 +188,8 @@ const canGoNext = computed(() => {
 })
 
 const getMediaUrl = (item: MessageMediaItem) => {
-  return item.file_path
+  // 对 URL 进行编码处理，特别是对 # 字符进行编码
+  return item.file_path.replace(/#/g, '%23')
 }
 
 const close = () => {

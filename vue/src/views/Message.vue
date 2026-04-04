@@ -312,7 +312,7 @@ defineOptions({ name: 'Message' })
 const toast = useToast()
 
 const tags = ref<TagWithCount[]>([])
-const selectedTagId = ref<number | null>(null)
+const selectedTagId = ref<number | null | undefined>(undefined)
 
 const fetchTags = async () => {
   try {
@@ -575,6 +575,7 @@ const resetAndFetch = (params?: { mediaId?: number }) => {
 const fetchMessages = async (isLoadingMore = false) => {
   if (loading.value) return
   if (isLoadingMore && !hasMoreData.value) return
+  if (selectedTagId.value === undefined) return
 
   loading.value = true
   try {

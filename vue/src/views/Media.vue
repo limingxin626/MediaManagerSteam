@@ -154,6 +154,7 @@ const { items, loading, hasMore, reset, setupObserver } = useInfiniteScroll<Medi
     cursor,
     limit,
     starred: starredFilter.value || undefined,
+    type: selectedType.value || undefined,
   }),
   sentinel,
   limit: 40,

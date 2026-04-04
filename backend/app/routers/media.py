@@ -13,6 +13,7 @@ def get_media(
     limit: int = Query(20, ge=1, le=100),
     message_id: Optional[int] = None,
     starred: Optional[bool] = Query(None),
+    type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
     db: Session = Depends(get_db)
 ):
     """获取媒体列表（游标分页，显示所有媒体）"""
@@ -41,6 +42,11 @@ def get_media(
 
         if starred is not None:
             query = query.filter(Media.starred == (1 if starred else 0))
+        
+        if type == 'video':
+            query = query.filter(Media.mime_type.like('video/%'))
+        elif type == 'image':
+            query = query.filter(Media.mime_type.like('image/%'))
 
         # 游标格式："{created_at}|{id}"
         if cursor:
@@ -166,6 +172,7 @@ def get_media_feed(
     )
 
 
+@router.put("/{media_id}/starred")
 def toggle_media_starred(
     media_id: int,
     starred: bool = Query(...),

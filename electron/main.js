@@ -12,6 +12,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: false, // 先隐藏窗口
     webPreferences: {
       webSecurity: false, // 必须！允许播放本地绝对路径视频
       nodeIntegration: true,
@@ -20,6 +21,14 @@ function createWindow() {
         ? path.join(__dirname, 'preload.js')
         : path.join(process.resourcesPath, 'app', 'preload.js')
     }
+  });
+  
+  // 直接最大化窗口
+  win.maximize();
+  
+  // 窗口准备就绪后显示
+  win.on('ready-to-show', () => {
+    win.show();
   });
   
   if (isDev) {
