@@ -4,7 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from app.models import get_db, Message, MessageMedia, message_tag
+from app.models import get_db, Message, MessageMedia, Tag, message_tag
 from app.schemas.message import (
     MessageCreate, MessageCreateFromClient, MessageUpdate, MessageMerge,
     MessageResponse, MessageDetailResponse,
@@ -342,6 +342,13 @@ def create_message(
 
     sync_tags_from_text(db, db_message, message_data.text)
 
+    if message_data.tag_ids:
+        existing_ids = {t.id for t in db_message.tags}
+        extra_tags = db.query(Tag).filter(Tag.id.in_(message_data.tag_ids)).all()
+        for tag in extra_tags:
+            if tag.id not in existing_ids:
+                db_message.tags.append(tag)
+
     position = 0
     for file_path in message_data.files:
         result = process_file(db, file_path, db_message.id, position)
@@ -351,9 +358,6 @@ def create_message(
     db.commit()
     db.refresh(db_message)
     return _build_sync_response(db, db_message)
-
-
-@router.post("/create-from-client", response_model=MessageSyncResponse, status_code=201)
 def create_message_from_client(
     message_data: MessageCreateFromClient,
     db: Session = Depends(get_db),

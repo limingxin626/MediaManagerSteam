@@ -10,6 +10,7 @@ class MessageCreate(BaseModel):
     text: Optional[str] = None
     actor_id: Optional[int] = None
     files: List[str] = []
+    tag_ids: List[int] = []
 
 
 class ClientMediaFile(BaseModel):

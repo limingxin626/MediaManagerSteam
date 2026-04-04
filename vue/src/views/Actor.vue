@@ -27,18 +27,7 @@
           <div class="flex gap-4 items-center max-w-2xl mx-auto">
             <h2 class="text-2xl font-bold text-white">演员消息</h2>
             <!-- Search -->
-            <div class="relative flex-1 max-w-md">
-              <input
-                v-model="filterName"
-                type="text"
-                placeholder="搜索演员..."
-                class="w-full pl-10 pr-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                @keydown.enter="resetAndFetch"
-              />
-              <svg class="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
+            <SearchInput v-model="filterName" placeholder="搜索演员..." @search="resetAndFetch" />
           </div>
         </div>
       </div>
@@ -115,6 +104,13 @@
         <!-- Scroll sentinel for loading newer messages -->
         <div ref="bottomSentinel" class="h-1"></div>
       </div>
+
+      <!-- Input Area at Bottom -->
+      <MessageCompose
+        v-if="selectedActorId != null"
+        :actor-id="selectedActorId"
+        @sent="onMessageSent"
+      />
     </div>
 
     <!-- Right Actor Detail Column -->
@@ -216,6 +212,8 @@ import type { Actor, MessageDetail, MessageMediaItem } from '../types'
 import ActorEditModal from '../components/ActorEditModal.vue'
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
+import SearchInput from '../components/SearchInput.vue'
+import MessageCompose from '../components/MessageCompose.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { resolveUrl } from '../utils/media'
@@ -356,6 +354,12 @@ const fetchMessages = async (reset = false) => {
 const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
   const el = scrollContainer.value
   if (el) el.scrollTo({ top: el.scrollHeight, behavior })
+}
+
+const onMessageSent = async (message: MessageDetail) => {
+  messages.value.push(message)
+  await nextTick()
+  scrollToBottom()
 }
 
 // --- CRUD ---

@@ -59,17 +59,7 @@
             </svg>
           </button>
           <!-- Search -->
-          <div class="relative flex-1 max-w-md">
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="搜索消息..."
-              class="w-full pl-10 pr-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <svg class="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
+          <SearchInput v-model="searchQuery" placeholder="搜索消息..." @search="onSearch" />
         </div>
       </div>
     </div>
@@ -192,77 +182,10 @@
     </div>
 
     <!-- Input Area at Bottom -->
-    <div class="shrink-0 border-t border-white/10 shadow-lg">
-      <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <div class="flex gap-2 items-center max-w-2xl mx-auto">
-          <!-- Attachment Button -->
-          <button
-            @click="triggerFileInput"
-            class="flex-shrink-0 p-2 text-gray-400 hover:text-indigo-400 hover:bg-white/10 rounded-lg transition-colors"
-            title="添加附件"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
-          </button>
-
-          <!-- File Input (Hidden) -->
-          <input
-            ref="fileInput"
-            type="file"
-            multiple
-            class="hidden"
-            @change="handleFileSelect"
-          />
-
-          <!-- Text Input -->
-          <div class="flex-1 relative">
-            <textarea
-              ref="textareaRef"
-              v-model="newMessageText"
-              placeholder="输入消息..."
-              rows="1"
-              class="w-full px-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none max-h-32 overflow-y-auto"
-              @keydown.enter="handleEnterKey"
-              @input="autoResize"
-            />
-          </div>
-
-          <!-- Send Button -->
-          <button
-            @click="sendMessage"
-            :disabled="!newMessageText.trim() && selectedFiles.length === 0"
-            class="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
-            title="发送"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- Selected Files Preview -->
-        <div v-if="selectedFiles.length > 0" class="mt-2 max-w-2xl mx-auto">
-          <div class="flex flex-wrap gap-2">
-            <div
-              v-for="(filePath, index) in selectedFiles"
-              :key="index"
-              class="inline-flex items-center gap-1 px-2 py-1 bg-white/10 rounded-md text-sm"
-            >
-              <span class="text-gray-300 truncate max-w-xs">{{ filePath.split('\\').pop() || filePath }}</span>
-              <button
-                @click="removeFile(index)"
-                class="text-gray-500 hover:text-red-500 transition-colors"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <MessageCompose
+      :tag-id="selectedTagId ?? null"
+      @sent="onMessageSent"
+    />
 
     <MediaPreview
       :is-open="previewOpen"
@@ -287,25 +210,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import CalendarSidebar from '../components/CalendarSidebar.vue'
+import SearchInput from '../components/SearchInput.vue'
+import MessageCompose from '../components/MessageCompose.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-
-// Electron API 类型声明
-declare global {
-  interface Window {
-    electronAPI?: {
-      openFileDialog: (options: { properties: string[] }) => Promise<{
-        canceled: boolean
-        filePaths: string[]
-      }>
-    }
-  }
-}
 
 defineOptions({ name: 'Message' })
 
@@ -351,10 +264,6 @@ const previewMessageStarred = computed(() => {
   return messages.value[currentMessageIndex.value]?.starred ?? false
 })
 
-const newMessageText = ref('')
-const selectedFiles = ref<string[]>([])
-const fileInput = ref<HTMLInputElement | null>(null)
-const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 // --- Merge selection mode ---
 const mergeMode = ref(false)
@@ -489,77 +398,12 @@ const backToLatest = () => {
   resetAndFetch()
 }
 
-// --- File input ---
-
-const triggerFileInput = async () => {
-  const isElectron = navigator.userAgent.indexOf('Electron') > -1
-
-  if (isElectron && window.electronAPI) {
-    try {
-      const result = await window.electronAPI.openFileDialog({
-        properties: ['openFile', 'multiSelections']
-      })
-      if (!result.canceled && result.filePaths) {
-        selectedFiles.value = [...selectedFiles.value, ...result.filePaths]
-      }
-    } catch (err) {
-      console.error('Error opening dialog:', err)
-      fileInput.value?.click()
-    }
-  } else {
-    fileInput.value?.click()
-  }
-}
-
-const handleFileSelect = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  if (target.files) {
-    const filePaths = Array.from(target.files).map(file => {
-      return (file as any).path || (file as any).webkitRelativePath || file.name
-    })
-    selectedFiles.value = [...selectedFiles.value, ...filePaths]
-  }
-  target.value = ''
-}
-
-const removeFile = (index: number) => {
-  selectedFiles.value.splice(index, 1)
-}
-
 // --- Send message ---
 
-const handleEnterKey = (event: KeyboardEvent) => {
-  if (event.shiftKey) return // Shift+Enter: allow newline
-  event.preventDefault()
-  sendMessage()
-}
-
-const autoResize = () => {
-  const el = textareaRef.value
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = el.scrollHeight + 'px'
-}
-
-const sendMessage = async () => {
-  if (!newMessageText.value.trim() && selectedFiles.value.length === 0) return
-
-  try {
-    const result = await api.post<MessageDetail>('/messages', {
-      text: newMessageText.value || null,
-      files: selectedFiles.value
-    })
-
-    messages.value.push(result)
-    newMessageText.value = ''
-    selectedFiles.value = []
-    if (textareaRef.value) textareaRef.value.style.height = 'auto'
-    await nextTick()
-    scrollToBottom()
-    toast.success('消息已发送')
-  } catch (error) {
-    toast.error('发送消息失败')
-  }
+const onMessageSent = async (message: MessageDetail) => {
+  messages.value.push(message)
+  await nextTick()
+  scrollToBottom()
 }
 
 // --- Fetch messages (unified) ---
@@ -786,7 +630,6 @@ const handleFindMessagesByMedia = (mediaId: number) => {
 
 // --- Search debounce ---
 
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 // --- Date helpers ---
 
@@ -809,13 +652,10 @@ const formatDateLabel = (dateString: string) => {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
 }
 
-watch(searchQuery, () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    activeMediaFilter.value = null
-    resetAndFetch()
-  }, 300)
-})
+function onSearch() {
+  activeMediaFilter.value = null
+  resetAndFetch()
+}
 
 // --- Infinite scroll via IntersectionObserver ---
 
@@ -853,6 +693,5 @@ onMounted(() => {
 onUnmounted(() => {
   topObserver?.disconnect()
   bottomObserver?.disconnect()
-  if (searchTimeout) clearTimeout(searchTimeout)
 })
 </script>
