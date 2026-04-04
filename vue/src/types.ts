@@ -87,6 +87,13 @@ export interface TagItem {
   category: string | null
 }
 
+export interface TagWithCount {
+  id: number
+  name: string
+  category: string | null
+  message_count: number
+}
+
 export interface Tag {
   id: number
   type: string

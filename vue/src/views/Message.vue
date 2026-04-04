@@ -1,5 +1,35 @@
 <template>
-  <div class="h-screen flex flex-col 2xl:pr-72 transition-colors">
+  <div class="h-screen flex 2xl:pr-72 transition-colors">
+    <!-- Left Tag Column -->
+    <div class="flex flex-col w-48 shrink-0 border-r border-white/10 overflow-y-auto">
+      <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider shrink-0">标签</div>
+      <div class="flex flex-col gap-0.5 px-2 pb-4">
+        <button
+          @click="selectTag(null)"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
+          :class="selectedTagId === null
+            ? 'bg-indigo-600/30 text-indigo-300'
+            : 'text-gray-300 hover:bg-white/10'"
+        >
+          <span>全部</span>
+        </button>
+        <button
+          v-for="tag in tags"
+          :key="tag.id"
+          @click="selectTag(tag.id)"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
+          :class="selectedTagId === tag.id
+            ? 'bg-indigo-600/30 text-indigo-300'
+            : 'text-gray-300 hover:bg-white/10'"
+        >
+          <span class="truncate">{{ tag.name }}</span>
+          <span class="ml-1 text-xs text-gray-500 shrink-0">{{ tag.message_count }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col min-w-0">
     <!-- Search Header -->
     <div class="shrink-0 border-b border-white/10 shadow-sm">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -253,11 +283,12 @@
       />
     </aside>
   </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { type MessageDetail, type MessageMediaItem } from '../types'
+import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import CalendarSidebar from '../components/CalendarSidebar.vue'
@@ -279,6 +310,22 @@ declare global {
 defineOptions({ name: 'Message' })
 
 const toast = useToast()
+
+const tags = ref<TagWithCount[]>([])
+const selectedTagId = ref<number | null>(null)
+
+const fetchTags = async () => {
+  try {
+    tags.value = await api.get<TagWithCount[]>('/tags')
+  } catch {
+    // Tags are non-critical; silent fail
+  }
+}
+
+const selectTag = (tagId: number | null) => {
+  selectedTagId.value = tagId
+  resetAndFetch()
+}
 
 const messages = ref<MessageDetail[]>([])
 const loading = ref(false)
@@ -360,6 +407,7 @@ const handleDateSelected = async (dateStr: string) => {
       query_text: searchQuery.value || undefined,
       media_id: activeMediaFilter.value ?? undefined,
       starred: starredFilter.value || undefined,
+      tag_id: selectedTagId.value ?? undefined,
     })
 
     // desc order returned, reverse for chat layout (newest at bottom)
@@ -405,6 +453,7 @@ const fetchForwardMessages = async () => {
       query_text: searchQuery.value || undefined,
       media_id: activeMediaFilter.value ?? undefined,
       starred: starredFilter.value || undefined,
+      tag_id: selectedTagId.value ?? undefined,
     })
 
     const container = scrollContainer.value
@@ -537,6 +586,7 @@ const fetchMessages = async (isLoadingMore = false) => {
         query_text: searchQuery.value || undefined,
         media_id: activeMediaFilter.value ?? undefined,
         starred: starredFilter.value || undefined,
+        tag_id: selectedTagId.value ?? undefined,
       },
     )
 
@@ -772,6 +822,7 @@ let topObserver: IntersectionObserver | null = null
 let bottomObserver: IntersectionObserver | null = null
 
 onMounted(() => {
+  fetchTags()
   fetchMessages()
 
   const root = scrollContainer.value
