@@ -10,7 +10,7 @@ from app.config import config
 logger = logging.getLogger(__name__)
 
 
-def process_file(db: Session, file_path: str, message_id: int, position: int) -> Optional[Dict[str, Any]]:
+def process_file(db: Session, file_path: str, message_id: int, position: int, media_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     """
     处理单个文件：hash 去重 → 媒体信息提取 → 缩略图生成 → 创建 MessageMedia。
     返回 {"media": Media, "is_new": bool} 或 None（文件不存在或不支持的类型）。
@@ -37,7 +37,7 @@ def process_file(db: Session, file_path: str, message_id: int, position: int) ->
     mime_type, _ = mimetypes.guess_type(file_path)
     media_info = MediaInfoUtils.get_media_info(file_path, media_type, config.FFPROBE_PATH)
 
-    media = Media(
+    media_kwargs = dict(
         file_path=file_path,
         file_hash=file_hash,
         file_size=file_size,
@@ -46,6 +46,9 @@ def process_file(db: Session, file_path: str, message_id: int, position: int) ->
         height=media_info["height"],
         duration_ms=media_info["duration_ms"],
     )
+    if media_id is not None:
+        media_kwargs["id"] = media_id
+    media = Media(**media_kwargs)
     db.add(media)
     db.flush()
 

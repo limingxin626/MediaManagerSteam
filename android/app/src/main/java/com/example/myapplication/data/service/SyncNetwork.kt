@@ -45,12 +45,17 @@ interface MessageSyncService {
     suspend fun createFromClient(@Body request: MessageSyncRequest): MessageSyncResponse
 }
 
+data class ClientMediaFile(
+    val id: Long,
+    val file_path: String
+)
+
 data class MessageSyncRequest(
     val id: Long,
     val text: String?,
     val actor_id: Long?,
     val created_at: String?,
-    val files: List<String>
+    val files: List<ClientMediaFile>
 )
 
 data class MessageSyncResponse(

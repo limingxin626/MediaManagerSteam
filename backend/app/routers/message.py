@@ -380,8 +380,8 @@ def create_message_from_client(
     sync_tags_from_text(db, db_message, message_data.text)
 
     position = 0
-    for file_path in message_data.files:
-        result = process_file(db, file_path, db_message.id, position)
+    for client_file in message_data.files:
+        result = process_file(db, client_file.file_path, db_message.id, position, media_id=client_file.id)
         if result is not None:
             position += 1
 

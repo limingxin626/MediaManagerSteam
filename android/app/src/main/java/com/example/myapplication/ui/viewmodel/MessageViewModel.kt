@@ -14,6 +14,7 @@ import com.example.myapplication.data.database.entities.Message
 import com.example.myapplication.data.database.entities.MessageWithDetails
 import com.example.myapplication.data.model.ProgressRequestBody
 import com.example.myapplication.data.repository.MessageRepository
+import com.example.myapplication.data.service.ClientMediaFile
 import com.example.myapplication.data.service.MessageSyncRequest
 import com.example.myapplication.data.service.SyncNetwork
 import com.example.myapplication.utils.MediaFileInfo
@@ -132,7 +133,7 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
             parseAndAttachTags(text, localMessageId, databaseManager)
 
             // Step 2: 创建 Media + MessageMedia junctions
-            val localMediaInfos = mutableListOf<Pair<MediaFileInfo, String?>>()
+            val localMediaInfos = mutableListOf<Triple<MediaFileInfo, String?, Long>>()
             for ((index, mediaFileInfo) in mediaList.withIndex()) {
                 val localPath = filePicker.copyFileToAppStorage(mediaFileInfo.uri, mediaFileInfo.fileName)
                 val fileHash = filePicker.computeBlake2bHash(mediaFileInfo.uri) ?: mediaFileInfo.uri.toString()
@@ -152,19 +153,22 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                 )
                 val mediaId = databaseManager.mediaRepository.insertMedia(media)
                 messageRepository.addMediaToMessage(localMessageId, mediaId, position = index)
-                localMediaInfos.add(mediaFileInfo to localPath)
+                localMediaInfos.add(Triple(mediaFileInfo, localPath, mediaId))
             }
             // ↑ 至此消息已在 paging 中可见（带本地缩略图，状态 PUSHING）
 
             // Step 3: 后台上传 + 推送
             try {
-                // 并行上传文件
-                val serverPaths = coroutineScope {
-                    localMediaInfos.map { (info, path) ->
-                        async { uploadFile(info, path) }
+                // 并行上传文件，收集 (mediaId, serverPath) 配对
+                val uploadResults = coroutineScope {
+                    localMediaInfos.map { (info, path, mediaId) ->
+                        async {
+                            val serverPath = uploadFile(info, path)
+                            if (serverPath != null) ClientMediaFile(id = mediaId, file_path = serverPath) else null
+                        }
                     }.awaitAll()
                 }
-                if (serverPaths.any { it == null } && localMediaInfos.isNotEmpty()) {
+                if (uploadResults.any { it == null } && localMediaInfos.isNotEmpty()) {
                     messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PUSH_FAILED)
                     onError("上传失败")
                     return@launch
@@ -185,7 +189,7 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                         text = text.ifBlank { null },
                         actor_id = null,
                         created_at = createdAtIso,
-                        files = serverPaths.filterNotNull()
+                        files = uploadResults.filterNotNull()
                     )
                 )
 
@@ -208,9 +212,12 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
             messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PUSHING)
             try {
                 val mediaList = messageRepository.getMediaByMessageId(messageId)
-                val serverPaths = coroutineScope {
+                val uploadResults = coroutineScope {
                     mediaList.map { media ->
-                        async { uploadFileFromMedia(media) }
+                        async {
+                            val serverPath = uploadFileFromMedia(media)
+                            if (serverPath != null) ClientMediaFile(id = media.id, file_path = serverPath) else null
+                        }
                     }.awaitAll()
                 }
 
@@ -228,7 +235,7 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                         text = msg?.text,
                         actor_id = msg?.actorId,
                         created_at = createdAtIso,
-                        files = serverPaths.filterNotNull()
+                        files = uploadResults.filterNotNull()
                     )
                 )
                 messageRepository.applyRemoteUrls(messageId, response)
