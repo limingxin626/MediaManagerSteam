@@ -606,7 +606,7 @@ const fetchMessages = async (isLoadingMore = false) => {
 
     await nextTick()
     if (!isLoadingMore) {
-      scrollToBottom()
+      scrollToBottom('auto')
     } else if (container) {
       const scrollDelta = container.scrollHeight - previousHeight
       container.scrollTo({ top: previousScrollY + scrollDelta, behavior: 'auto' })
@@ -830,7 +830,8 @@ onMounted(() => {
 
   topObserver = new IntersectionObserver(
     (entries) => {
-      if (entries[0].isIntersecting && !loading.value && hasMoreData.value) {
+      const container = scrollContainer.value
+      if (entries[0].isIntersecting && !loading.value && hasMoreData.value && container && container.scrollTop > 0) {
         fetchMessages(true)
       }
     },

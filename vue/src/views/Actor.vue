@@ -325,7 +325,7 @@ const fetchMessages = async (reset = false) => {
       messages.value = data.items.reverse()
       // Scroll to bottom on initial load
       await nextTick()
-      scrollToBottom()
+      scrollToBottom('auto')
     } else {
       // Preserve scroll position when loading older messages
       const container = scrollContainer.value
