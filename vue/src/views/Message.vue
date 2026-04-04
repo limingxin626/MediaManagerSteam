@@ -193,9 +193,12 @@
 
       <!-- Right Media Display Section -->
       <div v-if="selectedMessage" class="w-96 border-l border-white/10 flex flex-col overflow-hidden">
-        <div class="p-4 border-b border-white/10">
-          <h3 class="text-lg font-semibold text-white">{{ selectedMessage.title || '消息详情' }}</h3>
-          <p class="text-sm text-gray-400 mt-1">{{ formatDateLabel(selectedMessage.created_at) }}</p>
+        <div class="p-4 border-b border-white/10 flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-white">{{ selectedMessage.title || '消息详情' }}</h3>
+            <p class="text-sm text-gray-400 mt-1">{{ formatDateLabel(selectedMessage.created_at) }}</p>
+          </div>
+          <div v-if="selectedMessageLoading" class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-500"></div>
         </div>
         <div class="flex-1 overflow-y-auto p-4">
           <div v-if="selectedMessage.media_items && selectedMessage.media_items.length > 0" class="grid grid-cols-2 gap-1">
@@ -203,7 +206,7 @@
               v-for="(media, index) in selectedMessage.media_items"
               :key="media.id"
               class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity bg-gray-900"
-              @click="handleMediaClick(selectedMessage.id, index)"
+              @click="handleSelectedMessageMediaClick(index)"
             >
               <img
                 :src="resolveUrl(media.thumb_url || media.url)"
@@ -321,6 +324,7 @@ const previewItems = ref<MessageMediaItem[]>([])
 const previewStartIndex = ref(0)
 const currentMessageIndex = ref(-1)
 const selectedMessage = ref<MessageDetail | null>(null)
+const selectedMessageLoading = ref(false)
 
 const previewMessageStarred = computed(() => {
   if (currentMessageIndex.value < 0) return false
@@ -691,8 +695,27 @@ const handleFindMessagesByMedia = (mediaId: number) => {
   resetAndFetch({ mediaId })
 }
 
-const handleMessageClick = (message: MessageDetail) => {
+const handleSelectedMessageMediaClick = (mediaIndex: number) => {
+  if (!selectedMessage.value?.media_items) return
+  currentMessageIndex.value = messages.value.findIndex(m => m.id === selectedMessage.value!.id)
+  previewItems.value = selectedMessage.value.media_items
+  previewStartIndex.value = mediaIndex
+  previewOpen.value = true
+}
+
+const handleMessageClick = async (message: MessageDetail) => {
   selectedMessage.value = message
+  selectedMessageLoading.value = true
+  try {
+    const full = await api.get<MessageDetail>(`/messages/${message.id}`)
+    if (selectedMessage.value?.id === message.id) {
+      selectedMessage.value = full
+    }
+  } catch {
+    // keep preview data on failure
+  } finally {
+    selectedMessageLoading.value = false
+  }
 }
 
 // --- Search debounce ---
