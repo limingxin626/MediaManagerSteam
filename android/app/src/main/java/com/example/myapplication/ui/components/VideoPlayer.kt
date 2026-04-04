@@ -79,6 +79,9 @@ fun TelegramVideoPlayer(
         }
     }
 
+    // 持有 PlayerView 引用，以便 onDispose 时清除 player 避免退场动画残留
+    var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+
     var isPlaying by remember { mutableStateOf(autoPlay) }
     var controlsVisible by remember { mutableStateOf(false) }
     var hideControlsJob by remember { mutableStateOf<Job?>(null) }
@@ -124,6 +127,9 @@ fun TelegramVideoPlayer(
         exoPlayer.addListener(listener)
         onDispose {
             exoPlayer.removeListener(listener)
+            // 先从 PlayerView 解除绑定，让视频画面立即消失，
+            // 避免 Compose fadeOut 动画期间原生 Surface 残留
+            playerViewRef?.player = null
             exoPlayer.release()
         }
     }
@@ -178,6 +184,7 @@ fun TelegramVideoPlayer(
                     )
                     this.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                    playerViewRef = this
                 }
             },
             modifier = Modifier.fillMaxSize()
