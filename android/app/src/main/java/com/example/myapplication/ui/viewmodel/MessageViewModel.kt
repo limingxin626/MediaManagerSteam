@@ -20,6 +20,7 @@ import com.example.myapplication.data.service.SyncNetwork
 import com.example.myapplication.utils.MediaFileInfo
 import com.example.myapplication.utils.MediaFilePicker
 import com.example.myapplication.utils.ThumbnailGenerator
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MultipartBody
 import java.io.File
 import java.time.Instant
@@ -44,6 +46,10 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
     // 搜索查询
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
+
+    // 发送中状态（文件预处理 + DB 事务完成前为 true）
+    private val _isSending = MutableStateFlow(false)
+    val isSending = _isSending.asStateFlow()
 
     // 标签过滤
     private val _tagId = MutableStateFlow<Long?>(null)
@@ -122,59 +128,63 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
+            _isSending.value = true
             val filePicker = MediaFilePicker(context)
             val thumbnailGenerator = ThumbnailGenerator(context)
 
-            // Step 1: 本地创建完整记录，sendStatus=PUSHING，立刻进入 paging
-            val localMessageId = messageRepository.createMessage(
-                Message(text = text.ifBlank { null }, sendStatus = Message.MSG_STATUS_PUSHING),
-                immediateSync = false
-            )
-            parseAndAttachTags(text, localMessageId, databaseManager)
+            // Step 1: 在主线程外预处理所有媒体文件（复制、哈希、缩略图）
+            data class PreparedMedia(val info: MediaFileInfo, val localPath: String?, val entity: Media)
 
-            // Step 2: 创建 Media + MessageMedia junctions
-            val localMediaInfos = mutableListOf<Triple<MediaFileInfo, String?, Long>>()
-            for ((index, mediaFileInfo) in mediaList.withIndex()) {
-                val localPath = filePicker.copyFileToAppStorage(mediaFileInfo.uri, mediaFileInfo.fileName)
-                val fileHash = filePicker.computeBlake2bHash(mediaFileInfo.uri) ?: mediaFileInfo.uri.toString()
-                val resolution = filePicker.getMediaResolution(mediaFileInfo.uri)
-                val isVideo = mediaFileInfo.mimeType?.startsWith("video/") == true
-                val durationMs = if (isVideo) filePicker.getVideoDuration(mediaFileInfo.uri)?.let { it * 1000 } else null
-                val thumbnailPath = localPath?.let { thumbnailGenerator.generateThumbnail(it, isVideo) }
-                val media = Media(
-                    fileHash = fileHash,
-                    localMediaPath = localPath,
-                    localThumbnailPath = thumbnailPath,
-                    mimeType = mediaFileInfo.mimeType,
-                    fileSize = mediaFileInfo.size,
-                    width = resolution?.split("x")?.getOrNull(0)?.toIntOrNull(),
-                    height = resolution?.split("x")?.getOrNull(1)?.toIntOrNull(),
-                    durationMs = durationMs
-                )
-                val mediaId = databaseManager.mediaRepository.insertMedia(media)
-                messageRepository.addMediaToMessage(localMessageId, mediaId, position = index)
-                localMediaInfos.add(Triple(mediaFileInfo, localPath, mediaId))
+            val preparedList = withContext(Dispatchers.IO) {
+                mediaList.mapIndexed { _, mediaFileInfo ->
+                    val localPath = filePicker.copyFileToAppStorage(mediaFileInfo.uri, mediaFileInfo.fileName)
+                    val fileHash = filePicker.computeBlake2bHash(mediaFileInfo.uri) ?: mediaFileInfo.uri.toString()
+                    val resolution = filePicker.getMediaResolution(mediaFileInfo.uri)
+                    val isVideo = mediaFileInfo.mimeType?.startsWith("video/") == true
+                    val durationMs = if (isVideo) filePicker.getVideoDuration(mediaFileInfo.uri)?.let { it * 1000 } else null
+                    val thumbnailPath = localPath?.let { thumbnailGenerator.generateThumbnail(it, isVideo) }
+                    PreparedMedia(
+                        info = mediaFileInfo,
+                        localPath = localPath,
+                        entity = Media(
+                            fileHash = fileHash,
+                            localMediaPath = localPath,
+                            localThumbnailPath = thumbnailPath,
+                            mimeType = mediaFileInfo.mimeType,
+                            fileSize = mediaFileInfo.size,
+                            width = resolution?.split("x")?.getOrNull(0)?.toIntOrNull(),
+                            height = resolution?.split("x")?.getOrNull(1)?.toIntOrNull(),
+                            durationMs = durationMs
+                        )
+                    )
+                }
             }
-            // ↑ 至此消息已在 paging 中可见（带本地缩略图，状态 PUSHING）
+
+            // Step 2: 单事务写入 Message + 所有 Media + junctions + tags → PagingData 只刷新一次
+            val (localMessageId, mediaIds) = messageRepository.createMessageWithMedia(
+                message = Message(text = text.ifBlank { null }, sendStatus = Message.MSG_STATUS_PUSHING),
+                mediaEntities = preparedList.map { it.entity },
+                tagRepository = databaseManager.tagRepository
+            )
+            // ↑ 至此消息已在 paging 中完整可见（带全部本地缩略图，状态 PUSHING）
+            _isSending.value = false
 
             // Step 3: 后台上传 + 推送
             try {
-                // 并行上传文件，收集 (mediaId, serverPath) 配对
                 val uploadResults = coroutineScope {
-                    localMediaInfos.map { (info, path, mediaId) ->
+                    preparedList.mapIndexed { index, prepared ->
                         async {
-                            val serverPath = uploadFile(info, path)
-                            if (serverPath != null) ClientMediaFile(id = mediaId, file_path = serverPath) else null
+                            val serverPath = uploadFile(prepared.info, prepared.localPath)
+                            if (serverPath != null) ClientMediaFile(id = mediaIds[index], file_path = serverPath) else null
                         }
                     }.awaitAll()
                 }
-                if (uploadResults.any { it == null } && localMediaInfos.isNotEmpty()) {
+                if (uploadResults.any { it == null } && preparedList.isNotEmpty()) {
                     messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PUSH_FAILED)
                     onError("上传失败")
                     return@launch
                 }
 
-                // 构建 created_at ISO 字符串
                 val msg = messageRepository.getMessageById(localMessageId)
                 val createdAtIso = msg?.let {
                     Instant.ofEpochMilli(it.createdAt)
@@ -182,7 +192,6 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                         .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                 }
 
-                // 调用新接口
                 val response = SyncNetwork.messageSyncService.createFromClient(
                     MessageSyncRequest(
                         id = localMessageId,
@@ -193,7 +202,6 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                     )
                 )
 
-                // 更新远程 URL + 标记 SYNCED
                 messageRepository.applyRemoteUrls(localMessageId, response)
                 onSuccess()
             } catch (e: Exception) {
@@ -275,10 +283,6 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
             Log.e(TAG, "uploadFileFromMedia 失败: ${e.message}", e)
             null
         }
-    }
-
-    private suspend fun parseAndAttachTags(text: String, messageId: Long, databaseManager: DatabaseManager) {
-        messageRepository.parseAndAttachTags(text, messageId, databaseManager.tagRepository)
     }
 
     companion object {

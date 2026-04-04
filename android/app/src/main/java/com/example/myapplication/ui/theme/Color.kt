@@ -16,11 +16,11 @@ val InstagramGradientMiddle = Color(0xFFE1306C) // 玫红色
 val InstagramGradientEnd = Color(0xFF833AB4)    // 紫色
 val InstagramBlue = Color(0xFF405DE6)           // Instagram 蓝
 
-// 现代 UI 配色
-val SurfaceLight = Color(0xFFFAFAFA)            // 浅灰背景
-val SurfaceDark = Color(0xFF121212)             // 深色背景
-val CardLight = Color(0xFFFFFFFF)               // 白色卡片
-val CardDark = Color(0xFF1E1E1E)                // 深色卡片
+// Telegram 风格配色
+val SurfaceLight = Color(0xFFEFEFEF)            // 浅灰聊天背景
+val SurfaceDark = Color(0xFF0E1621)             // Telegram 深色聊天背景
+val CardLight = Color(0xFFFFFFFF)               // 白色卡片气泡
+val CardDark = Color(0xFF182533)                // Telegram 深色气泡
 val DividerLight = Color(0xFFEEEEEE)            // 浅色分隔线
 val DividerDark = Color(0xFF2C2C2C)             // 深色分隔线
 val TextSecondary = Color(0xFF8E8E8E)           // 次级文字颜色

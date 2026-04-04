@@ -75,9 +75,9 @@ fun MessageCard(
                     onLongClick = { showMenu = true }
                 ),
             shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
             )
         ) {
         Column(modifier = Modifier.fillMaxWidth()) {

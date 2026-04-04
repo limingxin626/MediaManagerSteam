@@ -62,6 +62,53 @@ class MessageRepository(
             addTagToMessage(messageId, tag.id)
         }
     }
+
+    /**
+     * 在单个事务中创建消息 + 所有媒体 + junction + tags，
+     * 保证 PagingData 只刷新一次，媒体同时出现。
+     *
+     * @return Pair(messageId, List<mediaId>) — 用于后续上传 / 推送
+     */
+    suspend fun createMessageWithMedia(
+        message: Message,
+        mediaEntities: List<Media>,
+        tagRepository: TagRepository
+    ): Pair<Long, List<Long>> {
+        var msgId = 0L
+        val mediaIds = mutableListOf<Long>()
+
+        suspend fun txBody() {
+            msgId = messageDao.insertMessage(message)
+
+            for ((index, media) in mediaEntities.withIndex()) {
+                val existing = mediaDao.getMediaByHash(media.fileHash)
+                val mediaId = existing?.id ?: mediaDao.insertMedia(media)
+                messageDao.insertMessageMedia(
+                    MessageMedia(messageId = msgId, mediaId = mediaId, position = index)
+                )
+                mediaIds.add(mediaId)
+            }
+
+            if (!message.text.isNullOrBlank()) {
+                val tagNames = TAG_PATTERN.findAll(message.text)
+                    .map { it.groupValues[1] }
+                    .distinct()
+                    .toList()
+                for (name in tagNames) {
+                    val tag = tagRepository.createOrGetTag(name)
+                    messageDao.insertMessageTag(MessageTag(messageId = msgId, tagId = tag.id))
+                }
+            }
+        }
+
+        if (database != null) {
+            database.withTransaction { txBody() }
+        } else {
+            txBody()
+        }
+
+        return Pair(msgId, mediaIds)
+    }
     
     /**
      * 获取消息列表（响应式 Flow）

@@ -39,6 +39,7 @@ import com.example.myapplication.utils.rememberMultipleMediaFilePicker
 @Composable
 fun MessageComposeBar(
     onSendMessage: (text: String, mediaList: List<MediaFileInfo>) -> Unit,
+    isSending: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var text by remember { mutableStateOf("") }
@@ -48,7 +49,7 @@ fun MessageComposeBar(
         selectedMedia.addAll(mediaFiles)
     }
 
-    val canSend = text.isNotBlank() || selectedMedia.isNotEmpty()
+    val canSend = !isSending && (text.isNotBlank() || selectedMedia.isNotEmpty())
 
     val instagramGradient = Brush.linearGradient(
         colors = listOf(
@@ -150,7 +151,13 @@ fun MessageComposeBar(
                     enabled = canSend,
                     modifier = Modifier.size(40.dp)
                 ) {
-                    if (canSend) {
+                    if (isSending) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    } else if (canSend) {
                         Box(
                             modifier = Modifier
                                 .size(36.dp)

@@ -53,6 +53,7 @@ fun MessageListScreen(
     val uiState by viewModel.uiState.collectAsState(initial = UIState())
     val pagingItems = viewModel.messagesPaged.collectAsLazyPagingItems()
     val searchQuery by viewModel.searchQuery.collectAsState(initial = "")
+    val isSending by viewModel.isSending.collectAsState()
 
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -132,7 +133,7 @@ fun MessageListScreen(
                     LazyColumn(
                         state = listState,
                         reverseLayout = true,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(
                             top = 8.dp,
                             // 底部留出输入框的空间（约 60dp）
@@ -141,6 +142,13 @@ fun MessageListScreen(
                             end = 8.dp
                         )
                     ) {
+                        // 发送中占位卡片（reverseLayout 中排在最前 = 视觉最底部）
+                        if (isSending) {
+                            item(key = "sending_placeholder") {
+                                SendingPlaceholderCard()
+                            }
+                        }
+
                         items(
                             count = pagingItems.itemCount,
                             key = { index -> pagingItems[index]?.message?.id ?: index }
@@ -203,13 +211,13 @@ fun MessageListScreen(
                         mediaList = mediaList,
                         databaseManager = databaseManager,
                         context = context,
-                        onSuccess = {
-                            snackbarMessage = "消息已发送"
-                            coroutineScope.launch { listState.scrollToItem(0) }
-                        },
-                        onError = { error -> snackbarMessage = error }
+                        onSuccess = { },
+                        onError = { }
                     )
+                    // 立即滚动到占位卡片
+                    coroutineScope.launch { listState.animateScrollToItem(0) }
                 },
+                isSending = isSending,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 
@@ -254,6 +262,40 @@ fun MessageListScreen(
         LaunchedEffect(message) {
             snackbarMessage = message
             viewModel.clearMessage()
+        }
+    }
+}
+
+/**
+ * 发送中占位卡片 — 消息正在预处理时显示
+ */
+@Composable
+private fun SendingPlaceholderCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "正在准备消息...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
         }
     }
 }
