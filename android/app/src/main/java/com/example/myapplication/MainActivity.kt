@@ -311,13 +311,37 @@ fun AppNavHost(
         popEnterTransition = { EnterTransition.None },
         popExitTransition = { ExitTransition.None }
     ) {
-        // 主页 - 无动画
+        // 主页 - 底部导航方向感知滑动
         composable(
             Routes.HOME,
-            enterTransition = { NavigationAnimations.noAnimation() },
-            exitTransition = { NavigationAnimations.noExitAnimation() },
-            popEnterTransition = { NavigationAnimations.noAnimation() },
-            popExitTransition = { NavigationAnimations.noExitAnimation() }
+            enterTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else NavigationAnimations.noAnimation()
+            },
+            exitTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else NavigationAnimations.noExitAnimation()
+            },
+            popEnterTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else NavigationAnimations.noAnimation()
+            },
+            popExitTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else NavigationAnimations.noExitAnimation()
+            }
         ) {
             HomeScreen(
                 homeViewModel = homeViewModel!!,
@@ -327,13 +351,37 @@ fun AppNavHost(
             )
         }
 
-        // 演员列表 - 无动画（底部导航标签页）
+        // 演员列表 - 底部导航方向感知滑动
         composable(
             Routes.ACTOR_LIST,
-            enterTransition = { NavigationAnimations.noAnimation() },
-            exitTransition = { NavigationAnimations.noExitAnimation() },
-            popEnterTransition = { NavigationAnimations.noAnimation() },
-            popExitTransition = { NavigationAnimations.noExitAnimation() }
+            enterTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else NavigationAnimations.noAnimation()
+            },
+            exitTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else NavigationAnimations.noExitAnimation()
+            },
+            popEnterTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else NavigationAnimations.noAnimation()
+            },
+            popExitTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else NavigationAnimations.noExitAnimation()
+            }
         ) {
             ActorListScreen(
                 viewModel = actorViewModel!!,
@@ -346,13 +394,37 @@ fun AppNavHost(
 
 
 
-        // 媒体列表 - 无动画
+        // 媒体列表 - 底部导航方向感知滑动
         composable(
             Routes.MEDIA_LIST,
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
+            enterTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else NavigationAnimations.noAnimation()
+            },
+            exitTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else NavigationAnimations.noExitAnimation()
+            },
+            popEnterTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else EnterTransition.None
+            },
+            popExitTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else ExitTransition.None
+            }
         ) {
             MediaListScreen(
                 viewModel = mediaViewModel!!,
@@ -658,13 +730,37 @@ fun AppNavHost(
             )
         }
 
-        // 设置页面 - 无动画（底部导航标签页）
+        // 设置页面 - 底部导航方向感知滑动
         composable(
             Routes.SETTINGS,
-            enterTransition = { NavigationAnimations.noAnimation() },
-            exitTransition = { NavigationAnimations.noExitAnimation() },
-            popEnterTransition = { NavigationAnimations.noAnimation() },
-            popExitTransition = { NavigationAnimations.noExitAnimation() }
+            enterTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else NavigationAnimations.noAnimation()
+            },
+            exitTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else NavigationAnimations.noExitAnimation()
+            },
+            popEnterTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else NavigationAnimations.noAnimation()
+            },
+            popExitTransition = {
+                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else NavigationAnimations.noExitAnimation()
+            }
         ) {
             SettingsScreen(viewModel = settingsViewModel!!)
         }

@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -27,9 +26,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.myapplication.ui.theme.InstagramGradientEnd
-import com.example.myapplication.ui.theme.InstagramGradientMiddle
-import com.example.myapplication.ui.theme.InstagramGradientStart
 import com.example.myapplication.utils.MediaFileInfo
 import com.example.myapplication.utils.rememberMultipleMediaFilePicker
 
@@ -50,14 +46,6 @@ fun MessageComposeBar(
     }
 
     val canSend = !isSending && (text.isNotBlank() || selectedMedia.isNotEmpty())
-
-    val instagramGradient = Brush.linearGradient(
-        colors = listOf(
-            InstagramGradientStart,
-            InstagramGradientMiddle,
-            InstagramGradientEnd
-        )
-    )
 
     Column(modifier = modifier.fillMaxWidth()) {
         HorizontalDivider(
@@ -161,13 +149,13 @@ fun MessageComposeBar(
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
-                                .background(instagramGradient, CircleShape),
+                                .background(MaterialTheme.colorScheme.primary, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.Send,
                                 contentDescription = "发送",
-                                tint = Color.White,
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }

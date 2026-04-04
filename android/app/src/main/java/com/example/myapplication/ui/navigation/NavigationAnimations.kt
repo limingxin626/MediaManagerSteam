@@ -13,10 +13,11 @@ import androidx.compose.animation.slideOutHorizontally
  * 导航动画配置
  */
 object NavigationAnimations {
-    
+
     // 定义动画持续时间
     private const val ANIMATION_DURATION = 400
-    
+    private const val TAB_ANIMATION_DURATION = 300
+
     // 页面间导航动画（前进）
     fun slideInFromRight(): EnterTransition {
         return slideInHorizontally(
@@ -74,6 +75,47 @@ object NavigationAnimations {
         ) + fadeOut(
             animationSpec = tween(
                 durationMillis = ANIMATION_DURATION / 2,
+                easing = FastOutSlowInEasing
+            )
+        )
+    }
+
+    // Tab 切换专用：纯滑动，无 fade（更流畅的横向切换感）
+    fun tabSlideInFromRight(): EnterTransition {
+        return slideInHorizontally(
+            initialOffsetX = { fullWidth -> fullWidth },
+            animationSpec = tween(
+                durationMillis = TAB_ANIMATION_DURATION,
+                easing = FastOutSlowInEasing
+            )
+        )
+    }
+
+    fun tabSlideOutToLeft(): ExitTransition {
+        return slideOutHorizontally(
+            targetOffsetX = { fullWidth -> -fullWidth },
+            animationSpec = tween(
+                durationMillis = TAB_ANIMATION_DURATION,
+                easing = FastOutSlowInEasing
+            )
+        )
+    }
+
+    fun tabSlideInFromLeft(): EnterTransition {
+        return slideInHorizontally(
+            initialOffsetX = { fullWidth -> -fullWidth },
+            animationSpec = tween(
+                durationMillis = TAB_ANIMATION_DURATION,
+                easing = FastOutSlowInEasing
+            )
+        )
+    }
+
+    fun tabSlideOutToRight(): ExitTransition {
+        return slideOutHorizontally(
+            targetOffsetX = { fullWidth -> fullWidth },
+            animationSpec = tween(
+                durationMillis = TAB_ANIMATION_DURATION,
                 easing = FastOutSlowInEasing
             )
         )
