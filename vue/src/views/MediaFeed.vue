@@ -56,7 +56,7 @@
             </div>
             <!-- Star toggle -->
             <button
-              @click.stop="toggleStar(item, $event)"
+              @click.stop="toggleMediaStar(item)"
               class="absolute top-1 right-1 p-1 rounded-full transition-all"
               :class="item.starred
                 ? 'text-yellow-400'
@@ -98,7 +98,6 @@
       :is-open="previewOpen"
       :items="previewItems"
       :start-index="previewStartIndex"
-      :starred-ids="mediaStarredIds"
       @close="previewOpen = false"
       @toggle-star="handlePreviewToggleStar"
     />
@@ -106,19 +105,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MediaPreview from '../components/MediaPreview.vue'
 import type { Media, CursorResponse } from '../types'
 import { api, useInfiniteScroll } from '../composables/useApi'
-import { isVideo, formatDuration, resolveUrl } from '../utils/media'
-import { useToast } from '../composables/useToast'
+import { isVideo, formatDuration, resolveUrl, toggleMediaStar } from '../utils/media'
 
 defineOptions({ name: 'MediaFeed' })
 
 const route = useRoute()
 const router = useRouter()
-const toast = useToast()
 
 const tagId = route.query.tag_id ? Number(route.query.tag_id) : undefined
 const actorId = route.query.actor_id ? Number(route.query.actor_id) : undefined
@@ -147,14 +144,9 @@ const toggleStarredFilter = () => {
   reset()
 }
 
-const toggleStar = async (item: Media, event: Event) => {
-  event.stopPropagation()
-  try {
-    await api.put(`/media/${item.id}/starred?starred=${!item.starred}`)
-    item.starred = !item.starred
-  } catch {
-    toast.error('操作失败')
-  }
+const handlePreviewToggleStar = async (mediaId: number) => {
+  const item = items.value.find(m => m.id === mediaId)
+  if (item) await toggleMediaStar(item)
 }
 
 const openPreview = (idx: number) => {
@@ -177,19 +169,6 @@ const openPreview = (idx: number) => {
   }))
   previewStartIndex.value = idx - start
   previewOpen.value = true
-}
-
-const mediaStarredIds = computed(() => {
-  const s = new Set<number>()
-  for (const m of items.value) {
-    if (m.starred) s.add(m.id)
-  }
-  return s
-})
-
-const handlePreviewToggleStar = async (mediaId: number) => {
-  const item = items.value.find(m => m.id === mediaId)
-  if (item) await toggleStar(item, new Event('click'))
 }
 
 onMounted(() => {

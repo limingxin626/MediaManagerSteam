@@ -228,6 +228,7 @@ import MessageCompose from '../components/MessageCompose.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { resolveUrl, formatDuration } from '../utils/media'
+import { formatDateLabel } from '../utils/date'
 
 
 defineOptions({ name: 'Message' })
@@ -693,23 +694,6 @@ const handleMessageClick = async (message: MessageDetail) => {
 // --- Date helpers ---
 
 const getDateStr = (dateString: string) => dateString.substring(0, 10)
-
-const formatDateLabel = (dateString: string) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const todayStr = now.toISOString().substring(0, 10)
-  const yesterday = new Date(now)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const yesterdayStr = yesterday.toISOString().substring(0, 10)
-  const ds = dateString.substring(0, 10)
-
-  if (ds === todayStr) return '今天'
-  if (ds === yesterdayStr) return '昨天'
-  if (date.getFullYear() === now.getFullYear()) {
-    return `${date.getMonth() + 1}月${date.getDate()}日`
-  }
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
-}
 
 function onSearch() {
   activeMediaFilter.value = null

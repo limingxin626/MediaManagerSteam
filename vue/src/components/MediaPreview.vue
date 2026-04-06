@@ -133,13 +133,11 @@ interface Props {
   items: MessageMediaItem[]
   startIndex?: number
   starred?: boolean
-  starredIds?: Set<number>
 }
 
 const props = withDefaults(defineProps<Props>(), {
   startIndex: 0,
   starred: false,
-  starredIds: undefined,
 })
 
 const emit = defineEmits<{
@@ -167,15 +165,7 @@ const currentItem = computed(() => {
   return props.items[currentIndex.value]
 })
 
-const isCurrentStarred = computed(() => {
-  if (currentItem.value?.starred !== undefined) {
-    return currentItem.value.starred
-  }
-  if (props.starredIds && currentItem.value) {
-    return props.starredIds.has(currentItem.value.id)
-  }
-  return props.starred
-})
+const isCurrentStarred = computed(() => currentItem.value?.starred ?? props.starred)
 
 const totalItems = computed(() => props.items.length)
 

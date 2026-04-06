@@ -66,7 +66,7 @@
             </div>
             <!-- Star toggle -->
             <button
-              @click.stop="toggleStar(item, $event)"
+              @click.stop="toggleMediaStar(item)"
               class="absolute top-1 right-1 p-1 rounded-full transition-all"
               :class="item.starred
                 ? 'text-yellow-400'
@@ -108,7 +108,6 @@
       :is-open="previewOpen"
       :items="previewItems"
       :start-index="previewStartIndex"
-      :starred-ids="mediaStarredIds"
       @close="previewOpen = false"
       @toggle-star="handlePreviewToggleStar"
     />
@@ -124,16 +123,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import type { Media, CursorResponse } from '../types'
 import { api, useInfiniteScroll } from '../composables/useApi'
-import { isVideo, formatDuration, resolveUrl } from '../utils/media'
-import { useToast } from '../composables/useToast'
+import { isVideo, formatDuration, resolveUrl, toggleMediaStar } from '../utils/media'
 
 defineOptions({ name: 'Media' })
-
-const toast = useToast()
 
 const typeOptions = [
   { value: '', label: '全部' },
@@ -171,27 +167,22 @@ const toggleStarredFilter = () => {
   reset()
 }
 
-const toggleStar = async (item: Media, event: Event) => {
-  event.stopPropagation()
-  try {
-    await api.put(`/media/${item.id}/starred?starred=${!item.starred}`)
-    item.starred = !item.starred
-  } catch {
-    toast.error('操作失败')
-  }
+const handlePreviewToggleStar = async (mediaId: number) => {
+  const item = items.value.find(m => m.id === mediaId)
+  if (item) await toggleMediaStar(item)
 }
 
 const openPreview = (item: Media) => {
   const idx = items.value.findIndex(m => m.id === item.id)
   if (idx === -1) return
-  
+
   // 最多显示9个媒体，以点击的媒体为中心
   const totalItems = 20
   const half = Math.floor(totalItems / 2)
-  
+
   let start = idx - half
   let end = idx + half
-  
+
   // 调整边界
   if (start < 0) {
     end += Math.abs(start)
@@ -201,10 +192,10 @@ const openPreview = (item: Media) => {
     start -= (end - items.value.length + 1)
     end = items.value.length - 1
   }
-  
+
   // 确保起始索引不小于0
   start = Math.max(0, start)
-  
+
   // 提取媒体项
   const selectedItems = items.value.slice(start, end + 1)
   previewItems.value = selectedItems.map((m: Media) => ({
@@ -215,25 +206,10 @@ const openPreview = (item: Media) => {
     thumb_url: m.thumb_url,
     starred: m.starred
   }))
-  
+
   // 计算新的起始索引（相对于selectedItems）
   previewStartIndex.value = idx - start
   previewOpen.value = true
-}
-
-const mediaStarredIds = computed(() => {
-  const s = new Set<number>()
-  for (const m of items.value) {
-    if (m.starred) s.add(m.id)
-  }
-  return s
-})
-
-const handlePreviewToggleStar = async (mediaId: number) => {
-  const item = items.value.find(m => m.id === mediaId)
-  if (item) {
-    await toggleStar(item, new Event('click'))
-  }
 }
 
 onMounted(() => {

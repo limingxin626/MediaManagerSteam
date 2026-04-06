@@ -1,4 +1,6 @@
 import { API_BASE_URL } from './constants'
+import { api } from '../composables/useApi'
+import { useToast } from '../composables/useToast'
 
 export function formatDuration(ms: number | null): string {
   if (!ms) return ''
@@ -22,4 +24,15 @@ export function isImage(mimeType: string | null): boolean {
 export function resolveUrl(path: string): string {
   // 对 URL 进行编码处理，特别是对 # 字符进行编码
   return `${API_BASE_URL}${path.replace(/#/g, '%23')}`
+}
+
+/** Toggle media starred state via API, updates item.starred in-place */
+export async function toggleMediaStar(item: { id: number; starred: boolean }): Promise<void> {
+  const toast = useToast()
+  try {
+    await api.put(`/media/${item.id}/starred?starred=${!item.starred}`)
+    item.starred = !item.starred
+  } catch {
+    toast.error('操作失败')
+  }
 }

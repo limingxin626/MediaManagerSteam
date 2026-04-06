@@ -146,11 +146,11 @@
               </div>
               <div class="flex justify-between text-sm">
                 <span class="text-gray-400">创建时间</span>
-                <span class="text-gray-300">{{ formatDate(selectedActor.created_at) }}</span>
+                <span class="text-gray-300">{{ formatDateTime(selectedActor.created_at) }}</span>
               </div>
               <div class="flex justify-between text-sm">
                 <span class="text-gray-400">更新时间</span>
-                <span class="text-gray-300">{{ formatDate(selectedActor.updated_at) }}</span>
+                <span class="text-gray-300">{{ formatDateTime(selectedActor.updated_at) }}</span>
               </div>
             </div>
           </div>
@@ -217,6 +217,7 @@ import MessageCompose from '../components/MessageCompose.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { resolveUrl } from '../utils/media'
+import { formatDateLabel, formatDateTime } from '../utils/date'
 
 defineOptions({ name: 'Actor' })
 
@@ -496,36 +497,7 @@ const closePreview = () => {
   currentMessageIndex.value = -1
 }
 
-// --- Date Formatting ---
-
-const getDateStr = (dateStr: string) => {
-  return dateStr.substring(0, 10)
-}
-
-const formatDateLabel = (dateStr: string) => {
-  const date = new Date(dateStr)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-
-  if (getDateStr(dateStr) === getDateStr(today.toISOString())) {
-    return '今天'
-  }
-  if (getDateStr(dateStr) === getDateStr(yesterday.toISOString())) {
-    return '昨天'
-  }
-  return date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
-}
-
-const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+const getDateStr = (dateStr: string) => dateStr.substring(0, 10)
 
 // --- Infinite scroll ---
 

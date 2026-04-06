@@ -3,7 +3,7 @@
     <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">日历</h3>
     <VCalendar
   :attributes="calendarAttributes"
-  :is-dark="isDark"
+  :is-dark="true"
   borderless
   transparent
   expanded
@@ -34,8 +34,6 @@ const emit = defineEmits<{
 const dateCounts = ref<MessageDateCount[]>([])
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth() + 1)
-
-const isDark = computed(() => true)
 
 const calendarAttributes = computed(() => {
   const attrs: any[] = []

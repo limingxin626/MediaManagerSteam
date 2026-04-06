@@ -181,23 +181,24 @@
         v-model="editText"
         placeholder="输入消息内容..."
         class="flex-1 w-full px-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-        @input="handleEditTextInput"
-        @keydown="handleEditKeydown"
+        @input="tag.onInput"
+        @keydown="tag.onKeydown"
+        @blur="tag.hide"
       />
       <!-- Tag Suggestions -->
       <div
-        v-if="tagSuggestionVisible && tagSuggestions.length > 0"
+        v-if="tag.tagSuggestionVisible.value && tag.tagSuggestions.value.length > 0"
         class="fixed bg-gray-800 border border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[100]"
-        :style="{ top: tagSuggestionPosition.top + 'px', left: tagSuggestionPosition.left + 'px', transform: 'translateY(-100%)' }"
+        :style="{ top: tag.tagSuggestionPosition.value.top + 'px', left: tag.tagSuggestionPosition.value.left + 'px', transform: 'translateY(-100%)' }"
       >
         <div
-          v-for="(tag, index) in tagSuggestions"
-          :key="tag.id"
-          @click="selectTagSuggestion(tag)"
+          v-for="(t, index) in tag.tagSuggestions.value"
+          :key="t.id"
+          @click="tag.selectTag(t)"
           class="px-3 py-2 cursor-pointer text-sm"
-          :class="index === tagSuggestionIndex ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-white/10'"
+          :class="index === tag.tagSuggestionIndex.value ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-white/10'"
         >
-          #{{ tag.name }}
+          #{{ t.name }}
         </div>
       </div>
       <div class="flex justify-end gap-3 mt-4">
@@ -217,6 +218,8 @@ import { computed, ref } from 'vue'
 import { marked } from 'marked'
 import type { Message, MessageMediaItem, TagItem } from '../types'
 import { isVideo, formatDuration, resolveUrl } from '../utils/media'
+import { useTagAutocomplete } from '../composables/useTagAutocomplete'
+import { formatRelativeTime } from '../utils/date'
 
 interface Props {
   message: Message
@@ -249,12 +252,7 @@ const editText = ref('')
 const editDate = ref('')
 const editTextareaRef = ref<HTMLTextAreaElement | null>(null)
 
-// Tag 自动提示相关状态
-const tagSuggestions = ref<TagItem[]>([])
-const tagSuggestionVisible = ref(false)
-const tagSuggestionIndex = ref(0)
-const tagSuggestionPosition = ref({ top: 0, left: 0 })
-let currentTagStart = -1
+const tag = useTagAutocomplete(editTextareaRef, editText, computed(() => props.allTags || []))
 
 const handleEdit = () => {
   editText.value = props.message.text || ''
@@ -284,153 +282,7 @@ const cancelEdit = () => {
   editDialogVisible.value = false
   editText.value = ''
   editDate.value = ''
-  tagSuggestionVisible.value = false
-}
-
-// Tag 自动提示相关函数
-const handleEditTextInput = () => {
-  const textarea = editTextareaRef.value
-  if (!textarea) return
-
-  const text = editText.value
-  const cursorPos = textarea.selectionStart
-
-  // 查找当前光标位置前最近的 #
-  let hashPos = -1
-  for (let i = cursorPos - 1; i >= 0; i--) {
-    if (text[i] === '#') {
-      hashPos = i
-      break
-    }
-    if (text[i] === ' ' || text[i] === '\n') {
-      break
-    }
-  }
-
-  if (hashPos === -1) {
-    tagSuggestionVisible.value = false
-    return
-  }
-
-  // 检查 # 后面是否有空格或换行
-  const afterHash = text.substring(hashPos + 1, cursorPos)
-  if (afterHash.includes(' ') || afterHash.includes('\n')) {
-    tagSuggestionVisible.value = false
-    return
-  }
-
-  currentTagStart = hashPos
-  const query = afterHash.toLowerCase()
-
-  // 过滤匹配的 tags
-  const allTags = props.allTags || []
-  tagSuggestions.value = allTags.filter(tag =>
-    tag.name.toLowerCase().includes(query)
-  ).slice(0, 8)
-
-  if (tagSuggestions.value.length > 0) {
-    tagSuggestionVisible.value = true
-    tagSuggestionIndex.value = 0
-    updateSuggestionPosition()
-  } else {
-    tagSuggestionVisible.value = false
-  }
-}
-
-const updateSuggestionPosition = () => {
-  const textarea = editTextareaRef.value
-  if (!textarea) return
-
-  const caretPos = textarea.selectionStart
-  const cs = window.getComputedStyle(textarea)
-  const textareaRect = textarea.getBoundingClientRect()
-
-  const mirror = document.createElement('div')
-
-  ;[
-    'font-family', 'font-size', 'font-weight', 'font-style',
-    'letter-spacing', 'word-spacing', 'line-height',
-    'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
-    'box-sizing', 'word-wrap', 'overflow-wrap',
-  ].forEach((prop) => mirror.style.setProperty(prop, cs.getPropertyValue(prop)))
-
-  mirror.style.position = 'fixed'
-  mirror.style.visibility = 'hidden'
-  mirror.style.pointerEvents = 'none'
-  mirror.style.top = textareaRect.top + 'px'
-  mirror.style.left = textareaRect.left + 'px'
-  mirror.style.width = textareaRect.width + 'px'
-  mirror.style.height = textareaRect.height + 'px'
-  mirror.style.whiteSpace = 'pre-wrap'
-  mirror.style.wordBreak = 'break-word'
-  mirror.style.overflow = 'hidden'
-
-  mirror.textContent = textarea.value.substring(0, caretPos)
-
-  const caretSpan = document.createElement('span')
-  caretSpan.textContent = '\u200b'
-  mirror.appendChild(caretSpan)
-
-  document.body.appendChild(mirror)
-  const spanRect = caretSpan.getBoundingClientRect()
-  document.body.removeChild(mirror)
-
-  tagSuggestionPosition.value = {
-    top: spanRect.top - textarea.scrollTop - 4,
-    left: spanRect.left - textarea.scrollLeft,
-  }
-}
-
-const handleEditKeydown = (e: KeyboardEvent) => {
-  if (!tagSuggestionVisible.value) return
-
-  if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    tagSuggestionIndex.value = Math.min(
-      tagSuggestionIndex.value + 1,
-      tagSuggestions.value.length - 1
-    )
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    tagSuggestionIndex.value = Math.max(tagSuggestionIndex.value - 1, 0)
-  } else if (e.key === 'Enter' || e.key === 'Tab') {
-    e.preventDefault()
-    selectTagSuggestion(tagSuggestions.value[tagSuggestionIndex.value])
-  } else if (e.key === 'Escape') {
-    tagSuggestionVisible.value = false
-  }
-}
-
-const selectTagSuggestion = (tag: TagItem) => {
-  if (!tag || currentTagStart === -1) return
-
-  const textarea = editTextareaRef.value
-  if (!textarea) return
-
-  const text = editText.value
-  const cursorPos = textarea.selectionStart
-
-  // 替换 #xxx 为 #tagname
-  const before = text.substring(0, currentTagStart)
-  const after = text.substring(cursorPos)
-  const tagName = tag.name.includes(' ') ? `#${tag.name}#` : `#${tag.name}`
-
-  editText.value = before + tagName + (after.startsWith(' ') ? '' : ' ') + after
-
-  tagSuggestionVisible.value = false
-  currentTagStart = -1
-
-  // 移动光标到插入位置之后
-  nextTick(() => {
-    const newPos = before.length + tagName.length + 1
-    textarea.setSelectionRange(newPos, newPos)
-    textarea.focus()
-  })
-}
-
-const nextTick = (fn: () => void) => {
-  setTimeout(fn, 0)
+  tag.hide()
 }
 
 const actorInitial = computed(() => {
@@ -475,25 +327,7 @@ const mediaItemClass = (index: number) => {
   return 'aspect-square'
 }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  if (days < 7) return `${days}天前`
-
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
-}
+const formatDate = formatRelativeTime
 
 const handleClick = () => {
   emit('click', props.message.id)
