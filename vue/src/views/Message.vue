@@ -96,10 +96,11 @@
                 <div :data-message-date="message.created_at.substring(0, 10)">
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
                     :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
+                    :all-tags="tags"
                     @click="" @media-click="(index) => handleMediaClick(message.id, index)"
                     @delete="handleDeleteMessage" @find-messages-by-media="handleFindMessagesByMedia"
                     @toggle-select="toggleSelectMessage" @toggle-star="handleToggleStar"
-                    @toggle-media-star="handleToggleMediaStar" />
+                    @toggle-media-star="handleToggleMediaStar" @edit="(id, text, date) => handleEditMessage(id, text, date)" />
                 </div>
               </template>
             </div>
@@ -575,6 +576,30 @@ const handleToggleStar = async (messageId: number) => {
     msg.starred = updated.starred
   } catch {
     toast.error('操作失败')
+  }
+}
+
+const handleEditMessage = async (messageId: number, text: string, date: string) => {
+  const msg = messages.value.find(m => m.id === messageId)
+  if (!msg) return
+
+  try {
+    const updateData: any = {
+      text: text || null,
+    }
+    
+    // 如果提供了日期，则添加到更新数据中
+    if (date) {
+      updateData.created_at = date
+    }
+
+    const updated = await api.patch<MessageDetail>(`/messages/${messageId}`, updateData)
+    msg.text = updated.text
+    msg.created_at = updated.created_at
+    msg.updated_at = updated.updated_at
+    toast.success('消息已更新')
+  } catch {
+    toast.error('更新消息失败')
   }
 }
 

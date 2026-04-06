@@ -30,6 +30,7 @@ class MessageUpdate(BaseModel):
     text: Optional[str] = None
     actor_id: Optional[int] = None
     starred: Optional[bool] = None
+    created_at: Optional[str] = None  # ISO 时间戳
     media_order: Optional[List[int]] = None  # media_id 数组，定义新的 position 顺序
 
 

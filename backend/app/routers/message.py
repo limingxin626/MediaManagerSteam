@@ -421,6 +421,12 @@ def update_message(
     if update_data.starred is not None:
         message.starred = 1 if update_data.starred else 0
 
+    if update_data.created_at is not None:
+        try:
+            message.created_at = datetime.fromisoformat(update_data.created_at)
+        except ValueError:
+            pass
+
     if update_data.media_order is not None:
         if not reorder_message_media(db, message_id, update_data.media_order):
             raise HTTPException(status_code=422, detail="media_order 包含不属于该消息的 media_id")

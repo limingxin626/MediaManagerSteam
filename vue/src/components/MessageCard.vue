@@ -116,42 +116,97 @@
 
       <!-- Timestamp Info & Actions -->
       <div class="flex items-center justify-between mt-3 pt-2 border-t border-white/5 text-xs text-gray-500">
-        <div class="flex items-center gap-3">
-          <span class="flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            创建: {{ formatDate(message.created_at) }}
-          </span>
-          <span v-if="message.updated_at && message.updated_at !== message.created_at" class="flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            修改: {{ formatDate(message.updated_at) }}
-          </span>
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              创建: {{ formatDate(message.created_at) }}
+            </span>
+            <span v-if="message.updated_at && message.updated_at !== message.created_at" class="flex items-center gap-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              修改: {{ formatDate(message.updated_at) }}
+            </span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button @click.stop="handleToggleStar" class="p-1 rounded transition-colors" :class="props.message.starred
+              ? 'text-yellow-400 hover:text-yellow-500'
+              : 'text-gray-500 hover:text-yellow-400'"
+              :title="props.message.starred ? '取消收藏' : '收藏'">
+              <svg class="w-3.5 h-3.5" :fill="props.message.starred ? 'currentColor' : 'none'" stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+            </button>
+            <button @click.stop="handleEdit"
+              class="p-1 text-gray-500 hover:text-blue-500 rounded transition-colors"
+              title="编辑消息">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button @click.stop="handleDelete"
+              class="p-1 text-gray-500 hover:text-red-500 rounded transition-colors"
+              title="删除消息">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <div class="flex items-center gap-1">
-          <button @click.stop="handleToggleStar" class="p-1 rounded transition-colors" :class="props.message.starred
-            ? 'text-yellow-400 hover:text-yellow-500'
-            : 'text-gray-500 hover:text-yellow-400'"
-            :title="props.message.starred ? '取消收藏' : '收藏'">
-            <svg class="w-3.5 h-3.5" :fill="props.message.starred ? 'currentColor' : 'none'" stroke="currentColor"
-              viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-            </svg>
-          </button>
-          <button @click.stop="handleDelete"
-            class="p-1 text-gray-500 hover:text-red-500 rounded transition-colors"
-            title="删除消息">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
+    </div>
+  </div>
+
+  <!-- Edit Dialog -->
+  <div v-if="editDialogVisible" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-gray-900 rounded-xl border border-white/10 shadow-xl w-full max-w-3xl p-6 h-[90vh] flex flex-col">
+      <h3 class="text-lg font-semibold text-white mb-4">编辑消息</h3>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-300 mb-1">创建日期</label>
+        <input
+          v-model="editDate"
+          type="datetime-local"
+          class="w-full px-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        />
+      </div>
+      <textarea
+        ref="editTextareaRef"
+        v-model="editText"
+        placeholder="输入消息内容..."
+        class="flex-1 w-full px-4 py-2 border border-white/10 rounded-lg bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+        @input="handleEditTextInput"
+        @keydown="handleEditKeydown"
+      />
+      <!-- Tag Suggestions -->
+      <div
+        v-if="tagSuggestionVisible && tagSuggestions.length > 0"
+        class="absolute bg-gray-800 border border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto z-50"
+        :style="{ top: tagSuggestionPosition.top + 'px', left: tagSuggestionPosition.left + 'px' }"
+      >
+        <div
+          v-for="(tag, index) in tagSuggestions"
+          :key="tag.id"
+          @click="selectTagSuggestion(tag)"
+          class="px-3 py-2 cursor-pointer text-sm"
+          :class="index === tagSuggestionIndex ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-white/10'"
+        >
+          #{{ tag.name }}
         </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-4">
+        <button @click="cancelEdit" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors">
+          取消
+        </button>
+        <button @click="saveEdit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+          保存
+        </button>
       </div>
     </div>
   </div>
@@ -169,6 +224,7 @@ interface Props {
   tags?: TagItem[]
   selectable?: boolean
   selected?: boolean
+  allTags?: TagItem[]
 }
 
 const props = defineProps<Props>()
@@ -181,10 +237,168 @@ const emit = defineEmits<{
   'toggle-select': [id: number]
   'toggle-star': [id: number]
   'toggle-media-star': [mediaId: number]
+  'edit': [id: number, text: string, date: string]
 }>()
 
 const maxPreviewItems = 9
 const activeMenuIndex = ref<number | null>(null)
+
+// 编辑相关状态
+const editDialogVisible = ref(false)
+const editText = ref('')
+const editDate = ref('')
+const editTextareaRef = ref<HTMLTextAreaElement | null>(null)
+
+// Tag 自动提示相关状态
+const tagSuggestions = ref<TagItem[]>([])
+const tagSuggestionVisible = ref(false)
+const tagSuggestionIndex = ref(0)
+const tagSuggestionPosition = ref({ top: 0, left: 0 })
+let currentTagStart = -1
+
+const handleEdit = () => {
+  editText.value = props.message.text || ''
+  const dateStr = props.message.created_at
+  if (dateStr) {
+    const date = new Date(dateStr)
+    // 确保日期是有效的
+    if (!isNaN(date.getTime())) {
+      // 格式化为 YYYY-MM-DDTHH:MM
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      editDate.value = `${year}-${month}-${day}T${hours}:${minutes}`
+    }
+  }
+  editDialogVisible.value = true
+}
+
+const saveEdit = () => {
+  emit('edit', props.message.id, editText.value, editDate.value)
+  editDialogVisible.value = false
+}
+
+const cancelEdit = () => {
+  editDialogVisible.value = false
+  editText.value = ''
+  editDate.value = ''
+  tagSuggestionVisible.value = false
+}
+
+// Tag 自动提示相关函数
+const handleEditTextInput = () => {
+  const textarea = editTextareaRef.value
+  if (!textarea) return
+
+  const text = editText.value
+  const cursorPos = textarea.selectionStart
+
+  // 查找当前光标位置前最近的 #
+  let hashPos = -1
+  for (let i = cursorPos - 1; i >= 0; i--) {
+    if (text[i] === '#') {
+      hashPos = i
+      break
+    }
+    if (text[i] === ' ' || text[i] === '\n') {
+      break
+    }
+  }
+
+  if (hashPos === -1) {
+    tagSuggestionVisible.value = false
+    return
+  }
+
+  // 检查 # 后面是否有空格或换行
+  const afterHash = text.substring(hashPos + 1, cursorPos)
+  if (afterHash.includes(' ') || afterHash.includes('\n')) {
+    tagSuggestionVisible.value = false
+    return
+  }
+
+  currentTagStart = hashPos
+  const query = afterHash.toLowerCase()
+
+  // 过滤匹配的 tags
+  const allTags = props.allTags || []
+  tagSuggestions.value = allTags.filter(tag =>
+    tag.name.toLowerCase().includes(query)
+  ).slice(0, 8)
+
+  if (tagSuggestions.value.length > 0) {
+    tagSuggestionVisible.value = true
+    tagSuggestionIndex.value = 0
+    updateSuggestionPosition()
+  } else {
+    tagSuggestionVisible.value = false
+  }
+}
+
+const updateSuggestionPosition = () => {
+  const textarea = editTextareaRef.value
+  if (!textarea) return
+
+  // 简单定位：在 textarea 下方显示
+  const rect = textarea.getBoundingClientRect()
+  tagSuggestionPosition.value = {
+    top: rect.bottom + 4,
+    left: rect.left
+  }
+}
+
+const handleEditKeydown = (e: KeyboardEvent) => {
+  if (!tagSuggestionVisible.value) return
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    tagSuggestionIndex.value = Math.min(
+      tagSuggestionIndex.value + 1,
+      tagSuggestions.value.length - 1
+    )
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    tagSuggestionIndex.value = Math.max(tagSuggestionIndex.value - 1, 0)
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault()
+    selectTagSuggestion(tagSuggestions.value[tagSuggestionIndex.value])
+  } else if (e.key === 'Escape') {
+    tagSuggestionVisible.value = false
+  }
+}
+
+const selectTagSuggestion = (tag: TagItem) => {
+  if (!tag || currentTagStart === -1) return
+
+  const textarea = editTextareaRef.value
+  if (!textarea) return
+
+  const text = editText.value
+  const cursorPos = textarea.selectionStart
+
+  // 替换 #xxx 为 #tagname
+  const before = text.substring(0, currentTagStart)
+  const after = text.substring(cursorPos)
+  const tagName = tag.name.includes(' ') ? `#${tag.name}#` : `#${tag.name}`
+
+  editText.value = before + tagName + (after.startsWith(' ') ? '' : ' ') + after
+
+  tagSuggestionVisible.value = false
+  currentTagStart = -1
+
+  // 移动光标到插入位置之后
+  nextTick(() => {
+    const newPos = before.length + tagName.length + 1
+    textarea.setSelectionRange(newPos, newPos)
+    textarea.focus()
+  })
+}
+
+const nextTick = (fn: () => void) => {
+  setTimeout(fn, 0)
+}
 
 const actorInitial = computed(() => {
   if (!props.message.actor_name) return '?'
