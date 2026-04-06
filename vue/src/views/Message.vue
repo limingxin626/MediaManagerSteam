@@ -4,24 +4,16 @@
     <div class="flex flex-col w-48 shrink-0 border-r border-white/10 overflow-y-auto">
       <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider shrink-0">标签</div>
       <div class="flex flex-col gap-0.5 px-2 pb-4">
-        <button
-          @click="selectTag(null)"
-          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
-          :class="selectedTagId === null
+        <button @click="selectTag(null)"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === null
             ? 'bg-indigo-600/30 text-indigo-300'
-            : 'text-gray-300 hover:bg-white/10'"
-        >
+            : 'text-gray-300 hover:bg-white/10'">
           <span>全部</span>
         </button>
-        <button
-          v-for="tag in tags"
-          :key="tag.id"
-          @click="selectTag(tag.id)"
-          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
-          :class="selectedTagId === tag.id
+        <button v-for="tag in tags" :key="tag.id" @click="selectTag(tag.id)"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === tag.id
             ? 'bg-indigo-600/30 text-indigo-300'
-            : 'text-gray-300 hover:bg-white/10'"
-        >
+            : 'text-gray-300 hover:bg-white/10'">
           <span class="truncate">{{ tag.name }}</span>
           <span class="ml-1 text-xs text-gray-500 shrink-0">{{ tag.message_count }}</span>
         </button>
@@ -32,242 +24,194 @@
     <div class="flex-1 flex min-w-0">
       <!-- Left Feed Section -->
       <div class="flex-1 flex flex-col min-w-0">
-    <!-- Search Header -->
-    <div class="shrink-0 border-b border-white/10 shadow-sm">
-      <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div class="flex gap-4 items-center max-w-2xl mx-auto">
-          <h2 class="text-2xl font-bold text-white">消息流</h2>
-          <!-- Merge toggle -->
-          <button
-            @click="toggleMergeMode"
-            class="px-3 py-1.5 text-sm rounded-lg transition-colors"
-            :class="mergeMode
-              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-              : 'bg-white/10 text-gray-300 hover:bg-white/20'"
-          >
-            {{ mergeMode ? '取消合并' : '合并' }}
-          </button>
-          <!-- Starred filter -->
-          <button
-            @click="starredFilter = !starredFilter; resetAndFetch()"
-            class="p-1.5 rounded-lg transition-colors"
-            :class="starredFilter
-              ? 'text-yellow-400 bg-yellow-900/20'
-              : 'text-gray-400 hover:text-yellow-400 bg-white/10'"
-            title="仅看收藏"
-          >
-            <svg class="w-5 h-5" :fill="starredFilter ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-            </svg>
-          </button>
-          <!-- Search -->
-          <SearchInput v-model="searchQuery" placeholder="搜索消息..." @search="onSearch" />
-        </div>
-      </div>
-    </div>
-
-    <!-- Scrollable Content Area -->
-    <div ref="scrollContainer" class="flex-1 overflow-y-auto min-h-0 relative">
-      <!-- Scroll sentinel for loading older messages -->
-      <div ref="topSentinel" class="h-1"></div>
-
-      <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <!-- Loading skeleton (initial load) -->
-        <div v-if="loading && messages.length === 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
-          <div v-for="i in 3" :key="i" class="bg-(--color-card-bg) rounded-xl border border-white/10 p-4 animate-pulse">
-            <div class="flex items-center gap-3 mb-3">
-              <div class="w-10 h-10 rounded-full bg-white/10"></div>
-              <div class="flex-1">
-                <div class="h-4 w-20 bg-white/10 rounded"></div>
-                <div class="h-3 w-16 bg-white/10 rounded mt-1.5"></div>
-              </div>
+        <!-- Search Header -->
+        <div class="shrink-0 border-b border-white/10 shadow-sm">
+          <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex gap-4 items-center max-w-2xl mx-auto">
+              <h2 class="text-2xl font-bold text-white">消息流</h2>
+              <!-- Merge toggle -->
+              <button @click="toggleMergeMode" class="px-3 py-1.5 text-sm rounded-lg transition-colors" :class="mergeMode
+                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                : 'bg-white/10 text-gray-300 hover:bg-white/20'">
+                {{ mergeMode ? '取消合并' : '合并' }}
+              </button>
+              <!-- Starred filter -->
+              <button @click="starredFilter = !starredFilter; resetAndFetch()"
+                class="p-1.5 rounded-lg transition-colors" :class="starredFilter
+                  ? 'text-yellow-400 bg-yellow-900/20'
+                  : 'text-gray-400 hover:text-yellow-400 bg-white/10'" title="仅看收藏">
+                <svg class="w-5 h-5" :fill="starredFilter ? 'currentColor' : 'none'" stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </button>
+              <!-- Search -->
+              <SearchInput v-model="searchQuery" placeholder="搜索消息..." @search="onSearch" />
             </div>
-            <div class="aspect-video bg-white/10 rounded-xl mb-2"></div>
-            <div class="h-3 w-3/4 bg-white/10 rounded"></div>
-            <div class="h-3 w-1/2 bg-white/10 rounded mt-1.5"></div>
           </div>
         </div>
-        <div v-if="loading && messages.length > 0" class="text-center py-4">
-          <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
-        </div>
 
-        <!-- No more data -->
-        <div v-if="!loading && !hasMoreData && messages.length > 0" class="text-center py-8">
-          <p class="text-sm text-gray-400">已经到底了</p>
-        </div>
+        <!-- Scrollable Content Area -->
+        <div ref="scrollContainer" class="flex-1 overflow-y-auto min-h-0 relative">
+          <!-- Scroll sentinel for loading older messages -->
+          <div ref="topSentinel" class="h-1"></div>
 
-        <!-- Messages Feed -->
-        <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
-          <template
-            v-for="(message, idx) in messages"
-            :key="message.id"
-          >
-            <!-- Date separator -->
+          <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <!-- Loading skeleton (initial load) -->
+            <div v-if="loading && messages.length === 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
+              <div v-for="i in 3" :key="i"
+                class="bg-(--color-card-bg) rounded-xl border border-white/10 p-4 animate-pulse">
+                <div class="flex items-center gap-3 mb-3">
+                  <div class="w-10 h-10 rounded-full bg-white/10"></div>
+                  <div class="flex-1">
+                    <div class="h-4 w-20 bg-white/10 rounded"></div>
+                    <div class="h-3 w-16 bg-white/10 rounded mt-1.5"></div>
+                  </div>
+                </div>
+                <div class="aspect-video bg-white/10 rounded-xl mb-2"></div>
+                <div class="h-3 w-3/4 bg-white/10 rounded"></div>
+                <div class="h-3 w-1/2 bg-white/10 rounded mt-1.5"></div>
+              </div>
+            </div>
+            <div v-if="loading && messages.length > 0" class="text-center py-4">
+              <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
+            </div>
+
+            <!-- No more data -->
+            <div v-if="!loading && !hasMoreData && messages.length > 0" class="text-center py-8">
+              <p class="text-sm text-gray-400">已经到底了</p>
+            </div>
+
+            <!-- Messages Feed -->
+            <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
+              <template v-for="(message, idx) in messages" :key="message.id">
+                <!-- Date separator -->
+                <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1].created_at)"
+                  class="flex items-center gap-3 py-2">
+                  <div class="flex-1 h-px bg-white/10"></div>
+                  <span class="text-xs text-gray-400 whitespace-nowrap">{{ formatDateLabel(message.created_at) }}</span>
+                  <div class="flex-1 h-px bg-white/10"></div>
+                </div>
+                <div :data-message-date="message.created_at.substring(0, 10)">
+                  <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
+                    :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
+                    @click="" @media-click="(index) => handleMediaClick(message.id, index)"
+                    @delete="handleDeleteMessage" @find-messages-by-media="handleFindMessagesByMedia"
+                    @toggle-select="toggleSelectMessage" @toggle-star="handleToggleStar"
+                    @toggle-media-star="handleToggleMediaStar" />
+                </div>
+              </template>
+            </div>
+
+            <!-- Empty State -->
+            <div v-if="messages.length === 0 && !loading" class="text-center py-12">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <h3 class="mt-2 text-sm font-medium text-white">暂无消息</h3>
+              <p class="mt-1 text-sm text-gray-400">还没有任何消息内容</p>
+            </div>
+
+            <!-- Loading indicator (bottom, for loading newer) -->
+            <div v-if="loadingForward" class="text-center py-4">
+              <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
+            </div>
+          </div>
+
+          <!-- Scroll sentinel for loading newer messages -->
+          <div ref="bottomSentinel" class="h-1"></div>
+
+          <!-- Merge action bar -->
+          <div v-if="mergeMode && selectedMessageIds.size > 0"
+            class="sticky bottom-4 z-50 flex items-center justify-center pointer-events-none">
             <div
-              v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1].created_at)"
-              class="flex items-center gap-3 py-2"
-            >
-              <div class="flex-1 h-px bg-white/10"></div>
-              <span class="text-xs text-gray-400 whitespace-nowrap">{{ formatDateLabel(message.created_at) }}</span>
-              <div class="flex-1 h-px bg-white/10"></div>
+              class="pointer-events-auto flex items-center gap-3 px-5 py-3 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl text-white text-sm">
+              <span>已选 {{ selectedMessageIds.size }} 条</span>
+              <button @click="handleMerge" :disabled="selectedMessageIds.size < 2"
+                class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 rounded-full font-medium transition-colors">
+                合并
+              </button>
+              <button @click="toggleMergeMode"
+                class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors">
+                取消
+              </button>
             </div>
-            <div :data-message-date="message.created_at.substring(0, 10)">
-              <MessageCard
-                :message="message"
-                :media-items="message.media_items"
-                :tags="message.tags"
-                :selectable="mergeMode"
-                :selected="selectedMessageIds.has(message.id)"
-                @click="handleMessageClick(message)"
-                @media-click="(index) => handleMediaClick(message.id, index)"
-                @delete="handleDeleteMessage"
-                @find-messages-by-media="handleFindMessagesByMedia"
-                @toggle-select="toggleSelectMessage"
-                @toggle-star="handleToggleStar"
-                @toggle-media-star="handleToggleMediaStar"
-              />
-            </div>
-          </template>
-        </div>
+          </div>
 
-        <!-- Empty State -->
-        <div v-if="messages.length === 0 && !loading" class="text-center py-12">
-          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-          <h3 class="mt-2 text-sm font-medium text-white">暂无消息</h3>
-          <p class="mt-1 text-sm text-gray-400">还没有任何消息内容</p>
-        </div>
-
-        <!-- Loading indicator (bottom, for loading newer) -->
-        <div v-if="loadingForward" class="text-center py-4">
-          <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
-        </div>
-      </div>
-
-      <!-- Scroll sentinel for loading newer messages -->
-      <div ref="bottomSentinel" class="h-1"></div>
-
-      <!-- Merge action bar -->
-      <div
-        v-if="mergeMode && selectedMessageIds.size > 0"
-        class="sticky bottom-4 z-50 flex items-center justify-center pointer-events-none"
-      >
-        <div class="pointer-events-auto flex items-center gap-3 px-5 py-3 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl text-white text-sm">
-          <span>已选 {{ selectedMessageIds.size }} 条</span>
-          <button
-            @click="handleMerge"
-            :disabled="selectedMessageIds.size < 2"
-            class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 rounded-full font-medium transition-colors"
-          >
-            合并
-          </button>
-          <button
-            @click="toggleMergeMode"
-            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
-          >
-            取消
+          <!-- "回到最新" floating button -->
+          <button v-if="isViewingHistory" @click="backToLatest"
+            class="sticky bottom-4 left-full -translate-x-6 z-50 flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-full shadow-lg transition-colors w-fit ml-auto mr-6">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+            回到最新
           </button>
         </div>
-      </div>
 
-      <!-- "回到最新" floating button -->
-      <button
-        v-if="isViewingHistory"
-        @click="backToLatest"
-        class="sticky bottom-4 left-full -translate-x-6 z-50 flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-full shadow-lg transition-colors w-fit ml-auto mr-6"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-        </svg>
-        回到最新
-      </button>
-    </div>
-
-    <!-- Input Area at Bottom -->
-    <MessageCompose
-      :tag-id="selectedTagId ?? null"
-      @sent="onMessageSent"
-    />
+        <!-- Input Area at Bottom -->
+        <MessageCompose :tag-id="selectedTagId ?? null" @sent="onMessageSent" />
       </div>
 
       <!-- Right Media Display Section -->
-      <div v-if="selectedMessage" class="w-96 border-l border-white/10 flex flex-col overflow-hidden">
-        <div class="p-4 border-b border-white/10 flex items-center justify-between">
+      <div v-if="selectedMessage" class="flex-1 border-l border-white/10 flex flex-col overflow-hidden">
+        <div class="p-4 border-white/10 flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-semibold text-white">{{ selectedMessage.title || '消息详情' }}</h3>
+            <h3 class="text-lg font-semibold text-white">{{ selectedMessage.text || '消息详情' }}</h3>
             <p class="text-sm text-gray-400 mt-1">{{ formatDateLabel(selectedMessage.created_at) }}</p>
           </div>
-          <div v-if="selectedMessageLoading" class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-500"></div>
+          <div v-if="selectedMessageLoading"
+            class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-500">
+          </div>
         </div>
         <div class="flex-1 overflow-y-auto p-4">
-          <div v-if="selectedMessage.media_items && selectedMessage.media_items.length > 0" class="grid grid-cols-2 gap-1">
-            <div
-              v-for="(media, index) in selectedMessage.media_items"
-              :key="media.id"
-              class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity bg-gray-900"
-              @click="handleSelectedMessageMediaClick(index)"
-            >
-              <img
-                :src="resolveUrl(media.thumb_url || media.url)"
-                :alt="media.filename"
-                class="w-full h-full object-cover"
-              />
+          <div v-if="selectedMessage.media_items && selectedMessage.media_items.length > 0"
+            class="grid grid-cols-4 gap-1">
+            <div v-for="(media, index) in selectedMessage.media_items" :key="media.id"
+              class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity"
+              @click="handleSelectedMessageMediaClick(index)">
+              <img :src="resolveUrl(media.thumb_url)" class="w-full h-full object-contain" />
               <!-- Video icon -->
-              <div v-if="media.mime_type && media.mime_type.startsWith('video')" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div v-if="media.mime_type && media.mime_type.startsWith('video')"
+                class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div class="w-8 h-8 bg-black/40 rounded-full flex items-center justify-center border border-white/30">
                   <svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z"/>
+                    <path d="M8 5v14l11-7z" />
                   </svg>
                 </div>
               </div>
               <!-- Duration -->
-              <div v-if="media.duration_ms" class="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+              <div v-if="media.duration_ms"
+                class="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
                 {{ formatDuration(media.duration_ms) }}
               </div>
               <!-- Star toggle -->
-              <button
-                @click.stop="handleToggleMediaStar(media.id)"
-                class="absolute top-1 right-1 p-1 rounded-full transition-all"
-                :class="media.starred
+              <button @click.stop="handleToggleMediaStar(media.id)"
+                class="absolute top-1 right-1 p-1 rounded-full transition-all" :class="media.starred
                   ? 'text-yellow-400'
                   : 'text-white/70 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
-                "
-              >
-                <svg class="w-4 h-4" :fill="media.starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  ">
+                <svg class="w-4 h-4" :fill="media.starred ? 'currentColor' : 'none'" stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                 </svg>
               </button>
             </div>
           </div>
-          <div v-else class="text-center py-12">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-white">暂无媒体</h3>
-            <p class="mt-1 text-sm text-gray-400">该消息没有媒体内容</p>
-          </div>
         </div>
       </div>
 
-    <MediaPreview
-      :is-open="previewOpen"
-      :items="previewItems"
-      :start-index="previewStartIndex"
-      :starred="previewMessageStarred"
-      @close="closePreview"
-      @navigate-prev="navigateToPrevMessage"
-      @navigate-next="navigateToNextMessage"
-      @toggle-star="handlePreviewToggleStar"
-    />
+      <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
+        :starred="previewMessageStarred" @close="closePreview" @navigate-prev="navigateToPrevMessage"
+        @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" />
 
-    <!-- Calendar Sidebar (wide screens only) -->
-    <aside class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-white/10 backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
-      <CalendarSidebar
-        :active-filters="calendarFilters"
-        @date-selected="handleDateSelected"
-      />
-    </aside>
+      <!-- Calendar Sidebar (wide screens only) -->
+      <aside
+        class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-white/10 backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
+        <CalendarSidebar :active-filters="calendarFilters" @date-selected="handleDateSelected" />
+      </aside>
     </div>
   </div>
 </template>
@@ -282,7 +226,7 @@ import SearchInput from '../components/SearchInput.vue'
 import MessageCompose from '../components/MessageCompose.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import { resolveUrl } from '../utils/media'
+import { resolveUrl, formatDuration } from '../utils/media'
 
 
 defineOptions({ name: 'Message' })
@@ -551,13 +495,13 @@ const handlePreviewToggleStar = async (mediaId: number) => {
   try {
     const currentItem = previewItems.value.find(item => item.id === mediaId)
     if (!currentItem) return
-    
+
     const newStarredState = !currentItem.starred
     await api.put(`/media/${mediaId}/starred?starred=${newStarredState}`)
-    
+
     // 更新当前预览项的状态
     currentItem.starred = newStarredState
-    
+
     // 更新消息中的媒体项状态
     if (currentMessageIndex.value >= 0) {
       const msg = messages.value[currentMessageIndex.value]
