@@ -187,8 +187,8 @@
       <!-- Tag Suggestions -->
       <div
         v-if="tagSuggestionVisible && tagSuggestions.length > 0"
-        class="absolute bg-gray-800 border border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto z-50"
-        :style="{ top: tagSuggestionPosition.top + 'px', left: tagSuggestionPosition.left + 'px' }"
+        class="fixed bg-gray-800 border border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[100]"
+        :style="{ top: tagSuggestionPosition.top + 'px', left: tagSuggestionPosition.left + 'px', transform: 'translateY(-100%)' }"
       >
         <div
           v-for="(tag, index) in tagSuggestions"
@@ -341,11 +341,44 @@ const updateSuggestionPosition = () => {
   const textarea = editTextareaRef.value
   if (!textarea) return
 
-  // 简单定位：在 textarea 下方显示
-  const rect = textarea.getBoundingClientRect()
+  const caretPos = textarea.selectionStart
+  const cs = window.getComputedStyle(textarea)
+  const textareaRect = textarea.getBoundingClientRect()
+
+  const mirror = document.createElement('div')
+
+  ;[
+    'font-family', 'font-size', 'font-weight', 'font-style',
+    'letter-spacing', 'word-spacing', 'line-height',
+    'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+    'box-sizing', 'word-wrap', 'overflow-wrap',
+  ].forEach((prop) => mirror.style.setProperty(prop, cs.getPropertyValue(prop)))
+
+  mirror.style.position = 'fixed'
+  mirror.style.visibility = 'hidden'
+  mirror.style.pointerEvents = 'none'
+  mirror.style.top = textareaRect.top + 'px'
+  mirror.style.left = textareaRect.left + 'px'
+  mirror.style.width = textareaRect.width + 'px'
+  mirror.style.height = textareaRect.height + 'px'
+  mirror.style.whiteSpace = 'pre-wrap'
+  mirror.style.wordBreak = 'break-word'
+  mirror.style.overflow = 'hidden'
+
+  mirror.textContent = textarea.value.substring(0, caretPos)
+
+  const caretSpan = document.createElement('span')
+  caretSpan.textContent = '\u200b'
+  mirror.appendChild(caretSpan)
+
+  document.body.appendChild(mirror)
+  const spanRect = caretSpan.getBoundingClientRect()
+  document.body.removeChild(mirror)
+
   tagSuggestionPosition.value = {
-    top: rect.bottom + 4,
-    left: rect.left
+    top: spanRect.top - textarea.scrollTop - 4,
+    left: spanRect.left - textarea.scrollLeft,
   }
 }
 

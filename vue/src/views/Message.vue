@@ -152,7 +152,7 @@
         </div>
 
         <!-- Input Area at Bottom -->
-        <MessageCompose :tag-id="selectedTagId ?? null" @sent="onMessageSent" />
+        <MessageCompose :tag-id="selectedTagId ?? null" :all-tags="tags" @sent="onMessageSent" />
       </div>
 
       <!-- Right Media Display Section -->
