@@ -1,9 +1,9 @@
 <template>
   <div class="h-screen flex flex-col 2xl:pr-72 transition-colors">
     <!-- Fixed Header -->
-    <div class="shrink-0 border-b border-white/10 shadow-sm">
+    <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3 max-w-2xl">
-        <h2 class="text-xl font-bold text-white shrink-0">媒体</h2>
+        <h2 class="text-xl font-bold text-gray-900 dark:text-white shrink-0">媒体</h2>
         <!-- Type Filter -->
         <div class="flex gap-2">
           <button
@@ -14,7 +14,7 @@
               'px-3 py-1.5 rounded-full text-sm transition-colors',
               selectedType === opt.value
                 ? 'bg-pink-600 text-white'
-                : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
             ]"
           >{{ opt.label }}</button>
         </div>
@@ -24,7 +24,7 @@
           class="p-1.5 rounded-lg transition-colors"
           :class="starredFilter
             ? 'text-yellow-400 bg-yellow-900/20'
-            : 'text-gray-400 hover:text-yellow-400 bg-white/10'
+            : 'text-gray-400 hover:text-yellow-400 bg-gray-100 dark:bg-white/10'
           "
           title="仅看收藏"
         >
@@ -43,7 +43,7 @@
           <div
             v-for="item in items"
             :key="item.id"
-            class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity bg-gray-900"
+            class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity bg-gray-200 dark:bg-gray-900"
             @click="openPreview(item)"
           >
             <img
@@ -113,7 +113,7 @@
     />
 
     <!-- Right Sidebar (wide screens only) -->
-    <aside class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-white/10 backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
+    <aside class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-[var(--border-color)] backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
       <!-- Calendar placeholder -->
       <div class="text-center py-12 text-gray-400">
         <p>日历功能开发中...</p>

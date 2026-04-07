@@ -1,21 +1,21 @@
 <template>
   <div class="h-screen flex 2xl:pr-72 transition-colors">
     <!-- Left Tag Column -->
-    <div class="flex flex-col w-48 shrink-0 border-r border-white/10 overflow-y-auto">
-      <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider shrink-0">标签</div>
+    <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] overflow-y-auto">
+      <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">标签</div>
       <div class="flex flex-col gap-0.5 px-2 pb-4">
         <button @click="selectTag(null)"
           class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === null
-            ? 'bg-indigo-600/30 text-indigo-300'
-            : 'text-gray-300 hover:bg-white/10'">
+            ? 'bg-indigo-600/30 text-indigo-600 dark:text-indigo-300'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
           <span>全部</span>
         </button>
         <button v-for="tag in tags" :key="tag.id" @click="selectTag(tag.id)"
           class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === tag.id
-            ? 'bg-indigo-600/30 text-indigo-300'
-            : 'text-gray-300 hover:bg-white/10'">
+            ? 'bg-indigo-600/30 text-indigo-600 dark:text-indigo-300'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
           <span class="truncate">{{ tag.name }}</span>
-          <span class="ml-1 text-xs text-gray-500 shrink-0">{{ tag.message_count }}</span>
+          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ tag.message_count }}</span>
         </button>
       </div>
     </div>
@@ -25,21 +25,21 @@
       <!-- Left Feed Section -->
       <div class="flex-1 flex flex-col min-w-0">
         <!-- Search Header -->
-        <div class="shrink-0 border-b border-white/10 shadow-sm">
+        <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div class="flex gap-4 items-center max-w-2xl mx-auto">
-              <h2 class="text-2xl font-bold text-white">消息流</h2>
+              <h2 class="text-2xl font-bold text-gray-900 dark:text-white">消息流</h2>
               <!-- Merge toggle -->
               <button @click="toggleMergeMode" class="px-3 py-1.5 text-sm rounded-lg transition-colors" :class="mergeMode
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                : 'bg-white/10 text-gray-300 hover:bg-white/20'">
+                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'">
                 {{ mergeMode ? '取消合并' : '合并' }}
               </button>
               <!-- Starred filter -->
               <button @click="starredFilter = !starredFilter; resetAndFetch()"
                 class="p-1.5 rounded-lg transition-colors" :class="starredFilter
                   ? 'text-yellow-400 bg-yellow-900/20'
-                  : 'text-gray-400 hover:text-yellow-400 bg-white/10'" title="仅看收藏">
+                  : 'text-gray-400 hover:text-yellow-400 bg-gray-100 dark:bg-white/10'" title="仅看收藏">
                 <svg class="w-5 h-5" :fill="starredFilter ? 'currentColor' : 'none'" stroke="currentColor"
                   viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -61,17 +61,17 @@
             <!-- Loading skeleton (initial load) -->
             <div v-if="loading && messages.length === 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
               <div v-for="i in 3" :key="i"
-                class="bg-(--color-card-bg) rounded-xl border border-white/10 p-4 animate-pulse">
+                class="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 animate-pulse">
                 <div class="flex items-center gap-3 mb-3">
-                  <div class="w-10 h-10 rounded-full bg-white/10"></div>
+                  <div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-white/10"></div>
                   <div class="flex-1">
-                    <div class="h-4 w-20 bg-white/10 rounded"></div>
-                    <div class="h-3 w-16 bg-white/10 rounded mt-1.5"></div>
+                    <div class="h-4 w-20 bg-gray-200 dark:bg-white/10 rounded"></div>
+                    <div class="h-3 w-16 bg-gray-200 dark:bg-white/10 rounded mt-1.5"></div>
                   </div>
                 </div>
-                <div class="aspect-video bg-white/10 rounded-xl mb-2"></div>
-                <div class="h-3 w-3/4 bg-white/10 rounded"></div>
-                <div class="h-3 w-1/2 bg-white/10 rounded mt-1.5"></div>
+                <div class="aspect-video bg-gray-200 dark:bg-white/10 rounded-xl mb-2"></div>
+                <div class="h-3 w-3/4 bg-gray-200 dark:bg-white/10 rounded"></div>
+                <div class="h-3 w-1/2 bg-gray-200 dark:bg-white/10 rounded mt-1.5"></div>
               </div>
             </div>
             <div v-if="loading && messages.length > 0" class="text-center py-4">
@@ -89,9 +89,9 @@
                 <!-- Date separator -->
                 <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1].created_at)"
                   class="flex items-center gap-3 py-2">
-                  <div class="flex-1 h-px bg-white/10"></div>
+                  <div class="flex-1 h-px bg-[var(--divider)]"></div>
                   <span class="text-xs text-gray-400 whitespace-nowrap">{{ formatDateLabel(message.created_at) }}</span>
-                  <div class="flex-1 h-px bg-white/10"></div>
+                  <div class="flex-1 h-px bg-[var(--divider)]"></div>
                 </div>
                 <div :data-message-date="message.created_at.substring(0, 10)">
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
@@ -111,7 +111,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <h3 class="mt-2 text-sm font-medium text-white">暂无消息</h3>
+              <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无消息</h3>
               <p class="mt-1 text-sm text-gray-400">还没有任何消息内容</p>
             </div>
 
@@ -156,10 +156,10 @@
       </div>
 
       <!-- Right Media Display Section -->
-      <div v-if="selectedMessage" class="flex-1 border-l border-white/10 flex flex-col overflow-hidden">
-        <div class="p-4 border-white/10 flex items-center justify-between">
+      <div v-if="selectedMessage" class="flex-1 border-l border-[var(--border-color)] flex flex-col overflow-hidden">
+        <div class="p-4 border-[var(--border-color)] flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-semibold text-white">{{ selectedMessage.text || '消息详情' }}</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ selectedMessage.text || '消息详情' }}</h3>
             <p class="text-sm text-gray-400 mt-1">{{ formatDateLabel(selectedMessage.created_at) }}</p>
           </div>
           <div v-if="selectedMessageLoading"
@@ -210,7 +210,7 @@
 
       <!-- Calendar Sidebar (wide screens only) -->
       <aside
-        class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-white/10 backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
+        class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-[var(--border-color)] backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
         <CalendarSidebar :active-filters="calendarFilters" @date-selected="handleDateSelected" />
       </aside>
     </div>

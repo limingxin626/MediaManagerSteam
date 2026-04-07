@@ -1,21 +1,21 @@
 <template>
   <div class="h-screen flex flex-col 2xl:pr-72 transition-colors">
     <!-- Fixed Header -->
-    <div class="shrink-0 border-b border-white/10 shadow-sm">
+    <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3 max-w-2xl">
-        <button @click="router.back()" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors shrink-0">
+        <button @click="router.back()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors shrink-0">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h2 class="text-xl font-bold text-white shrink-0">消息媒体流</h2>
+        <h2 class="text-xl font-bold text-gray-900 dark:text-white shrink-0">消息媒体流</h2>
         <!-- Starred Filter -->
         <button
           @click="toggleStarredFilter"
           class="p-1.5 rounded-lg transition-colors ml-auto"
           :class="starredFilter
             ? 'text-yellow-400 bg-yellow-900/20'
-            : 'text-gray-400 hover:text-yellow-400 bg-white/10'
+            : 'text-gray-400 hover:text-yellow-400 bg-gray-100 dark:bg-white/10'
           "
           title="仅看收藏"
         >
@@ -33,7 +33,7 @@
           <div
             v-for="(item, idx) in items"
             :key="`${item.id}-${idx}`"
-            class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity bg-gray-900"
+            class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity bg-gray-200 dark:bg-gray-900"
             @click="openPreview(idx)"
           >
             <img

@@ -1,8 +1,8 @@
 <template>
   <div class="h-screen flex transition-colors">
     <!-- Left Actor Column -->
-    <div class="flex flex-col w-48 shrink-0 border-r border-white/10 overflow-y-auto">
-      <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider shrink-0">演员列表</div>
+    <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] overflow-y-auto">
+      <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">演员列表</div>
       <div class="flex flex-col gap-0.5 px-2 pb-4">
         <button
           v-for="actor in actorsData"
@@ -10,11 +10,11 @@
           @click="selectActor(actor.id)"
           class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
           :class="selectedActorId === actor.id
-            ? 'bg-indigo-600/30 text-indigo-300'
-            : 'text-gray-300 hover:bg-white/10'"
+            ? 'bg-indigo-600/30 text-indigo-600 dark:text-indigo-300'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
         >
           <span class="truncate">{{ actor.name }}</span>
-          <span class="ml-1 text-xs text-gray-500 shrink-0">{{ actor.message_count }}</span>
+          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ actor.message_count }}</span>
         </button>
       </div>
     </div>
@@ -22,10 +22,10 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Search Header -->
-      <div class="shrink-0 border-b border-white/10 shadow-sm">
+      <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
         <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div class="flex gap-4 items-center max-w-2xl mx-auto">
-            <h2 class="text-2xl font-bold text-white">演员消息</h2>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">演员消息</h2>
             <!-- Search -->
             <SearchInput v-model="filterName" placeholder="搜索演员..." @search="resetAndFetch" />
           </div>
@@ -40,17 +40,17 @@
         <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <!-- Loading skeleton (initial load) -->
           <div v-if="loading && messages.length === 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
-            <div v-for="i in 3" :key="i" class="bg-(--color-card-bg) rounded-xl border border-white/10 p-4 animate-pulse">
+            <div v-for="i in 3" :key="i" class="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 animate-pulse">
               <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-full bg-white/10"></div>
+                <div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-white/10"></div>
                 <div class="flex-1">
-                  <div class="h-4 w-20 bg-white/10 rounded"></div>
-                  <div class="h-3 w-16 bg-white/10 rounded mt-1.5"></div>
+                  <div class="h-4 w-20 bg-gray-200 dark:bg-white/10 rounded"></div>
+                  <div class="h-3 w-16 bg-gray-200 dark:bg-white/10 rounded mt-1.5"></div>
                 </div>
               </div>
-              <div class="aspect-video bg-white/10 rounded-xl mb-2"></div>
-              <div class="h-3 w-3/4 bg-white/10 rounded"></div>
-              <div class="h-3 w-1/2 bg-white/10 rounded mt-1.5"></div>
+              <div class="aspect-video bg-gray-200 dark:bg-white/10 rounded-xl mb-2"></div>
+              <div class="h-3 w-3/4 bg-gray-200 dark:bg-white/10 rounded"></div>
+              <div class="h-3 w-1/2 bg-gray-200 dark:bg-white/10 rounded mt-1.5"></div>
             </div>
           </div>
           <div v-if="loading && messages.length > 0" class="text-center py-4">
@@ -68,9 +68,9 @@
                 v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1].created_at)"
                 class="flex items-center gap-3 py-2"
               >
-                <div class="flex-1 h-px bg-white/10"></div>
+                <div class="flex-1 h-px bg-[var(--divider)]"></div>
                 <span class="text-xs text-gray-400 whitespace-nowrap">{{ formatDateLabel(message.created_at) }}</span>
-                <div class="flex-1 h-px bg-white/10"></div>
+                <div class="flex-1 h-px bg-[var(--divider)]"></div>
               </div>
               <div :data-message-date="message.created_at.substring(0, 10)">
                 <MessageCard
@@ -96,7 +96,7 @@
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <h3 class="mt-2 text-sm font-medium text-white">暂无消息</h3>
+            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无消息</h3>
             <p class="mt-1 text-sm text-gray-400">选择一个演员查看消息</p>
           </div>
         </div>
@@ -114,49 +114,49 @@
     </div>
 
     <!-- Right Actor Detail Column -->
-    <aside class="w-72 shrink-0 border-l border-white/10 overflow-y-auto">
+    <aside class="w-72 shrink-0 border-l border-[var(--border-color)] overflow-y-auto">
       <div v-if="selectedActor" class="p-6">
         <!-- Actor Avatar -->
         <div class="flex flex-col items-center mb-6">
-          <div class="w-32 h-32 rounded-full overflow-hidden bg-gray-700 mb-4">
+          <div class="w-32 h-32 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 mb-4">
             <img
               :src="resolveUrl(selectedActor.avatar_url)"
               :alt="selectedActor.name"
               class="w-full h-full object-cover"
             />
           </div>
-          <h3 class="text-xl font-bold text-white mb-1">{{ selectedActor.name }}</h3>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-1">{{ selectedActor.name }}</h3>
           <p class="text-sm text-gray-400">{{ selectedActor.message_count }} 条消息</p>
         </div>
 
         <!-- Actor Description -->
         <div v-if="selectedActor.description" class="mb-6">
-          <h4 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">简介</h4>
-          <p class="text-sm text-gray-300">{{ selectedActor.description }}</p>
+          <h4 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">简介</h4>
+          <p class="text-sm text-gray-600 dark:text-gray-300">{{ selectedActor.description }}</p>
         </div>
 
         <!-- Actor Info -->
         <div class="space-y-4">
           <div>
-            <h4 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">信息</h4>
+            <h4 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">信息</h4>
             <div class="space-y-2">
               <div class="flex justify-between text-sm">
                 <span class="text-gray-400">ID</span>
-                <span class="text-gray-300">{{ selectedActor.id }}</span>
+                <span class="text-gray-600 dark:text-gray-300">{{ selectedActor.id }}</span>
               </div>
               <div class="flex justify-between text-sm">
                 <span class="text-gray-400">创建时间</span>
-                <span class="text-gray-300">{{ formatDateTime(selectedActor.created_at) }}</span>
+                <span class="text-gray-600 dark:text-gray-300">{{ formatDateTime(selectedActor.created_at) }}</span>
               </div>
               <div class="flex justify-between text-sm">
                 <span class="text-gray-400">更新时间</span>
-                <span class="text-gray-300">{{ formatDateTime(selectedActor.updated_at) }}</span>
+                <span class="text-gray-600 dark:text-gray-300">{{ formatDateTime(selectedActor.updated_at) }}</span>
               </div>
             </div>
           </div>
 
           <!-- Actions -->
-          <div class="pt-4 border-t border-white/10">
+          <div class="pt-4 border-t border-[var(--border-color)]">
             <button
               @click="editActor(selectedActor)"
               class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors mb-2"

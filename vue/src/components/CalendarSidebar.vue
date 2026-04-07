@@ -1,9 +1,9 @@
 <template>
   <div class="calendar-sidebar">
-    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">日历</h3>
+    <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">日历</h3>
     <VCalendar
   :attributes="calendarAttributes"
-  :is-dark="true"
+  :is-dark="isDark"
   borderless
   transparent
   expanded
@@ -19,6 +19,7 @@ import { Calendar as VCalendar } from 'v-calendar'
 import 'v-calendar/style.css'
 import { api } from '../composables/useApi'
 import type { MessageDateCount } from '../types'
+import { useTheme } from '../composables/useTheme'
 
 const props = defineProps<{
   activeFilters?: {
@@ -30,6 +31,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   'date-selected': [date: string]
 }>()
+
+const { theme } = useTheme()
+const isDark = computed(() => theme.value === 'dark')
 
 const dateCounts = ref<MessageDateCount[]>([])
 const currentYear = ref(new Date().getFullYear())

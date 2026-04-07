@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-[rgb(32,26,27)] to-[rgb(65,32,68)] bg-fixed transition-colors">
+  <div class="min-h-screen bg-[var(--bg-secondary)] dark:bg-gradient-to-b dark:from-[rgb(32,26,27)] dark:to-[rgb(65,32,68)] bg-fixed transition-colors">
     <div v-if="!isOnline" class="fixed top-0 md:left-64 right-0 bg-red-600 text-white text-center py-2 z-50">
       您当前处于离线状态，部分功能可能受限
     </div>
