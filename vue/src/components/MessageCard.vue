@@ -306,6 +306,10 @@ const remainingCount = computed(() => {
 
 const renderedText = computed(() => {
   if (!props.message.text) return ''
+  // 配置 marked 保留原始换行行为
+  marked.setOptions({
+    breaks: true
+  })
   return marked.parse(props.message.text) as string
 })
 
