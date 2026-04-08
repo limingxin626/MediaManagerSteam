@@ -1,114 +1,157 @@
 """
 应用配置模块 - 集中管理所有路径和配置
-支持通过环境变量覆盖默认配置
+
+环境变量：
+  DATA_ROOT     — 数据库 + 缩略图目录（必填，无默认值）
+  UPLOAD_DIR    — 上传文件落地目录（必填，无默认值）
+  STATIC_DIRS   — 额外静态挂载目录，分号分隔，可选（如 F:/AV;G:/Movies）
+  PORT          — 服务端口，默认 8002
+  FFMPEG_PATH   — ffmpeg 可执行文件路径，默认使用 PATH 中的
+  FFPROBE_PATH  — ffprobe 可执行文件路径，默认使用 PATH 中的
 """
 import logging
 import os
+import sys
 from typing import Dict
 
 logger = logging.getLogger(__name__)
 
 
+def _require_env(name: str) -> str:
+    val = os.getenv(name, "").strip()
+    if not val:
+        logger.error("环境变量 %s 未设置，无法启动。", name)
+        sys.exit(1)
+    return val
+
+
+def _dir_name(path: str) -> str:
+    """取目录的最后一级文件夹名（不区分大小写统一小写比较）"""
+    return os.path.basename(os.path.normpath(path))
+
+
 class AppConfig:
     """应用配置类"""
 
-    # 基础数据目录 - 可通过环境变量 ASKTAO_DATA_ROOT 覆盖
-    DATA_ROOT: str = os.getenv("ASKTAO_DATA_ROOT", "E:/AskTao")
+    DATA_ROOT: str = _require_env("DATA_ROOT")
+    UPLOAD_DIR: str = _require_env("UPLOAD_DIR")
 
-    # ffmpeg/ffprobe 路径 - 可通过环境变量覆盖
-    FFMPEG_PATH: str = os.getenv("FFMPEG_PATH", "C:/Users/christluck/Documents/ffmpeg/bin/ffmpeg.exe")
-    FFPROBE_PATH: str = os.getenv("FFPROBE_PATH", "C:/Users/christluck/Documents/ffmpeg/bin/ffprobe.exe")
-    
+    # 额外静态挂载目录，分号分隔
+    STATIC_DIRS: list = [
+        d.strip() for d in os.getenv("STATIC_DIRS", "").split(";") if d.strip()
+    ]
+
+    PORT: int = int(os.getenv("PORT", "8002"))
+
+    FFMPEG_PATH: str = os.getenv("FFMPEG_PATH", "ffmpeg")
+    FFPROBE_PATH: str = os.getenv("FFPROBE_PATH", "ffprobe")
+
+    # 支持的媒体文件扩展名
+    VIDEO_EXTENSIONS: set = {".mp4"}
+    IMAGE_EXTENSIONS: set = {".jpg", ".jpeg", ".png", ".gif"}
+
     @classmethod
     def check_paths(cls) -> None:
-        """启动时检查关键路径是否存在，不存在则打印 warning。"""
+        """启动时检查关键路径，ffmpeg 不在 PATH 时打印 warning。"""
         for label, path in [("FFMPEG_PATH", cls.FFMPEG_PATH), ("FFPROBE_PATH", cls.FFPROBE_PATH)]:
-            if not os.path.isfile(path):
+            # 如果是绝对路径则检查文件是否存在；如果是命令名则跳过（交给运行时报错）
+            if os.path.isabs(path) and not os.path.isfile(path):
                 logger.warning(
-                    "%s 指向的文件不存在: %s — 缩略图生成和媒体信息提取将静默失败。"
-                    " 请通过环境变量设置正确路径。",
+                    "%s 指向的文件不存在: %s — 缩略图生成和媒体信息提取将静默失败。",
                     label, path,
                 )
 
-    # 支持的媒体文件扩展名（统一管理）
-    VIDEO_EXTENSIONS: set = {".mp4"}
-    IMAGE_EXTENSIONS: set = {".jpg", ".jpeg", ".png", ".gif"}
-    
+    @classmethod
+    def get_static_mounts(cls) -> Dict[str, str]:
+        """
+        返回 {url_prefix: system_path} 的挂载映射。
+        DATA_ROOT、UPLOAD_DIR、STATIC_DIRS 均以文件夹名为 URL 前缀。
+        启动时已通过 check_mount_names() 保证无重名。
+        """
+        mounts: Dict[str, str] = {}
+        for path in [cls.DATA_ROOT, cls.UPLOAD_DIR] + cls.STATIC_DIRS:
+            name = _dir_name(path)
+            mounts[f"/{name}"] = path
+        return mounts
+
+    @classmethod
+    def check_mount_names(cls) -> None:
+        """检查所有挂载目录的文件夹名是否重复，重复则报错退出。"""
+        all_dirs = [cls.DATA_ROOT, cls.UPLOAD_DIR] + cls.STATIC_DIRS
+        seen: Dict[str, str] = {}
+        for path in all_dirs:
+            name = _dir_name(path).lower()
+            if name in seen:
+                logger.error(
+                    "挂载目录名称冲突：'%s' 和 '%s' 的文件夹名相同（%s），无法启动。"
+                    " 请重命名其中一个目录或使用子目录。",
+                    seen[name], path, name,
+                )
+                sys.exit(1)
+            seen[name] = path
+
     @classmethod
     def get_media_type(cls, file_path: str) -> str | None:
-        """根据文件扩展名判断媒体类型"""
         ext = os.path.splitext(file_path)[1].lower()
         if ext in cls.VIDEO_EXTENSIONS:
             return "VIDEO"
         elif ext in cls.IMAGE_EXTENSIONS:
             return "IMAGE"
         return None
-    
-    # 静态文件挂载配置: {服务器路径: 系统目录}
-    # 服务器路径不包含 DATA_ROOT，因为它们直接映射到 category
-    @classmethod
-    def get_static_mounts(cls) -> Dict[str, str]:
-        """获取静态文件挂载配置"""
-        mounts = {
-            "/asktao": cls.DATA_ROOT,
-            "/av": "F:/AV",
-        }
-        return mounts
-    
+
     @classmethod
     def get_upload_dir(cls) -> str:
-        """获取手机上传文件的落地目录"""
+        """获取按日期分组的上传落地目录"""
         from datetime import date
         today = date.today()
-        return os.path.join(cls.DATA_ROOT, "uploads", str(today.year), f"{today.month:02d}", f"{today.day:02d}")
+        return os.path.join(cls.UPLOAD_DIR, str(today.year), f"{today.month:02d}", f"{today.day:02d}")
 
     @classmethod
     def get_thumbs_dir(cls) -> str:
-        """获取缩略图目录的系统绝对路径"""
         return os.path.join(cls.DATA_ROOT, "data", "thumbs")
-    
+
     @classmethod
     def get_thumbnail_path(cls, media_id: int) -> str:
-        """获取指定媒体ID的缩略图系统绝对路径"""
         return os.path.join(cls.get_thumbs_dir(), f"{media_id}.webp")
-    
+
     @classmethod
     def get_actor_cover_dir(cls) -> str:
-        """获取演员封面目录的系统绝对路径"""
         return os.path.join(cls.DATA_ROOT, "data", "actor_cover")
-    
+
     @classmethod
     def get_actor_avatar_path(cls, actor_id: int) -> str:
-        """获取指定演员ID的头像系统绝对路径"""
         return os.path.join(cls.get_actor_cover_dir(), f"{actor_id}.webp")
-    
+
+    @classmethod
+    def _data_root_prefix(cls) -> str:
+        return f"/{_dir_name(cls.DATA_ROOT)}"
+
+    @classmethod
+    def get_thumbnail_url(cls, media_id: int) -> str:
+        return f"{cls._data_root_prefix()}/data/thumbs/{media_id}.webp"
+
+    @classmethod
+    def get_actor_avatar_url(cls, actor_id: int) -> str:
+        return f"{cls._data_root_prefix()}/data/actor_cover/{actor_id}.webp"
+
     @classmethod
     def to_url_path(cls, file_path: str) -> str:
-        """将系统绝对路径转换为服务器URL路径
-        
-        例如: E:/AskTao/data/video.mp4 -> /asktao/data/video.mp4
-              F:/AV/movie.mp4 -> /av/movie.mp4
-        """
+        """将系统绝对路径转换为服务器 URL 路径"""
         if not file_path:
             return ""
-        
-        # 统一使用正斜杠
         normalized_path = file_path.replace("\\", "/")
-        
-        # 遍历所有挂载点，找到匹配的并转换
         for url_prefix, system_path in cls.get_static_mounts().items():
             normalized_mount = system_path.replace("\\", "/")
-            # 处理路径匹配（不区分大小写）
             if normalized_path.lower().startswith(normalized_mount.lower()):
-                # 替换挂载路径为URL前缀
                 relative_path = normalized_path[len(normalized_mount):]
-                # 确保relative_path以/开头
                 if relative_path and not relative_path.startswith("/"):
                     relative_path = "/" + relative_path
                 return url_prefix + relative_path
-        
-        # 如果没有匹配到任何挂载点，返回原路径
         return file_path
+
+    @classmethod
+    def get_db_path(cls) -> str:
+        return os.path.join(cls.DATA_ROOT, "db.sqlite3")
 
 
 # 创建全局配置实例

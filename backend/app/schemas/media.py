@@ -34,7 +34,7 @@ class MediaResponse(BaseModel):
     def _fill_urls(self):
         # 自动填充缩略图URL
         if not self.thumb_url:
-            self.thumb_url = f"/asktao/data/thumbs/{self.id}.webp"
+            self.thumb_url = config.get_thumbnail_url(self.id)
         # 将绝对路径转换为URL路径
         if not self.file_url and self.file_path:
             self.file_url = config.to_url_path(self.file_path)

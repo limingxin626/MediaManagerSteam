@@ -3,17 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 import os
+from app.config import config
 
-# 支持多个数据库，通过环境变量 DB_NAME 控制
-DB_NAME = os.getenv("DB_NAME", "default")
-
-if DB_NAME == "default":
-    DATABASE_URL = "sqlite:///./db_notes2.sqlite3"
-elif DB_NAME == "notes2":
-    DATABASE_URL = "sqlite:///./db_notes2.sqlite3"
-else:
-    DATABASE_URL = f"sqlite:///./db_{DB_NAME}.sqlite3"
-
+DATABASE_URL = f"sqlite:///{config.get_db_path()}"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

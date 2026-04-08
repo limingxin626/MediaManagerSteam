@@ -1,5 +1,6 @@
 from pydantic import BaseModel, model_validator
 from typing import List, Optional
+from app.config import config
 
 
 class ActorResponse(BaseModel):
@@ -18,7 +19,7 @@ class ActorResponse(BaseModel):
     @model_validator(mode="after")
     def _fill_avatar_url(self):
         if not self.avatar_url:
-            self.avatar_url = f"/data/actor_cover/{self.id}.webp"
+            self.avatar_url = config.get_actor_avatar_url(self.id)
         return self
 
 

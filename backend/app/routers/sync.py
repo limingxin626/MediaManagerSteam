@@ -61,7 +61,7 @@ def _message_snapshot(db: Session, msg: Message) -> Dict[str, Any]:
                 "duration_ms": m.duration_ms,
                 "rating": m.rating,
                 "starred": bool(m.starred),
-                "thumb_url": f"/asktao/data/thumbs/{m.id}.webp",
+                "thumb_url": config.get_thumbnail_url(m.id),
                 "position": r.position,
             })
     tags = [{"id": t.id, "name": t.name, "category": t.category} for t in msg.tags]
@@ -83,7 +83,7 @@ def _actor_snapshot(actor: Actor) -> Dict[str, Any]:
         "id": actor.id,
         "name": actor.name,
         "description": actor.description,
-        "avatar": f"/asktao/data/actor_cover/{actor.id}.webp" if actor.avatar_path else None,
+        "avatar": config.get_actor_avatar_url(actor.id) if actor.avatar_path else None,
         "created_at": actor.created_at.isoformat(),
         "updated_at": actor.updated_at.isoformat(),
     }
@@ -102,7 +102,7 @@ def _media_snapshot(media: Media) -> Dict[str, Any]:
         "duration_ms": media.duration_ms,
         "rating": media.rating,
         "starred": bool(media.starred),
-        "thumb_url": f"/asktao/data/thumbs/{media.id}.webp",
+        "thumb_url": config.get_thumbnail_url(media.id),
         "created_at": media.created_at.isoformat(),
         "updated_at": media.updated_at.isoformat(),
     }

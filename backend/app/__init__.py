@@ -44,15 +44,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 配置静态文件服务
-app.mount("/uploads", StaticFiles(directory="./uploads"), name="uploads")
+# 检查挂载目录名称冲突（重复则退出）
+config.check_mount_names()
 
-# 从配置动态挂载AskTao数据目录
-for server_path, system_path in config.get_static_mounts().items():
-    if os.path.exists(system_path):
-        # 使用路径的最后一部分作为name（去掉开头的/）
-        mount_name = server_path.lstrip("/").replace("/", "_") or "root"
-        app.mount(server_path, StaticFiles(directory=system_path), name=mount_name)
+# 配置静态文件服务（所有目录以文件夹名为 URL 前缀挂载）
+for url_prefix, system_path in config.get_static_mounts().items():
+    os.makedirs(system_path, exist_ok=True)
+    mount_name = url_prefix.lstrip("/")
+    app.mount(url_prefix, StaticFiles(directory=system_path), name=mount_name)
 
 # 注册所有路由
 for router in all_routers:

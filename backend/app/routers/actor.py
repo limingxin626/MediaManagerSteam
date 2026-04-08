@@ -4,6 +4,7 @@ from sqlalchemy import func
 from app.models import get_db, Actor, Message, MessageMedia
 from typing import List, Optional
 from app.schemas.actor import ActorResponse, ActorDetailResponse, ActorSyncResponse
+from app.config import config
 
 router = APIRouter(prefix="/actors", tags=["actors"])
 
@@ -17,7 +18,7 @@ def sync_actors(db: Session = Depends(get_db)):
             id=a.id,
             name=a.name,
             description=a.description,
-            avatar=f"/asktao/data/actor_cover/{a.id}.webp" if a.avatar_path else None,
+            avatar=config.get_actor_avatar_url(a.id) if a.avatar_path else None,
         )
         for a in actors
     ]

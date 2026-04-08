@@ -4,11 +4,12 @@ import hashlib
 import logging
 import subprocess
 from typing import List
+from app.config import config
 
 logger = logging.getLogger(__name__)
 
-# 媒体文件上传目录
-MEDIA_UPLOAD_DIR = "./uploads"
+# 媒体文件上传目录（使用配置中的 UPLOAD_DIR）
+MEDIA_UPLOAD_DIR = config.UPLOAD_DIR
 os.makedirs(MEDIA_UPLOAD_DIR, exist_ok=True)
 
 # 全局变量，用于存储当前的媒体ID列表
