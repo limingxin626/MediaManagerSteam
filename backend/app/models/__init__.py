@@ -34,8 +34,8 @@ class Message(Base):
     text = Column(Text, nullable=True)
     actor_id = Column(Integer, ForeignKey("actor.id"), nullable=True, index=True)
     starred = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     actor = relationship("Actor", back_populates="messages")
     message_media = relationship("MessageMedia", back_populates="message", cascade="all, delete-orphan")
@@ -48,8 +48,8 @@ class Actor(Base):
     name = Column(String(256), nullable=False, index=True)
     description = Column(Text, nullable=True)
     avatar_path = Column(String(1024), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     messages = relationship("Message", back_populates="actor")
 
@@ -85,8 +85,8 @@ class Media(Base):
     starred = Column(Integer, default=0, nullable=False)
     view_count = Column(Integer, default=0, nullable=False)
     last_viewed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     message_media = relationship("MessageMedia", back_populates="media")
 
@@ -97,7 +97,7 @@ class MessageMedia(Base):
     message_id = Column(Integer, ForeignKey("message.id"), nullable=False, index=True)
     media_id = Column(Integer, ForeignKey("media.id"), nullable=False, index=True)
     position = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
 
     message = relationship("Message", back_populates="message_media")
     media = relationship("Media", back_populates="message_media")
@@ -115,7 +115,7 @@ class SyncLog(Base):
     entity_type = Column(String(32), nullable=False)   # MESSAGE | ACTOR | MEDIA | TAG
     entity_id = Column(Integer, nullable=False)
     operation = Column(String(16), nullable=False)      # UPSERT | DELETE
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=datetime.now, nullable=False)
 
     __table_args__ = (
         Index("ix_sync_log_timestamp_id", "timestamp", "id"),

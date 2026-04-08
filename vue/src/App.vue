@@ -9,7 +9,6 @@
       </router-view>
     </div>
     <BottomNavBar />
-    <PwaInstallPrompt @install="handleInstall" />
     <ToastContainer />
   </div>
 </template>
@@ -18,15 +17,10 @@
 import { onMounted } from 'vue'
 import Navbar from './components/Navbar.vue'
 import BottomNavBar from './components/BottomNavBar.vue'
-import PwaInstallPrompt from './components/PwaInstallPrompt.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import { useTheme } from './composables/useTheme'
 
 const { initTheme } = useTheme()
-
-const handleInstall = (outcome: string) => {
-  console.log('PWA installation outcome:', outcome)
-}
 
 onMounted(() => {
   initTheme()

@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex 2xl:pr-72 transition-colors">
+  <div class="h-screen flex transition-colors">
     <!-- Left Tag Column -->
     <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] overflow-y-auto">
       <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">标签</div>
@@ -26,21 +26,21 @@
       <div class="flex-1 flex flex-col min-w-0">
         <!-- Search Header -->
         <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
-          <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div class="flex gap-4 items-center max-w-2xl mx-auto">
-              <h2 class="text-2xl font-bold text-gray-900 dark:text-white">消息流</h2>
+          <div class="w-full mx-auto px-3 py-2">
+            <div class="flex gap-2 items-center max-w-2xl mx-auto">
+              <h2 class="text-base font-semibold text-gray-900 dark:text-white">消息流</h2>
               <!-- Merge toggle -->
-              <button @click="toggleMergeMode" class="px-3 py-1.5 text-sm rounded-lg transition-colors" :class="mergeMode
+              <button @click="toggleMergeMode" class="px-2 py-1 text-xs rounded-md transition-colors" :class="mergeMode
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                 : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'">
                 {{ mergeMode ? '取消合并' : '合并' }}
               </button>
               <!-- Starred filter -->
               <button @click="starredFilter = !starredFilter; resetAndFetch()"
-                class="p-1.5 rounded-lg transition-colors" :class="starredFilter
+                class="p-1 rounded-md transition-colors" :class="starredFilter
                   ? 'text-yellow-400 bg-yellow-900/20'
                   : 'text-gray-400 hover:text-yellow-400 bg-gray-100 dark:bg-white/10'" title="仅看收藏">
-                <svg class="w-5 h-5" :fill="starredFilter ? 'currentColor' : 'none'" stroke="currentColor"
+                <svg class="w-4 h-4" :fill="starredFilter ? 'currentColor' : 'none'" stroke="currentColor"
                   viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -208,11 +208,6 @@
         :starred="previewMessageStarred" @close="closePreview" @navigate-prev="navigateToPrevMessage"
         @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" />
 
-      <!-- Calendar Sidebar (wide screens only) -->
-      <aside
-        class="hidden 2xl:block fixed top-0 right-0 bottom-0 w-72 border-l border-[var(--border-color)] backdrop-blur-sm z-40 overflow-y-auto p-4 pt-6">
-        <CalendarSidebar :active-filters="calendarFilters" @date-selected="handleDateSelected" />
-      </aside>
     </div>
   </div>
 </template>
@@ -222,7 +217,6 @@ import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
-import CalendarSidebar from '../components/CalendarSidebar.vue'
 import SearchInput from '../components/SearchInput.vue'
 import MessageCompose from '../components/MessageCompose.vue'
 import { api } from '../composables/useApi'
@@ -288,75 +282,11 @@ const hasMoreForward = ref(false)
 const loadingForward = ref(false)
 const isViewingHistory = ref(false)
 
-const calendarFilters = computed(() => ({
-  queryText: searchQuery.value || null,
-  mediaId: activeMediaFilter.value,
-}))
-
 // --- Scroll helpers ---
 
 const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
   const el = scrollContainer.value
   if (el) el.scrollTo({ top: el.scrollHeight, behavior })
-}
-
-// --- Calendar date jump ---
-
-const handleDateSelected = async (dateStr: string) => {
-  // Check if any loaded message is on this date
-  const target = messages.value.find(m => m.created_at.startsWith(dateStr))
-  if (target) {
-    const el = document.querySelector(`[data-message-date="${dateStr}"]`)
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    return
-  }
-
-  // Load messages up to the end of the selected date (desc order, like default)
-  // Use next day T00:00:00 as cursor so created_at < next day covers the whole day
-  const nextDay = new Date(dateStr + 'T00:00:00')
-  nextDay.setDate(nextDay.getDate() + 1)
-  const cursorValue = nextDay.toISOString().slice(0, 19) // YYYY-MM-DDTHH:MM:SS
-
-  loading.value = true
-  try {
-    const data = await api.get<{
-      items: MessageDetail[]
-      next_cursor: string | null
-      has_more: boolean
-    }>('/messages/with-detail', {
-      cursor: cursorValue,
-      limit: pageSize,
-      query_text: searchQuery.value || undefined,
-      media_id: activeMediaFilter.value ?? undefined,
-      starred: starredFilter.value || undefined,
-      tag_id: selectedTagId.value ?? undefined,
-    })
-
-    // desc order returned, reverse for chat layout (newest at bottom)
-    messages.value = data.items.reverse()
-    hasMoreData.value = data.has_more
-    nextCursor.value = data.next_cursor
-
-    // There are newer messages after this date
-    const today = new Date().toISOString().slice(0, 10)
-    hasMoreForward.value = dateStr < today
-    forwardCursor.value = messages.value.length
-      ? messages.value[messages.value.length - 1].created_at
-      : null
-    isViewingHistory.value = hasMoreForward.value
-
-    await nextTick()
-    const el = document.querySelector(`[data-message-date="${dateStr}"]`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } else {
-      scrollToBottom()
-    }
-  } catch {
-    toast.error('加载消息失败')
-  } finally {
-    loading.value = false
-  }
 }
 
 const fetchForwardMessages = async () => {

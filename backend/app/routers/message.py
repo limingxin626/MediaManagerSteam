@@ -376,7 +376,7 @@ def create_message_from_client(
         except ValueError:
             pass
     if created_at is None:
-        created_at = datetime.utcnow()
+        created_at = datetime.now()
 
     db_message = Message(
         id=message_data.id,

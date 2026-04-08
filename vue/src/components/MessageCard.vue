@@ -306,11 +306,13 @@ const remainingCount = computed(() => {
 
 const renderedText = computed(() => {
   if (!props.message.text) return ''
-  // 配置 marked 保留原始换行行为
-  marked.setOptions({
-    breaks: true
-  })
-  return marked.parse(props.message.text) as string
+  // 在 --- 或 === 独占行前后插入空行，防止上方文字被解析为 setext heading
+  const normalized = props.message.text.replace(
+    /([^\n])\n([-=]{2,})\n/g,
+    '$1\n\n$2\n\n'
+  )
+  marked.setOptions({ breaks: true })
+  return marked.parse(normalized) as string
 })
 
 // Telegram-style grid: 1→full, 2→2col, 3→left big + right 2 small, 4→2x2, 5+→3col
