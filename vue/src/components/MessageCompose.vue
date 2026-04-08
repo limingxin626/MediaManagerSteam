@@ -1,7 +1,7 @@
 <template>
   <div class="shrink-0 border-t border-[var(--border-color)] shadow-lg">
     <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
-      <div class="flex gap-2 items-center max-w-2xl mx-auto">
+      <div class="flex gap-2 items-center max-w-4xl mx-auto">
         <!-- Attachment Button -->
         <button @click="triggerFileInput"
           class="flex-shrink-0 p-2 text-gray-400 hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
@@ -18,7 +18,7 @@
         <!-- Text Input -->
         <div class="flex-1 relative">
           <textarea ref="textareaRef" v-model="text" placeholder="输入消息..." rows="1"
-            class="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none max-h-32 overflow-hidden"
+            class="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none max-h-32 overflow-hidden"
             @keydown="handleKeydown" @input="handleInput" @blur="tag.hide" />
         </div>
 
@@ -34,7 +34,7 @@
       </div>
 
       <!-- Selected Files Preview -->
-      <div v-if="files.length > 0" class="mt-2 max-w-2xl mx-auto">
+      <div v-if="files.length > 0" class="mt-2 max-w-4xl mx-auto">
         <div class="flex flex-wrap gap-2">
           <div v-for="(filePath, index) in files" :key="index"
             class="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-white/10 rounded-md text-sm">

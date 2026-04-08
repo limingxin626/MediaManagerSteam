@@ -23,11 +23,11 @@
     <!-- Main Content -->
     <div class="flex-1 flex min-w-0">
       <!-- Left Feed Section -->
-      <div class="flex-1 flex flex-col min-w-0">
+      <div class="flex flex-col min-w-0" :class="selectedMessage ? 'w-1/2' : 'flex-1'">
         <!-- Search Header -->
         <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
           <div class="w-full mx-auto px-3 py-2">
-            <div class="flex gap-2 items-center max-w-2xl mx-auto">
+            <div class="flex gap-2 items-center max-w-4xl mx-auto">
               <h2 class="text-base font-semibold text-gray-900 dark:text-white">消息流</h2>
               <!-- Merge toggle -->
               <button @click="toggleMergeMode" class="px-2 py-1 text-xs rounded-md transition-colors" :class="mergeMode
@@ -59,7 +59,7 @@
 
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <!-- Loading skeleton (initial load) -->
-            <div v-if="loading && messages.length === 0" class="flex flex-col gap-4" :class="selectedMessage ? 'max-w-2xl' : 'max-w-2xl mx-auto'">
+            <div v-if="loading && messages.length === 0" class="flex flex-col gap-4 max-w-4xl mx-auto">
               <div v-for="i in 3" :key="i"
                 class="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 animate-pulse">
                 <div class="flex items-center gap-3 mb-3">
@@ -84,7 +84,7 @@
             </div>
 
             <!-- Messages Feed -->
-            <div v-if="messages.length > 0" class="flex flex-col gap-4" :class="selectedMessage ? 'max-w-2xl' : 'max-w-2xl mx-auto'">
+            <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-4xl mx-auto">
               <template v-for="(message, idx) in messages" :key="message.id">
                 <!-- Date separator -->
                 <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1].created_at)"
