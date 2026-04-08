@@ -68,23 +68,9 @@ def _build_message_query(
     starred: Optional[bool] = None,
 ):
     """공통 필터·정렬을 적용한 Message 쿼리를 반환한다."""
-    query = db.query(Message)
-
-    if actor_id:
-        query = query.filter(Message.actor_id == actor_id)
-    if query_text:
-        query = query.filter(Message.text.ilike(f"%{query_text}%"))
-    if media_id:
-        query = query.join(MessageMedia).filter(MessageMedia.media_id == media_id)
-    if tag_id:
-        query = query.join(message_tag, Message.id == message_tag.c.message_id).filter(
-            message_tag.c.tag_id == tag_id
-        )
-    if starred is not None:
-        query = query.filter(Message.starred == (1 if starred else 0))
+    query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred)
     if cursor_time:
         query = query.filter(Message.created_at < cursor_time)
-
     return query.order_by(Message.created_at.desc())
 
 
@@ -113,8 +99,39 @@ def _media_items_for(db: Session, message_id: int, limit: Optional[int] = MEDIA_
     ]
 
 
-def _build_detail_response(db: Session, msg: Message, media_limit: Optional[int] = MEDIA_PREVIEW_LIMIT) -> MessageDetailResponse:
-    media_items = _media_items_for(db, msg.id, limit=media_limit)
+def _batch_media_items(
+    db: Session, message_ids: List[int], limit: Optional[int] = MEDIA_PREVIEW_LIMIT
+) -> dict:
+    """批量加载多条消息的媒体，返回 {message_id: [MessageMediaItem]}，避免 N+1。"""
+    query = (
+        db.query(MessageMedia)
+        .filter(MessageMedia.message_id.in_(message_ids))
+        .order_by(MessageMedia.message_id, MessageMedia.position)
+    )
+    grouped: dict[int, List[MessageMediaItem]] = {}
+    per_msg: dict[int, int] = {}
+    for r in query.all():
+        if not r.media:
+            continue
+        if limit is not None:
+            count = per_msg.get(r.message_id, 0)
+            if count >= limit:
+                continue
+            per_msg[r.message_id] = count + 1
+        grouped.setdefault(r.message_id, []).append(MessageMediaItem.model_validate(r.media))
+    return grouped
+
+
+def _build_detail_response(
+    db: Session,
+    msg: Message,
+    media_limit: Optional[int] = MEDIA_PREVIEW_LIMIT,
+    media_by_msg: Optional[dict] = None,
+) -> MessageDetailResponse:
+    if media_by_msg is not None:
+        media_items = media_by_msg.get(msg.id, [])
+    else:
+        media_items = _media_items_for(db, msg.id, limit=media_limit)
     tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in msg.tags]
     actor_name = msg.actor.name if msg.actor else None
     return MessageDetailResponse(
@@ -245,26 +262,31 @@ def get_message_dates(
 def sync_messages(db: Session = Depends(get_db)):
     """全量同步：返回所有消息的完整详情（含 media 元数据和 tag）"""
     messages = db.query(Message).order_by(Message.created_at.desc()).all()
+    if not messages:
+        return []
+
+    # 批量加载所有 MessageMedia，避免 N+1
+    msg_ids = [m.id for m in messages]
+    all_relations = (
+        db.query(MessageMedia)
+        .filter(MessageMedia.message_id.in_(msg_ids))
+        .order_by(MessageMedia.message_id, MessageMedia.position)
+        .all()
+    )
+    relations_by_msg: dict[int, list] = {}
+    for r in all_relations:
+        relations_by_msg.setdefault(r.message_id, []).append(r)
+
     results = []
     for msg in messages:
-        relations = (
-            db.query(MessageMedia)
-            .filter(MessageMedia.message_id == msg.id)
-            .order_by(MessageMedia.position)
-            .all()
-        )
-        media_items = [
-            _sync_media_item(r)
-            for r in relations
-            if r.media
-        ]
+        relations = relations_by_msg.get(msg.id, [])
+        media_items = [_sync_media_item(r) for r in relations if r.media]
         tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in msg.tags]
-        actor_name = msg.actor.name if msg.actor else None
         results.append(MessageSyncResponse(
             id=msg.id,
             text=msg.text,
             actor_id=msg.actor_id,
-            actor_name=actor_name,
+            actor_name=msg.actor.name if msg.actor else None,
             starred=bool(msg.starred),
             created_at=msg.created_at.isoformat(),
             updated_at=msg.updated_at.isoformat(),
@@ -300,7 +322,9 @@ def get_messages_with_detail(
         base = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred)
         has_more_before = base.filter(Message.created_at < pivot).first() is not None
 
-        result = [_build_detail_response(db, msg) for msg in items]
+        ids = [m.id for m in items]
+        media_by_msg = _batch_media_items(db, ids) if ids else {}
+        result = [_build_detail_response(db, msg, media_by_msg=media_by_msg) for msg in items]
         return MessageDetailCursorResponse(
             items=result,
             next_cursor=items[-1].created_at.isoformat() if has_more and items else None,
@@ -314,7 +338,9 @@ def get_messages_with_detail(
     query = _build_message_query(db, actor_id, query_text, media_id, tag_id, cursor_time, starred=starred)
     items, has_more, next_cursor = _paginate(query, limit)
 
-    result = [_build_detail_response(db, msg) for msg in items]
+    ids = [m.id for m in items]
+    media_by_msg = _batch_media_items(db, ids) if ids else {}
+    result = [_build_detail_response(db, msg, media_by_msg=media_by_msg) for msg in items]
     return MessageDetailCursorResponse(items=result, next_cursor=next_cursor, has_more=has_more)
 
 
@@ -358,6 +384,9 @@ def create_message(
     db.commit()
     db.refresh(db_message)
     return _build_sync_response(db, db_message)
+
+
+@router.post("/create-from-client", response_model=MessageSyncResponse, status_code=201)
 def create_message_from_client(
     message_data: MessageCreateFromClient,
     db: Session = Depends(get_db),
@@ -521,25 +550,8 @@ def get_messages_around(
 
     half_limit = limit // 2
 
-    # 构建基础查询（不含排序和游标）
-    def build_base_query():
-        query = db.query(Message)
-        if actor_id:
-            query = query.filter(Message.actor_id == actor_id)
-        if query_text:
-            query = query.filter(Message.text.ilike(f"%{query_text}%"))
-        if media_id:
-            query = query.join(MessageMedia).filter(MessageMedia.media_id == media_id)
-        if tag_id:
-            query = query.join(message_tag, Message.id == message_tag.c.message_id).filter(
-                message_tag.c.tag_id == tag_id
-            )
-        if starred is not None:
-            query = query.filter(Message.starred == (1 if starred else 0))
-        return query
-
     # 向后加载：更旧的消息（created_at < target.created_at）
-    older_query = build_base_query().filter(
+    older_query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred).filter(
         Message.created_at < target.created_at
     ).order_by(Message.created_at.desc())
     older = older_query.limit(half_limit + 1).all()
@@ -547,7 +559,7 @@ def get_messages_around(
     older = older[:half_limit]
 
     # 向前加载：更新的消息（created_at > target.created_at）
-    newer_query = build_base_query().filter(
+    newer_query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred).filter(
         Message.created_at > target.created_at
     ).order_by(Message.created_at.asc())
     newer = newer_query.limit(half_limit + 1).all()
@@ -558,8 +570,12 @@ def get_messages_around(
     # 按时间正序排列（旧 → 新），方便聊天界面展示
     messages = list(reversed(older)) + [target] + newer
 
+    # 批量加载媒体，避免 N+1
+    all_ids = [m.id for m in messages]
+    media_by_msg = _batch_media_items(db, all_ids, limit=None) if all_ids else {}
+
     # 构建响应
-    result = [_build_detail_response(db, msg, media_limit=None) for msg in messages]
+    result = [_build_detail_response(db, msg, media_limit=None, media_by_msg=media_by_msg) for msg in messages]
 
     return MessageDetailCursorResponse(
         items=result,
@@ -580,6 +596,5 @@ def delete_message(
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    db.query(MessageMedia).filter(MessageMedia.message_id == message_id).delete()
     db.delete(message)
     db.commit()

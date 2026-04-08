@@ -8,7 +8,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -159,7 +159,6 @@ def get_sync_changes(
         raise HTTPException(status_code=400, detail="since 格式无效，应为 ISO timestamp")
 
     # 超过保留期
-    from datetime import timedelta
     cutoff = datetime.utcnow() - timedelta(days=SYNC_LOG_RETENTION_DAYS)
     if since_dt < cutoff:
         raise HTTPException(status_code=410, detail="since 超过保留期（90天），请执行全量同步")

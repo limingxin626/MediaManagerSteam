@@ -3,7 +3,6 @@ import datetime
 import hashlib
 import logging
 import subprocess
-from typing import List
 from app.config import config
 
 logger = logging.getLogger(__name__)
@@ -11,36 +10,6 @@ logger = logging.getLogger(__name__)
 # 媒体文件上传目录（使用配置中的 UPLOAD_DIR）
 MEDIA_UPLOAD_DIR = config.UPLOAD_DIR
 os.makedirs(MEDIA_UPLOAD_DIR, exist_ok=True)
-
-# 全局变量，用于存储当前的媒体ID列表
-# 永远只维持最新的列表
-current_media_list: List[int] = []
-
-# 全局变量，用于存储当前的分组ID列表
-# 永远只维持最新的列表
-current_group_list: List[int] = []
-
-
-# 文件处理工具类
-class FileUtils:
-    @staticmethod
-    def save_upload_file(file, upload_dir: str = MEDIA_UPLOAD_DIR) -> str:
-        """保存上传的文件并返回文件路径"""
-        file_extension = os.path.splitext(file.filename)[1]
-        file_path = os.path.join(upload_dir, f"{datetime.datetime.now().timestamp()}{file_extension}")
-        
-        with open(file_path, "wb") as f:
-            f.write(file.read())
-        
-        return file_path
-    
-    @staticmethod
-    def delete_file(file_path: str) -> bool:
-        """删除文件"""
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            return True
-        return False
 
 
 def calculate_file_hash(file_path: str, size_threshold: int = 100 * 1024 * 1024) -> str | None:

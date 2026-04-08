@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.models import get_db, Media, MessageMedia, Message, message_tag
@@ -17,8 +18,7 @@ def get_media(
     db: Session = Depends(get_db)
 ):
     """获取媒体列表（游标分页，显示所有媒体）"""
-    from datetime import datetime
-    
+
     if message_id:
         # 通过 message_id 获取媒体
         media_relations = db.query(MessageMedia).filter(
@@ -92,36 +92,6 @@ def get_media(
             has_more_before=False
         )
 
-@router.get("/{media_id}", response_model=MediaDetailResponse)
-def get_media_detail(
-    media_id: int,
-    db: Session = Depends(get_db)
-):
-    """获取媒体详情"""
-    media = db.query(Media).filter(Media.id == media_id).first()
-    if not media:
-        raise HTTPException(status_code=404, detail="Media not found")
-    
-    # 获取媒体关联的消息
-    media_relations = db.query(MessageMedia).filter(
-        MessageMedia.media_id == media_id
-    ).order_by(MessageMedia.created_at.desc()).all()
-    
-    messages = []
-    for relation in media_relations:
-        message = relation.message
-        messages.append({
-            "id": message.id,
-            "text": message.text,
-            "actor_id": message.actor_id,
-            "actor_name": message.actor.name if message.actor else None,
-            "position": relation.position,
-            "created_at": message.created_at.isoformat()
-        })
-    
-    return MediaDetailResponse.model_validate(media, messages=messages)
-
-
 @router.get("/feed", response_model=MediaCursorResponse)
 def get_media_feed(
     cursor: Optional[int] = Query(None, description="游标：message_media.id"),
@@ -172,6 +142,36 @@ def get_media_feed(
     )
 
 
+@router.get("/{media_id}", response_model=MediaDetailResponse)
+def get_media_detail(
+    media_id: int,
+    db: Session = Depends(get_db)
+):
+    """获取媒体详情"""
+    media = db.query(Media).filter(Media.id == media_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    # 获取媒体关联的消息
+    media_relations = db.query(MessageMedia).filter(
+        MessageMedia.media_id == media_id
+    ).order_by(MessageMedia.created_at.desc()).all()
+
+    messages = []
+    for relation in media_relations:
+        message = relation.message
+        messages.append({
+            "id": message.id,
+            "text": message.text,
+            "actor_id": message.actor_id,
+            "actor_name": message.actor.name if message.actor else None,
+            "position": relation.position,
+            "created_at": message.created_at.isoformat()
+        })
+
+    return MediaDetailResponse.model_validate({**media.__dict__, "messages": messages})
+
+
 @router.put("/{media_id}/starred")
 def toggle_media_starred(
     media_id: int,
@@ -215,7 +215,7 @@ def increment_view_count(
         raise HTTPException(status_code=404, detail="Media not found")
 
     media.view_count += 1
-    media.last_viewed_at = db.func.current_timestamp()
+    media.last_viewed_at = datetime.now()
     db.commit()
 
     return {"message": "View count updated", "view_count": media.view_count}
@@ -229,7 +229,6 @@ def get_media_around(
     db: Session = Depends(get_db)
 ):
     """以指定媒体为中心，向前/向后加载媒体"""
-    from datetime import datetime
 
     # 找到目标媒体对应的 MessageMedia 记录
     target_mm = db.query(MessageMedia).filter(
