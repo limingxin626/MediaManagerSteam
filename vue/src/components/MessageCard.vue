@@ -96,7 +96,7 @@
 
       <!-- Message Text -->
       <div v-if="message.text" class="mb-2 prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300">
-        <div class="line-clamp-40" v-html="renderedText"></div>
+        <div class="line-clamp-10" v-html="renderedText"></div>
       </div>
 
       <!-- Tags & Media count row -->

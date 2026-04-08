@@ -59,7 +59,7 @@
 
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <!-- Loading skeleton (initial load) -->
-            <div v-if="loading && messages.length === 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
+            <div v-if="loading && messages.length === 0" class="flex flex-col gap-4" :class="selectedMessage ? 'max-w-2xl' : 'max-w-2xl mx-auto'">
               <div v-for="i in 3" :key="i"
                 class="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 animate-pulse">
                 <div class="flex items-center gap-3 mb-3">
@@ -84,7 +84,7 @@
             </div>
 
             <!-- Messages Feed -->
-            <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-2xl mx-auto">
+            <div v-if="messages.length > 0" class="flex flex-col gap-4" :class="selectedMessage ? 'max-w-2xl' : 'max-w-2xl mx-auto'">
               <template v-for="(message, idx) in messages" :key="message.id">
                 <!-- Date separator -->
                 <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1].created_at)"
@@ -97,7 +97,7 @@
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
                     :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
                     :all-tags="tags"
-                    @click="" @media-click="(index) => handleMediaClick(message.id, index)"
+                    @click="handleMessageClick(message)" @media-click="(index) => handleMediaClick(message.id, index)"
                     @delete="handleDeleteMessage" @find-messages-by-media="handleFindMessagesByMedia"
                     @toggle-select="toggleSelectMessage" @toggle-star="handleToggleStar"
                     @toggle-media-star="handleToggleMediaStar" @edit="(id, text, date) => handleEditMessage(id, text, date)" />
@@ -155,25 +155,44 @@
         <MessageCompose :tag-id="selectedTagId ?? null" :all-tags="tags" @sent="onMessageSent" />
       </div>
 
-      <!-- Right Media Display Section -->
-      <div v-if="selectedMessage" class="flex-1 border-l border-[var(--border-color)] flex flex-col overflow-hidden">
-        <div class="p-4 border-[var(--border-color)] flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ selectedMessage.text || '消息详情' }}</h3>
-            <p class="text-sm text-gray-400 mt-1">{{ formatDateLabel(selectedMessage.created_at) }}</p>
-          </div>
-          <div v-if="selectedMessageLoading"
-            class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-500">
+      <!-- Right Detail Panel -->
+      <div v-if="selectedMessage" class="flex-1 min-w-0 border-l border-[var(--border-color)] flex flex-col overflow-hidden">
+        <!-- Header -->
+        <div class="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
+          <span class="text-sm font-semibold text-gray-900 dark:text-white">消息详情</span>
+          <div class="flex items-center gap-2">
+            <div v-if="selectedMessageLoading"
+              class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-500">
+            </div>
+            <button @click="selectedMessage = null"
+              class="p-1 text-gray-400 hover:text-gray-200 rounded transition-colors" title="关闭">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
-        <div class="flex-1 overflow-y-auto p-4">
+        <!-- Scrollable body -->
+        <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+          <!-- Full text -->
+          <div v-if="selectedMessage.text"
+            class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300"
+            v-html="renderDetailText(selectedMessage.text)">
+          </div>
+          <!-- Tags -->
+          <div v-if="selectedMessage.tags && selectedMessage.tags.length > 0" class="flex flex-wrap gap-1.5">
+            <span v-for="t in selectedMessage.tags" :key="t.id"
+              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-900/30 text-indigo-300">
+              {{ t.name }}
+            </span>
+          </div>
+          <!-- All media -->
           <div v-if="selectedMessage.media_items && selectedMessage.media_items.length > 0"
-            class="grid grid-cols-4 gap-1">
+            class="grid grid-cols-3 gap-1">
             <div v-for="(media, index) in selectedMessage.media_items" :key="media.id"
               class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity"
               @click="handleSelectedMessageMediaClick(index)">
-              <img :src="resolveUrl(media.thumb_url)" class="w-full h-full object-contain" />
-              <!-- Video icon -->
+              <img :src="resolveUrl(media.thumb_url)" class="w-full h-full object-cover" />
               <div v-if="media.mime_type && media.mime_type.startsWith('video')"
                 class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div class="w-8 h-8 bg-black/40 rounded-full flex items-center justify-center border border-white/30">
@@ -182,17 +201,14 @@
                   </svg>
                 </div>
               </div>
-              <!-- Duration -->
               <div v-if="media.duration_ms"
                 class="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
                 {{ formatDuration(media.duration_ms) }}
               </div>
-              <!-- Star toggle -->
               <button @click.stop="handleToggleMediaStar(media.id)"
                 class="absolute top-1 right-1 p-1 rounded-full transition-all" :class="media.starred
                   ? 'text-yellow-400'
-                  : 'text-white/70 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
-                  ">
+                  : 'text-white/70 hover:text-yellow-400 opacity-0 group-hover:opacity-100'">
                 <svg class="w-4 h-4" :fill="media.starred ? 'currentColor' : 'none'" stroke="currentColor"
                   viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -201,6 +217,8 @@
               </button>
             </div>
           </div>
+          <!-- Date -->
+          <p class="text-xs text-gray-500">{{ formatDateLabel(selectedMessage.created_at) }}</p>
         </div>
       </div>
 
@@ -214,6 +232,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { marked } from 'marked'
 import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
@@ -616,6 +635,12 @@ const handleMessageClick = async (message: MessageDetail) => {
   } finally {
     selectedMessageLoading.value = false
   }
+}
+
+const renderDetailText = (text: string) => {
+  const normalized = text.replace(/([^\n])\n([-=]{2,})\n/g, '$1\n\n$2\n\n')
+  marked.setOptions({ breaks: true })
+  return marked.parse(normalized) as string
 }
 
 // --- Search debounce ---
