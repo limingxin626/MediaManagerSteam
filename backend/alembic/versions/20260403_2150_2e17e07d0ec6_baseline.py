@@ -20,9 +20,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    pass
+    from app.models import Base
+    conn = op.get_bind()
+    Base.metadata.create_all(bind=conn)
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    pass
+    from app.models import Base
+    conn = op.get_bind()
+    Base.metadata.drop_all(bind=conn)

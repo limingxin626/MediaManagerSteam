@@ -12,6 +12,9 @@ wheels/
 .Python
 pip-log.txt
 pip-delete-this-directory.txt
+backend/Data/
+backend/Uploads/
+backend/Static/
 
 # Node.js
 node_modules/

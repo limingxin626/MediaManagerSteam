@@ -16,23 +16,9 @@ from app.models import Base
 # access to the values within the .ini file in use.
 config = context.config
 
-# 支持多个数据库，通过环境变量 DB_NAME 控制
-import os
-DB_NAME = os.getenv("DB_NAME", "default")
-
-# 根据 DB_NAME 选择数据库 URL
-if DB_NAME == "default":
-    config.set_main_option("sqlalchemy.url", "sqlite:///./db_new.sqlite3")
-    # 使用默认的版本目录
-    config.set_main_option("version_locations", "%(here)s/versions")
-elif DB_NAME == "notes2":
-    config.set_main_option("sqlalchemy.url", "sqlite:///./db_notes2.sqlite3")
-    # 使用专门的版本目录
-    config.set_main_option("version_locations", "%(here)s/versions_notes2")
-else:
-    config.set_main_option("sqlalchemy.url", f"sqlite:///./db_{DB_NAME}.sqlite3")
-    # 使用默认的版本目录
-    config.set_main_option("version_locations", "%(here)s/versions")
+# 使用 AppConfig 中的数据库路径（由 DATA_ROOT 环境变量决定）
+from app.config import config as app_config
+config.set_main_option("sqlalchemy.url", f"sqlite:///{app_config.get_db_path()}")
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

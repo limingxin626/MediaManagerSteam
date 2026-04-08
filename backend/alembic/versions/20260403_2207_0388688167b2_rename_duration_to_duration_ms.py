@@ -20,9 +20,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.execute("ALTER TABLE media RENAME COLUMN duration TO duration_ms")
+    # 新数据库已经用 duration_ms 建表，无需 rename
+    pass
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.execute("ALTER TABLE media RENAME COLUMN duration_ms TO duration")
+    pass
