@@ -75,6 +75,11 @@ video {
   object-fit: contain;
 }
 
+.prose {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
 .dark ::-webkit-scrollbar-track {
   background: #1a1a1a;
 }
