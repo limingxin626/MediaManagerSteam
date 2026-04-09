@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Calendar as VCalendar } from 'v-calendar'
 import 'v-calendar/style.css'
 import { api } from '../composables/useApi'

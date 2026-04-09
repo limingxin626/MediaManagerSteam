@@ -149,7 +149,6 @@ const emit = defineEmits<{
 
 const currentIndex = ref(props.startIndex)
 const videoRef = ref<HTMLVideoElement | null>(null)
-const thumbStripRef = ref<HTMLElement | null>(null)
 const thumbRefs = ref<Map<number, HTMLElement>>(new Map())
 
 const setThumbRef = (idx: number, el: HTMLElement | null) => {

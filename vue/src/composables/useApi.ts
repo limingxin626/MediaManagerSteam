@@ -6,12 +6,14 @@ import { API_BASE_URL } from '../utils/constants'
 // ---------------------------------------------------------------------------
 
 export class ApiError extends Error {
+  status: number
   constructor(
-    public status: number,
+    status: number,
     message: string,
   ) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
   }
 }
 
@@ -140,7 +142,7 @@ export function useInfiniteScroll<T>(options: InfiniteScrollOptions<T>) {
   const setupObserver = () => {
     observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loading.value && hasMore.value) {
+        if (entries[0]?.isIntersecting && !loading.value && hasMore.value) {
           load()
         }
       },

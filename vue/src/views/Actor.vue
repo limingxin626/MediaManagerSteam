@@ -65,7 +65,7 @@
             >
               <!-- Date separator -->
               <div
-                v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1].created_at)"
+                v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1]?.created_at ?? '')"
                 class="flex items-center gap-3 py-2"
               >
                 <div class="flex-1 h-px bg-[var(--divider)]"></div>
@@ -102,7 +102,7 @@
         </div>
 
         <!-- Scroll sentinel for loading newer messages -->
-        <div ref="bottomSentinel" class="h-1"></div>
+        <div class="h-1"></div>
       </div>
 
       <!-- Input Area at Bottom -->
@@ -207,7 +207,6 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import type { Actor, MessageDetail, MessageMediaItem } from '../types'
 import ActorEditModal from '../components/ActorEditModal.vue'
 import MessageCard from '../components/MessageCard.vue'
@@ -221,7 +220,6 @@ import { formatDateLabel, formatDateTime } from '../utils/date'
 
 defineOptions({ name: 'Actor' })
 
-const router = useRouter()
 const toast = useToast()
 
 const pageSize = 20
@@ -231,7 +229,7 @@ const loading = ref(false)
 const filterName = ref('')
 
 const selectedActorId = ref<number | null>(null)
-const selectedActor = computed(() => actorsData.value.find(a => a.id === selectedActorId.value) || null)
+const selectedActor = computed(() => actorsData.value.find(a => a.id === selectedActorId.value) ?? null)
 
 const messages = ref<MessageDetail[]>([])
 const hasMoreMessages = ref(true)
@@ -244,7 +242,6 @@ const formData = ref({ name: '', description: '' })
 
 const scrollContainer = ref<HTMLElement | null>(null)
 const topSentinel = ref<HTMLElement | null>(null)
-const bottomSentinel = ref<HTMLElement | null>(null)
 
 const previewOpen = ref(false)
 const previewItems = ref<MessageMediaItem[]>([])
@@ -276,7 +273,7 @@ const fetchActors = async (reset = false) => {
     actorsData.value = data
 
     if (actorsData.value.length > 0 && !selectedActorId.value) {
-      selectActor(actorsData.value[0].id)
+      selectActor(actorsData.value[0]!.id)
     }
   } catch (error) {
     toast.error('获取演员数据失败')
@@ -365,13 +362,6 @@ const onMessageSent = async (message: MessageDetail) => {
 
 // --- CRUD ---
 
-const openAddModal = () => {
-  editMode.value = false
-  currentEditId.value = null
-  formData.value = { name: '', description: '' }
-  showModal.value = true
-}
-
 const editActor = (item: Actor) => {
   editMode.value = true
   currentEditId.value = item.id
@@ -421,7 +411,7 @@ const handleMediaClick = (messageId: number, index: number) => {
   const messageIndex = messages.value.findIndex(m => m.id === messageId)
   if (messageIndex >= 0) {
     currentMessageIndex.value = messageIndex
-    previewItems.value = messages.value[messageIndex].media_items
+    previewItems.value = messages.value[messageIndex]!.media_items
     previewStartIndex.value = index
     previewOpen.value = true
   }
@@ -470,7 +460,7 @@ const handleToggleMediaStar = async (mediaId: number) => {
 const navigateToPrevMessage = () => {
   if (currentMessageIndex.value > 0) {
     currentMessageIndex.value--
-    const message = messages.value[currentMessageIndex.value]
+    const message = messages.value[currentMessageIndex.value]!
     previewItems.value = message.media_items
     previewStartIndex.value = 0
   }
@@ -479,7 +469,7 @@ const navigateToPrevMessage = () => {
 const navigateToNextMessage = () => {
   if (currentMessageIndex.value < messages.value.length - 1) {
     currentMessageIndex.value++
-    const message = messages.value[currentMessageIndex.value]
+    const message = messages.value[currentMessageIndex.value]!
     previewItems.value = message.media_items
     previewStartIndex.value = 0
   }
@@ -487,7 +477,7 @@ const navigateToNextMessage = () => {
 
 const handlePreviewToggleStar = async () => {
   if (currentMessageIndex.value >= 0) {
-    await handleToggleStar(messages.value[currentMessageIndex.value].id)
+    await handleToggleStar(messages.value[currentMessageIndex.value]!.id)
   }
 }
 

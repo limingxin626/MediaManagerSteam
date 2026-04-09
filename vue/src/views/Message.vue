@@ -87,7 +87,7 @@
             <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-4xl mx-auto">
               <template v-for="(message, idx) in messages" :key="message.id">
                 <!-- Date separator -->
-                <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1].created_at)"
+                <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1]?.created_at ?? '')"
                   class="flex items-center gap-3 py-2">
                   <div class="flex-1 h-px bg-[var(--divider)]"></div>
                   <span class="text-xs text-gray-400 whitespace-nowrap">{{ formatDateLabel(message.created_at) }}</span>
@@ -712,7 +712,7 @@ onMounted(() => {
   topObserver = new IntersectionObserver(
     (entries) => {
       const container = scrollContainer.value
-      if (entries[0].isIntersecting && !loading.value && hasMoreData.value && container && container.scrollTop > 0) {
+      if (entries[0]?.isIntersecting && !loading.value && hasMoreData.value && container && container.scrollTop > 0) {
         fetchMessages(true)
       }
     },
@@ -722,7 +722,7 @@ onMounted(() => {
 
   bottomObserver = new IntersectionObserver(
     (entries) => {
-      if (entries[0].isIntersecting && !loadingForward.value && hasMoreForward.value) {
+      if (entries[0]?.isIntersecting && !loadingForward.value && hasMoreForward.value) {
         fetchForwardMessages()
       }
     },

@@ -114,7 +114,8 @@ export function useTagAutocomplete(
     }
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault()
-      selectTag(tagSuggestions.value[tagSuggestionIndex.value])
+      const selected = tagSuggestions.value[tagSuggestionIndex.value]
+      if (selected) selectTag(selected)
       return true
     }
     if (e.key === 'Escape') {

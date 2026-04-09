@@ -79,17 +79,12 @@ import {
   DialogTitle,
   TransitionRoot,
   TransitionChild,
-  Listbox,
-  ListboxButton,
-  ListboxOptions,
-  ListboxOption,
 } from '@headlessui/vue'
 
 
 interface ActorFormData {
   name: string
   description: string
-  score: number
 }
 
 interface Props {
