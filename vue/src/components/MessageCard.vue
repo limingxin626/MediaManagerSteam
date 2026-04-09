@@ -164,53 +164,6 @@
     </div>
   </div>
 
-  <!-- Edit Dialog -->
-  <div v-if="editDialogVisible" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-white/10 shadow-xl w-full max-w-3xl p-6 h-[90vh] flex flex-col">
-      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">编辑消息</h3>
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">创建日期</label>
-        <input
-          v-model="editDate"
-          type="datetime-local"
-          class="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-        />
-      </div>
-      <textarea
-        ref="editTextareaRef"
-        v-model="editText"
-        placeholder="输入消息内容..."
-        class="flex-1 w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-        @input="tag.onInput"
-        @keydown="tag.onKeydown"
-        @blur="tag.hide"
-      />
-      <!-- Tag Suggestions -->
-      <div
-        v-if="tag.tagSuggestionVisible.value && tag.tagSuggestions.value.length > 0"
-        class="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[100]"
-        :style="{ top: tag.tagSuggestionPosition.value.top + 'px', left: tag.tagSuggestionPosition.value.left + 'px', transform: 'translateY(-100%)' }"
-      >
-        <div
-          v-for="(t, index) in tag.tagSuggestions.value"
-          :key="t.id"
-          @click="tag.selectTag(t)"
-          class="px-3 py-2 cursor-pointer text-sm"
-          :class="index === tag.tagSuggestionIndex.value ? 'bg-indigo-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
-        >
-          #{{ t.name }}
-        </div>
-      </div>
-      <div class="flex justify-end gap-3 mt-4">
-        <button @click="cancelEdit" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg transition-colors">
-          取消
-        </button>
-        <button @click="saveEdit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
-          保存
-        </button>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -218,7 +171,6 @@ import { computed, ref } from 'vue'
 import { marked } from 'marked'
 import type { Message, MessageMediaItem, TagItem } from '../types'
 import { isVideo, formatDuration, resolveUrl } from '../utils/media'
-import { useTagAutocomplete } from '../composables/useTagAutocomplete'
 import { formatRelativeTime } from '../utils/date'
 
 interface Props {
@@ -227,7 +179,6 @@ interface Props {
   tags?: TagItem[]
   selectable?: boolean
   selected?: boolean
-  allTags?: TagItem[]
 }
 
 const props = defineProps<Props>()
@@ -240,49 +191,14 @@ const emit = defineEmits<{
   'toggle-select': [id: number]
   'toggle-star': [id: number]
   'toggle-media-star': [mediaId: number]
-  'edit': [id: number, text: string, date: string]
+  'edit': [id: number]
 }>()
 
 const maxPreviewItems = 9
 const activeMenuIndex = ref<number | null>(null)
 
-// 编辑相关状态
-const editDialogVisible = ref(false)
-const editText = ref('')
-const editDate = ref('')
-const editTextareaRef = ref<HTMLTextAreaElement | null>(null)
-
-const tag = useTagAutocomplete(editTextareaRef, editText, computed(() => props.allTags || []))
-
 const handleEdit = () => {
-  editText.value = props.message.text || ''
-  const dateStr = props.message.created_at
-  if (dateStr) {
-    const date = new Date(dateStr)
-    // 确保日期是有效的
-    if (!isNaN(date.getTime())) {
-      // 格式化为 YYYY-MM-DDTHH:MM
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      editDate.value = `${year}-${month}-${day}T${hours}:${minutes}`
-    }
-  }
-  editDialogVisible.value = true
-}
-
-const saveEdit = () => {
-  emit('edit', props.message.id, editText.value, editDate.value)
-  editDialogVisible.value = false
-}
-
-const cancelEdit = () => {
-  editDialogVisible.value = false
-  editText.value = ''
-  editDate.value = ''
-  tag.hide()
+  emit('edit', props.message.id)
 }
 
 const actorInitial = computed(() => {

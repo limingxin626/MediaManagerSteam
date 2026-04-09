@@ -23,7 +23,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex min-w-0">
       <!-- Left Feed Section -->
-      <div class="flex flex-col min-w-0" :class="selectedMessage ? 'w-1/2' : 'flex-1'">
+      <div class="flex flex-col min-w-0 relative" :class="selectedMessage ? 'w-1/2' : 'flex-1'">
         <!-- Search Header -->
         <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
           <div class="w-full mx-auto px-3 py-2">
@@ -96,11 +96,10 @@
                 <div :data-message-date="message.created_at.substring(0, 10)">
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
                     :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
-                    :all-tags="tags"
                     @click="handleMessageClick(message)" @media-click="(index) => handleMediaClick(message.id, index)"
                     @delete="handleDeleteMessage" @find-messages-by-media="handleFindMessagesByMedia"
                     @toggle-select="toggleSelectMessage" @toggle-star="handleToggleStar"
-                    @toggle-media-star="handleToggleMediaStar" @edit="(id, text, date) => handleEditMessage(id, text, date)" />
+                    @toggle-media-star="handleToggleMediaStar" @edit="openEditDialog" />
                 </div>
               </template>
             </div>
@@ -151,8 +150,14 @@
           </button>
         </div>
 
-        <!-- Input Area at Bottom -->
-        <MessageCompose :tag-id="selectedTagId ?? null" :all-tags="tags" @sent="onMessageSent" />
+        <!-- FAB: New Message -->
+        <button @click="openCreateDialog"
+          class="absolute bottom-6 right-6 z-50 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
+          title="新消息">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
       </div>
 
       <!-- Right Detail Panel -->
@@ -222,6 +227,11 @@
         </div>
       </div>
 
+      <MessageComposeDialog :visible="dialogVisible" :mode="dialogMode" :message-id="dialogMessageId"
+        :initial-text="dialogInitialText" :initial-date="dialogInitialDate" :all-tags="tags"
+        :tag-id="selectedTagId ?? null" :actor-id="undefined" @close="dialogVisible = false"
+        @created="onDialogCreated" @updated="onDialogUpdated" />
+
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
         :starred="previewMessageStarred" @close="closePreview" @navigate-prev="navigateToPrevMessage"
         @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" />
@@ -237,7 +247,7 @@ import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '..
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import SearchInput from '../components/SearchInput.vue'
-import MessageCompose from '../components/MessageCompose.vue'
+import MessageComposeDialog from '../components/MessageComposeDialog.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { resolveUrl, formatDuration } from '../utils/media'
@@ -360,12 +370,69 @@ const backToLatest = () => {
   resetAndFetch()
 }
 
-// --- Send message ---
+// --- Compose dialog state ---
 
-const onMessageSent = async (message: MessageDetail) => {
+const dialogVisible = ref(false)
+const dialogMode = ref<'create' | 'edit'>('create')
+const dialogMessageId = ref<number | undefined>(undefined)
+const dialogInitialText = ref('')
+const dialogInitialDate = ref('')
+
+const openCreateDialog = () => {
+  dialogMode.value = 'create'
+  dialogMessageId.value = undefined
+  dialogInitialText.value = ''
+  dialogInitialDate.value = ''
+  dialogVisible.value = true
+}
+
+const openEditDialog = (messageId: number) => {
+  const msg = messages.value.find(m => m.id === messageId)
+  if (!msg) return
+
+  dialogMode.value = 'edit'
+  dialogMessageId.value = messageId
+  dialogInitialText.value = msg.text || ''
+
+  const dateStr = msg.created_at
+  if (dateStr) {
+    const date = new Date(dateStr)
+    if (!isNaN(date.getTime())) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      dialogInitialDate.value = `${year}-${month}-${day}T${hours}:${minutes}`
+    }
+  }
+
+  dialogVisible.value = true
+}
+
+const onDialogCreated = async (message: MessageDetail) => {
   messages.value.push(message)
   await nextTick()
   scrollToBottom()
+}
+
+const onDialogUpdated = async (messageId: number, text: string, date: string) => {
+  const msg = messages.value.find(m => m.id === messageId)
+  if (!msg) return
+
+  try {
+    const updateData: Record<string, unknown> = { text: text || null }
+    if (date) updateData.created_at = date
+
+    const updated = await api.patch<MessageDetail>(`/messages/${messageId}`, updateData)
+    msg.text = updated.text
+    msg.created_at = updated.created_at
+    msg.updated_at = updated.updated_at
+    if (updated.tags) msg.tags = updated.tags
+    toast.success('消息已更新')
+  } catch {
+    toast.error('更新消息失败')
+  }
 }
 
 // --- Fetch messages (unified) ---
@@ -526,30 +593,6 @@ const handleToggleStar = async (messageId: number) => {
     msg.starred = updated.starred
   } catch {
     toast.error('操作失败')
-  }
-}
-
-const handleEditMessage = async (messageId: number, text: string, date: string) => {
-  const msg = messages.value.find(m => m.id === messageId)
-  if (!msg) return
-
-  try {
-    const updateData: any = {
-      text: text || null,
-    }
-    
-    // 如果提供了日期，则添加到更新数据中
-    if (date) {
-      updateData.created_at = date
-    }
-
-    const updated = await api.patch<MessageDetail>(`/messages/${messageId}`, updateData)
-    msg.text = updated.text
-    msg.created_at = updated.created_at
-    msg.updated_at = updated.updated_at
-    toast.success('消息已更新')
-  } catch {
-    toast.error('更新消息失败')
   }
 }
 

@@ -1,9 +1,9 @@
 <template>
   <div class="shrink-0 border-t border-[var(--border-color)] shadow-lg">
     <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
-      <div class="flex gap-2 items-center max-w-4xl mx-auto">
+      <div class="flex gap-2 items-center max-w-4xl mx-auto cursor-pointer" @click="emit('open')">
         <!-- Attachment Button -->
-        <button @click="triggerFileInput"
+        <button
           class="flex-shrink-0 p-2 text-gray-400 hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
           title="添加附件">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -12,19 +12,15 @@
           </svg>
         </button>
 
-        <!-- File Input (Hidden) -->
-        <input ref="fileInput" type="file" multiple class="hidden" @change="handleFileSelect" />
-
-        <!-- Text Input -->
-        <div class="flex-1 relative">
-          <textarea ref="textareaRef" v-model="text" placeholder="输入消息..." rows="1"
-            class="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none max-h-32 overflow-hidden"
-            @keydown="handleKeydown" @input="handleInput" @blur="tag.hide" />
+        <!-- Placeholder (readonly trigger) -->
+        <div
+          class="flex-1 px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10 text-sm text-gray-400 select-none">
+          输入消息...
         </div>
 
-        <!-- Send Button -->
-        <button @click="send" :disabled="!text.trim() && files.length === 0"
-          class="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
+        <!-- Send Button (visual only) -->
+        <button
+          class="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
           title="发送">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -32,141 +28,12 @@
           </svg>
         </button>
       </div>
-
-      <!-- Selected Files Preview -->
-      <div v-if="files.length > 0" class="mt-2 max-w-4xl mx-auto">
-        <div class="flex flex-wrap gap-2">
-          <div v-for="(filePath, index) in files" :key="index"
-            class="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-white/10 rounded-md text-sm">
-            <span class="text-gray-700 dark:text-gray-300 truncate max-w-xs">{{ filePath.split('\\').pop() || filePath }}</span>
-            <button @click="removeFile(index)" class="text-gray-500 hover:text-red-500 transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tag Suggestions -->
-    <div
-      v-if="tag.tagSuggestionVisible.value && tag.tagSuggestions.value.length > 0"
-      class="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[100]"
-      :style="{ top: tag.tagSuggestionPosition.value.top + 'px', left: tag.tagSuggestionPosition.value.left + 'px', transform: 'translateY(-100%)' }"
-    >
-      <div
-        v-for="(t, index) in tag.tagSuggestions.value"
-        :key="t.id"
-        @click="tag.selectTag(t)"
-        class="px-3 py-2 cursor-pointer text-sm"
-        :class="index === tag.tagSuggestionIndex.value ? 'bg-indigo-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
-      >
-        #{{ t.name }}
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { MessageDetail, TagItem } from '../types'
-import { api } from '../composables/useApi'
-import { useToast } from '../composables/useToast'
-import { useTagAutocomplete } from '../composables/useTagAutocomplete'
-
-const props = defineProps<{
-  actorId?: number | null
-  tagId?: number | null
-  allTags?: TagItem[]
-}>()
-
 const emit = defineEmits<{
-  sent: [message: MessageDetail]
+  open: []
 }>()
-
-const toast = useToast()
-
-const text = ref('')
-const files = ref<string[]>([])
-const fileInput = ref<HTMLInputElement | null>(null)
-const textareaRef = ref<HTMLTextAreaElement | null>(null)
-
-const tag = useTagAutocomplete(textareaRef, text, computed(() => props.allTags || []))
-
-const triggerFileInput = async () => {
-  const isElectron = navigator.userAgent.indexOf('Electron') > -1
-  if (isElectron && window.electronAPI) {
-    try {
-      const result = await window.electronAPI.openFileDialog({
-        properties: ['openFile', 'multiSelections']
-      })
-      if (!result.canceled && result.filePaths) {
-        files.value = [...files.value, ...result.filePaths]
-      }
-    } catch (err) {
-      fileInput.value?.click()
-    }
-  } else {
-    fileInput.value?.click()
-  }
-}
-
-const handleFileSelect = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  if (target.files) {
-    const filePaths = Array.from(target.files).map(file =>
-      (file as any).path || (file as any).webkitRelativePath || file.name
-    )
-    files.value = [...files.value, ...filePaths]
-  }
-  target.value = ''
-}
-
-const removeFile = (index: number) => {
-  files.value.splice(index, 1)
-}
-
-const autoResize = () => {
-  const el = textareaRef.value
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = el.scrollHeight + 'px'
-}
-
-const handleInput = () => {
-  autoResize()
-  tag.onInput()
-}
-
-const handleKeydown = (e: KeyboardEvent) => {
-  if (tag.onKeydown(e)) return
-
-  // Default Enter behavior: send message
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    send()
-  }
-}
-
-const send = async () => {
-  if (!text.value.trim() && files.value.length === 0) return
-
-  try {
-    const result = await api.post<MessageDetail>('/messages', {
-      text: text.value || null,
-      files: files.value,
-      actor_id: props.actorId ?? undefined,
-      tag_ids: props.tagId != null ? [props.tagId] : undefined,
-    })
-
-    emit('sent', result)
-    text.value = ''
-    files.value = []
-    if (textareaRef.value) textareaRef.value.style.height = 'auto'
-    toast.success('消息已发送')
-  } catch (error) {
-    toast.error('发送消息失败')
-  }
-}
 </script>
