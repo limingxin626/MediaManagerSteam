@@ -1,6 +1,8 @@
 import os
 import logging
 import mimetypes
+import shutil
+import time
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.models import Media, MessageMedia
@@ -32,6 +34,21 @@ def process_file(db: Session, file_path: str, message_id: int, position: int, me
     if existing_media:
         _link_media(db, message_id, existing_media.id, position)
         return {"media": existing_media, "is_new": False}
+
+    # 非挂载目录的文件复制到 uploads
+    if not config.is_mounted_path(file_path):
+        ext = os.path.splitext(file_path)[1]
+        upload_dir = config.get_upload_dir()
+        os.makedirs(upload_dir, exist_ok=True)
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        dest_path = os.path.join(upload_dir, f"{timestamp}{ext}")
+        counter = 1
+        while os.path.exists(dest_path):
+            dest_path = os.path.join(upload_dir, f"{timestamp}_{counter}{ext}")
+            counter += 1
+        shutil.copy2(file_path, dest_path)
+        logger.info(f"Copied non-mounted file to uploads: {file_path} -> {dest_path}")
+        file_path = dest_path
 
     file_size = os.path.getsize(file_path)
     mime_type, _ = mimetypes.guess_type(file_path)

@@ -33,12 +33,12 @@ def _dir_name(path: str) -> str:
 class AppConfig:
     """应用配置类"""
 
-    DATA_ROOT: str = _require_env("DATA_ROOT")
-    UPLOAD_DIR: str = _require_env("UPLOAD_DIR")
+    DATA_ROOT: str = os.path.abspath(_require_env("DATA_ROOT"))
+    UPLOAD_DIR: str = os.path.abspath(_require_env("UPLOAD_DIR"))
 
     # 额外静态挂载目录，分号分隔
     STATIC_DIRS: list = [
-        d.strip() for d in os.getenv("STATIC_DIRS", "").split(";") if d.strip()
+        os.path.abspath(d.strip()) for d in os.getenv("STATIC_DIRS", "").split(";") if d.strip()
     ]
 
     PORT: int = int(os.getenv("PORT", "8002"))
@@ -108,7 +108,7 @@ class AppConfig:
 
     @classmethod
     def get_thumbs_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "data", "thumbs")
+        return os.path.join(cls.DATA_ROOT, "thumbs")
 
     @classmethod
     def get_thumbnail_path(cls, media_id: int) -> str:
@@ -116,7 +116,7 @@ class AppConfig:
 
     @classmethod
     def get_actor_cover_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "data", "actor_cover")
+        return os.path.join(cls.DATA_ROOT, "actor_cover")
 
     @classmethod
     def get_actor_avatar_path(cls, actor_id: int) -> str:
@@ -128,11 +128,23 @@ class AppConfig:
 
     @classmethod
     def get_thumbnail_url(cls, media_id: int) -> str:
-        return f"{cls._data_root_prefix()}/data/thumbs/{media_id}.webp"
+        return f"{cls._data_root_prefix()}/thumbs/{media_id}.webp"
 
     @classmethod
     def get_actor_avatar_url(cls, actor_id: int) -> str:
-        return f"{cls._data_root_prefix()}/data/actor_cover/{actor_id}.webp"
+        return f"{cls._data_root_prefix()}/actor_cover/{actor_id}.webp"
+
+    @classmethod
+    def is_mounted_path(cls, file_path: str) -> bool:
+        """判断文件路径是否位于任何已挂载的静态目录下"""
+        if not file_path:
+            return False
+        normalized = file_path.replace("\\", "/").lower()
+        for system_path in cls.get_static_mounts().values():
+            normalized_mount = system_path.replace("\\", "/").lower()
+            if normalized.startswith(normalized_mount):
+                return True
+        return False
 
     @classmethod
     def to_url_path(cls, file_path: str) -> str:
