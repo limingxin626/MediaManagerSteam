@@ -241,7 +241,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import { marked } from 'marked'
 import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
@@ -438,10 +438,12 @@ const onDialogUpdated = async (messageId: number, text: string, date: string) =>
 // --- Fetch messages (unified) ---
 
 const resetAndFetch = (params?: { mediaId?: number }) => {
-  messages.value = []
   nextCursor.value = null
   hasMoreData.value = true
   activeMediaFilter.value = params?.mediaId ?? null
+  forwardCursor.value = null
+  hasMoreForward.value = false
+  isViewingHistory.value = false
   fetchMessages()
 }
 
@@ -703,10 +705,8 @@ function onSearch() {
 let topObserver: IntersectionObserver | null = null
 let bottomObserver: IntersectionObserver | null = null
 
-onMounted(() => {
-  fetchTags()
-  fetchMessages()
-
+const setupObservers = () => {
+  teardownObservers()
   const root = scrollContainer.value
 
   topObserver = new IntersectionObserver(
@@ -729,10 +729,18 @@ onMounted(() => {
     { root, rootMargin: '200px' }
   )
   if (bottomSentinel.value) bottomObserver.observe(bottomSentinel.value)
-})
+}
 
-onUnmounted(() => {
+const teardownObservers = () => {
   topObserver?.disconnect()
+  topObserver = null
   bottomObserver?.disconnect()
+  bottomObserver = null
+}
+
+onMounted(() => {
+  fetchTags()
+  fetchMessages()
+  setupObservers()
 })
 </script>

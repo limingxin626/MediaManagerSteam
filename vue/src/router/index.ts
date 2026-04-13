@@ -4,7 +4,8 @@ const routes = [
   {
     path: '/',
     name: 'Message',
-    component: () => import('../views/Message.vue')
+    // Message 组件由 App.vue 通过 v-show 管理，此处仅保留路由占位
+    component: () => import('../views/Empty.vue')
   },
   {
     path: '/actor',
