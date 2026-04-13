@@ -1,7 +1,8 @@
 <template>
+  <div class="flex items-end gap-2">
   <div
-    class="group bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-color)] overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer"
-    :class="{ 'ring-2 ring-indigo-500 border-indigo-500': props.selected }" @click="handleClick">
+    class="group flex-1 min-w-0 bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-color)] overflow-hidden hover:shadow-lg transition-all duration-200"
+    :class="{ 'ring-2 ring-indigo-500 border-indigo-500': props.selected }">
     <div class="px-4">
       <!-- Actor Info -->
       <div class="flex items-center justify-between gap-3">
@@ -162,6 +163,15 @@
           </div>
         </div>
     </div>
+  </div>
+    <!-- Detail arrow button (Telegram-style) -->
+    <button @click="handleClick"
+      class="shrink-0 w-8 h-8 mb-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+      title="查看详情">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
   </div>
 
 </template>

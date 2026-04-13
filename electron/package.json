@@ -19,7 +19,7 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
-    "electron": "^40.7.0",
+    "electron": "^40.8.5",
     "electron-builder": "^25.0.5"
   },
   "build": {
@@ -37,7 +37,12 @@
       {
         "from": "../backend",
         "to": "backend",
-        "filter": ["!*.pyc", "!__pycache__", "!*.sqlite3", "!*.pem"]
+        "filter": [
+          "!*.pyc",
+          "!__pycache__",
+          "!*.sqlite3",
+          "!*.pem"
+        ]
       },
       {
         "from": "../vue/dist",

@@ -5,7 +5,18 @@
       "Bash(git add:*)",
       "Bash(git rm:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(xargs grep:*)",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(DATA_ROOT=./Data UPLOAD_DIR=./Uploads STATIC_DIRS=./Static uv run:*)",
+      "Bash(uv run:*)",
+      "Bash(netstat:*)",
+      "Bash(netsh interface:*)",
+      "Bash(xargs head:*)",
+      "Bash(.venv/Scripts/python:*)",
+      "WebFetch(domain:pypi.org)",
+      "Bash(pnpm build:*)",
+      "Bash(echo DATA_ROOT=$DATA_ROOT:*)"
     ]
   }
 }
