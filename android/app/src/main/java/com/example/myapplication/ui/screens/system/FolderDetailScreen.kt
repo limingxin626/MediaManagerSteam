@@ -1,20 +1,41 @@
 package com.example.myapplication.ui.screens.system
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.myapplication.data.model.SystemMedia
 import com.example.myapplication.ui.components.SystemMediaCard
 import com.example.myapplication.ui.viewmodel.MediaFilterType
 import com.example.myapplication.ui.viewmodel.SystemGalleryViewModel
@@ -35,10 +56,10 @@ fun FolderDetailScreen(
     val selectedMedia by viewModel.selectedMedia.collectAsState()
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
-    
+
     // 获取当前文件夹的媒体列表
     val currentFolderMedia = mediaByFolder[folderName] ?: emptyList()
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -83,25 +104,25 @@ fun FolderDetailScreen(
                     } else {
                         // 普通模式下的筛选菜单
                         var showFilterMenu by remember { mutableStateOf(false) }
-                        
+
                         IconButton(onClick = { showFilterMenu = true }) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "筛选"
                             )
                         }
-                        
+
                         DropdownMenu(
                             expanded = showFilterMenu,
                             onDismissRequest = { showFilterMenu = false }
                         ) {
                             MediaFilterType.values().forEach { type ->
                                 DropdownMenuItem(
-                                    text = { 
+                                    text = {
                                         Text(
                                             text = type.displayName,
                                             fontWeight = if (filterType == type) FontWeight.Bold else FontWeight.Normal
-                                        ) 
+                                        )
                                     },
                                     onClick = {
                                         viewModel.setFilterType(type)
@@ -126,6 +147,7 @@ fun FolderDetailScreen(
                     // 加载中
                     LoadingContent()
                 }
+
                 uiState.error != null -> {
                     // 错误状态
                     ErrorContent(
@@ -133,10 +155,12 @@ fun FolderDetailScreen(
                         onRetry = { viewModel.loadFolderData() }
                     )
                 }
+
                 currentFolderMedia.isEmpty() -> {
                     // 空状态
                     EmptyFolderContent(folderName)
                 }
+
                 else -> {
                     // 媒体网格
                     LazyVerticalGrid(
@@ -218,17 +242,17 @@ private fun ErrorContent(
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.error
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Text(
             text = error,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Button(onClick = onRetry) {
             Text("重试")
         }
@@ -252,9 +276,9 @@ private fun EmptyFolderContent(folderName: String) {
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Text(
             text = "「$folderName」文件夹中没有找到媒体文件。",
             style = MaterialTheme.typography.bodyMedium,

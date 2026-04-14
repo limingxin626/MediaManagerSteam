@@ -1,12 +1,12 @@
 package com.example.myapplication.data.database.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
-import androidx.paging.PagingSource
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.database.entities.Message
 import com.example.myapplication.data.database.entities.MessageMedia
@@ -98,33 +98,39 @@ interface MessageDao {
     // ==================== Tag-filtered Paging 查询 ====================
 
     @Transaction
-    @Query("""
+    @Query(
+        """
         SELECT m.* FROM messages m
         INNER JOIN message_tag mt ON m.id = mt.messageId
         WHERE mt.tagId = :tagId
         ORDER BY m.createdAt DESC
-    """)
+    """
+    )
     fun getMessagesByTagPaged(tagId: Long): PagingSource<Int, MessageWithDetails>
 
     @Transaction
-    @Query("""
+    @Query(
+        """
         SELECT m.* FROM messages m
         INNER JOIN message_tag mt ON m.id = mt.messageId
         WHERE mt.tagId = :tagId AND m.text LIKE '%' || :query || '%'
         ORDER BY m.createdAt DESC
-    """)
+    """
+    )
     fun searchMessagesByTagPaged(tagId: Long, query: String): PagingSource<Int, MessageWithDetails>
 
     // ==================== Group preview 查询 ====================
 
     @Transaction
-    @Query("""
+    @Query(
+        """
         SELECT m.* FROM messages m
         INNER JOIN message_tag mt ON m.id = mt.messageId
         WHERE mt.tagId = :tagId
         ORDER BY m.createdAt DESC
         LIMIT 1
-    """)
+    """
+    )
     suspend fun getLastMessageForTag(tagId: Long): MessageWithDetails?
 
     @Query("SELECT COUNT(*) FROM messages")
@@ -148,12 +154,14 @@ interface MessageDao {
     @Query("SELECT * FROM message_media WHERE messageId = :messageId ORDER BY position")
     suspend fun getMessageMediaByMessageId(messageId: Long): List<MessageMedia>
 
-    @Query("""
+    @Query(
+        """
         SELECT m.* FROM media m
         INNER JOIN message_media mm ON m.id = mm.mediaId
         WHERE mm.messageId = :messageId
         ORDER BY mm.position
-    """)
+    """
+    )
     suspend fun getMediaByMessageId(messageId: Long): List<Media>
 
     @Query("DELETE FROM message_media WHERE messageId = :messageId")
@@ -167,20 +175,24 @@ interface MessageDao {
     @Query("SELECT tagId FROM message_tag WHERE messageId = :messageId")
     suspend fun getMessageTagIdsByMessageId(messageId: Long): List<Long>
 
-    @Query("""
+    @Query(
+        """
         SELECT t.* FROM tags t
         INNER JOIN message_tag mt ON t.id = mt.tagId
         WHERE mt.messageId = :messageId
         ORDER BY t.name
-    """)
+    """
+    )
     suspend fun getTagsByMessageId(messageId: Long): List<Tag>
 
-    @Query("""
+    @Query(
+        """
         SELECT t.* FROM tags t
         INNER JOIN message_tag mt ON t.id = mt.tagId
         WHERE mt.messageId = :messageId
         ORDER BY t.name
-    """)
+    """
+    )
     fun getTagsByMessageIdFlow(messageId: Long): Flow<List<Tag>>
 
     @Query("DELETE FROM message_tag WHERE messageId = :messageId")
@@ -197,7 +209,10 @@ interface MessageDao {
 
     @Transaction
     @Query("SELECT * FROM messages WHERE actorId = :actorId AND text LIKE '%' || :query || '%' ORDER BY createdAt DESC")
-    fun searchMessagesByActorPaged(actorId: Long, query: String): PagingSource<Int, MessageWithDetails>
+    fun searchMessagesByActorPaged(
+        actorId: Long,
+        query: String
+    ): PagingSource<Int, MessageWithDetails>
 
     @Query("SELECT COUNT(*) FROM messages WHERE actorId = :actorId")
     suspend fun getMessageCountByActor(actorId: Long): Int

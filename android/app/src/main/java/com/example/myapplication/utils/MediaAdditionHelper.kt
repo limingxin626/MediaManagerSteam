@@ -1,17 +1,11 @@
 package com.example.myapplication.utils
 
 import android.content.Context
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.activity.compose.rememberLauncherForActivityResult
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
-import android.net.Uri
-import android.provider.OpenableColumns
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import java.io.File
 
 /**
  * 媒体添加助手类
@@ -22,7 +16,7 @@ class MediaAdditionHelper(
     private val context: Context,
     private val databaseManager: DatabaseManager
 ) {
-    
+
     /**
      * 添加媒体结果回调
      */
@@ -31,7 +25,7 @@ class MediaAdditionHelper(
         fun onError(error: String)
         fun onProcessingStateChanged(isProcessing: Boolean)
     }
-    
+
     /**
      * 媒体添加配置
      */
@@ -40,7 +34,7 @@ class MediaAdditionHelper(
         val autoConnectToActor: Long? = null,
         val actorRole: String? = null
     )
-    
+
     /**
      * 处理视频文件添加 - 临时占位实现
      */
@@ -52,7 +46,7 @@ class MediaAdditionHelper(
         // TODO: 实现真正的系统媒体选择功能
         callback.onError("此功能需要重新实现以支持系统媒体")
     }
-    
+
     /**
      * 处理图片文件添加 - 临时占位实现
      */
@@ -64,7 +58,7 @@ class MediaAdditionHelper(
         // TODO: 实现真正的系统媒体选择功能
         callback.onError("此功能需要重新实现以支持系统媒体")
     }
-    
+
     /**
      * 预处理视频文件 - 临时占位实现
      */
@@ -75,7 +69,7 @@ class MediaAdditionHelper(
         // TODO: 实现真正的系统媒体预览功能  
         callback.onError("此功能需要重新实现以支持系统媒体")
     }
-    
+
     /**
      * 预处理图片文件 - 临时占位实现
      */
@@ -86,7 +80,7 @@ class MediaAdditionHelper(
         // TODO: 实现真正的系统媒体预览功能
         callback.onError("此功能需要重新实现以支持系统媒体")
     }
-    
+
     /**
      * 计算现有媒体的文件大小 - 临时占位实现
      */
@@ -94,7 +88,7 @@ class MediaAdditionHelper(
         // TODO: 实现系统媒体大小计算
         return 0L
     }
-    
+
     /**
      * 媒体预览回调
      */
@@ -117,7 +111,7 @@ fun rememberMediaAdditionManager(
 ): MediaAdditionManagerState {
     val context = androidx.compose.ui.platform.LocalContext.current
     val helper = remember { MediaAdditionHelper(context, databaseManager) }
-    
+
     return remember(helper, config, callback) {
         MediaAdditionManagerState(
             helper = helper,

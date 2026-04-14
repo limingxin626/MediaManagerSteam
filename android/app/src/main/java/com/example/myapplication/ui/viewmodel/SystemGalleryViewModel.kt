@@ -1,6 +1,7 @@
 package com.example.myapplication.ui.viewmodel
 
 import android.content.Context
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.model.SystemMedia
@@ -9,50 +10,49 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.lazy.grid.LazyGridState
 
 /**
  * 系统相册页面的ViewModel
  */
 class SystemGalleryViewModel(context: Context) : ViewModel() {
-    
+
     private val systemMediaRepository = SystemMediaRepository(context)
-    
+
     private val _uiState = MutableStateFlow(SystemGalleryUiState())
     val uiState: StateFlow<SystemGalleryUiState> = _uiState.asStateFlow()
-    
+
     private val _mediaList = MutableStateFlow<List<SystemMedia>>(emptyList())
     val mediaList: StateFlow<List<SystemMedia>> = _mediaList.asStateFlow()
-    
+
     private val _mediaByFolder = MutableStateFlow<Map<String, List<SystemMedia>>>(emptyMap())
     val mediaByFolder: StateFlow<Map<String, List<SystemMedia>>> = _mediaByFolder.asStateFlow()
-    
+
     private val _filterType = MutableStateFlow(MediaFilterType.ALL)
     val filterType: StateFlow<MediaFilterType> = _filterType.asStateFlow()
-    
+
     private val _viewMode = MutableStateFlow(ViewMode.GRID)
     val viewMode: StateFlow<ViewMode> = _viewMode.asStateFlow()
-    
+
     private val _expandedFolders = MutableStateFlow<Set<String>>(emptySet())
     val expandedFolders: StateFlow<Set<String>> = _expandedFolders.asStateFlow()
-    
+
     private val _selectedMedia = MutableStateFlow<Set<SystemMedia>>(emptySet())
     val selectedMedia: StateFlow<Set<SystemMedia>> = _selectedMedia.asStateFlow()
-    
+
     private val _isSelectionMode = MutableStateFlow(false)
     val isSelectionMode: StateFlow<Boolean> = _isSelectionMode.asStateFlow()
-    
+
     // 网格滚动状态
     val gridState = LazyGridState()
-    
+
     // 权限状态
     private val _hasPermission = MutableStateFlow(false)
     val hasPermission: StateFlow<Boolean> = _hasPermission.asStateFlow()
-    
+
     init {
         // 初始时不自动加载，等待权限授予
     }
-    
+
     /**
      * 设置权限状态并加载数据
      */
@@ -68,7 +68,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             )
         }
     }
-    
+
     /**
      * 加载系统媒体
      */
@@ -79,16 +79,17 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             )
             return
         }
-        
+
         // 如果已经在加载或已有数据，避免重复加载
-        if (_uiState.value.isLoading || 
-            (_mediaList.value.isNotEmpty() || _mediaByFolder.value.isNotEmpty())) {
+        if (_uiState.value.isLoading ||
+            (_mediaList.value.isNotEmpty() || _mediaByFolder.value.isNotEmpty())
+        ) {
             return
         }
-        
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            
+
             try {
                 if (_viewMode.value == ViewMode.FOLDER) {
                     // 文件夹模式：按文件夹分组加载
@@ -98,11 +99,12 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
                             MediaFilterType.IMAGES -> mediaByFolder.mapValues { (_, mediaList) ->
                                 mediaList.filter { it.isImage }
                             }.filter { it.value.isNotEmpty() }
+
                             MediaFilterType.VIDEOS -> mediaByFolder.mapValues { (_, mediaList) ->
                                 mediaList.filter { it.isVideo }
                             }.filter { it.value.isNotEmpty() }
                         }
-                        
+
                         _mediaByFolder.value = filteredByFolder
                         val totalCount = filteredByFolder.values.sumOf { it.size }
                         _uiState.value = _uiState.value.copy(
@@ -123,6 +125,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
                                 )
                             }
                         }
+
                         MediaFilterType.IMAGES -> {
                             systemMediaRepository.getImages().collect { mediaList ->
                                 _mediaList.value = mediaList
@@ -132,6 +135,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
                                 )
                             }
                         }
+
                         MediaFilterType.VIDEOS -> {
                             systemMediaRepository.getVideos().collect { mediaList ->
                                 _mediaList.value = mediaList
@@ -151,7 +155,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             }
         }
     }
-    
+
     /**
      * 切换媒体类型筛选
      */
@@ -161,7 +165,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             loadSystemMedia()
         }
     }
-    
+
     /**
      * 切换视图模式
      */
@@ -171,7 +175,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             loadSystemMedia()
         }
     }
-    
+
     /**
      * 切换文件夹展开状态
      */
@@ -184,21 +188,21 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
         }
         _expandedFolders.value = currentExpanded
     }
-    
+
     /**
      * 展开所有文件夹
      */
     fun expandAllFolders() {
         _expandedFolders.value = _mediaByFolder.value.keys.toSet()
     }
-    
+
     /**
      * 折叠所有文件夹
      */
     fun collapseAllFolders() {
         _expandedFolders.value = emptySet()
     }
-    
+
     /**
      * 开启选择模式
      */
@@ -206,7 +210,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
         _isSelectionMode.value = true
         _selectedMedia.value = emptySet()
     }
-    
+
     /**
      * 退出选择模式
      */
@@ -214,7 +218,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
         _isSelectionMode.value = false
         _selectedMedia.value = emptySet()
     }
-    
+
     /**
      * 切换媒体选择状态
      */
@@ -226,13 +230,13 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             currentSelection.add(media)
         }
         _selectedMedia.value = currentSelection
-        
+
         // 如果没有选中任何项，自动退出选择模式
         if (currentSelection.isEmpty()) {
             _isSelectionMode.value = false
         }
     }
-    
+
     /**
      * 全选/取消全选
      */
@@ -247,7 +251,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             _selectedMedia.value = _mediaList.value.toSet()
         }
     }
-    
+
     /**
      * 专门为文件夹视图加载数据
      */
@@ -258,15 +262,15 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             )
             return
         }
-        
+
         // 如果已经在加载，避免重复加载
         if (_uiState.value.isLoading) {
             return
         }
-        
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            
+
             try {
                 // 文件夹模式：按文件夹分组加载
                 systemMediaRepository.getMediaByBucket().collect { mediaByFolder ->
@@ -275,11 +279,12 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
                         MediaFilterType.IMAGES -> mediaByFolder.mapValues { (_, mediaList) ->
                             mediaList.filter { it.isImage }
                         }.filter { it.value.isNotEmpty() }
+
                         MediaFilterType.VIDEOS -> mediaByFolder.mapValues { (_, mediaList) ->
                             mediaList.filter { it.isVideo }
                         }.filter { it.value.isNotEmpty() }
                     }
-                    
+
                     _mediaByFolder.value = filteredByFolder
                     val totalCount = filteredByFolder.values.sumOf { it.size }
                     _uiState.value = _uiState.value.copy(
@@ -296,7 +301,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             }
         }
     }
-    
+
     /**
      * 刷新数据
      */
@@ -311,21 +316,21 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
             loadSystemMedia()
         }
     }
-    
+
     /**
      * 清除错误信息
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
-    
+
     /**
      * 清除消息
      */
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(message = null)
     }
-    
+
     /**
      * 获取当前选中媒体的统计信息
      */
@@ -334,7 +339,7 @@ class SystemGalleryViewModel(context: Context) : ViewModel() {
         val imageCount = selected.count { it.isImage }
         val videoCount = selected.count { it.isVideo }
         val totalSize = selected.sumOf { it.size }
-        
+
         return SelectionInfo(
             totalCount = selected.size,
             imageCount = imageCount,

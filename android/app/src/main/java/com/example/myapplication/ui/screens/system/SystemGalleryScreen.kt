@@ -5,25 +5,46 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import com.example.myapplication.LocalBottomBarVisible
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.example.myapplication.LocalBottomBarVisible
 import com.example.myapplication.ui.components.SystemMediaCard
 import com.example.myapplication.ui.viewmodel.MediaFilterType
 import com.example.myapplication.ui.viewmodel.SystemGalleryViewModel
@@ -39,25 +60,25 @@ fun SystemGalleryScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    
+
     val uiState by viewModel.uiState.collectAsState()
     val mediaList by viewModel.mediaList.collectAsState()
     val filterType by viewModel.filterType.collectAsState()
     val hasPermission by viewModel.hasPermission.collectAsState()
-    
+
     // 权限请求
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions[Manifest.permission.READ_MEDIA_IMAGES] == true &&
-            permissions[Manifest.permission.READ_MEDIA_VIDEO] == true
+                    permissions[Manifest.permission.READ_MEDIA_VIDEO] == true
         } else {
             permissions[Manifest.permission.READ_EXTERNAL_STORAGE] == true
         }
         viewModel.setPermissionGranted(granted)
     }
-    
+
     // 检查权限
     LaunchedEffect(Unit) {
         val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -68,18 +89,21 @@ fun SystemGalleryScreen(
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
-        
+
         val allGranted = permissions.all { permission ->
-            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                context,
+                permission
+            ) == PackageManager.PERMISSION_GRANTED
         }
-        
+
         if (allGranted) {
             viewModel.setPermissionGranted(true)
         } else {
             permissionLauncher.launch(permissions)
         }
     }
-    
+
     // 底部导航栏控制
     val bottomBarVisible = LocalBottomBarVisible.current
     val nestedScrollConnection = remember {
@@ -96,7 +120,9 @@ fun SystemGalleryScreen(
     }
 
     Column(
-        modifier = modifier.fillMaxSize().nestedScroll(nestedScrollConnection)
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection)
     ) {
         // 顶部栏
         TopAppBar(
@@ -109,14 +135,14 @@ fun SystemGalleryScreen(
             actions = {
                 // 筛选菜单
                 var showFilterMenu by remember { mutableStateOf(false) }
-                
+
                 IconButton(onClick = { showFilterMenu = true }) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "筛选"
                     )
                 }
-                
+
                 DropdownMenu(
                     expanded = showFilterMenu,
                     onDismissRequest = { showFilterMenu = false }
@@ -133,7 +159,7 @@ fun SystemGalleryScreen(
                 }
             }
         )
-        
+
         // 主内容区域
         Box(
             modifier = Modifier.fillMaxSize()
@@ -143,18 +169,20 @@ fun SystemGalleryScreen(
                     // 没有权限
                     PermissionRequiredContent(
                         onRequestPermission = {
-                            val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                arrayOf(
-                                    Manifest.permission.READ_MEDIA_IMAGES,
-                                    Manifest.permission.READ_MEDIA_VIDEO
-                                )
-                            } else {
-                                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-                            }
+                            val permissions =
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    arrayOf(
+                                        Manifest.permission.READ_MEDIA_IMAGES,
+                                        Manifest.permission.READ_MEDIA_VIDEO
+                                    )
+                                } else {
+                                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+                                }
                             permissionLauncher.launch(permissions)
                         }
                     )
                 }
+
                 uiState.isLoading -> {
                     // 加载中
                     Box(
@@ -173,6 +201,7 @@ fun SystemGalleryScreen(
                         }
                     }
                 }
+
                 uiState.error != null -> {
                     // 错误状态
                     ErrorContent(
@@ -180,15 +209,22 @@ fun SystemGalleryScreen(
                         onRetry = { viewModel.refresh() }
                     )
                 }
+
                 mediaList.isEmpty() -> {
                     // 空状态
                     EmptyContent()
                 }
+
                 else -> {
                     // 网格视图
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
-                        contentPadding = PaddingValues(top = 2.dp, start = 2.dp, end = 2.dp, bottom = 88.dp),
+                        contentPadding = PaddingValues(
+                            top = 2.dp,
+                            start = 2.dp,
+                            end = 2.dp,
+                            bottom = 88.dp
+                        ),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
@@ -233,9 +269,9 @@ private fun PermissionRequiredContent(
             text = "需要存储权限",
             style = MaterialTheme.typography.headlineSmall
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Button(onClick = onRequestPermission) {
             Text("授予权限")
         }
@@ -261,9 +297,9 @@ private fun ErrorContent(
             text = "加载失败",
             style = MaterialTheme.typography.headlineSmall
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Button(onClick = onRetry) {
             Text("重试")
         }

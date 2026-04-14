@@ -1,8 +1,8 @@
 package com.example.myapplication.data.database.entities
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import androidx.room.Index
+import androidx.room.PrimaryKey
 
 /**
  * 媒体实体类

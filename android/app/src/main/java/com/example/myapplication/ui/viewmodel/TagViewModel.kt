@@ -5,7 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Tag
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -46,12 +52,12 @@ class TagViewModel(
     ) { tags, query, category ->
         tags.filter { tag ->
             // 按名称搜索
-            val matchesSearch = query.isEmpty() || 
-                tag.name.contains(query, ignoreCase = true)
+            val matchesSearch = query.isEmpty() ||
+                    tag.name.contains(query, ignoreCase = true)
 
             // 按分类筛选
-            val matchesCategory = category == null || 
-                tag.category == category
+            val matchesCategory = category == null ||
+                    tag.category == category
 
             matchesSearch && matchesCategory
         }

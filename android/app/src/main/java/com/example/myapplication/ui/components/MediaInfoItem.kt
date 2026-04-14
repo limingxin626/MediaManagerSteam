@@ -1,7 +1,10 @@
 package com.example.myapplication.ui.components
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -12,7 +15,7 @@ import androidx.compose.ui.unit.dp
 /**
  * 媒体信息项组件
  * 用于显示带图标、标签和值的信息项
- * 
+ *
  * @param icon 显示的图标
  * @param label 标签文本（如"类型"、"大小"等）
  * @param value 显示的值

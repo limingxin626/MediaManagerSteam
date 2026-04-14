@@ -1,12 +1,26 @@
 package com.example.myapplication.ui.components
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.myapplication.data.model.SystemMedia
-import android.net.Uri
 
 /**
  * 文件夹卡片组件
@@ -33,7 +46,7 @@ fun FolderCard(
 ) {
     val context = LocalContext.current
     val firstMedia = mediaList.firstOrNull()
-    
+
     Card(
         modifier = modifier
             .aspectRatio(1f)
@@ -64,7 +77,7 @@ fun FolderCard(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                    
+
                     // 如果有多个文件，显示数量标识
                     if (mediaList.size > 1) {
                         Box(
@@ -100,7 +113,7 @@ fun FolderCard(
                     }
                 }
             }
-            
+
             // 文件夹信息
             Column(
                 modifier = Modifier
@@ -115,9 +128,9 @@ fun FolderCard(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                
+
                 Spacer(modifier = Modifier.height(4.dp))
-                
+
                 Text(
                     text = "${mediaList.size} 个文件",
                     style = MaterialTheme.typography.bodySmall,

@@ -36,12 +36,14 @@ class SettingsViewModel(
             val results = mutableListOf<String>()
 
             // 同步 Actor（必须先成功，Message 依赖 Actor 外键）
-            when (val r = databaseManager.actorRepository.syncFromRemote(databaseManager.appContext)) {
+            when (val r =
+                databaseManager.actorRepository.syncFromRemote(databaseManager.appContext)) {
                 is SyncResult.Success -> results.add("演员: +${r.insertedCount} ~${r.updatedCount}")
                 is SyncResult.Error -> {
                     _syncState.value = SyncUiState.Error("演员同步失败: ${r.message}")
                     return@launch
                 }
+
                 else -> {}
             }
 
@@ -49,9 +51,11 @@ class SettingsViewModel(
             when (val r = databaseManager.messageRepository.syncFromRemote()) {
                 is SyncResult.Success -> results.add("消息: +${r.insertedCount} ~${r.updatedCount}")
                 is SyncResult.Error -> {
-                    _syncState.value = SyncUiState.Error("消息同步失败: ${r.message}\n${results.joinToString("\n")}")
+                    _syncState.value =
+                        SyncUiState.Error("消息同步失败: ${r.message}\n${results.joinToString("\n")}")
                     return@launch
                 }
+
                 else -> {}
             }
 

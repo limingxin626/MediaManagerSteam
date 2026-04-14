@@ -25,25 +25,25 @@ data class SystemMedia(
      */
     val isImage: Boolean
         get() = mimeType.startsWith("image/")
-    
+
     /**
      * 是否为视频
      */
     val isVideo: Boolean
         get() = mimeType.startsWith("video/")
-    
+
     /**
      * 获取分辨率字符串
      */
     val resolution: String?
         get() = if (width > 0 && height > 0) "${width}x${height}" else null
-    
+
     /**
      * 获取宽高比
      */
     val aspectRatio: Float?
         get() = if (width > 0 && height > 0) width.toFloat() / height.toFloat() else null
-    
+
     /**
      * 获取格式化的文件大小
      */
@@ -55,7 +55,7 @@ data class SystemMedia(
             else -> "${size / (1024 * 1024 * 1024)}GB"
         }
     }
-    
+
     /**
      * 获取格式化的时长（仅视频）
      */
@@ -64,7 +64,7 @@ data class SystemMedia(
             val seconds = durationMs / 1000
             val minutes = seconds / 60
             val hours = minutes / 60
-            
+
             when {
                 hours > 0 -> String.format("%d:%02d:%02d", hours, minutes % 60, seconds % 60)
                 minutes > 0 -> String.format("%d:%02d", minutes, seconds % 60)

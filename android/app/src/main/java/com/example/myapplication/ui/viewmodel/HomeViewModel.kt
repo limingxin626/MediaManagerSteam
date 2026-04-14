@@ -57,7 +57,8 @@ class HomeViewModel(
         // Each tag as a group
         for (tag in tags) {
             val count = tagRepository.getMessageCountForTag(tag.id)
-            val tagLastMessage = if (count > 0) messageRepository.getLastMessageForTag(tag.id) else null
+            val tagLastMessage =
+                if (count > 0) messageRepository.getLastMessageForTag(tag.id) else null
             groups.add(
                 GroupItem(
                     tagId = tag.id,

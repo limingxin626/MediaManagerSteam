@@ -17,7 +17,15 @@
       "WebFetch(domain:pypi.org)",
       "Bash(pnpm build:*)",
       "Bash(echo DATA_ROOT=$DATA_ROOT:*)",
-      "Bash(openspec new:*)"
+      "Bash(openspec new:*)",
+      "mcp__note-service__search_messages",
+      "mcp__note-service__list_tags",
+      "mcp__note-service__write_message",
+      "Bash(openspec status:*)",
+      "Bash(openspec instructions:*)",
+      "Bash(grep:*)",
+      "Bash(./gradlew compileDebugKotlin:*)",
+      "Bash(python3:*)"
     ]
   }
 }

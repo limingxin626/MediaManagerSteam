@@ -1,14 +1,13 @@
 package com.example.myapplication.data
 
+
 import android.content.Context
 import com.example.myapplication.data.database.AppDatabase
-
-
 import com.example.myapplication.data.repository.ActorRepository
 import com.example.myapplication.data.repository.MediaRepository
-import com.example.myapplication.data.repository.TagRepository
-import com.example.myapplication.data.repository.SyncOutboxRepository
 import com.example.myapplication.data.repository.MessageRepository
+import com.example.myapplication.data.repository.SyncOutboxRepository
+import com.example.myapplication.data.repository.TagRepository
 import com.example.myapplication.data.service.NetworkMonitor
 import com.example.myapplication.data.service.SyncPreferences
 
@@ -43,7 +42,8 @@ class DatabaseManager private constructor(context: Context) {
     val actorRepository = ActorRepository(actorDao, syncOutboxRepository)
     val mediaRepository = MediaRepository(mediaDao, syncOutboxRepository)
     val tagRepository = TagRepository(tagDao)
-    val messageRepository = MessageRepository(messageDao, mediaDao, tagDao, actorDao, syncOutboxRepository, database)
+    val messageRepository =
+        MessageRepository(messageDao, mediaDao, tagDao, actorDao, syncOutboxRepository, database)
 
     companion object {
         @Volatile

@@ -1,26 +1,35 @@
 package com.example.myapplication.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapplication.data.database.entities.Media
-import com.example.myapplication.ui.theme.InstagramGradientEnd
-import com.example.myapplication.ui.theme.InstagramGradientMiddle
 import com.example.myapplication.ui.theme.InstagramGradientStart
-import com.example.myapplication.ui.theme.TextSecondary
 
 /**
  * Instagram/Pinterest 风格媒体卡片组件
@@ -62,7 +71,7 @@ fun MediaCard(
             ) {
                 // 缩略图加载
                 val displayUri = media.filePath ?: ""
-                val thumbnailUri = media.thumbnailPath?: displayUri
+                val thumbnailUri = media.thumbnailPath ?: displayUri
 
                 OptimizedThumbnail(
                     thumbnailPath = thumbnailUri,

@@ -10,8 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import android.media.ExifInterface
-
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import java.io.File
 import java.io.FileOutputStream
@@ -45,11 +43,11 @@ class MediaFilePicker(private val context: Context) {
                 if (it.moveToFirst()) {
                     val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     val sizeIndex = it.getColumnIndex(OpenableColumns.SIZE)
-                    
+
                     val fileName = if (nameIndex != -1) it.getString(nameIndex) else "unknown"
                     val size = if (sizeIndex != -1) it.getLong(sizeIndex) else 0L
                     val mimeType = context.contentResolver.getType(uri)
-                    
+
                     MediaFileInfo(
                         uri = uri,
                         fileName = fileName,
@@ -75,14 +73,14 @@ class MediaFilePicker(private val context: Context) {
                 if (!filesDir.exists()) {
                     filesDir.mkdirs()
                 }
-                
+
                 val outputFile = File(filesDir, fileName)
                 val outputStream = FileOutputStream(outputFile)
-                
+
                 outputStream.use { output ->
                     input.copyTo(output)
                 }
-                
+
                 outputFile.absolutePath
             }
         } catch (e: Exception) {
@@ -147,11 +145,11 @@ class MediaFilePicker(private val context: Context) {
                 if (it.moveToFirst()) {
                     val widthIndex = it.getColumnIndex(MediaStore.Images.Media.WIDTH)
                     val heightIndex = it.getColumnIndex(MediaStore.Images.Media.HEIGHT)
-                    
+
                     if (widthIndex != -1 && heightIndex != -1) {
                         var width = it.getInt(widthIndex)
                         var height = it.getInt(heightIndex)
-                        
+
                         if (width > 0 && height > 0) {
                             // 检查EXIF旋转信息，如果是90度或270度旋转，需要交换宽高
                             val mimeType = context.contentResolver.getType(uri)
@@ -174,7 +172,7 @@ class MediaFilePicker(private val context: Context) {
             null
         }
     }
-    
+
     /**
      * 使用BLAKE2b计算文件内容哈希
      * 与 Backend 逻辑一致：
@@ -186,11 +184,12 @@ class MediaFilePicker(private val context: Context) {
         val sampleSize = 4 * 1024 * 1024 // 4MB
 
         return try {
-            val fileSize = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                cursor.moveToFirst()
-                if (sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L
-            } ?: -1L
+            val fileSize =
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    cursor.moveToFirst()
+                    if (sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L
+                } ?: -1L
 
             val digest = Blake2bDigest(512)
 
@@ -283,11 +282,11 @@ fun rememberVideoFilePicker(
 ): ActivityResultLauncher<PickVisualMediaRequest> {
     val context = LocalContext.current
     val filePicker = remember { MediaFilePicker(context) }
-    
+
     return androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        uri?.let { 
+        uri?.let {
             filePicker.getFileInfo(it)?.let { fileInfo ->
                 onVideoSelected(fileInfo)
             }
@@ -304,11 +303,11 @@ fun rememberImageFilePicker(
 ): ActivityResultLauncher<PickVisualMediaRequest> {
     val context = LocalContext.current
     val filePicker = remember { MediaFilePicker(context) }
-    
+
     return androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        uri?.let { 
+        uri?.let {
             filePicker.getFileInfo(it)?.let { fileInfo ->
                 onImageSelected(fileInfo)
             }
@@ -347,7 +346,7 @@ fun rememberMultipleMediaFilePicker(
 ): ActivityResultLauncher<PickVisualMediaRequest> {
     val context = LocalContext.current
     val filePicker = remember { MediaFilePicker(context) }
-    
+
     return androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems)
     ) { uris ->

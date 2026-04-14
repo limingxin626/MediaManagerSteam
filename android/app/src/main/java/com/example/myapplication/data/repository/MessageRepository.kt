@@ -1,6 +1,9 @@
 package com.example.myapplication.data.repository
 
 import android.util.Log
+import androidx.paging.PagingSource
+import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import com.example.myapplication.data.database.dao.ActorDao
 import com.example.myapplication.data.database.dao.MediaDao
 import com.example.myapplication.data.database.dao.MessageDao
@@ -18,13 +21,11 @@ import com.example.myapplication.data.model.RemoteMediaItem
 import com.example.myapplication.data.model.RemoteMessage
 import com.example.myapplication.data.model.RemoteTagItem
 import com.example.myapplication.data.model.SyncResult
+import com.example.myapplication.data.service.MessageSyncResponse
 import com.example.myapplication.data.service.SyncConfig
 import com.example.myapplication.data.service.SyncNetwork
 import com.example.myapplication.data.service.buildFullUrl
-import com.example.myapplication.data.service.MessageSyncResponse
-import androidx.paging.PagingSource
-import androidx.room.RoomDatabase
-import androidx.room.withTransaction
+import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -32,7 +33,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import com.google.gson.Gson
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
@@ -115,7 +115,7 @@ class MessageRepository(
 
         return Pair(msgId, mediaIds)
     }
-    
+
     /**
      * 获取消息列表（响应式 Flow）
      */
@@ -129,7 +129,7 @@ class MessageRepository(
         }
         return messageDao.searchMessages(query)
     }
-    
+
     /**
      * 获取分页消息列表（含详情）
      */
@@ -155,7 +155,10 @@ class MessageRepository(
     /**
      * 获取按演员过滤的分页消息列表
      */
-    fun getMessagesByActorPaged(actorId: Long, query: String): PagingSource<Int, MessageWithDetails> {
+    fun getMessagesByActorPaged(
+        actorId: Long,
+        query: String
+    ): PagingSource<Int, MessageWithDetails> {
         return if (query.isBlank()) {
             messageDao.getMessagesByActorPaged(actorId)
         } else {
@@ -218,7 +221,7 @@ class MessageRepository(
     fun getAllMessagesWithDetails(): Flow<List<MessageWithDetails>> {
         return messageDao.getAllMessagesWithDetails()
     }
-    
+
     /**
      * 创建消息（本地立即生效）
      * @param immediateSync 是否立即推送到后端，含媒体的新消息应传 false，由调用方在所有关联完成后统一推送
@@ -309,7 +312,7 @@ class MessageRepository(
             txBody()
         }
     }
-    
+
     /**
      * 切换消息收藏状态（本地立即生效，随后立即推送到后端）
      */
@@ -332,7 +335,7 @@ class MessageRepository(
             }
         }
     }
-    
+
     /**
      * 添加媒体到消息
      */
@@ -344,7 +347,7 @@ class MessageRepository(
         )
         messageDao.insertMessageMedia(messageMedia)
     }
-    
+
     /**
      * 添加标签到消息
      */
@@ -362,7 +365,7 @@ class MessageRepository(
     suspend fun removeTagFromMessage(messageId: Long, tagId: Long) {
         messageDao.deleteMessageTag(messageId, tagId)
     }
-    
+
     /**
      * 获取消息的媒体列表
      */
@@ -376,7 +379,7 @@ class MessageRepository(
     suspend fun getMediaByMessageId(messageId: Long): List<Media> {
         return messageDao.getMediaByMessageId(messageId)
     }
-    
+
     /**
      * 获取消息的标签ID列表
      */
@@ -450,7 +453,10 @@ class MessageRepository(
                             val media = Media(
                                 id = rm.id,
                                 remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
-                                remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url),
+                                remoteThumbnailUrl = buildFullUrl(
+                                    SyncConfig.BASE_URL,
+                                    rm.thumb_url
+                                ),
                                 fileHash = rm.file_hash ?: "unknown_${rm.id}",
                                 fileSize = rm.file_size,
                                 mimeType = rm.mime_type,
@@ -469,17 +475,20 @@ class MessageRepository(
 
                         // 3) Upsert Message
                         val createdAtMs = try {
-                            LocalDateTime.parse(remote.created_at).toInstant(ZoneOffset.UTC).toEpochMilli()
+                            LocalDateTime.parse(remote.created_at).toInstant(ZoneOffset.UTC)
+                                .toEpochMilli()
                         } catch (_: Exception) {
                             System.currentTimeMillis()
                         }
                         val updatedAtMs = try {
-                            LocalDateTime.parse(remote.updated_at).toInstant(ZoneOffset.UTC).toEpochMilli()
+                            LocalDateTime.parse(remote.updated_at).toInstant(ZoneOffset.UTC)
+                                .toEpochMilli()
                         } catch (_: Exception) {
                             System.currentTimeMillis()
                         }
 
-                        val safeActorId = if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
+                        val safeActorId =
+                            if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
 
                         val message = Message(
                             id = remote.id,
@@ -513,9 +522,11 @@ class MessageRepository(
 
                         if (remote.id in existingIds) updatedCount++ else insertedCount++
                     } catch (e: Exception) {
-                        Log.e(TAG, "同步消息 id=${remote.id} 失败, actorId=${remote.actor_id}, " +
-                                "mediaIds=${remote.media_items.map { it.id }}, " +
-                                "tagIds=${remote.tags.map { it.id }}: ${e.message}")
+                        Log.e(
+                            TAG, "同步消息 id=${remote.id} 失败, actorId=${remote.actor_id}, " +
+                                    "mediaIds=${remote.media_items.map { it.id }}, " +
+                                    "tagIds=${remote.tags.map { it.id }}: ${e.message}"
+                        )
                         throw e
                     }
                 }
@@ -578,12 +589,14 @@ class MessageRepository(
                                         messageDao.deleteMessageMediaByMessageId(change.entity_id)
                                         messageDao.deleteMessage(change.entity_id)
                                     }
+
                                     "ACTOR" -> actorDao.deleteActorById(change.entity_id)
                                     "MEDIA" -> mediaDao.deleteMediaById(change.entity_id)
                                     "TAG" -> tagDao.deleteTagById(change.entity_id)
                                 }
                                 totalDeleted++
                             }
+
                             "UPSERT" -> {
                                 val data = change.data
                                 if (data != null) {
@@ -595,6 +608,7 @@ class MessageRepository(
                                                 totalInserted++
                                             }
                                         }
+
                                         "ACTOR" -> {
                                             val actor = parseRemoteActor(data)
                                             if (actor != null) {
@@ -602,20 +616,34 @@ class MessageRepository(
                                                 totalInserted++
                                             }
                                         }
+
                                         "TAG" -> {
                                             val tag = parseRemoteTag(data)
                                             if (tag != null) {
-                                                tagDao.insertTag(Tag(id = tag.id, name = tag.name, category = tag.category))
+                                                tagDao.insertTag(
+                                                    Tag(
+                                                        id = tag.id,
+                                                        name = tag.name,
+                                                        category = tag.category
+                                                    )
+                                                )
                                                 totalInserted++
                                             }
                                         }
+
                                         "MEDIA" -> {
                                             val rm = parseRemoteMediaItem(data)
                                             if (rm != null) {
                                                 val media = Media(
                                                     id = rm.id,
-                                                    remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
-                                                    remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url),
+                                                    remoteMediaUrl = buildFullUrl(
+                                                        SyncConfig.BASE_URL,
+                                                        rm.file_url
+                                                    ),
+                                                    remoteThumbnailUrl = buildFullUrl(
+                                                        SyncConfig.BASE_URL,
+                                                        rm.thumb_url
+                                                    ),
                                                     fileHash = rm.file_hash ?: "unknown_${rm.id}",
                                                     fileSize = rm.file_size,
                                                     mimeType = rm.mime_type,
@@ -635,7 +663,10 @@ class MessageRepository(
                             }
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "处理变更失败 [${change.operation} ${change.entity_type} #${change.entity_id}]: ${e.message}")
+                        Log.e(
+                            TAG,
+                            "处理变更失败 [${change.operation} ${change.entity_type} #${change.entity_id}]: ${e.message}"
+                        )
                     }
                 }
             }
@@ -659,7 +690,8 @@ class MessageRepository(
     private suspend fun applyRemoteMessage(remote: RemoteMessage, validActorIds: Set<Long>) {
         val createdAtMs = parseIsoToMs(remote.created_at)
         val updatedAtMs = parseIsoToMs(remote.updated_at)
-        val safeActorId = if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
+        val safeActorId =
+            if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
         val message = Message(
             id = remote.id,
             text = remote.text,
@@ -671,7 +703,13 @@ class MessageRepository(
         messageDao.upsertMessage(message)
         messageDao.deleteMessageMediaByMessageId(remote.id)
         for (rm in remote.media_items) {
-            messageDao.insertMessageMedia(MessageMedia(messageId = remote.id, mediaId = rm.id, position = rm.position))
+            messageDao.insertMessageMedia(
+                MessageMedia(
+                    messageId = remote.id,
+                    mediaId = rm.id,
+                    position = rm.position
+                )
+            )
         }
         messageDao.deleteMessageTagsByMessageId(remote.id)
         for (rt in remote.tags) {
@@ -777,8 +815,11 @@ class MessageRepository(
         outboxRepository?.let { repo ->
             appScope.launch {
                 syncMutex.withLock {
-                    try { repo.syncToServer() }
-                    catch (e: Exception) { Log.w(TAG, "立即推送失败，将由后台任务重试: ${e.message}") }
+                    try {
+                        repo.syncToServer()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "立即推送失败，将由后台任务重试: ${e.message}")
+                    }
                 }
             }
         }

@@ -1,6 +1,8 @@
 package com.example.myapplication.data.database.entities
 
-import androidx.room.*
+import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 
 /**
  * 媒体-标签关联表

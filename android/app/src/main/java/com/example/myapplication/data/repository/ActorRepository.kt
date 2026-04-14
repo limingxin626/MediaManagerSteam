@@ -10,11 +10,11 @@ import com.example.myapplication.data.service.SyncConfig
 import com.example.myapplication.data.service.SyncNetwork
 import com.example.myapplication.data.service.buildFullUrl
 import com.example.myapplication.utils.FileUtils
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.flow.Flow
-import java.io.File
 import com.google.gson.Gson
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * 演员数据仓库
@@ -26,18 +26,18 @@ class ActorRepository(
 
     private val syncService by lazy { SyncNetwork.syncService }
     private val gson = Gson()
-    
+
     // 查询操作
     fun getAllActors(): Flow<List<Actor>> = actorDao.getAllActors()
-    
-    suspend fun getActorById(id: Long): Actor? = actorDao.getActorById(id)
-    
 
-    fun searchActorsByName(query: String): Flow<List<Actor>> = 
+    suspend fun getActorById(id: Long): Actor? = actorDao.getActorById(id)
+
+
+    fun searchActorsByName(query: String): Flow<List<Actor>> =
         actorDao.searchActorsByName(query)
-    
+
     suspend fun getActorCount(): Int = actorDao.getActorCount()
-    
+
 
     // 写入操作
     suspend fun insertActor(actor: Actor): Long {
@@ -55,7 +55,7 @@ class ActorRepository(
 
         return insertedId
     }
-    
+
     suspend fun insertActors(actors: List<Actor>): List<Long> {
         val ids = actorDao.insertActors(actors)
 
@@ -73,7 +73,7 @@ class ActorRepository(
 
         return ids
     }
-    
+
     suspend fun updateActor(actor: Actor) {
         // 更新时间戳
         val updatedActor = actor.copy(updatedAt = System.currentTimeMillis())
@@ -88,7 +88,7 @@ class ActorRepository(
             )
         }
     }
-    
+
     suspend fun deleteActor(actor: Actor) {
         // 删除演员时，消息的actorId会保留（不级联删除）
         actorDao.deleteActor(actor)
@@ -100,7 +100,7 @@ class ActorRepository(
             )
         }
     }
-    
+
     suspend fun deleteActorById(id: Long) {
         actorDao.deleteActorById(id)
 
@@ -111,7 +111,7 @@ class ActorRepository(
             )
         }
     }
-    
+
     suspend fun deleteAllActors() {
         val allActors = actorDao.getAllActorsSync()
         actorDao.deleteAllActors()
@@ -125,7 +125,7 @@ class ActorRepository(
             }
         }
     }
-    
+
 
     // ==================== 远程同步相关方法（与 Media/Group 对齐） ====================
 
@@ -147,7 +147,11 @@ class ActorRepository(
             var updatedCount = 0
 
             for (remote in remoteActors) {
-                val localAvatarPath = downloadAvatar(remoteAvatarPath = remote.avatar, actorId = remote.id, avatarsDir = avatarsDir)
+                val localAvatarPath = downloadAvatar(
+                    remoteAvatarPath = remote.avatar,
+                    actorId = remote.id,
+                    avatarsDir = avatarsDir
+                )
                 val localActor = remote.toLocalActor(avatarLocalPath = localAvatarPath).copy(
                     updatedAt = System.currentTimeMillis()
                 )
@@ -202,7 +206,11 @@ class ActorRepository(
             }
 
             for (remote in remoteActors) {
-                val localAvatarPath = downloadAvatar(remoteAvatarPath = remote.avatar, actorId = remote.id, avatarsDir = avatarsDir)
+                val localAvatarPath = downloadAvatar(
+                    remoteAvatarPath = remote.avatar,
+                    actorId = remote.id,
+                    avatarsDir = avatarsDir
+                )
                 val localActor = remote.toLocalActor(avatarLocalPath = localAvatarPath).copy(
                     updatedAt = System.currentTimeMillis()
                 )
@@ -211,7 +219,10 @@ class ActorRepository(
                 if (remote.id in existingIds) updatedCount++ else insertedCount++
             }
 
-            Log.d(TAG, "全量同步完成：新增 $insertedCount 条，更新 $updatedCount 条，删除 $deletedCount 条")
+            Log.d(
+                TAG,
+                "全量同步完成：新增 $insertedCount 条，更新 $updatedCount 条，删除 $deletedCount 条"
+            )
             SyncResult.Success(insertedCount, updatedCount, deletedCount)
         } catch (e: Exception) {
             Log.e(TAG, "全量同步失败: ${e.message}", e)
@@ -219,7 +230,11 @@ class ActorRepository(
         }
     }
 
-    private suspend fun downloadAvatar(remoteAvatarPath: String?, actorId: Long, avatarsDir: File): String? {
+    private suspend fun downloadAvatar(
+        remoteAvatarPath: String?,
+        actorId: Long,
+        avatarsDir: File
+    ): String? {
         if (remoteAvatarPath.isNullOrBlank()) return null
 
         return try {

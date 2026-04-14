@@ -1,15 +1,14 @@
 package com.example.myapplication.ui.components
 
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import androidx.compose.runtime.Composable
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.utils.MediaAdditionHelper
 import com.example.myapplication.utils.rememberMediaAdditionManager
 import com.example.myapplication.utils.rememberMediaFilePicker
 import com.example.myapplication.utils.rememberMultipleMediaFilePicker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * 统一媒体选择器配置
@@ -29,7 +28,7 @@ interface UnifiedMediaPickerCallback {
     fun onSuccess(mediaId: Long, media: Media)
     fun onError(error: String)
     fun onProcessingStateChanged(isProcessing: Boolean)
-    
+
     // 多选支持
     fun onMultipleSuccess(results: List<Pair<Long, Media>>) {
         // 默认实现：逐个调用单个成功回调
@@ -78,7 +77,7 @@ fun rememberUnifiedMediaPicker(
     val mediaPickerLauncher = rememberMediaFilePicker { fileInfo ->
         coroutineScope.launch {
             callback.onProcessingStateChanged(true)
-            
+
             // 判断文件类型并调用相应的处理方法
             val mimeType = fileInfo.mimeType ?: ""
             val helperConfig = MediaAdditionHelper.MediaAdditionConfig(
@@ -93,26 +92,30 @@ fun rememberUnifiedMediaPicker(
                         callback.onSuccess(mediaId, media)
                     }
                 }
+
                 override fun onError(error: String) {
                     coroutineScope.launch {
                         callback.onProcessingStateChanged(false)
                         callback.onError(error)
                     }
                 }
+
                 override fun onProcessingStateChanged(isProcessing: Boolean) {
                     coroutineScope.launch {
                         callback.onProcessingStateChanged(isProcessing)
                     }
                 }
             }
-            
+
             when {
                 mimeType.startsWith("video/") -> {
                     mediaManager.helper.addVideoFromFile(fileInfo, helperConfig, helperCallback)
                 }
+
                 mimeType.startsWith("image/") -> {
                     mediaManager.helper.addImageFromFile(fileInfo, helperConfig, helperCallback)
                 }
+
                 else -> {
                     callback.onProcessingStateChanged(false)
                     callback.onError("不支持的文件类型")
@@ -128,11 +131,11 @@ fun rememberUnifiedMediaPicker(
         ) { fileInfoList ->
             coroutineScope.launch {
                 callback.onProcessingStateChanged(true)
-                
+
                 val results = mutableListOf<Pair<Long, Media>>()
                 val errors = mutableListOf<String>()
                 var completedCount = 0
-                
+
                 fileInfoList.forEach { fileInfo ->
                     val mimeType = fileInfo.mimeType ?: ""
                     val helperConfig = MediaAdditionHelper.MediaAdditionConfig(
@@ -140,7 +143,7 @@ fun rememberUnifiedMediaPicker(
                         autoConnectToActor = config.autoConnectToActor,
                         actorRole = config.actorRole ?: ""
                     )
-                    
+
                     val callbackWrapper = object : MediaAdditionHelper.MediaAdditionCallback {
                         override fun onSuccess(mediaId: Long, media: Media) {
                             synchronized(results) {
@@ -157,6 +160,7 @@ fun rememberUnifiedMediaPicker(
                                 }
                             }
                         }
+
                         override fun onError(error: String) {
                             synchronized(results) {
                                 errors.add(error)
@@ -172,19 +176,30 @@ fun rememberUnifiedMediaPicker(
                                 }
                             }
                         }
+
                         override fun onProcessingStateChanged(isProcessing: Boolean) {
                             // For multi-file processing, we don't need to propagate individual processing state changes
                             // as the main callback already handles overall processing state
                         }
                     }
-                    
+
                     when {
                         mimeType.startsWith("video/") -> {
-                            mediaManager.helper.addVideoFromFile(fileInfo, helperConfig, callbackWrapper)
+                            mediaManager.helper.addVideoFromFile(
+                                fileInfo,
+                                helperConfig,
+                                callbackWrapper
+                            )
                         }
+
                         mimeType.startsWith("image/") -> {
-                            mediaManager.helper.addImageFromFile(fileInfo, helperConfig, callbackWrapper)
+                            mediaManager.helper.addImageFromFile(
+                                fileInfo,
+                                helperConfig,
+                                callbackWrapper
+                            )
                         }
+
                         else -> {
                             callbackWrapper.onError("不支持的文件类型: ${fileInfo.fileName}")
                         }

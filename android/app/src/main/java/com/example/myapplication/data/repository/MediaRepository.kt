@@ -4,8 +4,8 @@ import android.util.Log
 import com.example.myapplication.data.database.dao.MediaDao
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.database.entities.SyncOutboxItem
-import kotlinx.coroutines.flow.Flow
 import com.google.gson.Gson
+import kotlinx.coroutines.flow.Flow
 
 /**
  * 媒体数据仓库
@@ -16,38 +16,39 @@ class MediaRepository(
 ) {
 
     private val gson = Gson()
-    
+
     // 查询操作
     fun getAllMedia(): Flow<List<Media>> = mediaDao.getAllMedia()
-    
+
     suspend fun getMediaById(id: Long): Media? = mediaDao.getMediaById(id)
 
     suspend fun getMediaByIds(ids: List<Long>): List<Media> = mediaDao.getMediaByIds(ids)
-    
+
     fun searchMedia(query: String): Flow<List<Media>> =
         mediaDao.searchMedia(query)
-    
+
     fun getMediaByRatingRange(minRating: Int, maxRating: Int): Flow<List<Media>> =
         mediaDao.getMediaByRatingRange(minRating, maxRating)
-    
+
     fun getHighRatedMedia(): Flow<List<Media>> = mediaDao.getHighRatedMedia()
-    
-    fun getRecentMedia(limit: Int = 10): Flow<List<Media>> = 
+
+    fun getRecentMedia(limit: Int = 10): Flow<List<Media>> =
         mediaDao.getRecentMedia(limit)
-    
+
     suspend fun getAllMediaSync(): List<Media> = mediaDao.getAllMediaSync()
 
     suspend fun getAllMediaIdsSorted(): List<Long> = mediaDao.getAllMediaIdsSorted()
 
-    suspend fun getMediaWindow(offset: Int, limit: Int): List<Media> = mediaDao.getMediaWindow(offset, limit)
+    suspend fun getMediaWindow(offset: Int, limit: Int): List<Media> =
+        mediaDao.getMediaWindow(offset, limit)
 
     // 统计信息
     suspend fun getMediaCount(): Int = mediaDao.getMediaCount()
 
     suspend fun getAverageRating(): Float = mediaDao.getAverageRating()
-    
+
     suspend fun getTotalSize(): Long = mediaDao.getTotalSize()
-    
+
 
     // 写入操作
     suspend fun insertMedia(media: Media): Long {

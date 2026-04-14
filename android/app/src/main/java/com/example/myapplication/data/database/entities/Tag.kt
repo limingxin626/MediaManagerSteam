@@ -1,6 +1,8 @@
 package com.example.myapplication.data.database.entities
 
-import androidx.room.*
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.PrimaryKey
 
 /**
  * 标签实体

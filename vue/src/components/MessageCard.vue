@@ -103,7 +103,7 @@
       <!-- Tags & Media count row -->
       <div v-if="messageTags.length > 0 || message.media_count > 0" class="flex items-center gap-2 mt-2 flex-wrap">
         <span v-for="tag in messageTags" :key="tag.id"
-          class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-900/30 text-indigo-300">
+          class="tag-chip">
           {{ tag.name }}
         </span>
         <span v-if="message.media_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500 ml-auto">

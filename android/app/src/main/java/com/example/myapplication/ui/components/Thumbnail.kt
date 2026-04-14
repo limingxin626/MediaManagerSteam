@@ -1,30 +1,28 @@
 package com.example.myapplication.ui.components
 
-import androidx.compose.foundation.layout.*
+import android.net.Uri
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
 import coil.request.CachePolicy
+import coil.request.ImageRequest
 import java.io.File
-import android.net.Uri
-import coil.compose.AsyncImage
-
-import android.os.Build
-import android.util.Size
-import androidx.compose.ui.graphics.asImageBitmap
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * 优化的媒体缩略图组件
@@ -37,16 +35,17 @@ fun OptimizedThumbnail(
 ) {
     // 获取Context在Composable作用域中
     val context = LocalContext.current
-    
+
     // 简化实现，使用默认颜色和图标
     val typeColor = Color(0xFF388E3C) // 绿色
     val typeIcon = Icons.Default.Star
-    
+
     if (!thumbnailPath.isNullOrEmpty()) {
         // 判断路径类型
         val isSystemUri = thumbnailPath.startsWith("content://")
-        val isNetworkUrl = thumbnailPath.startsWith("http://") || thumbnailPath.startsWith("https://")
-        
+        val isNetworkUrl =
+            thumbnailPath.startsWith("http://") || thumbnailPath.startsWith("https://")
+
         // 检查文件/URI可用性
         val mediaExists = remember(thumbnailPath) {
             when {
@@ -55,7 +54,7 @@ fun OptimizedThumbnail(
                 else -> File(thumbnailPath).exists() // 对于文件路径，检查文件是否存在
             }
         }
-        
+
         if (mediaExists) {
             // 高性能图片加载配置
             val imageRequest = remember(thumbnailPath) {
@@ -64,7 +63,7 @@ fun OptimizedThumbnail(
                     isNetworkUrl -> thumbnailPath // 网络URL直接使用字符串
                     else -> File(thumbnailPath) // 文件路径
                 }
-                
+
                 ImageRequest.Builder(context)
                     .data(dataSource)
                     .size(coil.size.Size.ORIGINAL) // 使用原始分辨率，避免二次缩放模糊
@@ -75,7 +74,7 @@ fun OptimizedThumbnail(
                     .networkCachePolicy(if (isNetworkUrl) CachePolicy.ENABLED else CachePolicy.DISABLED)
                     .build()
             }
-            
+
             SubcomposeAsyncImage(
                 model = imageRequest,
                 contentDescription = "媒体缩略图",
@@ -123,7 +122,7 @@ fun OptimizedThumbnail(
                 .fillMaxSize()
                 .padding(24.dp)
         }
-        
+
         // 默认图标 - 使用缓存的颜色和图标
         Surface(
             modifier = modifier,
@@ -139,7 +138,6 @@ fun OptimizedThumbnail(
         }
     }
 }
-
 
 
 /**
@@ -174,11 +172,11 @@ fun OptimizedAvatar(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    
+
     if (!avatarPath.isNullOrEmpty()) {
         // 判断是系统URI还是文件路径
         val isSystemUri = avatarPath.startsWith("content://")
-        
+
         // 检查资源可用性
         val avatarExists = remember(avatarPath) {
             if (isSystemUri) {
@@ -187,7 +185,7 @@ fun OptimizedAvatar(
                 File(avatarPath).exists()
             }
         }
-        
+
         if (avatarExists) {
             val imageRequest = remember(avatarPath) {
                 val dataSource = if (isSystemUri) {
@@ -195,14 +193,14 @@ fun OptimizedAvatar(
                 } else {
                     File(avatarPath)
                 }
-                
+
                 ImageRequest.Builder(context)
                     .data(dataSource)
                     .crossfade(true)
                     .size(240, 240) // 固定尺寸提高缓存效率
                     .build()
             }
-            
+
             SubcomposeAsyncImage(
                 model = imageRequest,
                 contentDescription = "${actorName}的头像",

@@ -1,6 +1,15 @@
 package com.example.myapplication.ui.screens.tag
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -10,22 +19,39 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.myapplication.data.DatabaseManager
-import com.example.myapplication.data.database.entities.Tag
 import com.example.myapplication.data.database.entities.Media
+import com.example.myapplication.data.database.entities.Tag
 import com.example.myapplication.navigation.Routes
-import com.example.myapplication.ui.components.MediaCard
 import com.example.myapplication.ui.components.EmptyState
+import com.example.myapplication.ui.components.MediaCard
 import kotlinx.coroutines.launch
 
 /**
@@ -42,22 +68,22 @@ fun TagEditScreen(
     var tag by remember { mutableStateOf<Tag?>(null) }
     var isLoading by remember { mutableStateOf(tagId != null) }
     val coroutineScope = rememberCoroutineScope()
-    
+
     // 表单状态
     var tagName by remember { mutableStateOf("") }
     var tagCategory by remember { mutableStateOf("") }
-    
+
     // 验证状态
     var nameError by remember { mutableStateOf<String?>(null) }
     var isFormValid by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
-    
+
     // 媒体列表状态
     var mediaList by remember { mutableStateOf<List<Media>>(emptyList()) }
-    
+
     // 删除对话框状态
     var showDeleteDialog by remember { mutableStateOf(false) }
-    
+
     val focusManager = LocalFocusManager.current
 
     // 加载现有标签数据（编辑模式）
@@ -73,7 +99,7 @@ fun TagEditScreen(
             }
         }
     }
-    
+
     // 加载标签关联的媒体列表（仅编辑模式）
     LaunchedEffect(tagId) {
         if (tagId != null) {
@@ -91,7 +117,7 @@ fun TagEditScreen(
             tagName.length > 50 -> "标签名称不能超过50个字符"
             else -> null
         }
-        
+
         isFormValid = nameError == null && tagName.isNotBlank()
     }
 
@@ -102,14 +128,17 @@ fun TagEditScreen(
                 coroutineScope.launch {
                     try {
                         isSaving = true
-                        
+
                         if (tagId == null) {
                             // 新增标签
                             val newTag = Tag(
                                 name = tagName.trim(),
                                 category = tagCategory.trim().takeIf { it.isNotEmpty() }
                             )
-                            databaseManager.tagRepository.createOrGetTag(newTag.name, newTag.category)
+                            databaseManager.tagRepository.createOrGetTag(
+                                newTag.name,
+                                newTag.category
+                            )
                         } else {
                             // 更新标签
                             val updatedTag = tag!!.copy(
@@ -118,7 +147,7 @@ fun TagEditScreen(
                             )
                             databaseManager.tagRepository.updateTag(updatedTag)
                         }
-                        
+
                         navController.navigateUp()
                     } catch (e: Exception) {
                         // 处理错误，这里可以显示错误消息
@@ -129,7 +158,7 @@ fun TagEditScreen(
             }
         }
     }
-    
+
     // 删除函数
     val deleteTag = remember {
         {
@@ -179,7 +208,7 @@ fun TagEditScreen(
                                 )
                             }
                         }
-                        
+
                         // 保存按钮
                         IconButton(
                             onClick = saveTag,
@@ -220,7 +249,7 @@ fun TagEditScreen(
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
-                    
+
                     // 表单内容
                     Card(
                         modifier = Modifier.fillMaxWidth()
@@ -244,7 +273,7 @@ fun TagEditScreen(
                                 ),
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            
+
                             // 分类
                             OutlinedTextField(
                                 value = tagCategory,
@@ -262,20 +291,20 @@ fun TagEditScreen(
                         }
                     }
                 }
-                
+
                 // 媒体列表部分（仅编辑模式显示）
                 if (tagId != null) {
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     Text(
                         text = "关联的媒体 (${mediaList.size})",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    
+
                     // 媒体网格列表
                     Box(
                         modifier = Modifier
@@ -300,7 +329,7 @@ fun TagEditScreen(
                                 ) { media ->
                                     MediaCard(
                                         media = media,
-                                        onClick = { 
+                                        onClick = {
                                             navController.navigate(Routes.mediaDetail(media.id))
                                         }
                                     )
@@ -314,7 +343,7 @@ fun TagEditScreen(
                 }
             }
         }
-        
+
         // 删除确认对话框
         if (showDeleteDialog) {
             AlertDialog(

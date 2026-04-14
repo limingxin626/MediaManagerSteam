@@ -1,35 +1,65 @@
 package com.example.myapplication.ui.screens.media
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.example.myapplication.LocalBottomBarVisible
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
-import com.example.myapplication.ui.components.*
+import com.example.myapplication.ui.components.EmptyState
+import com.example.myapplication.ui.components.InstagramFilterButton
+import com.example.myapplication.ui.components.LoadingIndicator
+import com.example.myapplication.ui.components.MediaCard
+import com.example.myapplication.ui.components.SearchBar
 import com.example.myapplication.ui.theme.InstagramGradientMiddle
 import com.example.myapplication.ui.viewmodel.MediaViewModel
+import androidx.compose.foundation.lazy.grid.items as gridItems
 
 /**
  * Instagram/Pinterest 风格媒体列表页面 - 两列瀑布流
@@ -46,17 +76,16 @@ fun MediaListScreen(
     val uiState by viewModel.uiState.collectAsState()
     val mediaList by viewModel.mediaList.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    
+
     // 局部搜索输入状态
     var localSearchQuery by remember { mutableStateOf("") }
-    
+
     LaunchedEffect(searchQuery) {
         localSearchQuery = searchQuery
     }
-    
+
     // 底部筛选面板状态
     var showFilterSheet by remember { mutableStateOf(false) }
-    
 
 
     val isListEmpty by remember {
@@ -94,7 +123,9 @@ fun MediaListScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        modifier = modifier.fillMaxSize().nestedScroll(nestedScrollConnection),
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surface
     ) { paddingValues ->
         Box(
@@ -129,7 +160,12 @@ fun MediaListScreen(
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
                             state = gridState,
-                            contentPadding = PaddingValues(top = topBarHeightDp + 4.dp, start = 2.dp, end = 2.dp, bottom = 88.dp),
+                            contentPadding = PaddingValues(
+                                top = topBarHeightDp + 4.dp,
+                                start = 2.dp,
+                                end = 2.dp,
+                                bottom = 88.dp
+                            ),
                             horizontalArrangement = Arrangement.spacedBy(2.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
@@ -138,7 +174,14 @@ fun MediaListScreen(
                                 key = { it.id }
                             ) { media ->
                                 val onClickCallback =
-                                    remember(media.id, mediaList) { { onMediaClick(media, mediaList) } }
+                                    remember(media.id, mediaList) {
+                                        {
+                                            onMediaClick(
+                                                media,
+                                                mediaList
+                                            )
+                                        }
+                                    }
 
                                 MediaCard(
                                     media = media,
@@ -184,13 +227,13 @@ fun MediaListScreen(
                         placeholder = "搜索媒体...",
                         modifier = Modifier.weight(1f)
                     )
-                
+
                     InstagramFilterButton(
                         hasActiveFilters = false,
                         onClick = { showFilterSheet = true }
                     )
                 }
-            
+
 
             }
         }
@@ -209,7 +252,7 @@ fun MediaListScreen(
             viewModel.clearMessage()
         }
     }
-    
+
 
 }
 

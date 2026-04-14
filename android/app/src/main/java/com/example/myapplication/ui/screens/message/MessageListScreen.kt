@@ -1,32 +1,68 @@
 package com.example.myapplication.ui.screens.message
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
-import com.example.myapplication.ui.components.*
+import com.example.myapplication.ui.components.EmptyState
+import com.example.myapplication.ui.components.LoadingIndicator
+import com.example.myapplication.ui.components.MessageCard
+import com.example.myapplication.ui.components.MessageComposeBar
+import com.example.myapplication.ui.components.SearchBar
 import com.example.myapplication.ui.theme.InstagramGradientMiddle
 import com.example.myapplication.ui.viewmodel.MessageViewModel
 import com.example.myapplication.ui.viewmodel.UIState
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 /**
  * Telegram 风格消息列表页面
@@ -157,14 +193,22 @@ fun MessageListScreen(
                             if (item != null) {
                                 // 日期分隔符：比较当前和下一条（index+1 方向是更旧的）
                                 val currentDate = dateFormatter.format(Date(item.message.createdAt))
-                                val nextItem = if (index + 1 < pagingItems.itemCount) pagingItems[index + 1] else null
-                                val nextDate = nextItem?.let { dateFormatter.format(Date(it.message.createdAt)) }
+                                val nextItem =
+                                    if (index + 1 < pagingItems.itemCount) pagingItems[index + 1] else null
+                                val nextDate =
+                                    nextItem?.let { dateFormatter.format(Date(it.message.createdAt)) }
 
                                 // reverseLayout 中，同一 item 块内先写的在视觉下方，后写的在上方
                                 // 所以先放 MessageCard，再放 DateSeparator，日期才会出现在消息上方
                                 MessageCard(
                                     messageWithDetails = item,
-                                    onMediaClick = { mediaId, mediaList -> onMediaClick(mediaId, item.message.id, mediaList) },
+                                    onMediaClick = { mediaId, mediaList ->
+                                        onMediaClick(
+                                            mediaId,
+                                            item.message.id,
+                                            mediaList
+                                        )
+                                    },
                                     onEditClick = { onEditMessage(it) },
                                     onDeleteClick = { viewModel.deleteMessage(it) },
                                     onToggleStarred = { viewModel.toggleStarred(it) },

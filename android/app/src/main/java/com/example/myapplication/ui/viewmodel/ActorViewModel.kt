@@ -60,7 +60,8 @@ class ActorViewModel(private val databaseManager: DatabaseManager) : ViewModel()
         // Each actor as a group
         for (actor in actors) {
             val count = messageRepository.getMessageCountByActor(actor.id)
-            val actorLastMessage = if (count > 0) messageRepository.getLastMessageByActor(actor.id) else null
+            val actorLastMessage =
+                if (count > 0) messageRepository.getLastMessageByActor(actor.id) else null
             groups.add(
                 ActorGroupItem(
                     actorId = actor.id,

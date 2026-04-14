@@ -12,7 +12,7 @@ import java.security.MessageDigest
  * 用于计算文件的哈希值，防止重复上传
  */
 object FileHashUtil {
-    
+
     /**
      * 计算文件的SHA-256哈希值
      * @param context Android 上下文
@@ -27,11 +27,11 @@ object FileHashUtil {
                     val digest = MessageDigest.getInstance("SHA-256")
                     val buffer = ByteArray(8192)
                     var bytesRead: Int
-                    
+
                     while (stream.read(buffer).also { bytesRead = it } != -1) {
                         digest.update(buffer, 0, bytesRead)
                     }
-                    
+
                     // 将字节数组转换为十六进制字符串
                     digest.digest().joinToString("") { "%02x".format(it) }
                 }
@@ -41,7 +41,7 @@ object FileHashUtil {
             }
         }
     }
-    
+
     /**
      * 计算字节数组的哈希值
      * @param data 字节数组
@@ -51,7 +51,7 @@ object FileHashUtil {
         val digest = MessageDigest.getInstance("SHA-256")
         return digest.digest(data).joinToString("") { "%02x".format(it) }
     }
-    
+
     /**
      * 验证文件是否与给定哈希值匹配
      * @param context Android 上下文
@@ -70,7 +70,7 @@ object FileHashUtil {
  * 包含文件相关的通用工具函数
  */
 object FileUtils {
-    
+
     /**
      * 格式化文件大小显示
      * @param sizeInBytes 文件大小（字节）
@@ -80,7 +80,11 @@ object FileUtils {
         return when {
             sizeInBytes < 1024 -> "${sizeInBytes} B"
             sizeInBytes < 1024 * 1024 -> String.format("%.1f KB", sizeInBytes / 1024.0)
-            sizeInBytes < 1024 * 1024 * 1024 -> String.format("%.1f MB", sizeInBytes / (1024.0 * 1024))
+            sizeInBytes < 1024 * 1024 * 1024 -> String.format(
+                "%.1f MB",
+                sizeInBytes / (1024.0 * 1024)
+            )
+
             else -> String.format("%.1f GB", sizeInBytes / (1024.0 * 1024 * 1024))
         }
     }
@@ -95,7 +99,7 @@ object FileUtils {
                     destFile.delete()
                 }
                 destFile.parentFile?.mkdirs()
-                
+
                 java.net.URL(url).openStream().use { input ->
                     java.io.FileOutputStream(destFile).use { output ->
                         input.copyTo(output)

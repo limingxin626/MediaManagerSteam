@@ -187,7 +187,7 @@
           <!-- Tags -->
           <div v-if="selectedMessage.tags && selectedMessage.tags.length > 0" class="flex flex-wrap gap-1.5">
             <span v-for="t in selectedMessage.tags" :key="t.id"
-              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-900/30 text-indigo-300">
+              class="tag-chip">
               {{ t.name }}
             </span>
           </div>

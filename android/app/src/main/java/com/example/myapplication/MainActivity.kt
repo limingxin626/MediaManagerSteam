@@ -5,11 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -22,7 +20,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,7 +29,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -50,12 +46,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -64,27 +61,25 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myapplication.data.DatabaseManager
-import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.service.SyncWorker
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.navigation.navigateToMediaFullscreen
+import com.example.myapplication.ui.navigation.NavigationAnimations
 import com.example.myapplication.ui.screens.actor.ActorListScreen
 import com.example.myapplication.ui.screens.home.HomeScreen
 import com.example.myapplication.ui.screens.media.MediaListScreen
-import com.example.myapplication.ui.screens.message.MessageListScreen
+import com.example.myapplication.ui.screens.media.MediaViewerScreen
 import com.example.myapplication.ui.screens.message.MessageEditScreen
-import com.example.myapplication.ui.screens.tag.TagEditScreen
-import com.example.myapplication.ui.screens.tag.TagListScreen
+import com.example.myapplication.ui.screens.message.MessageListScreen
+import com.example.myapplication.ui.screens.settings.SettingsScreen
+import com.example.myapplication.ui.screens.system.FolderDetailScreen
+import com.example.myapplication.ui.screens.system.SystemFolderViewScreen
 import com.example.myapplication.ui.screens.system.SystemGalleryScreen
 import com.example.myapplication.ui.screens.system.SystemMediaDetailScreen
 import com.example.myapplication.ui.screens.system.SystemMediaEditScreen
-import com.example.myapplication.ui.screens.system.SystemFolderViewScreen
-import com.example.myapplication.ui.screens.system.FolderDetailScreen
-import com.example.myapplication.ui.components.SystemMediaPickerScreen
-import com.example.myapplication.ui.screens.media.MediaViewerScreen
-import com.example.myapplication.ui.screens.settings.SettingsScreen
+import com.example.myapplication.ui.screens.tag.TagEditScreen
+import com.example.myapplication.ui.screens.tag.TagListScreen
 import com.example.myapplication.ui.theme.MyApplicationTheme
-import com.example.myapplication.ui.navigation.NavigationAnimations
 import com.example.myapplication.ui.viewmodel.ActorViewModel
 import com.example.myapplication.ui.viewmodel.HomeViewModel
 import com.example.myapplication.ui.viewmodel.MediaViewModel
@@ -94,12 +89,13 @@ import com.example.myapplication.ui.viewmodel.SystemGalleryViewModel
 import com.example.myapplication.ui.viewmodel.TagViewModel
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import java.net.URLDecoder
 
 
 // 定义 CompositionLocal 来控制底部导航栏的可见性
-val LocalBottomBarVisible = compositionLocalOf<MutableState<Boolean>> { error("No BottomBarVisible provided") }
+val LocalBottomBarVisible =
+    compositionLocalOf<MutableState<Boolean>> { error("No BottomBarVisible provided") }
 
 
 class MainActivity : ComponentActivity() {
@@ -156,7 +152,10 @@ class MainActivity : ComponentActivity() {
         object : ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return HomeViewModel(databaseManager.tagRepository, databaseManager.messageRepository) as T
+                return HomeViewModel(
+                    databaseManager.tagRepository,
+                    databaseManager.messageRepository
+                ) as T
             }
         }
     }
@@ -242,7 +241,11 @@ fun MyApplicationApp(
             modifier = Modifier.fillMaxSize(),
             contentWindowInsets = WindowInsets(0),
         ) { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
                 AppNavHost(
                     navController = navController,
                     databaseManager = databaseManager,
@@ -287,7 +290,6 @@ fun MyApplicationApp(
 }
 
 
-
 @Composable
 fun AppNavHost(
     navController: NavHostController,
@@ -314,29 +316,37 @@ fun AppNavHost(
         composable(
             Routes.HOME,
             enterTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
                 else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
                 else NavigationAnimations.noAnimation()
             },
             exitTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
                 else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
                 else NavigationAnimations.noExitAnimation()
             },
             popEnterTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
                 else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
                 else NavigationAnimations.noAnimation()
             },
             popExitTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
                 else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
                 else NavigationAnimations.noExitAnimation()
@@ -354,29 +364,37 @@ fun AppNavHost(
         composable(
             Routes.ACTOR_LIST,
             enterTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
                 else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
                 else NavigationAnimations.noAnimation()
             },
             exitTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
                 else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
                 else NavigationAnimations.noExitAnimation()
             },
             popEnterTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
                 else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
                 else NavigationAnimations.noAnimation()
             },
             popExitTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
                 else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
                 else NavigationAnimations.noExitAnimation()
@@ -392,34 +410,41 @@ fun AppNavHost(
         }
 
 
-
         // 媒体列表 - 底部导航方向感知滑动
         composable(
             Routes.MEDIA_LIST,
             enterTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
                 else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
                 else NavigationAnimations.noAnimation()
             },
             exitTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
                 else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
                 else NavigationAnimations.noExitAnimation()
             },
             popEnterTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
                 else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
                 else EnterTransition.None
             },
             popExitTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
                 else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
                 else ExitTransition.None
@@ -517,7 +542,6 @@ fun AppNavHost(
                 }
             )
         }
-
 
 
         // 消息编辑 - 从右侧滑入
@@ -733,29 +757,37 @@ fun AppNavHost(
         composable(
             Routes.SETTINGS,
             enterTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
                 else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
                 else NavigationAnimations.noAnimation()
             },
             exitTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
                 else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
                 else NavigationAnimations.noExitAnimation()
             },
             popEnterTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
                 else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
                 else NavigationAnimations.noAnimation()
             },
             popExitTransition = {
-                val from = AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
-                val to = AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
                 if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
                 else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
                 else NavigationAnimations.noExitAnimation()

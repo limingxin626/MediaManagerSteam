@@ -1,6 +1,16 @@
 package com.example.myapplication.ui.screens.system
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,8 +20,31 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,9 +59,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
-import com.example.myapplication.data.model.SystemMedia
 import com.example.myapplication.ui.viewmodel.MediaViewModel
 import com.example.myapplication.ui.viewmodel.SystemGalleryViewModel
 import com.example.myapplication.utils.MediaFilePicker
@@ -50,37 +81,37 @@ fun SystemMediaEditScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-    
+
     // 状态变量
     var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
     var showError by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var showSuccess by remember { mutableStateOf(false) }
-    
+
     // 系统媒体信息
     val mediaList by systemGalleryViewModel.mediaList.collectAsState()
     val mediaByFolder by systemGalleryViewModel.mediaByFolder.collectAsState()
     val hasPermission by systemGalleryViewModel.hasPermission.collectAsState()
-    
+
     // 查找系统媒体
     val systemMedia = remember(mediaId, mediaList, mediaByFolder) {
-        mediaList.find { it.id == mediaId } ?: 
-        mediaByFolder.values.flatten().find { it.id == mediaId }
+        mediaList.find { it.id == mediaId } ?: mediaByFolder.values.flatten()
+            .find { it.id == mediaId }
     }
-    
+
     // 编辑状态变量
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var rating by remember { mutableFloatStateOf(0f) }
-    
+
     // 权限检查
     LaunchedEffect(Unit) {
         if (!hasPermission) {
             systemGalleryViewModel.setPermissionGranted(true)
         }
     }
-    
+
     // 加载现有媒体数据
     LaunchedEffect(systemMedia) {
         if (systemMedia != null) {
@@ -98,7 +129,7 @@ fun SystemMediaEditScreen(
             }
         }
     }
-    
+
     // 保存函数
     fun saveMedia() {
         if (systemMedia == null) return
@@ -122,15 +153,15 @@ fun SystemMediaEditScreen(
                     fileHash = fileHash,
                     rating = rating.toInt()
                 )
-                
+
                 // 插入新记录
                 mediaViewModel.insertMedia(mediaToSave)
-                
+
                 showSuccess = true
                 // 延迟导航，让用户看到成功消息
                 kotlinx.coroutines.delay(1000)
                 navController.popBackStack()
-                
+
             } catch (e: Exception) {
                 errorMessage = "保存失败: ${e.message}"
                 showError = true
@@ -139,7 +170,7 @@ fun SystemMediaEditScreen(
             }
         }
     }
-    
+
     if (isLoading) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -155,7 +186,7 @@ fun SystemMediaEditScreen(
         }
         return
     }
-    
+
     if (systemMedia == null) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -173,7 +204,7 @@ fun SystemMediaEditScreen(
         }
         return
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -261,7 +292,7 @@ fun SystemMediaEditScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                    
+
                     // 视频指示器
                     if (systemMedia.isVideo) {
                         Surface(
@@ -281,7 +312,7 @@ fun SystemMediaEditScreen(
                     }
                 }
             }
-            
+
             // 编辑表单
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -309,7 +340,7 @@ fun SystemMediaEditScreen(
                         }
                     }
                 )
-                
+
                 // 描述编辑
                 OutlinedTextField(
                     value = description,
@@ -324,7 +355,7 @@ fun SystemMediaEditScreen(
                     minLines = 3,
                     maxLines = 5
                 )
-                
+
                 // 评分编辑
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -341,7 +372,7 @@ fun SystemMediaEditScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium
                         )
-                        
+
                         // 星级评分
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -350,7 +381,7 @@ fun SystemMediaEditScreen(
                             repeat(5) { index ->
                                 val starValue = index + 1f
                                 IconButton(
-                                    onClick = { 
+                                    onClick = {
                                         rating = if (rating == starValue) 0f else starValue
                                     }
                                 ) {
@@ -370,16 +401,16 @@ fun SystemMediaEditScreen(
                                     )
                                 }
                             }
-                            
+
                             Spacer(modifier = Modifier.width(8.dp))
-                            
+
                             Text(
                                 text = if (rating > 0) "${rating.toInt()}/5" else "未评分",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        
+
                         // 评分滑块
                         Column {
                             Slider(
@@ -407,7 +438,7 @@ fun SystemMediaEditScreen(
                         }
                     }
                 }
-                
+
                 // 文件信息（只读）
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -424,23 +455,23 @@ fun SystemMediaEditScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium
                         )
-                        
+
                         InfoRow("文件名", systemMedia.displayName)
                         InfoRow("大小", systemMedia.getFormattedSize())
-                        systemMedia.resolution?.let { 
+                        systemMedia.resolution?.let {
                             InfoRow("分辨率", it)
                         }
                         if (systemMedia.isVideo) {
-                            systemMedia.getFormattedDuration()?.let { 
+                            systemMedia.getFormattedDuration()?.let {
                                 InfoRow("时长", it)
                             }
                         }
-                        systemMedia.bucketDisplayName?.let { 
+                        systemMedia.bucketDisplayName?.let {
                             InfoRow("文件夹", it)
                         }
                     }
                 }
-                
+
                 // 底部间距
                 Spacer(modifier = Modifier.height(16.dp))
             }

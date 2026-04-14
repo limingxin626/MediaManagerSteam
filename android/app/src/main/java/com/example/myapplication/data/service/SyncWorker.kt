@@ -1,7 +1,6 @@
 package com.example.myapplication.data.service
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -14,6 +13,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.model.SyncResult
+import com.example.myapplication.data.service.SyncWorker.Companion.scheduleImmediateSync
+import com.example.myapplication.data.service.SyncWorker.Companion.schedulePeriodicSync
 import java.util.concurrent.TimeUnit
 
 /**
@@ -63,6 +64,7 @@ class SyncWorker(
                 prefs.edit().remove(KEY_LAST_SYNC_TIME).apply()
                 Result.success()
             }
+
             is SyncResult.Success -> {
                 val serverTime = pullResult.serverTime
                 if (serverTime != null) {
@@ -71,6 +73,7 @@ class SyncWorker(
                 Log.d(TAG, "增量同步完成: ${pullResult.totalAffected} 条")
                 Result.success()
             }
+
             is SyncResult.Error -> {
                 Log.e(TAG, "增量同步失败: ${pullResult.message}")
                 Result.retry()

@@ -1,11 +1,19 @@
 package com.example.myapplication.ui.components
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,13 +37,13 @@ fun MediaThumbnailCard(
     ) {
         // 简化实现，使用 Media 实体中的 filePath
         val displayPath = media.filePath ?: ""
-        
+
         // 使用 OptimizedThumbnail 处理所有媒体类型
         OptimizedThumbnail(
             thumbnailPath = displayPath,
             modifier = Modifier.fillMaxSize()
         )
-        
+
         // 视频标识（右上角小图标）
         if (media.mimeType?.startsWith("video/") == true) {
             Icon(
@@ -71,7 +79,7 @@ fun MediaThumbnailRow(
             val index = startIndex + col
             if (index < mediaList.size) {
                 val media = mediaList[index]
-                
+
                 MediaThumbnailCard(
                     media = media,
                     onClick = { onMediaClick(media, mediaList) },

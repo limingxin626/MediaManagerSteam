@@ -4,16 +4,34 @@ import android.os.Build
 import android.util.Size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -41,7 +59,7 @@ private fun SystemThumbnailImage(
     // 使用媒体ID作为缓存键，避免重复加载
     var thumbnailBitmap by remember(media.id) { mutableStateOf<android.graphics.Bitmap?>(null) }
     var isLoading by remember(media.id) { mutableStateOf(true) }
-    
+
     LaunchedEffect(media.id) {
         withContext(Dispatchers.IO) {
             try {
@@ -64,7 +82,7 @@ private fun SystemThumbnailImage(
             }
         }
     }
-    
+
     when {
         isLoading -> {
             // 加载中显示占位符
@@ -75,6 +93,7 @@ private fun SystemThumbnailImage(
                 CircularProgressIndicator(modifier = Modifier.size(24.dp))
             }
         }
+
         thumbnailBitmap != null -> {
             // 显示系统缩略图
             androidx.compose.foundation.Image(
@@ -84,6 +103,7 @@ private fun SystemThumbnailImage(
                 contentScale = contentScale
             )
         }
+
         else -> {
             // Fallback到Coil加载原图
             AsyncImage(
@@ -116,7 +136,7 @@ fun SystemMediaCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -136,7 +156,7 @@ fun SystemMediaCard(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            
+
             // 视频播放图标
             if (media.isVideo) {
                 Box(
@@ -157,7 +177,7 @@ fun SystemMediaCard(
                     )
                 }
             }
-            
+
             // 视频时长显示
             if (media.isVideo && media.duration != null) {
                 Box(
@@ -178,7 +198,7 @@ fun SystemMediaCard(
                     )
                 }
             }
-            
+
             // 选择模式下的选中状态
             if (isSelectionMode) {
                 Box(
@@ -210,7 +230,7 @@ fun SystemMediaCard(
                     }
                 }
             }
-            
+
             // 选中状态的遮罩
             if (isSelected) {
                 Box(
@@ -249,7 +269,7 @@ fun SystemMediaInfoCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            
+
             // 基本信息
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -265,7 +285,7 @@ fun SystemMediaInfoCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            
+
             // 分辨率
             media.resolution?.let { resolution ->
                 Text(
@@ -273,7 +293,7 @@ fun SystemMediaInfoCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            
+
             // 视频时长
             if (media.isVideo) {
                 media.getFormattedDuration()?.let { duration ->
@@ -283,7 +303,7 @@ fun SystemMediaInfoCard(
                     )
                 }
             }
-            
+
             // 文件夹
             media.bucketDisplayName?.let { bucket ->
                 Text(

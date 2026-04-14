@@ -1,9 +1,9 @@
 package com.example.myapplication.data.database.entities
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.PrimaryKey
 
 /**
  * 消息实体类
@@ -37,9 +37,10 @@ data class Message(
     val sendStatus: String = MSG_STATUS_SYNCED
 ) {
     companion object {
-        const val MSG_STATUS_SYNCED  = "SYNCED"
+        const val MSG_STATUS_SYNCED = "SYNCED"
         const val MSG_STATUS_PUSHING = "PUSHING"
         const val MSG_STATUS_PUSH_FAILED = "PUSH_FAILED"
+
         /** 本地已保存，等待后台自动同步（UI 上不显示任何同步指示） */
         const val MSG_STATUS_PENDING_SYNC = "PENDING_SYNC"
     }

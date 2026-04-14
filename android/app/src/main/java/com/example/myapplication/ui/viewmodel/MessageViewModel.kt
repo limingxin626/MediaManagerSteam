@@ -59,29 +59,41 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
 
     // 分页消息列表
     @OptIn(ExperimentalCoroutinesApi::class)
-    val messagesPaged: Flow<PagingData<MessageWithDetails>> = combine(_searchQuery, _tagId, _actorId) { query, tagId, actorId ->
-        Triple(query, tagId, actorId)
-    }.flatMapLatest { (query, tagId, actorId) ->
-        Pager(
-            config = PagingConfig(pageSize = 30, prefetchDistance = 10),
-            pagingSourceFactory = {
-                when {
-                    actorId != null -> messageRepository.getMessagesByActorPaged(actorId, query)
-                    tagId != null   -> messageRepository.getMessagesByTagPaged(tagId, query)
-                    else            -> messageRepository.getMessagesPaged(query)
+    val messagesPaged: Flow<PagingData<MessageWithDetails>> =
+        combine(_searchQuery, _tagId, _actorId) { query, tagId, actorId ->
+            Triple(query, tagId, actorId)
+        }.flatMapLatest { (query, tagId, actorId) ->
+            Pager(
+                config = PagingConfig(pageSize = 30, prefetchDistance = 10),
+                pagingSourceFactory = {
+                    when {
+                        actorId != null -> messageRepository.getMessagesByActorPaged(actorId, query)
+                        tagId != null -> messageRepository.getMessagesByTagPaged(tagId, query)
+                        else -> messageRepository.getMessagesPaged(query)
+                    }
                 }
-            }
-        ).flow
-    }.cachedIn(viewModelScope)
+            ).flow
+        }.cachedIn(viewModelScope)
 
     // UI状态
     private val _uiState = MutableStateFlow(UIState())
     val uiState: StateFlow<UIState> = _uiState.asStateFlow()
 
-    fun searchMessages(query: String) { _searchQuery.value = query }
-    fun clearSearch() { _searchQuery.value = "" }
-    fun setTagId(tagId: Long?) { _tagId.value = tagId }
-    fun setActorId(actorId: Long?) { _actorId.value = actorId }
+    fun searchMessages(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun clearSearch() {
+        _searchQuery.value = ""
+    }
+
+    fun setTagId(tagId: Long?) {
+        _tagId.value = tagId
+    }
+
+    fun setActorId(actorId: Long?) {
+        _actorId.value = actorId
+    }
 
     fun refreshMessages() {
         viewModelScope.launch {
@@ -90,8 +102,13 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
         }
     }
 
-    fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
-    fun clearMessage() { _uiState.value = _uiState.value.copy(message = null) }
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun clearMessage() {
+        _uiState.value = _uiState.value.copy(message = null)
+    }
 
     fun toggleStarred(messageId: Long) {
         viewModelScope.launch {
@@ -133,16 +150,24 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
             val thumbnailGenerator = ThumbnailGenerator(context)
 
             // Step 1: 在主线程外预处理所有媒体文件（复制、哈希、缩略图）
-            data class PreparedMedia(val info: MediaFileInfo, val localPath: String?, val entity: Media)
+            data class PreparedMedia(
+                val info: MediaFileInfo,
+                val localPath: String?,
+                val entity: Media
+            )
 
             val preparedList = withContext(Dispatchers.IO) {
                 mediaList.mapIndexed { _, mediaFileInfo ->
-                    val localPath = filePicker.copyFileToAppStorage(mediaFileInfo.uri, mediaFileInfo.fileName)
-                    val fileHash = filePicker.computeBlake2bHash(mediaFileInfo.uri) ?: mediaFileInfo.uri.toString()
+                    val localPath =
+                        filePicker.copyFileToAppStorage(mediaFileInfo.uri, mediaFileInfo.fileName)
+                    val fileHash = filePicker.computeBlake2bHash(mediaFileInfo.uri)
+                        ?: mediaFileInfo.uri.toString()
                     val resolution = filePicker.getMediaResolution(mediaFileInfo.uri)
                     val isVideo = mediaFileInfo.mimeType?.startsWith("video/") == true
-                    val durationMs = if (isVideo) filePicker.getVideoDuration(mediaFileInfo.uri)?.let { it * 1000 } else null
-                    val thumbnailPath = localPath?.let { thumbnailGenerator.generateThumbnail(it, isVideo) }
+                    val durationMs = if (isVideo) filePicker.getVideoDuration(mediaFileInfo.uri)
+                        ?.let { it * 1000 } else null
+                    val thumbnailPath =
+                        localPath?.let { thumbnailGenerator.generateThumbnail(it, isVideo) }
                     PreparedMedia(
                         info = mediaFileInfo,
                         localPath = localPath,
@@ -162,8 +187,9 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
 
             // Step 2: 判断是否在线，决定初始状态
             val isOnline = !databaseManager.syncPreferences.isOfflineMode.value &&
-                           databaseManager.networkMonitor.isWifiConnected.value == true
-            val initialStatus = if (isOnline) Message.MSG_STATUS_PUSHING else Message.MSG_STATUS_PENDING_SYNC
+                    databaseManager.networkMonitor.isWifiConnected.value == true
+            val initialStatus =
+                if (isOnline) Message.MSG_STATUS_PUSHING else Message.MSG_STATUS_PENDING_SYNC
 
             // 单事务写入 Message + 所有 Media + junctions + tags → PagingData 只刷新一次
             val (localMessageId, mediaIds) = messageRepository.createMessageWithMedia(
@@ -184,13 +210,19 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                     preparedList.mapIndexed { index, prepared ->
                         async {
                             val serverPath = uploadFile(prepared.info, prepared.localPath)
-                            if (serverPath != null) ClientMediaFile(id = mediaIds[index], file_path = serverPath) else null
+                            if (serverPath != null) ClientMediaFile(
+                                id = mediaIds[index],
+                                file_path = serverPath
+                            ) else null
                         }
                     }.awaitAll()
                 }
                 if (uploadResults.any { it == null } && preparedList.isNotEmpty()) {
                     Log.w(TAG, "sendMessage 部分文件上传失败，标记为待同步")
-                    messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PENDING_SYNC)
+                    messageRepository.updateSendStatus(
+                        localMessageId,
+                        Message.MSG_STATUS_PENDING_SYNC
+                    )
                     return@launch
                 }
 
@@ -233,7 +265,10 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                     mediaList.map { media ->
                         async {
                             val serverPath = uploadFileFromMedia(media)
-                            if (serverPath != null) ClientMediaFile(id = media.id, file_path = serverPath) else null
+                            if (serverPath != null) ClientMediaFile(
+                                id = media.id,
+                                file_path = serverPath
+                            ) else null
                         }
                     }.awaitAll()
                 }
@@ -269,7 +304,8 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
         val file = File(localPath)
         if (!file.exists()) return null
         return try {
-            val body = ProgressRequestBody(file, mediaFileInfo.mimeType ?: "application/octet-stream") { }
+            val body =
+                ProgressRequestBody(file, mediaFileInfo.mimeType ?: "application/octet-stream") { }
             val part = MultipartBody.Part.createFormData("file", mediaFileInfo.fileName, body)
             SyncNetwork.uploadService.uploadMedia(part).path
         } catch (e: Exception) {

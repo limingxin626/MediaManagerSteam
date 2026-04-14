@@ -19,7 +19,10 @@ interface SyncOutboxDao {
     @Query(
         "SELECT * FROM sync_outbox WHERE status = :status ORDER BY createdAt ASC LIMIT :limit"
     )
-    suspend fun getByStatus(status: String = SyncOutboxItem.STATUS_PENDING, limit: Int = 200): List<SyncOutboxItem>
+    suspend fun getByStatus(
+        status: String = SyncOutboxItem.STATUS_PENDING,
+        limit: Int = 200
+    ): List<SyncOutboxItem>
 
     @Query(
         "DELETE FROM sync_outbox WHERE status = :status"
@@ -42,5 +45,9 @@ interface SyncOutboxDao {
     @Query(
         "UPDATE sync_outbox SET attemptCount = attemptCount + 1, lastError = :lastError, updatedAt = :updatedAt WHERE id = :id"
     )
-    suspend fun markAttempt(id: Long, lastError: String?, updatedAt: Long = System.currentTimeMillis())
+    suspend fun markAttempt(
+        id: Long,
+        lastError: String?,
+        updatedAt: Long = System.currentTimeMillis()
+    )
 }

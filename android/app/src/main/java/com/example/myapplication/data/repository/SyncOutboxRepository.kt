@@ -5,9 +5,9 @@ import com.example.myapplication.data.database.dao.SyncOutboxDao
 import com.example.myapplication.data.database.entities.SyncOutboxItem
 import com.example.myapplication.data.model.PushSyncResult
 import com.example.myapplication.data.service.ApplySyncChangesRequest
+import com.example.myapplication.data.service.NetworkMonitor
 import com.example.myapplication.data.service.SyncChangeRequest
 import com.example.myapplication.data.service.SyncNetwork
-import com.example.myapplication.data.service.NetworkMonitor
 import com.example.myapplication.data.service.SyncPreferences
 import com.google.gson.JsonParser
 
@@ -109,13 +109,20 @@ class SyncOutboxRepository(
             for (item in pending) {
                 if (item.attemptCount + 1 >= MAX_RETRY_COUNT) {
                     dao.updateStatus(item.id, SyncOutboxItem.STATUS_FAILED)
-                    Log.w(TAG, "Outbox item #${item.id} 超过最大重试次数 ($MAX_RETRY_COUNT)，标记为 FAILED")
+                    Log.w(
+                        TAG,
+                        "Outbox item #${item.id} 超过最大重试次数 ($MAX_RETRY_COUNT)，标记为 FAILED"
+                    )
                 } else {
                     dao.markAttempt(item.id, e.message)
                 }
             }
 
-            PushSyncResult.Error(message = e.message ?: "未知错误", pushedCount = 0, failedCount = pending.size)
+            PushSyncResult.Error(
+                message = e.message ?: "未知错误",
+                pushedCount = 0,
+                failedCount = pending.size
+            )
         }
     }
 
