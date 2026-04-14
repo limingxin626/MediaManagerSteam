@@ -34,6 +34,12 @@ class SyncWorker(
         val db = DatabaseManager.getInstance(applicationContext)
         val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+        // 离线模式下跳过所有同步
+        if (db.syncPreferences.isOfflineMode.value) {
+            Log.d(TAG, "离线模式已开启，跳过后台同步")
+            return Result.success()
+        }
+
         // 1. Push outbox
         try {
             val pushResult = db.syncOutboxRepository.syncToServer()

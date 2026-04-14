@@ -160,16 +160,25 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                 }
             }
 
-            // Step 2: 单事务写入 Message + 所有 Media + junctions + tags → PagingData 只刷新一次
+            // Step 2: 判断是否在线，决定初始状态
+            val isOnline = !databaseManager.syncPreferences.isOfflineMode.value &&
+                           databaseManager.networkMonitor.isWifiConnected.value == true
+            val initialStatus = if (isOnline) Message.MSG_STATUS_PUSHING else Message.MSG_STATUS_PENDING_SYNC
+
+            // 单事务写入 Message + 所有 Media + junctions + tags → PagingData 只刷新一次
             val (localMessageId, mediaIds) = messageRepository.createMessageWithMedia(
-                message = Message(text = text.ifBlank { null }, sendStatus = Message.MSG_STATUS_PUSHING),
+                message = Message(text = text.ifBlank { null }, sendStatus = initialStatus),
                 mediaEntities = preparedList.map { it.entity },
                 tagRepository = databaseManager.tagRepository
             )
-            // ↑ 至此消息已在 paging 中完整可见（带全部本地缩略图，状态 PUSHING）
+            // ↑ 至此消息已在 paging 中完整可见（带全部本地缩略图）
             _isSending.value = false
 
-            // Step 3: 后台上传 + 推送
+            // Step 3: 后台上传 + 推送（离线时跳过，由 WorkManager/retrySync 重试）
+            if (!isOnline) {
+                Log.d(TAG, "sendMessage 跳过上传：离线模式或无 WiFi 连接，消息已本地保存")
+                return@launch
+            }
             try {
                 val uploadResults = coroutineScope {
                     preparedList.mapIndexed { index, prepared ->
@@ -180,8 +189,8 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                     }.awaitAll()
                 }
                 if (uploadResults.any { it == null } && preparedList.isNotEmpty()) {
-                    messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PUSH_FAILED)
-                    onError("上传失败")
+                    Log.w(TAG, "sendMessage 部分文件上传失败，标记为待同步")
+                    messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PENDING_SYNC)
                     return@launch
                 }
 
@@ -205,9 +214,9 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                 messageRepository.applyRemoteUrls(localMessageId, response)
                 onSuccess()
             } catch (e: Exception) {
-                Log.e(TAG, "sendMessage 失败: ${e.message}", e)
-                messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PUSH_FAILED)
-                onError("同步失败: ${e.message}")
+                Log.e(TAG, "sendMessage 同步失败，已入队等待重试: ${e.message}", e)
+                // 不标记 PUSH_FAILED（避免用户看到错误），标记 PENDING_SYNC 静默等待重试
+                messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PENDING_SYNC)
             }
         }
     }

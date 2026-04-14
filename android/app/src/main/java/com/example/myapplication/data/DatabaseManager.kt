@@ -10,6 +10,7 @@ import com.example.myapplication.data.repository.TagRepository
 import com.example.myapplication.data.repository.SyncOutboxRepository
 import com.example.myapplication.data.repository.MessageRepository
 import com.example.myapplication.data.service.NetworkMonitor
+import com.example.myapplication.data.service.SyncPreferences
 
 /**
  * 数据库管理器
@@ -30,16 +31,19 @@ class DatabaseManager private constructor(context: Context) {
     private val syncOutboxDao = database.syncOutboxDao()
     private val messageDao = database.messageDao()
 
+    // 网络监听
+    val networkMonitor = NetworkMonitor(appContext)
+
+    // 同步偏好
+    val syncPreferences = SyncPreferences(appContext)
+
     // Repository实例
-    val syncOutboxRepository = SyncOutboxRepository(syncOutboxDao)
+    val syncOutboxRepository = SyncOutboxRepository(syncOutboxDao, networkMonitor, syncPreferences)
 
     val actorRepository = ActorRepository(actorDao, syncOutboxRepository)
     val mediaRepository = MediaRepository(mediaDao, syncOutboxRepository)
     val tagRepository = TagRepository(tagDao)
     val messageRepository = MessageRepository(messageDao, mediaDao, tagDao, actorDao, syncOutboxRepository, database)
-
-    // 网络监听
-    val networkMonitor = NetworkMonitor(appContext)
 
     companion object {
         @Volatile

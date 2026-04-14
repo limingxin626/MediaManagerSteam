@@ -7,10 +7,14 @@ import com.example.myapplication.data.model.PushSyncResult
 import com.example.myapplication.data.service.ApplySyncChangesRequest
 import com.example.myapplication.data.service.SyncChangeRequest
 import com.example.myapplication.data.service.SyncNetwork
+import com.example.myapplication.data.service.NetworkMonitor
+import com.example.myapplication.data.service.SyncPreferences
 import com.google.gson.JsonParser
 
 class SyncOutboxRepository(
-    private val dao: SyncOutboxDao
+    private val dao: SyncOutboxDao,
+    private val networkMonitor: NetworkMonitor? = null,
+    private val syncPreferences: SyncPreferences? = null
 ) {
 
     suspend fun enqueueUpsert(entityType: String, entityId: Long, payloadJson: String) {
@@ -55,6 +59,18 @@ class SyncOutboxRepository(
     }
 
     suspend fun syncToServer(limit: Int = 200): PushSyncResult {
+        // 手动离线模式时跳过
+        if (syncPreferences?.isOfflineMode?.value == true) {
+            Log.d(TAG, "syncToServer 跳过：已开启离线模式")
+            return PushSyncResult.Skipped
+        }
+
+        // 无 WiFi 时跳过，由 WorkManager 在网络恢复后重试
+        if (networkMonitor?.isWifiConnected?.value == false) {
+            Log.d(TAG, "syncToServer 跳过：当前无 WiFi 连接")
+            return PushSyncResult.Skipped
+        }
+
         return try {
             val pending = dao.getByStatus(SyncOutboxItem.STATUS_PENDING, limit)
             if (pending.isEmpty()) {

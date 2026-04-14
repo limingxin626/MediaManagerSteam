@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.model.SyncResult
+import com.example.myapplication.data.service.SyncPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -12,8 +13,20 @@ class SettingsViewModel(
     private val databaseManager: DatabaseManager
 ) : ViewModel() {
 
+    private val syncPreferences: SyncPreferences = databaseManager.syncPreferences
+
     private val _syncState = MutableStateFlow<SyncUiState>(SyncUiState.Idle)
     val syncState: StateFlow<SyncUiState> = _syncState
+
+    /** 离线模式状态 */
+    val isOfflineMode: StateFlow<Boolean> = syncPreferences.isOfflineMode
+
+    /** 网络连接状态 */
+    val isWifiConnected: StateFlow<Boolean> = databaseManager.networkMonitor.isWifiConnected
+
+    fun setOfflineMode(enabled: Boolean) {
+        syncPreferences.setOfflineMode(enabled)
+    }
 
     fun syncAll() {
         if (_syncState.value is SyncUiState.Syncing) return

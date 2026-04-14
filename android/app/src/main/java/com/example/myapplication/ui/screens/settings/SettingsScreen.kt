@@ -15,6 +15,8 @@ import com.example.myapplication.ui.viewmodel.SyncUiState
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val syncState by viewModel.syncState.collectAsState()
+    val isOfflineMode by viewModel.isOfflineMode.collectAsState()
+    val isWifiConnected by viewModel.isWifiConnected.collectAsState()
 
     Scaffold(
         topBar = {
@@ -28,6 +30,40 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // 离线模式卡片
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "离线模式",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = if (isOfflineMode) "已开启，不会尝试同步"
+                                       else if (!isWifiConnected) "WiFi 未连接，自动跳过同步"
+                                       else "已关闭，正常同步",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isOfflineMode || !isWifiConnected)
+                                    MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = isOfflineMode,
+                            onCheckedChange = { viewModel.setOfflineMode(it) }
+                        )
+                    }
+                }
+            }
+
             // 同步卡片
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(

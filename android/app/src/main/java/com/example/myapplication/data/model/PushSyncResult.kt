@@ -11,4 +11,7 @@ sealed class PushSyncResult {
         val pushedCount: Int = 0,
         val failedCount: Int = 0
     ) : PushSyncResult()
+
+    /** 因离线或手动禁用而跳过同步 */
+    data object Skipped : PushSyncResult()
 }

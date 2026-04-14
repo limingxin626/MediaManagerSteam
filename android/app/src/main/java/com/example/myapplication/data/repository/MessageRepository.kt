@@ -27,8 +27,10 @@ import com.example.myapplication.data.service.MessageSyncResponse
 import androidx.paging.PagingSource
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.google.gson.Gson
 import java.time.LocalDateTime
@@ -227,10 +229,12 @@ class MessageRepository(
                 entityId = insertedId,
                 payloadJson = Gson().toJson(payload)
             )
-            try {
-                outboxRepository?.syncToServer()
-            } catch (e: Exception) {
-                Log.w(TAG, "createMessage 立即推送失败，将由后台任务重试: ${e.message}")
+            // Fire-and-forget: 不阻塞调用方
+            outboxRepository?.let { repo ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    try { repo.syncToServer() }
+                    catch (e: Exception) { Log.w(TAG, "createMessage 立即推送失败，将由后台任务重试: ${e.message}") }
+                }
             }
         }
 
@@ -250,10 +254,12 @@ class MessageRepository(
                 entityId = updatedMessage.id,
                 payloadJson = Gson().toJson(updatedMessage)
             )
-            try {
-                outboxRepository?.syncToServer()
-            } catch (e: Exception) {
-                Log.w(TAG, "updateMessage 立即推送失败，将由后台任务重试: ${e.message}")
+            // Fire-and-forget: 不阻塞调用方
+            outboxRepository?.let { repo ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    try { repo.syncToServer() }
+                    catch (e: Exception) { Log.w(TAG, "updateMessage 立即推送失败，将由后台任务重试: ${e.message}") }
+                }
             }
         }
     }
@@ -270,10 +276,12 @@ class MessageRepository(
                 entityType = SyncOutboxItem.ENTITY_MESSAGE,
                 entityId = messageId
             )
-            try {
-                outboxRepository?.syncToServer()
-            } catch (e: Exception) {
-                Log.w(TAG, "deleteMessage 立即推送失败，将由后台任务重试: ${e.message}")
+            // Fire-and-forget: 不阻塞调用方
+            outboxRepository?.let { repo ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    try { repo.syncToServer() }
+                    catch (e: Exception) { Log.w(TAG, "deleteMessage 立即推送失败，将由后台任务重试: ${e.message}") }
+                }
             }
         }
     }
@@ -334,11 +342,12 @@ class MessageRepository(
                     entityId = updated.id,
                     payloadJson = Gson().toJson(updated)
                 )
-                // 立即推送，失败时 outbox 保留记录供 WorkManager 补推
-                try {
-                    outboxRepository?.syncToServer()
-                } catch (e: Exception) {
-                    Log.w(TAG, "toggleStarred 立即推送失败，将由后台任务重试: ${e.message}")
+                // Fire-and-forget: 不阻塞调用方
+                outboxRepository?.let { repo ->
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try { repo.syncToServer() }
+                        catch (e: Exception) { Log.w(TAG, "toggleStarred 立即推送失败，将由后台任务重试: ${e.message}") }
+                    }
                 }
             }
         }
@@ -753,12 +762,13 @@ class MessageRepository(
         System.currentTimeMillis()
     }
 
-    /** 立即将 outbox 中的待推送变更同步到后端 */
-    suspend fun syncNow() {
-        try {
-            outboxRepository?.syncToServer()
-        } catch (e: Exception) {
-            Log.w(TAG, "syncNow 推送失败，将由后台任务重试: ${e.message}")
+    /** 立即将 outbox 中的待推送变更同步到后端（fire-and-forget） */
+    fun syncNow() {
+        outboxRepository?.let { repo ->
+            CoroutineScope(Dispatchers.IO).launch {
+                try { repo.syncToServer() }
+                catch (e: Exception) { Log.w(TAG, "syncNow 推送失败，将由后台任务重试: ${e.message}") }
+            }
         }
     }
 

@@ -40,5 +40,7 @@ data class Message(
         const val MSG_STATUS_SYNCED  = "SYNCED"
         const val MSG_STATUS_PUSHING = "PUSHING"
         const val MSG_STATUS_PUSH_FAILED = "PUSH_FAILED"
+        /** 本地已保存，等待后台自动同步（UI 上不显示任何同步指示） */
+        const val MSG_STATUS_PENDING_SYNC = "PENDING_SYNC"
     }
 }
