@@ -26,6 +26,21 @@ interface MessageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: Message): Long
 
+    // 插入消息（已存在则跳过，不触发 CASCADE 删除 junction 表）
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMessageIgnore(message: Message): Long
+
+    // 插入或更新消息（IGNORE + update，避免 REPLACE 的 CASCADE 副作用）
+    suspend fun upsertMessage(message: Message): Long {
+        val insertedId = insertMessageIgnore(message)
+        if (insertedId == -1L) {
+            // 已存在，更新
+            updateMessage(message)
+            return message.id
+        }
+        return insertedId
+    }
+
     @Update
     suspend fun updateMessage(message: Message)
 

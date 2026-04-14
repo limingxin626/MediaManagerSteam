@@ -32,7 +32,8 @@ sealed class SyncResult {
     data class Success(
         val insertedCount: Int,
         val updatedCount: Int,
-        val deletedCount: Int = 0
+        val deletedCount: Int = 0,
+        val serverTime: String? = null
     ) : SyncResult() {
         val totalAffected: Int get() = insertedCount + updatedCount + deletedCount
     }

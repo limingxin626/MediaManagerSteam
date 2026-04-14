@@ -25,6 +25,7 @@ class ActorRepository(
 ) {
 
     private val syncService by lazy { SyncNetwork.syncService }
+    private val gson = Gson()
     
     // 查询操作
     fun getAllActors(): Flow<List<Actor>> = actorDao.getAllActors()
@@ -48,7 +49,7 @@ class ActorRepository(
             outboxRepository?.enqueueUpsert(
                 entityType = SyncOutboxItem.ENTITY_ACTOR,
                 entityId = insertedId,
-                payloadJson = Gson().toJson(payload)
+                payloadJson = gson.toJson(payload)
             )
         }
 
@@ -65,7 +66,7 @@ class ActorRepository(
                 outboxRepository?.enqueueUpsert(
                     entityType = SyncOutboxItem.ENTITY_ACTOR,
                     entityId = id,
-                    payloadJson = Gson().toJson(payload)
+                    payloadJson = gson.toJson(payload)
                 )
             }
         }
@@ -83,7 +84,7 @@ class ActorRepository(
             outboxRepository?.enqueueUpsert(
                 entityType = SyncOutboxItem.ENTITY_ACTOR,
                 entityId = updatedActor.id,
-                payloadJson = Gson().toJson(updatedActor)
+                payloadJson = gson.toJson(updatedActor)
             )
         }
     }
@@ -131,7 +132,7 @@ class ActorRepository(
     /**
      * 从远程服务器同步演员数据（upsert，不删除本地多余数据）
      */
-    suspend fun syncFromRemote(context: Context, serverId: String = "default"): SyncResult = withContext(Dispatchers.IO) {
+    suspend fun syncFromRemote(context: Context): SyncResult = withContext(Dispatchers.IO) {
         return@withContext try {
             Log.d(TAG, "开始从远程服务器同步演员数据...")
 
@@ -166,7 +167,7 @@ class ActorRepository(
     /**
      * 从远程服务器全量同步（删除本地不存在于远程的演员）
      */
-    suspend fun fullSyncFromRemote(context: Context, serverId: String = "default"): SyncResult = withContext(Dispatchers.IO) {
+    suspend fun fullSyncFromRemote(context: Context): SyncResult = withContext(Dispatchers.IO) {
         return@withContext try {
             Log.d(TAG, "开始全量同步远程演员数据...")
 

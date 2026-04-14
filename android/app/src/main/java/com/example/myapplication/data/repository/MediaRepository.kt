@@ -4,10 +4,7 @@ import android.util.Log
 import com.example.myapplication.data.database.dao.MediaDao
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.database.entities.SyncOutboxItem
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.launch
 import com.google.gson.Gson
 
 /**
@@ -17,6 +14,8 @@ class MediaRepository(
     private val mediaDao: MediaDao,
     private val outboxRepository: SyncOutboxRepository? = null
 ) {
+
+    private val gson = Gson()
     
     // 查询操作
     fun getAllMedia(): Flow<List<Media>> = mediaDao.getAllMedia()
@@ -65,7 +64,7 @@ class MediaRepository(
             outboxRepository?.enqueueUpsert(
                 entityType = SyncOutboxItem.ENTITY_MEDIA,
                 entityId = insertedId,
-                payloadJson = Gson().toJson(payload)
+                payloadJson = gson.toJson(payload)
             )
             try {
                 outboxRepository?.syncToServer()
@@ -86,7 +85,7 @@ class MediaRepository(
                 outboxRepository?.enqueueUpsert(
                     entityType = SyncOutboxItem.ENTITY_MEDIA,
                     entityId = id,
-                    payloadJson = Gson().toJson(payload)
+                    payloadJson = gson.toJson(payload)
                 )
             }
         }
@@ -108,7 +107,7 @@ class MediaRepository(
             outboxRepository?.enqueueUpsert(
                 entityType = SyncOutboxItem.ENTITY_MEDIA,
                 entityId = updatedMedia.id,
-                payloadJson = Gson().toJson(updatedMedia)
+                payloadJson = gson.toJson(updatedMedia)
             )
             try {
                 outboxRepository?.syncToServer()
@@ -182,7 +181,7 @@ class MediaRepository(
             outboxRepository?.enqueueUpsert(
                 entityType = SyncOutboxItem.ENTITY_MEDIA,
                 entityId = updated.id,
-                payloadJson = Gson().toJson(updated)
+                payloadJson = gson.toJson(updated)
             )
             try {
                 outboxRepository?.syncToServer()
@@ -205,7 +204,7 @@ class MediaRepository(
                 outboxRepository?.enqueueUpsert(
                     entityType = SyncOutboxItem.ENTITY_MEDIA,
                     entityId = updatedMedia.id,
-                    payloadJson = Gson().toJson(updatedMedia)
+                    payloadJson = gson.toJson(updatedMedia)
                 )
                 try {
                     outboxRepository?.syncToServer()

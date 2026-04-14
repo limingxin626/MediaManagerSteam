@@ -14,8 +14,6 @@ import com.example.myapplication.data.database.entities.SyncOutboxItem
 import com.example.myapplication.data.database.entities.Tag
 import com.example.myapplication.data.model.MessageSortBy
 import com.example.myapplication.data.model.RemoteActor
-import com.example.myapplication.data.model.RemoteChangeItem
-import com.example.myapplication.data.model.RemoteChangesResponse
 import com.example.myapplication.data.model.RemoteMediaItem
 import com.example.myapplication.data.model.RemoteMessage
 import com.example.myapplication.data.model.RemoteTagItem
@@ -31,6 +29,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import com.google.gson.Gson
 import java.time.LocalDateTime
@@ -45,8 +45,12 @@ class MessageRepository(
     private val tagDao: TagDao,
     private val actorDao: ActorDao,
     private val outboxRepository: SyncOutboxRepository? = null,
-    private val database: RoomDatabase? = null
+    private val database: RoomDatabase? = null,
+    private val appScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) {
+
+    private val gson = Gson()
+    private val syncMutex = Mutex()
 
     /**
      * 解析文本中的 #tag 并关联到消息
@@ -227,15 +231,9 @@ class MessageRepository(
             outboxRepository?.enqueueUpsert(
                 entityType = SyncOutboxItem.ENTITY_MESSAGE,
                 entityId = insertedId,
-                payloadJson = Gson().toJson(payload)
+                payloadJson = gson.toJson(payload)
             )
-            // Fire-and-forget: 不阻塞调用方
-            outboxRepository?.let { repo ->
-                CoroutineScope(Dispatchers.IO).launch {
-                    try { repo.syncToServer() }
-                    catch (e: Exception) { Log.w(TAG, "createMessage 立即推送失败，将由后台任务重试: ${e.message}") }
-                }
-            }
+            fireAndForgetSync()
         }
 
         return insertedId
@@ -252,15 +250,9 @@ class MessageRepository(
             outboxRepository?.enqueueUpsert(
                 entityType = SyncOutboxItem.ENTITY_MESSAGE,
                 entityId = updatedMessage.id,
-                payloadJson = Gson().toJson(updatedMessage)
+                payloadJson = gson.toJson(updatedMessage)
             )
-            // Fire-and-forget: 不阻塞调用方
-            outboxRepository?.let { repo ->
-                CoroutineScope(Dispatchers.IO).launch {
-                    try { repo.syncToServer() }
-                    catch (e: Exception) { Log.w(TAG, "updateMessage 立即推送失败，将由后台任务重试: ${e.message}") }
-                }
-            }
+            fireAndForgetSync()
         }
     }
 
@@ -276,13 +268,7 @@ class MessageRepository(
                 entityType = SyncOutboxItem.ENTITY_MESSAGE,
                 entityId = messageId
             )
-            // Fire-and-forget: 不阻塞调用方
-            outboxRepository?.let { repo ->
-                CoroutineScope(Dispatchers.IO).launch {
-                    try { repo.syncToServer() }
-                    catch (e: Exception) { Log.w(TAG, "deleteMessage 立即推送失败，将由后台任务重试: ${e.message}") }
-                }
-            }
+            fireAndForgetSync()
         }
     }
 
@@ -340,15 +326,9 @@ class MessageRepository(
                 outboxRepository?.enqueueUpsert(
                     entityType = SyncOutboxItem.ENTITY_MESSAGE,
                     entityId = updated.id,
-                    payloadJson = Gson().toJson(updated)
+                    payloadJson = gson.toJson(updated)
                 )
-                // Fire-and-forget: 不阻塞调用方
-                outboxRepository?.let { repo ->
-                    CoroutineScope(Dispatchers.IO).launch {
-                        try { repo.syncToServer() }
-                        catch (e: Exception) { Log.w(TAG, "toggleStarred 立即推送失败，将由后台任务重试: ${e.message}") }
-                    }
-                }
+                fireAndForgetSync()
             }
         }
     }
@@ -452,91 +432,99 @@ class MessageRepository(
             var insertedCount = 0
             var updatedCount = 0
 
-            for (remote in remoteMessages) {
-                try {
-                    // 1) Upsert Tags
-                    for (rt in remote.tags) {
-                        val tag = Tag(
-                            id = rt.id,
-                            name = rt.name,
-                            category = rt.category,
-                        )
-                        tagDao.insertTag(tag)
-                    }
-
-                    // 2) Upsert Media (IGNORE + update 避免 REPLACE 级联删除 message_media)
-                    for (rm in remote.media_items) {
-                        val media = Media(
-                            id = rm.id,
-                            remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
-                            remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url),
-                            fileHash = rm.file_hash ?: "unknown_${rm.id}",
-                            fileSize = rm.file_size,
-                            mimeType = rm.mime_type,
-                            width = rm.width,
-                            height = rm.height,
-                            durationMs = rm.duration_ms?.toLong(),
-                            rating = rm.rating,
-                            starred = rm.starred,
-                        )
-                        val insertedId = mediaDao.insertMediaIgnore(media)
-                        if (insertedId == -1L) {
-                            // 已存在，更新元数据
-                            mediaDao.updateMedia(media)
-                        }
-                    }
-
-                    // 3) Upsert Message
-                    val createdAtMs = try {
-                        LocalDateTime.parse(remote.created_at).toInstant(ZoneOffset.UTC).toEpochMilli()
-                    } catch (_: Exception) {
-                        System.currentTimeMillis()
-                    }
-                    val updatedAtMs = try {
-                        LocalDateTime.parse(remote.updated_at).toInstant(ZoneOffset.UTC).toEpochMilli()
-                    } catch (_: Exception) {
-                        System.currentTimeMillis()
-                    }
-
-                    val safeActorId = if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
-
-                    val message = Message(
-                        id = remote.id,
-                        text = remote.text,
-                        actorId = safeActorId,
-                        starred = remote.starred,
-                        createdAt = createdAtMs,
-                        updatedAt = updatedAtMs,
-                    )
-                    messageDao.insertMessage(message)
-
-                    // 4) Link MessageMedia (clear + re-insert)
-                    messageDao.deleteMessageMediaByMessageId(remote.id)
-                    for (rm in remote.media_items) {
-                        messageDao.insertMessageMedia(
-                            MessageMedia(
-                                messageId = remote.id,
-                                mediaId = rm.id,
-                                position = rm.position,
+            val syncBody: suspend () -> Unit = {
+                for (remote in remoteMessages) {
+                    try {
+                        // 1) Upsert Tags
+                        for (rt in remote.tags) {
+                            val tag = Tag(
+                                id = rt.id,
+                                name = rt.name,
+                                category = rt.category,
                             )
-                        )
-                    }
+                            tagDao.insertTag(tag)
+                        }
 
-                    // 5) Link MessageTag (clear + re-insert)
-                    messageDao.deleteMessageTagsByMessageId(remote.id)
-                    for (rt in remote.tags) {
-                        messageDao.insertMessageTag(
-                            MessageTag(messageId = remote.id, tagId = rt.id)
-                        )
-                    }
+                        // 2) Upsert Media (IGNORE + update 避免 REPLACE 级联删除 message_media)
+                        for (rm in remote.media_items) {
+                            val media = Media(
+                                id = rm.id,
+                                remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
+                                remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url),
+                                fileHash = rm.file_hash ?: "unknown_${rm.id}",
+                                fileSize = rm.file_size,
+                                mimeType = rm.mime_type,
+                                width = rm.width,
+                                height = rm.height,
+                                durationMs = rm.duration_ms?.toLong(),
+                                rating = rm.rating,
+                                starred = rm.starred,
+                            )
+                            val insertedId = mediaDao.insertMediaIgnore(media)
+                            if (insertedId == -1L) {
+                                // 已存在，更新元数据
+                                mediaDao.updateMedia(media)
+                            }
+                        }
 
-                    if (remote.id in existingIds) updatedCount++ else insertedCount++
-                } catch (e: Exception) {
-                    Log.e(TAG, "同步消息 id=${remote.id} 失败, actorId=${remote.actor_id}, " +
-                            "mediaIds=${remote.media_items.map { it.id }}, " +
-                            "tagIds=${remote.tags.map { it.id }}: ${e.message}")
-                    throw e
+                        // 3) Upsert Message
+                        val createdAtMs = try {
+                            LocalDateTime.parse(remote.created_at).toInstant(ZoneOffset.UTC).toEpochMilli()
+                        } catch (_: Exception) {
+                            System.currentTimeMillis()
+                        }
+                        val updatedAtMs = try {
+                            LocalDateTime.parse(remote.updated_at).toInstant(ZoneOffset.UTC).toEpochMilli()
+                        } catch (_: Exception) {
+                            System.currentTimeMillis()
+                        }
+
+                        val safeActorId = if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
+
+                        val message = Message(
+                            id = remote.id,
+                            text = remote.text,
+                            actorId = safeActorId,
+                            starred = remote.starred,
+                            createdAt = createdAtMs,
+                            updatedAt = updatedAtMs,
+                        )
+                        messageDao.upsertMessage(message)
+
+                        // 4) Link MessageMedia (clear + re-insert)
+                        messageDao.deleteMessageMediaByMessageId(remote.id)
+                        for (rm in remote.media_items) {
+                            messageDao.insertMessageMedia(
+                                MessageMedia(
+                                    messageId = remote.id,
+                                    mediaId = rm.id,
+                                    position = rm.position,
+                                )
+                            )
+                        }
+
+                        // 5) Link MessageTag (clear + re-insert)
+                        messageDao.deleteMessageTagsByMessageId(remote.id)
+                        for (rt in remote.tags) {
+                            messageDao.insertMessageTag(
+                                MessageTag(messageId = remote.id, tagId = rt.id)
+                            )
+                        }
+
+                        if (remote.id in existingIds) updatedCount++ else insertedCount++
+                    } catch (e: Exception) {
+                        Log.e(TAG, "同步消息 id=${remote.id} 失败, actorId=${remote.actor_id}, " +
+                                "mediaIds=${remote.media_items.map { it.id }}, " +
+                                "tagIds=${remote.tags.map { it.id }}: ${e.message}")
+                        throw e
+                    }
                 }
+            }
+
+            if (database != null) {
+                database.withTransaction { syncBody() }
+            } else {
+                syncBody()
             }
 
             Log.d(TAG, "消息同步完成：新增 $insertedCount 条，更新 $updatedCount 条")
@@ -579,66 +567,83 @@ class MessageRepository(
             val body = response.body() ?: return@withContext SyncResult.Error("响应体为空")
             val validActorIds = actorDao.getAllActorIdsSync().toSet()
 
-            for (change in body.changes) {
-                try {
-                    when (change.operation.uppercase()) {
-                        "DELETE" -> {
-                            when (change.entity_type.uppercase()) {
-                                "MESSAGE" -> {
-                                    messageDao.deleteMessageTagsByMessageId(change.entity_id)
-                                    messageDao.deleteMessageMediaByMessageId(change.entity_id)
-                                    messageDao.deleteMessage(change.entity_id)
+            val applyChanges: suspend () -> Unit = {
+                for (change in body.changes) {
+                    try {
+                        when (change.operation.uppercase()) {
+                            "DELETE" -> {
+                                when (change.entity_type.uppercase()) {
+                                    "MESSAGE" -> {
+                                        messageDao.deleteMessageTagsByMessageId(change.entity_id)
+                                        messageDao.deleteMessageMediaByMessageId(change.entity_id)
+                                        messageDao.deleteMessage(change.entity_id)
+                                    }
+                                    "ACTOR" -> actorDao.deleteActorById(change.entity_id)
+                                    "MEDIA" -> mediaDao.deleteMediaById(change.entity_id)
+                                    "TAG" -> tagDao.deleteTagById(change.entity_id)
                                 }
-                                "ACTOR" -> actorDao.deleteActorById(change.entity_id)
-                                "MEDIA" -> mediaDao.deleteMediaById(change.entity_id)
-                                "TAG" -> tagDao.deleteTagById(change.entity_id)
+                                totalDeleted++
                             }
-                            totalDeleted++
-                        }
-                        "UPSERT" -> {
-                            val data = change.data ?: continue
-                            when (change.entity_type.uppercase()) {
-                                "MESSAGE" -> {
-                                    val remote = parseRemoteMessage(data) ?: continue
-                                    applyRemoteMessage(remote, validActorIds)
-                                    totalInserted++
-                                }
-                                "ACTOR" -> {
-                                    val actor = parseRemoteActor(data) ?: continue
-                                    actorDao.insertActor(actor.toLocalActor())
-                                    totalInserted++
-                                }
-                                "TAG" -> {
-                                    val tag = parseRemoteTag(data) ?: continue
-                                    tagDao.insertTag(Tag(id = tag.id, name = tag.name, category = tag.category))
-                                    totalInserted++
-                                }
-                                "MEDIA" -> {
-                                    // Media 由后端管理，只更新评分/收藏等元数据
-                                    val rm = parseRemoteMediaItem(data) ?: continue
-                                    val media = Media(
-                                        id = rm.id,
-                                        remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
-                                        remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url),
-                                        fileHash = rm.file_hash ?: "unknown_${rm.id}",
-                                        fileSize = rm.file_size,
-                                        mimeType = rm.mime_type,
-                                        width = rm.width,
-                                        height = rm.height,
-                                        durationMs = rm.duration_ms?.toLong(),
-                                        rating = rm.rating,
-                                        starred = rm.starred,
-                                    )
-                                    val inserted = mediaDao.insertMediaIgnore(media)
-                                    if (inserted == -1L) mediaDao.updateMedia(media)
-                                    totalInserted++
+                            "UPSERT" -> {
+                                val data = change.data
+                                if (data != null) {
+                                    when (change.entity_type.uppercase()) {
+                                        "MESSAGE" -> {
+                                            val remote = parseRemoteMessage(data)
+                                            if (remote != null) {
+                                                applyRemoteMessage(remote, validActorIds)
+                                                totalInserted++
+                                            }
+                                        }
+                                        "ACTOR" -> {
+                                            val actor = parseRemoteActor(data)
+                                            if (actor != null) {
+                                                actorDao.insertActor(actor.toLocalActor())
+                                                totalInserted++
+                                            }
+                                        }
+                                        "TAG" -> {
+                                            val tag = parseRemoteTag(data)
+                                            if (tag != null) {
+                                                tagDao.insertTag(Tag(id = tag.id, name = tag.name, category = tag.category))
+                                                totalInserted++
+                                            }
+                                        }
+                                        "MEDIA" -> {
+                                            val rm = parseRemoteMediaItem(data)
+                                            if (rm != null) {
+                                                val media = Media(
+                                                    id = rm.id,
+                                                    remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
+                                                    remoteThumbnailUrl = buildFullUrl(SyncConfig.BASE_URL, rm.thumb_url),
+                                                    fileHash = rm.file_hash ?: "unknown_${rm.id}",
+                                                    fileSize = rm.file_size,
+                                                    mimeType = rm.mime_type,
+                                                    width = rm.width,
+                                                    height = rm.height,
+                                                    durationMs = rm.duration_ms?.toLong(),
+                                                    rating = rm.rating,
+                                                    starred = rm.starred,
+                                                )
+                                                val inserted = mediaDao.insertMediaIgnore(media)
+                                                if (inserted == -1L) mediaDao.updateMedia(media)
+                                                totalInserted++
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "处理变更失败 [${change.operation} ${change.entity_type} #${change.entity_id}]: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "处理变更失败 [${change.operation} ${change.entity_type} #${change.entity_id}]: ${e.message}")
                 }
+            }
+
+            if (database != null) {
+                database.withTransaction { applyChanges() }
+            } else {
+                applyChanges()
             }
 
             // 更新 cursor 为 server_time
@@ -648,7 +653,7 @@ class MessageRepository(
         }
 
         Log.d(TAG, "增量同步完成：新增/更新 ${totalInserted + totalUpdated}，删除 $totalDeleted")
-        SyncResult.Success(totalInserted, totalUpdated, totalDeleted)
+        SyncResult.Success(totalInserted, totalUpdated, totalDeleted, serverTime = cursor)
     }
 
     private suspend fun applyRemoteMessage(remote: RemoteMessage, validActorIds: Set<Long>) {
@@ -663,7 +668,7 @@ class MessageRepository(
             createdAt = createdAtMs,
             updatedAt = updatedAtMs,
         )
-        messageDao.insertMessage(message)
+        messageDao.upsertMessage(message)
         messageDao.deleteMessageMediaByMessageId(remote.id)
         for (rm in remote.media_items) {
             messageDao.insertMessageMedia(MessageMedia(messageId = remote.id, mediaId = rm.id, position = rm.position))
@@ -764,10 +769,17 @@ class MessageRepository(
 
     /** 立即将 outbox 中的待推送变更同步到后端（fire-and-forget） */
     fun syncNow() {
+        fireAndForgetSync()
+    }
+
+    /** Fire-and-forget 推送，使用注入的 appScope 并加 mutex 防止并发 */
+    private fun fireAndForgetSync() {
         outboxRepository?.let { repo ->
-            CoroutineScope(Dispatchers.IO).launch {
-                try { repo.syncToServer() }
-                catch (e: Exception) { Log.w(TAG, "syncNow 推送失败，将由后台任务重试: ${e.message}") }
+            appScope.launch {
+                syncMutex.withLock {
+                    try { repo.syncToServer() }
+                    catch (e: Exception) { Log.w(TAG, "立即推送失败，将由后台任务重试: ${e.message}") }
+                }
             }
         }
     }

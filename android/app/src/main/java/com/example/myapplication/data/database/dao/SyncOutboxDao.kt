@@ -10,7 +10,7 @@ import com.example.myapplication.data.database.entities.SyncOutboxItem
 @Dao
 interface SyncOutboxDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(item: SyncOutboxItem): Long
 
     @Update

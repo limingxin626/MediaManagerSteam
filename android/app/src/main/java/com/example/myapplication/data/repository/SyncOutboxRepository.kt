@@ -71,12 +71,13 @@ class SyncOutboxRepository(
             return PushSyncResult.Skipped
         }
 
-        return try {
-            val pending = dao.getByStatus(SyncOutboxItem.STATUS_PENDING, limit)
-            if (pending.isEmpty()) {
-                return PushSyncResult.Success(pushedCount = 0, skippedCount = 0)
-            }
+        // 在 try 之前捕获 pending 列表，确保 catch 也能使用同一快照
+        val pending = dao.getByStatus(SyncOutboxItem.STATUS_PENDING, limit)
+        if (pending.isEmpty()) {
+            return PushSyncResult.Success(pushedCount = 0, skippedCount = 0)
+        }
 
+        return try {
             val changes = pending.map { item ->
                 val payload = item.payloadJson?.let {
                     try {
@@ -104,9 +105,15 @@ class SyncOutboxRepository(
         } catch (e: Exception) {
             Log.e(TAG, "syncToServer failed: ${e.message}", e)
 
-            // 标记尝试次数，保留队列以便下次重试
-            val pending = dao.getByStatus(SyncOutboxItem.STATUS_PENDING, limit)
-            pending.forEach { dao.markAttempt(it.id, e.message) }
+            // 使用同一快照标记尝试次数，超过上限的标记为 FAILED
+            for (item in pending) {
+                if (item.attemptCount + 1 >= MAX_RETRY_COUNT) {
+                    dao.updateStatus(item.id, SyncOutboxItem.STATUS_FAILED)
+                    Log.w(TAG, "Outbox item #${item.id} 超过最大重试次数 ($MAX_RETRY_COUNT)，标记为 FAILED")
+                } else {
+                    dao.markAttempt(item.id, e.message)
+                }
+            }
 
             PushSyncResult.Error(message = e.message ?: "未知错误", pushedCount = 0, failedCount = pending.size)
         }
@@ -114,5 +121,6 @@ class SyncOutboxRepository(
 
     companion object {
         private const val TAG = "SyncOutboxRepository"
+        private const val MAX_RETRY_COUNT = 10
     }
 }

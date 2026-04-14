@@ -28,13 +28,36 @@ interface ActorDao {
     @Query("SELECT COUNT(*) FROM actors")
     suspend fun getActorCount(): Int
     
-    // 插入演员
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertActor(actor: Actor): Long
-    
-    // 插入多个演员
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertActors(actors: List<Actor>): List<Long>
+    // 插入演员（已存在则跳过，不触发 DELETE 导致 Message.actorId SET_NULL）
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertActorIgnore(actor: Actor): Long
+
+    // 插入或更新演员
+    suspend fun insertActor(actor: Actor): Long {
+        val insertedId = insertActorIgnore(actor)
+        if (insertedId == -1L) {
+            // 已存在，更新
+            updateActor(actor)
+            return actor.id
+        }
+        return insertedId
+    }
+
+    // 插入多个演员（已存在则跳过，再逐个更新已存在的）
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertActorsIgnore(actors: List<Actor>): List<Long>
+
+    suspend fun insertActors(actors: List<Actor>): List<Long> {
+        val results = insertActorsIgnore(actors)
+        return results.mapIndexed { index, id ->
+            if (id == -1L) {
+                updateActor(actors[index])
+                actors[index].id
+            } else {
+                id
+            }
+        }
+    }
     
     // 更新演员
     @Update

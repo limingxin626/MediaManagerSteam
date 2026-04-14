@@ -64,7 +64,10 @@ class SyncWorker(
                 Result.success()
             }
             is SyncResult.Success -> {
-                saveServerTime(prefs)
+                val serverTime = pullResult.serverTime
+                if (serverTime != null) {
+                    prefs.edit().putString(KEY_LAST_SYNC_TIME, serverTime).apply()
+                }
                 Log.d(TAG, "增量同步完成: ${pullResult.totalAffected} 条")
                 Result.success()
             }
@@ -73,13 +76,6 @@ class SyncWorker(
                 Result.retry()
             }
         }
-    }
-
-    private fun saveServerTime(prefs: SharedPreferences) {
-        // 记录当前时间作为下次增量同步的起点
-        prefs.edit()
-            .putString(KEY_LAST_SYNC_TIME, java.time.Instant.now().toString())
-            .apply()
     }
 
     companion object {

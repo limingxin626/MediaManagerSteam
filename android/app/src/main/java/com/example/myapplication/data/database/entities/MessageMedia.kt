@@ -16,8 +16,7 @@ import androidx.room.Index
             entity = Message::class,
             parentColumns = ["id"],
             childColumns = ["messageId"],
-            onDelete = ForeignKey.CASCADE,
-            onUpdate = ForeignKey.CASCADE
+            onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
             entity = Media::class,
