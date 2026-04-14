@@ -308,7 +308,9 @@ private fun MediaViewerContent(
                         autoPlay = isCurrentPage,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(bottom = if (mediaList.size > 1) 76.dp else 0.dp)
+                            .padding(bottom = if (mediaList.size > 1) 76.dp else 0.dp),
+                        zoomEnabled = true,
+                        onScaleChanged = { if (isCurrentPage) currentScale = it }
                     )
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
