@@ -16,7 +16,8 @@
       "Bash(.venv/Scripts/python:*)",
       "WebFetch(domain:pypi.org)",
       "Bash(pnpm build:*)",
-      "Bash(echo DATA_ROOT=$DATA_ROOT:*)"
+      "Bash(echo DATA_ROOT=$DATA_ROOT:*)",
+      "Bash(openspec new:*)"
     ]
   }
 }

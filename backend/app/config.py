@@ -5,6 +5,7 @@
   DATA_ROOT     — 数据库 + 缩略图目录（必填，无默认值）
   UPLOAD_DIR    — 上传文件落地目录（必填，无默认值）
   STATIC_DIRS   — 额外静态挂载目录，分号分隔，可选（如 F:/AV;G:/Movies）
+    HOST          — 服务监听地址，默认 127.0.0.1（仅本机访问）
   PORT          — 服务端口，默认 8002
   FFMPEG_PATH   — ffmpeg 可执行文件路径，默认使用 PATH 中的
   FFPROBE_PATH  — ffprobe 可执行文件路径，默认使用 PATH 中的
@@ -41,10 +42,22 @@ class AppConfig:
         os.path.abspath(d.strip()) for d in os.getenv("STATIC_DIRS", "").split(";") if d.strip()
     ]
 
+    HOST: str = os.getenv("HOST", "127.0.0.1").strip() or "127.0.0.1"
     PORT: int = int(os.getenv("PORT", "8002"))
 
     FFMPEG_PATH: str = os.getenv("FFMPEG_PATH", "ffmpeg")
     FFPROBE_PATH: str = os.getenv("FFPROBE_PATH", "ffprobe")
+
+    ALLOWED_ORIGINS: list = [
+        "http://127.0.0.1",
+        "http://localhost",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:8002",
+        "http://localhost:8002",
+        "http://127.0.0.1:9002",
+        "http://localhost:9002",
+    ]
 
     # 支持的媒体文件扩展名
     VIDEO_EXTENSIONS: set = {".mp4"}

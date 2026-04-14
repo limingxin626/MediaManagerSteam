@@ -6,11 +6,8 @@ import { vite as vidstack } from 'vidstack/plugins';
 // https://vite.dev/config/
 export default defineConfig({
   server: {
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     port: 5173,
-    hmr: {
-      host: '192.168.31.146', // 将这里改为你当前的局域网 IP
-    },
   },
   plugins: [
     vue({
