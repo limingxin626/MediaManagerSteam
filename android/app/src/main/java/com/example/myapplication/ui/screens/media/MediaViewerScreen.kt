@@ -20,19 +20,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
 import com.example.myapplication.LocalBottomBarVisible
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.ui.components.OptimizedThumbnail
 import com.example.myapplication.ui.components.TelegramVideoPlayer
+import com.example.myapplication.ui.components.ZoomableImage
 import kotlinx.coroutines.launch
 
 /**
@@ -280,6 +277,14 @@ private fun MediaViewerContent(
     // 用于收藏状态变更的可变列表引用
     val mutableMediaList = mediaList as? MutableList<Media>
 
+    // 图片缩放状态 — 控制 Pager 是否允许滑动
+    var currentScale by remember { mutableFloatStateOf(1f) }
+
+    // 切换页面时重置缩放状态
+    LaunchedEffect(pagerState.settledPage) {
+        currentScale = 1f
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -289,7 +294,8 @@ private fun MediaViewerContent(
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 0 // 只保留当前页的 ExoPlayer，避免 OOM
+            beyondViewportPageCount = 0, // 只保留当前页的 ExoPlayer，避免 OOM
+            userScrollEnabled = currentScale <= 1f
         ) { page ->
             val media = mediaList[page]
             val isVideo = media.mimeType?.startsWith("video/") == true
@@ -311,13 +317,9 @@ private fun MediaViewerContent(
                 }
             } else {
                 val imagePath = media.filePath ?: media.thumbnailPath
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imagePath)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
+                ZoomableImage(
+                    imagePath = imagePath,
+                    onScaleChanged = { if (isCurrentPage) currentScale = it },
                     modifier = Modifier.fillMaxSize()
                 )
             }
