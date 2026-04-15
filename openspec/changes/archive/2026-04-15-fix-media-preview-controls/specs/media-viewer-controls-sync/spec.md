@@ -1,13 +1,4 @@
-### Requirement: Image single-tap toggles thumbnail strip
-在图片页面，单击 SHALL 切换缩略图条（MediaStripBar）的显示与隐藏。
-
-#### Scenario: Tap image to hide thumbnail strip
-- **WHEN** 用户在图片页面单击，且缩略图条当前可见
-- **THEN** 缩略图条 SHALL 以淡出动画隐藏
-
-#### Scenario: Tap image to show thumbnail strip
-- **WHEN** 用户在图片页面单击，且缩略图条当前隐藏
-- **THEN** 缩略图条 SHALL 以淡入动画显示
+## MODIFIED Requirements
 
 ### Requirement: Video controls and thumbnail strip sync
 视频页面的控件（播放/暂停按钮、进度条）与缩略图条 SHALL 同步显示和隐藏。TelegramVideoPlayer SHALL 接受外部传入的 `controlsVisible` 参数作为控件显隐的单一数据源，不再维护内部独立状态。

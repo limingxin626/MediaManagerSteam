@@ -58,8 +58,10 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,6 +91,7 @@ fun TelegramVideoPlayer(
     autoPlay: Boolean = true,
     modifier: Modifier = Modifier,
     zoomEnabled: Boolean = false,
+    controlsVisible: Boolean = false,
     onScaleChanged: ((Float) -> Unit)? = null,
     onControlsVisibilityChanged: ((Boolean) -> Unit)? = null
 ) {
@@ -122,7 +125,6 @@ fun TelegramVideoPlayer(
     }
 
     var isPlaying by remember { mutableStateOf(autoPlay) }
-    var controlsVisible by remember { mutableStateOf(false) }
     var hideControlsJob by remember { mutableStateOf<Job?>(null) }
 
     // 进度 & 时长
@@ -142,6 +144,10 @@ fun TelegramVideoPlayer(
     var lastTapPosition by remember { mutableStateOf(Offset.Zero) }
     var pendingSingleTapJob by remember { mutableStateOf<Job?>(null) }
     var videoAspectRatio by remember { mutableStateOf<Float?>(null) }
+    val density = LocalDensity.current
+    val flingDecay = remember(density) {
+        androidx.compose.animation.splineBasedDecay<Offset>(density)
+    }
 
     LaunchedEffect(zoomScale.value) {
         onScaleChanged?.invoke(zoomScale.value)
@@ -188,7 +194,6 @@ fun TelegramVideoPlayer(
         hideControlsJob?.cancel()
         hideControlsJob = coroutineScope.launch {
             delay(3000)
-            controlsVisible = false
             onControlsVisibilityChanged?.invoke(false)
         }
     }
@@ -196,10 +201,8 @@ fun TelegramVideoPlayer(
     fun toggleControls() {
         if (controlsVisible) {
             hideControlsJob?.cancel()
-            controlsVisible = false
             onControlsVisibilityChanged?.invoke(false)
         } else {
-            controlsVisible = true
             onControlsVisibilityChanged?.invoke(true)
             scheduleHideControls()
         }
@@ -229,6 +232,15 @@ fun TelegramVideoPlayer(
         isPlaying = autoPlay
         exoPlayer.playWhenReady = autoPlay
         if (autoPlay) exoPlayer.play() else exoPlayer.pause()
+    }
+
+    // 外部 controlsVisible 变为 true 时，启动自动隐藏计时
+    LaunchedEffect(controlsVisible) {
+        if (controlsVisible) {
+            scheduleHideControls()
+        } else {
+            hideControlsJob?.cancel()
+        }
     }
 
     // 播放器状态监听
@@ -276,6 +288,7 @@ fun TelegramVideoPlayer(
                             val firstDown = awaitFirstDown(requireUnconsumed = false)
                             var pastTouchSlop = false
                             var didTransform = false
+                            val velocityTracker = VelocityTracker()
 
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Main)
@@ -283,6 +296,7 @@ fun TelegramVideoPlayer(
 
                                 if (activePointers.isEmpty()) {
                                     if (didTransform) {
+                                        val velocity = velocityTracker.calculateVelocity()
                                         coroutineScope.launch {
                                             if (zoomScale.value < 1f) {
                                                 launch { zoomScale.animateTo(1f, spring()) }
@@ -291,6 +305,18 @@ fun TelegramVideoPlayer(
                                                         Offset.Zero,
                                                         spring()
                                                     )
+                                                }
+                                            } else if (zoomScale.value > 1.01f &&
+                                                (kotlin.math.abs(velocity.x) > 50f || kotlin.math.abs(velocity.y) > 50f)
+                                            ) {
+                                                // Fling 惯性动画 — 设置边界后启动衰减
+                                                val (minBound, maxBound) = calculateBounds()
+                                                zoomOffset.updateBounds(minBound, maxBound)
+                                                val initialVelocity = Offset(velocity.x, velocity.y)
+                                                try {
+                                                    zoomOffset.animateDecay(initialVelocity, flingDecay)
+                                                } finally {
+                                                    zoomOffset.updateBounds(null, null)
                                                 }
                                             } else {
                                                 val clamped = clampOffset(zoomOffset.value)
@@ -377,6 +403,11 @@ fun TelegramVideoPlayer(
                                     }
 
                                     if (pastTouchSlop && pointer.positionChanged()) {
+                                        // 追踪速度用于 fling
+                                        velocityTracker.addPosition(
+                                            event.changes.first().uptimeMillis,
+                                            pointer.position
+                                        )
                                         coroutineScope.launch {
                                             zoomOffset.snapTo(clampOffset(zoomOffset.value + pan))
                                         }

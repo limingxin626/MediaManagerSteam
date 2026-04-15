@@ -22,7 +22,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -62,6 +64,10 @@ fun ZoomableContainer(
     val scale = remember { Animatable(1f) }
     val offset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
+    val flingDecay = remember(density) {
+        androidx.compose.animation.splineBasedDecay<Offset>(density)
+    }
 
     // 双击检测状态
     var lastTapTimeMs by remember { mutableStateOf(0L) }
@@ -138,6 +144,7 @@ fun ZoomableContainer(
                     val firstDown = awaitFirstDown(requireUnconsumed = false)
                     var pastTouchSlop = false
                     var didTransform = false
+                    val velocityTracker = VelocityTracker()
 
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Main)
@@ -146,10 +153,24 @@ fun ZoomableContainer(
                         if (activePointers.isEmpty()) {
                             // 所有手指抬起
                             if (didTransform) {
+                                // 计算 fling 速度
+                                val velocity = velocityTracker.calculateVelocity()
                                 scope.launch {
                                     if (scale.value < MIN_SCALE) {
                                         launch { scale.animateTo(MIN_SCALE, spring()) }
                                         launch { offset.animateTo(Offset.Zero, spring()) }
+                                    } else if (scale.value > 1.01f &&
+                                        (kotlin.math.abs(velocity.x) > 50f || kotlin.math.abs(velocity.y) > 50f)
+                                    ) {
+                                        // Fling 惯性动画 — 设置边界后启动衰减
+                                        val (minBound, maxBound) = calculateBounds()
+                                        offset.updateBounds(minBound, maxBound)
+                                        val initialVelocity = Offset(velocity.x, velocity.y)
+                                        try {
+                                            offset.animateDecay(initialVelocity, flingDecay)
+                                        } finally {
+                                            offset.updateBounds(null, null)
+                                        }
                                     } else {
                                         val clamped = clampOffset(offset.value)
                                         if (clamped != offset.value) {
@@ -234,6 +255,11 @@ fun ZoomableContainer(
                             }
 
                             if (pastTouchSlop && pointer.positionChanged()) {
+                                // 追踪速度用于 fling
+                                velocityTracker.addPosition(
+                                    event.changes.first().uptimeMillis,
+                                    pointer.position
+                                )
                                 scope.launch {
                                     offset.snapTo(clampOffset(offset.value + pan))
                                 }

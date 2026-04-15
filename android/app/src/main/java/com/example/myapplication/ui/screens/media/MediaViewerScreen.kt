@@ -341,6 +341,7 @@ private fun MediaViewerContent(
                             .fillMaxSize()
                             .padding(bottom = if (mediaList.size > 1) 76.dp else 0.dp),
                         zoomEnabled = true,
+                        controlsVisible = controlsVisible,
                         onScaleChanged = { if (isCurrentPage) currentScale = it },
                         onControlsVisibilityChanged = { visible ->
                             if (isCurrentPage) controlsVisible = visible
