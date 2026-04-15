@@ -89,7 +89,8 @@ fun TelegramVideoPlayer(
     autoPlay: Boolean = true,
     modifier: Modifier = Modifier,
     zoomEnabled: Boolean = false,
-    onScaleChanged: ((Float) -> Unit)? = null
+    onScaleChanged: ((Float) -> Unit)? = null,
+    onControlsVisibilityChanged: ((Boolean) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -140,6 +141,7 @@ fun TelegramVideoPlayer(
     var lastTapTimeMs by remember { mutableStateOf(0L) }
     var lastTapPosition by remember { mutableStateOf(Offset.Zero) }
     var pendingSingleTapJob by remember { mutableStateOf<Job?>(null) }
+    var videoAspectRatio by remember { mutableStateOf<Float?>(null) }
 
     LaunchedEffect(zoomScale.value) {
         onScaleChanged?.invoke(zoomScale.value)
@@ -147,8 +149,26 @@ fun TelegramVideoPlayer(
 
     fun calculateBounds(atScale: Float = zoomScale.value): Pair<Offset, Offset> {
         if (containerSize == IntSize.Zero) return Offset.Zero to Offset.Zero
-        val maxX = ((atScale - 1f) * containerSize.width / 2f).coerceAtLeast(0f)
-        val maxY = ((atScale - 1f) * containerSize.height / 2f).coerceAtLeast(0f)
+        val cw = containerSize.width.toFloat()
+        val ch = containerSize.height.toFloat()
+
+        val (mediaW, mediaH) = if (videoAspectRatio != null && videoAspectRatio!! > 0f) {
+            val containerAR = cw / ch
+            if (videoAspectRatio!! > containerAR) {
+                cw to (cw / videoAspectRatio!!)
+            } else {
+                (ch * videoAspectRatio!!) to ch
+            }
+        } else {
+            cw to ch
+        }
+
+        val scaledW = mediaW * atScale
+        val scaledH = mediaH * atScale
+
+        val maxX = if (scaledW <= cw) 0f else (scaledW - cw) / 2f
+        val maxY = if (scaledH <= ch) 0f else (scaledH - ch) / 2f
+
         return Offset(-maxX, -maxY) to Offset(maxX, maxY)
     }
 
@@ -169,6 +189,7 @@ fun TelegramVideoPlayer(
         hideControlsJob = coroutineScope.launch {
             delay(3000)
             controlsVisible = false
+            onControlsVisibilityChanged?.invoke(false)
         }
     }
 
@@ -176,8 +197,10 @@ fun TelegramVideoPlayer(
         if (controlsVisible) {
             hideControlsJob?.cancel()
             controlsVisible = false
+            onControlsVisibilityChanged?.invoke(false)
         } else {
             controlsVisible = true
+            onControlsVisibilityChanged?.invoke(true)
             scheduleHideControls()
         }
     }
@@ -213,6 +236,12 @@ fun TelegramVideoPlayer(
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+            }
+
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                }
             }
         }
         exoPlayer.addListener(listener)

@@ -2,10 +2,15 @@ package com.example.myapplication.ui.components
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 
 /**
@@ -17,12 +22,17 @@ import coil.request.ImageRequest
 fun ZoomableImage(
     imagePath: String?,
     onScaleChanged: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSingleTap: (() -> Unit)? = null
 ) {
+    var imageAspectRatio by remember { mutableStateOf<Float?>(null) }
+
     ZoomableContainer(
         modifier = modifier,
         maxScale = 5f,
-        onScaleChanged = onScaleChanged
+        mediaAspectRatio = imageAspectRatio,
+        onScaleChanged = onScaleChanged,
+        onSingleTap = onSingleTap
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
@@ -31,7 +41,15 @@ fun ZoomableImage(
                 .build(),
             contentDescription = null,
             contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            onState = { state ->
+                if (state is AsyncImagePainter.State.Success) {
+                    val size = state.painter.intrinsicSize
+                    if (size.width > 0 && size.height > 0) {
+                        imageAspectRatio = size.width / size.height
+                    }
+                }
+            }
         )
     }
 }

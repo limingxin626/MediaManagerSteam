@@ -53,6 +53,7 @@ private const val DOUBLE_TAP_TIMEOUT_MS = 300L
 fun ZoomableContainer(
     modifier: Modifier = Modifier,
     maxScale: Float = 5f,
+    mediaAspectRatio: Float? = null,
     onScaleChanged: (Float) -> Unit = {},
     onSingleTap: (() -> Unit)? = null,
     content: @Composable () -> Unit
@@ -74,8 +75,30 @@ fun ZoomableContainer(
 
     fun calculateBounds(atScale: Float = scale.value): Pair<Offset, Offset> {
         if (containerSize == IntSize.Zero) return Offset.Zero to Offset.Zero
-        val maxX = ((atScale - 1f) * containerSize.width / 2f).coerceAtLeast(0f)
-        val maxY = ((atScale - 1f) * containerSize.height / 2f).coerceAtLeast(0f)
+        val cw = containerSize.width.toFloat()
+        val ch = containerSize.height.toFloat()
+
+        // 计算媒体在 ContentScale.Fit 下的实际渲染尺寸
+        val (mediaW, mediaH) = if (mediaAspectRatio != null && mediaAspectRatio > 0f) {
+            val containerAR = cw / ch
+            if (mediaAspectRatio > containerAR) {
+                // 横向媒体，上下留白
+                cw to (cw / mediaAspectRatio)
+            } else {
+                // 竖向媒体，左右留白
+                (ch * mediaAspectRatio) to ch
+            }
+        } else {
+            // 无 aspect ratio 信息，退化为容器尺寸
+            cw to ch
+        }
+
+        val scaledW = mediaW * atScale
+        val scaledH = mediaH * atScale
+
+        val maxX = if (scaledW <= cw) 0f else (scaledW - cw) / 2f
+        val maxY = if (scaledH <= ch) 0f else (scaledH - ch) / 2f
+
         return Offset(-maxX, -maxY) to Offset(maxX, maxY)
     }
 

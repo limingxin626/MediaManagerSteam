@@ -1,5 +1,8 @@
 package com.example.myapplication.ui.screens.media
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -305,6 +308,9 @@ private fun MediaViewerContent(
     // 图片缩放状态 — 控制 Pager 是否允许滑动
     var currentScale by remember { mutableFloatStateOf(1f) }
 
+    // 控件与缩略图条统一显隐状态
+    var controlsVisible by remember { mutableStateOf(true) }
+
     // 切换页面时重置缩放状态
     LaunchedEffect(pagerState.settledPage) {
         currentScale = 1f
@@ -335,7 +341,10 @@ private fun MediaViewerContent(
                             .fillMaxSize()
                             .padding(bottom = if (mediaList.size > 1) 76.dp else 0.dp),
                         zoomEnabled = true,
-                        onScaleChanged = { if (isCurrentPage) currentScale = it }
+                        onScaleChanged = { if (isCurrentPage) currentScale = it },
+                        onControlsVisibilityChanged = { visible ->
+                            if (isCurrentPage) controlsVisible = visible
+                        }
                     )
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -347,7 +356,8 @@ private fun MediaViewerContent(
                 ZoomableImage(
                     imagePath = imagePath,
                     onScaleChanged = { if (isCurrentPage) currentScale = it },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    onSingleTap = { controlsVisible = !controlsVisible }
                 )
             }
         }
@@ -401,17 +411,23 @@ private fun MediaViewerContent(
             }
         }
 
-        // 底部：横向缩略图导航条（多于1个媒体时显示）
+        // 底部：横向缩略图导航条（多于1个媒体时显示，受 controlsVisible 控制）
         if (mediaList.size > 1) {
-            MediaStripBar(
-                mediaList = mediaList,
-                currentIndex = pagerState.currentPage,
-                listState = stripListState,
-                pagerState = pagerState,
+            AnimatedVisibility(
+                visible = controlsVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-            )
+            ) {
+                MediaStripBar(
+                    mediaList = mediaList,
+                    currentIndex = pagerState.currentPage,
+                    listState = stripListState,
+                    pagerState = pagerState
+                )
+            }
         }
     }
 }
