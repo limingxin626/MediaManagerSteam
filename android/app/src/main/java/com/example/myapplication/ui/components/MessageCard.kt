@@ -93,7 +93,6 @@ fun MessageCard(
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
     val maxCardWidth = screenWidthDp * 0.9f
     val singleImageMaxHeight = 360.dp
-    val singleImageMinWidth = singleImageMaxHeight * 9f / 16f
 
     val cardWidthModifier = if (mediaList.size == 1) {
         val media0 = mediaList[0]
@@ -103,10 +102,10 @@ fun MessageCard(
             } else {
                 1f
             }
-        val clampedRatio = aspectRatio.coerceIn(0.5f, 2.5f)
-        // 图片自然宽度 = min(maxCardWidth, 按比例计算)
+        val minRatio = 9f / 16f  // 比 9:16 更窄的图片会被裁剪
+        val clampedRatio = aspectRatio.coerceIn(minRatio, 2.5f)
         val naturalWidth = (singleImageMaxHeight * clampedRatio).coerceAtMost(maxCardWidth)
-        val cardWidth = naturalWidth.coerceAtLeast(singleImageMinWidth)
+        val cardWidth = naturalWidth
         Modifier.width(cardWidth)
     } else {
         Modifier.fillMaxWidth(0.9f)
@@ -361,7 +360,7 @@ private fun MediaThumbnailGrid(
             } else {
                 1f
             }
-        val clampedRatio = aspectRatio.coerceIn(0.5f, 2.5f)
+        val clampedRatio = aspectRatio.coerceIn(9f / 16f, 2.5f)
         val density = androidx.compose.ui.platform.LocalDensity.current
         var widthPx by remember(media0.id) { mutableStateOf(0) }
         val maxHeightDp = 360.dp
