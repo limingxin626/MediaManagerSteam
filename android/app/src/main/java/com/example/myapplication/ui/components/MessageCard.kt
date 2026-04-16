@@ -1,15 +1,15 @@
 package com.example.myapplication.ui.components
 
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -48,11 +48,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapplication.data.database.entities.Media
@@ -67,7 +69,7 @@ import java.util.Locale
 /**
  * Telegram 风格消息卡片组件
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MessageCard(
     messageWithDetails: MessageWithDetails,
@@ -88,6 +90,7 @@ fun MessageCard(
     }
 
     var showMenu by remember { mutableStateOf(false) }
+    var menuOffset by remember { mutableStateOf(DpOffset.Zero) }
 
     // 单图时计算卡片宽度，使卡片收缩到图片宽度（Telegram 风格）
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
@@ -111,229 +114,240 @@ fun MessageCard(
         Modifier.fillMaxWidth(0.9f)
     }
 
-    Box(modifier = modifier) {
-        Card(
-            modifier = cardWidthModifier
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = { showMenu = true }
-                ),
-            shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            )
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // 缩略图网格区域
-                if (mediaList.isNotEmpty()) {
-                    MediaThumbnailGrid(
-                        mediaList = mediaList,
-                        messageId = message.id,
-                        onMediaClick = { mediaId -> onMediaClick(mediaId, mediaList) },
+    Box(modifier = modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Card(
+                modifier = cardWidthModifier,
+                shape = RoundedCornerShape(8.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                )
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // 缩略图网格区域
+                    if (mediaList.isNotEmpty()) {
+                        MediaThumbnailGrid(
+                            mediaList = mediaList,
+                            messageId = message.id,
+                            onMediaClick = { mediaId -> onMediaClick(mediaId, mediaList) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                        )
+                    }
+
+                    // 文本和元信息
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    )
-                }
-
-                // 文本和元信息
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    // 消息文本内容（#tag 高亮）
-                    if (!message.text.isNullOrBlank()) {
-                        val defaultTagColor = MaterialTheme.colorScheme.primary
-                        val annotatedText = remember(message.text, messageWithDetails.tagList) {
-                            buildHighlightedTagText(
-                                message.text,
-                                messageWithDetails.tagList,
-                                defaultTagColor
-                            )
-                        }
-                        Text(
-                            text = annotatedText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-
-                    // Tag chips
-                    if (messageWithDetails.tagList.isNotEmpty()) {
-                        val defaultTagColor = MaterialTheme.colorScheme.primary
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            messageWithDetails.tagList.forEach { tag ->
-                                val chipColor = tag.color?.let { parseColor(it) } ?: defaultTagColor
-                                Surface(
-                                    shape = CircleShape,
-                                    color = chipColor.copy(alpha = 0.15f),
-                                    modifier = Modifier.height(22.dp)
-                                ) {
-                                    Text(
-                                        text = "#${tag.name}",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium
-                                        ),
-                                        color = chipColor,
-                                        modifier = Modifier.padding(
-                                            horizontal = 8.dp,
-                                            vertical = 2.dp
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-
-                    // 底部元信息行
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
-                        // 左侧：根据 sendStatus 显示不同内容
-                        when (message.sendStatus) {
-                            Message.MSG_STATUS_PUSHING -> {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(12.dp),
-                                        strokeWidth = 1.5.dp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "同步中...",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
-                                    )
-                                }
+                        // 消息文本内容（#tag 高亮）
+                        if (!message.text.isNullOrBlank()) {
+                            val defaultTagColor = MaterialTheme.colorScheme.primary
+                            val annotatedText = remember(message.text, messageWithDetails.tagList) {
+                                buildHighlightedTagText(
+                                    message.text,
+                                    messageWithDetails.tagList,
+                                    defaultTagColor
+                                )
                             }
+                            Text(
+                                text = annotatedText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
 
-                            Message.MSG_STATUS_PUSH_FAILED -> {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = "同步失败",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.error,
-                                        fontSize = 12.sp
-                                    )
-                                    if (onRetrySync != null) {
+                        // Tag chips
+                        if (messageWithDetails.tagList.isNotEmpty()) {
+                            val defaultTagColor = MaterialTheme.colorScheme.primary
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                messageWithDetails.tagList.forEach { tag ->
+                                    val chipColor = tag.color?.let { parseColor(it) } ?: defaultTagColor
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = chipColor.copy(alpha = 0.15f),
+                                        modifier = Modifier.height(22.dp)
+                                    ) {
                                         Text(
-                                            text = "· 重试",
+                                            text = "#${tag.name}",
                                             style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.SemiBold
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium
                                             ),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontSize = 12.sp,
-                                            modifier = Modifier.clickable { onRetrySync(message.id) }
+                                            color = chipColor,
+                                            modifier = Modifier.padding(
+                                                horizontal = 8.dp,
+                                                vertical = 2.dp
+                                            )
                                         )
                                     }
                                 }
                             }
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
 
-                            else -> {
-                                // SYNCED: 正常显示演员名 + 时间
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    if (actor != null) {
-                                        Text(
-                                            text = actor.name,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.Medium,
-                                            fontSize = 12.sp
+                        // 底部元信息行
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 左侧：根据 sendStatus 显示不同内容
+                            when (message.sendStatus) {
+                                Message.MSG_STATUS_PUSHING -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(12.dp),
+                                            strokeWidth = 1.5.dp,
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                         Text(
-                                            text = "·",
+                                            text = "同步中...",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = TextSecondary,
                                             fontSize = 12.sp
                                         )
                                     }
-                                    Text(
-                                        text = formattedTime,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
-                                    )
+                                }
+
+                                Message.MSG_STATUS_PUSH_FAILED -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "同步失败",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error,
+                                            fontSize = 12.sp
+                                        )
+                                        if (onRetrySync != null) {
+                                            Text(
+                                                text = "· 重试",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = FontWeight.SemiBold
+                                                ),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontSize = 12.sp,
+                                                modifier = Modifier.clickable { onRetrySync(message.id) }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                else -> {
+                                    // SYNCED: 正常显示演员名 + 时间
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        if (actor != null) {
+                                            Text(
+                                                text = actor.name,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 12.sp
+                                            )
+                                            Text(
+                                                text = "·",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = TextSecondary,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                        Text(
+                                            text = formattedTime,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = TextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        // 右侧：收藏图标
-                        if (message.starred) {
-                            StarIcon(
-                                isStarred = true,
-                                size = 14.dp,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                            // 右侧：收藏图标
+                            if (message.starred) {
+                                StarIcon(
+                                    isStarred = true,
+                                    size = 14.dp,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // 长按上下文菜单
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("编辑") },
-                onClick = {
-                    showMenu = false
-                    onEditClick(message.id)
-                },
-                leadingIcon = {
-                    Icon(Icons.Default.Edit, contentDescription = null)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text(if (message.starred) "取消收藏" else "收藏") },
-                onClick = {
-                    showMenu = false
-                    onToggleStarred(message.id)
-                },
-                leadingIcon = {
-                    Icon(
-                        if (message.starred) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription = null
+            // 卡片右侧所有空白区域，点击弹出菜单
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .pointerInput(Unit) {
+                        detectTapGestures { offset ->
+                            menuOffset = DpOffset(offset.x.toDp(), offset.y.toDp())
+                            showMenu = true
+                        }
+                    }
+            ) {
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    offset = menuOffset
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("编辑") },
+                        onClick = {
+                            showMenu = false
+                            onEditClick(message.id)
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Edit, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (message.starred) "取消收藏" else "收藏") },
+                        onClick = {
+                            showMenu = false
+                            onToggleStarred(message.id)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (message.starred) Icons.Filled.Star else Icons.Outlined.Star,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            showMenu = false
+                            onDeleteClick(message.id)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     )
                 }
-            )
-            DropdownMenuItem(
-                text = { Text("删除", color = MaterialTheme.colorScheme.error) },
-                onClick = {
-                    showMenu = false
-                    onDeleteClick(message.id)
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            )
+            }
         }
     }
 }
