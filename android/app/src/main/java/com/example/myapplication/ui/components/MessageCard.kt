@@ -87,10 +87,10 @@ fun MessageCard(
 
     var showMenu by remember { mutableStateOf(false) }
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier, contentAlignment = androidx.compose.ui.Alignment.Center) {
         Card(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.9f)
                 .combinedClickable(
                     onClick = {},
                     onLongClick = { showMenu = true }
@@ -316,136 +316,212 @@ fun MessageCard(
 }
 
 /**
- * 布局规格：描述每种媒体数量的网格行结构
- */
-private data class GridLayoutSpec(
-    val rows: List<List<Int>>,       // 每行的宽度权重列表
-    val rowHeightWeights: List<Int>, // 行高度权重
-    val totalHeightDp: Int           // 总高度
-)
-
-private fun getGridLayout(count: Int): GridLayoutSpec = when (count) {
-    2 -> GridLayoutSpec(
-        rows = listOf(listOf(1, 1)),
-        rowHeightWeights = listOf(1),
-        totalHeightDp = 240
-    )
-
-    4 -> GridLayoutSpec(
-        rows = listOf(listOf(1, 1), listOf(1, 1)),
-        rowHeightWeights = listOf(1, 1),
-        totalHeightDp = 400
-    )
-
-    5 -> GridLayoutSpec(
-        rows = listOf(listOf(1, 1), listOf(1, 1), listOf(1)),
-        rowHeightWeights = listOf(1, 1, 1),
-        totalHeightDp = 500
-    )
-
-    6 -> GridLayoutSpec(                              // 2x3
-        rows = listOf(listOf(1, 1), listOf(1, 1), listOf(1, 1)),
-        rowHeightWeights = listOf(1, 1, 1),
-        totalHeightDp = 500
-    )
-
-    7 -> GridLayoutSpec(                              // 2+2+3
-        rows = listOf(listOf(1, 1), listOf(1, 1), listOf(1, 1, 1)),
-        rowHeightWeights = listOf(3, 3, 2),
-        totalHeightDp = 500
-    )
-
-    8 -> GridLayoutSpec(                              // 2+3+3
-        rows = listOf(listOf(1, 1), listOf(1, 1, 1), listOf(1, 1, 1)),
-        rowHeightWeights = listOf(3, 2, 2),
-        totalHeightDp = 500
-    )
-
-    9 -> GridLayoutSpec(                              // 3+3+3
-        rows = listOf(listOf(1, 1, 1), listOf(1, 1, 1), listOf(1, 1, 1)),
-        rowHeightWeights = listOf(1, 1, 1),
-        totalHeightDp = 500
-    )
-
-    10 -> GridLayoutSpec(                             // 2+2+3+3
-        rows = listOf(listOf(1, 1), listOf(1, 1), listOf(1, 1, 1), listOf(1, 1, 1)),
-        rowHeightWeights = listOf(3, 3, 2, 2),
-        totalHeightDp = 560
-    )
-
-    else -> GridLayoutSpec(
-        rows = listOf(listOf(1, 1), listOf(1, 1)),
-        rowHeightWeights = listOf(1, 1),
-        totalHeightDp = 400
-    )
-}
-
-/**
- * 通用行布局网格渲染器
+ * 媒体缩略图网格 — 使用 Telegram 风格 Mosaic 布局
  */
 @Composable
-private fun RowBasedGrid(
-    displayMedia: List<Media>,
-    totalMedia: Int,
-    maxDisplay: Int,
-    layout: GridLayoutSpec,
+private fun MediaThumbnailGrid(
+    mediaList: List<Media>,
     messageId: Long,
     onMediaClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val extraCount = totalMedia - maxDisplay
-    var mediaIndex = 0
-    val totalItems = displayMedia.size
+    val displayMedia = mediaList.take(10)
+    val extraCount = (mediaList.size - 10).coerceAtLeast(0)
 
-    Column(modifier = modifier.height(layout.totalHeightDp.dp)) {
-        layout.rows.forEachIndexed { rowIndex, widthWeights ->
-            if (rowIndex > 0) {
-                Spacer(modifier = Modifier.height(2.dp))
+    if (displayMedia.size == 1) {
+        // 单图：保持原始比例，高度不超过 360dp
+        val media0 = displayMedia[0]
+        val aspectRatio =
+            if (media0.width != null && media0.height != null && media0.width > 0 && media0.height > 0) {
+                media0.width.toFloat() / media0.height.toFloat()
+            } else {
+                1f
             }
-            Row(modifier = Modifier.weight(layout.rowHeightWeights[rowIndex].toFloat())) {
-                widthWeights.forEachIndexed { colIndex, widthWeight ->
-                    if (colIndex > 0) {
-                        Spacer(modifier = Modifier.width(2.dp))
-                    }
-                    if (mediaIndex < totalItems) {
-                        val media = displayMedia[mediaIndex]
-                        val isLastCell = mediaIndex == totalItems - 1
-                        mediaIndex++
+        val clampedRatio = aspectRatio.coerceIn(0.5f, 2.5f)
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        var widthPx by remember(media0.id) { mutableStateOf(0) }
+        val maxHeightDp = 360.dp
+        val maxHeightPx = with(density) { maxHeightDp.toPx() }
+        val effectiveWidthPx =
+            if (widthPx > 0) widthPx.toFloat() else maxHeightPx * clampedRatio
+        val naturalHeightPx = effectiveWidthPx / clampedRatio
+        val finalHeightPx = naturalHeightPx.coerceAtMost(maxHeightPx)
+        val finalWidthPx = (finalHeightPx * clampedRatio).coerceAtMost(effectiveWidthPx)
+        val finalHeightDp = with(density) { finalHeightPx.toDp() }
+        val finalWidthDp = with(density) { finalWidthPx.toDp() }
+        Box(
+            modifier = modifier.onGloballyPositioned { widthPx = it.size.width }
+        ) {
+            MediaThumbnailItem(
+                media = media0,
+                messageId = messageId,
+                onClick = { onMediaClick(media0.id) },
+                modifier = Modifier.size(width = finalWidthDp, height = finalHeightDp)
+            )
+        }
+        return
+    }
 
-                        if (isLastCell && extraCount > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(widthWeight.toFloat())
-                                    .fillMaxHeight()
-                            ) {
-                                MediaThumbnailItem(
-                                    media = media,
-                                    messageId = messageId,
-                                    onClick = { onMediaClick(media.id) },
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.5f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "+$extraCount",
-                                        color = Color.White,
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
+    // 2-10 图：Mosaic 动态布局
+    val ratios = remember(displayMedia) {
+        displayMedia.map { media ->
+            if (media.width != null && media.height != null && media.width > 0 && media.height > 0) {
+                media.width.toFloat() / media.height.toFloat()
+            } else {
+                1f
+            }
+        }
+    }
+
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var containerWidthPx by remember { mutableStateOf(0f) }
+    val layout = remember(ratios, containerWidthPx) {
+        calculateMosaicLayout(ratios, if (containerWidthPx > 0f) containerWidthPx else 400f)
+    }
+
+    // 计算总高度（px），然后转 dp
+    // ROWS: heightWeight 是每行的像素高度（containerWidth / 行内比例之和）
+    // LEFT_COLUMN: 高度由左列图片决定
+    val totalHeightPx = remember(layout, containerWidthPx) {
+        if (containerWidthPx <= 0f) return@remember 300f * density.density
+        if (layout.type == MosaicType.ROWS) {
+            val gapPx = 2f * density.density * (layout.rows.size - 1).coerceAtLeast(0)
+            layout.rows.sumOf { it.heightWeight.toDouble() }.toFloat() + gapPx
+        } else {
+            val leftWidthPx = containerWidthPx * layout.leftColumnWidth
+            val leftRatio = ratios[layout.leftColumnIndex].coerceIn(0.667f, 1.7f)
+            leftWidthPx / leftRatio
+        }
+    }
+    val maxHeightPx = with(density) { 800.dp.toPx() }
+    val minHeightPx = with(density) { 120.dp.toPx() }
+    val clampedHeightPx = totalHeightPx.coerceIn(minHeightPx, maxHeightPx)
+    val totalHeightDpVal = with(density) { clampedHeightPx.toDp() }
+
+    Box(
+        modifier = modifier.onGloballyPositioned {
+            containerWidthPx = it.size.width.toFloat()
+        }
+    ) {
+        when (layout.type) {
+            MosaicType.ROWS -> {
+                MosaicRowsGrid(
+                    layout = layout,
+                    displayMedia = displayMedia,
+                    extraCount = extraCount,
+                    messageId = messageId,
+                    onMediaClick = onMediaClick,
+                    modifier = Modifier.height(totalHeightDpVal)
+                )
+            }
+            MosaicType.LEFT_COLUMN -> {
+                MosaicLeftColumnGrid(
+                    layout = layout,
+                    displayMedia = displayMedia,
+                    extraCount = extraCount,
+                    messageId = messageId,
+                    onMediaClick = onMediaClick,
+                    modifier = Modifier.height(totalHeightDpVal)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 纯行布局渲染（ROWS 类型）
+ */
+@Composable
+private fun MosaicRowsGrid(
+    layout: MosaicLayout,
+    displayMedia: List<Media>,
+    extraCount: Int,
+    messageId: Long,
+    onMediaClick: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        layout.rows.forEachIndexed { rowIndex, row ->
+            if (rowIndex > 0) Spacer(modifier = Modifier.height(2.dp))
+            Row(modifier = Modifier.weight(row.heightWeight)) {
+                row.items.forEachIndexed { colIndex, item ->
+                    if (colIndex > 0) Spacer(modifier = Modifier.width(2.dp))
+                    val media = displayMedia[item.index]
+                    val isLast = item.index == displayMedia.lastIndex && extraCount > 0
+                    if (isLast) {
+                        OverflowCell(
+                            media = media,
+                            extraCount = extraCount,
+                            messageId = messageId,
+                            onMediaClick = onMediaClick,
+                            modifier = Modifier.weight(item.widthWeight).fillMaxHeight()
+                        )
+                    } else {
+                        MediaThumbnailItem(
+                            media = media,
+                            messageId = messageId,
+                            onClick = { onMediaClick(media.id) },
+                            modifier = Modifier.weight(item.widthWeight).fillMaxHeight()
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 左列大图 + 右列多行布局渲染（LEFT_COLUMN 类型）
+ */
+@Composable
+private fun MosaicLeftColumnGrid(
+    layout: MosaicLayout,
+    displayMedia: List<Media>,
+    extraCount: Int,
+    messageId: Long,
+    onMediaClick: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val leftMedia = displayMedia[layout.leftColumnIndex]
+
+    Row(modifier = modifier) {
+        // 左列大图
+        MediaThumbnailItem(
+            media = leftMedia,
+            messageId = messageId,
+            onClick = { onMediaClick(leftMedia.id) },
+            modifier = Modifier
+                .weight(layout.leftColumnWidth)
+                .fillMaxHeight()
+        )
+        Spacer(modifier = Modifier.width(2.dp))
+        // 右列多行
+        Column(
+            modifier = Modifier
+                .weight(1f - layout.leftColumnWidth)
+                .fillMaxHeight()
+        ) {
+            layout.rows.forEachIndexed { rowIndex, row ->
+                if (rowIndex > 0) Spacer(modifier = Modifier.height(2.dp))
+                Row(modifier = Modifier.weight(row.heightWeight)) {
+                    row.items.forEachIndexed { colIndex, item ->
+                        if (colIndex > 0) Spacer(modifier = Modifier.width(2.dp))
+                        val media = displayMedia[item.index]
+                        val isLast = item.index == displayMedia.lastIndex && extraCount > 0
+                        if (isLast) {
+                            OverflowCell(
+                                media = media,
+                                extraCount = extraCount,
+                                messageId = messageId,
+                                onMediaClick = onMediaClick,
+                                modifier = Modifier.weight(item.widthWeight).fillMaxHeight()
+                            )
                         } else {
                             MediaThumbnailItem(
                                 media = media,
                                 messageId = messageId,
                                 onClick = { onMediaClick(media.id) },
-                                modifier = Modifier
-                                    .weight(widthWeight.toFloat())
-                                    .fillMaxHeight()
+                                modifier = Modifier.weight(item.widthWeight).fillMaxHeight()
                             )
                         }
                     }
@@ -456,100 +532,34 @@ private fun RowBasedGrid(
 }
 
 /**
- * 媒体缩略图网格
+ * "+N" 溢出显示单元格
  */
 @Composable
-private fun MediaThumbnailGrid(
-    mediaList: List<Media>,
+private fun OverflowCell(
+    media: Media,
+    extraCount: Int,
     messageId: Long,
     onMediaClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val displayMedia = mediaList.take(10)
-    val extraCount = mediaList.size - 10
-
-    when (displayMedia.size) {
-        1 -> {
-            // 单图：保持原始比例，高度不超过 360dp，超高时缩小宽度
-            val media0 = displayMedia[0]
-            val aspectRatio =
-                if (media0.width != null && media0.height != null && media0.width > 0 && media0.height > 0) {
-                    media0.width.toFloat() / media0.height.toFloat()
-                } else {
-                    1f
-                }
-            val clampedRatio = aspectRatio.coerceIn(0.5f, 2.5f)
-            val density = androidx.compose.ui.platform.LocalDensity.current
-            var widthPx by remember(media0.id) { mutableStateOf(0) }
-            val maxHeightDp = 360.dp
-            val maxHeightPx = with(density) { maxHeightDp.toPx() }
-            val effectiveWidthPx =
-                if (widthPx > 0) widthPx.toFloat() else maxHeightPx * clampedRatio
-            val naturalHeightPx = effectiveWidthPx / clampedRatio
-            val finalHeightPx = naturalHeightPx.coerceAtMost(maxHeightPx)
-            val finalWidthPx = (finalHeightPx * clampedRatio).coerceAtMost(effectiveWidthPx)
-            val finalHeightDp = with(density) { finalHeightPx.toDp() }
-            val finalWidthDp = with(density) { finalWidthPx.toDp() }
-            Box(
-                modifier = modifier.onGloballyPositioned { widthPx = it.size.width }
-            ) {
-                MediaThumbnailItem(
-                    media = media0,
-                    messageId = messageId,
-                    onClick = { onMediaClick(media0.id) },
-                    modifier = Modifier.size(width = finalWidthDp, height = finalHeightDp)
-                )
-            }
-        }
-
-        3 -> {
-            // 三图：左侧50%1张，右侧50%两张上下排列
-            Row(modifier = modifier.height(220.dp)) {
-                MediaThumbnailItem(
-                    media = displayMedia[0],
-                    messageId = messageId,
-                    onClick = { onMediaClick(displayMedia[0].id) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                )
-                Spacer(modifier = Modifier.width(2.dp))
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                ) {
-                    MediaThumbnailItem(
-                        media = displayMedia[1],
-                        messageId = messageId,
-                        onClick = { onMediaClick(displayMedia[1].id) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    MediaThumbnailItem(
-                        media = displayMedia[2],
-                        messageId = messageId,
-                        onClick = { onMediaClick(displayMedia[2].id) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    )
-                }
-            }
-        }
-
-        else -> {
-            // 2, 4-10+: 使用通用行布局引擎
-            RowBasedGrid(
-                displayMedia = displayMedia,
-                totalMedia = mediaList.size,
-                maxDisplay = 10,
-                layout = getGridLayout(displayMedia.size),
-                messageId = messageId,
-                onMediaClick = onMediaClick,
-                modifier = modifier
+    Box(modifier = modifier) {
+        MediaThumbnailItem(
+            media = media,
+            messageId = messageId,
+            onClick = { onMediaClick(media.id) },
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "+$extraCount",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
             )
         }
     }
