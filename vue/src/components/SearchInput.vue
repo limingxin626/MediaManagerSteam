@@ -5,7 +5,7 @@
         :value="modelValue"
         type="text"
         :placeholder="placeholder"
-        class="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 dark:border-white/10 rounded-md bg-gray-50 dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        class="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 dark:border-white/10 rounded-md bg-gray-50 dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)] focus:border-transparent"
         @input="onInput"
         @keydown.enter="onSearch"
       />
@@ -15,7 +15,7 @@
     </div>
     <button
       @click="onSearch"
-      class="px-3 py-1.5 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-md transition-colors"
+      class="px-3 py-1.5 text-sm bg-[var(--color-primary-500)] hover:bg-[var(--color-primary-600)] text-white rounded-md transition-colors"
     >搜索</button>
   </div>
 </template>

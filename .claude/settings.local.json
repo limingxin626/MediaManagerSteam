@@ -25,7 +25,12 @@
       "Bash(openspec instructions:*)",
       "Bash(grep:*)",
       "Bash(./gradlew compileDebugKotlin:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

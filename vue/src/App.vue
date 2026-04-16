@@ -5,13 +5,16 @@
       <!-- Message 始终挂载，v-show 切显隐，滚动位置天然保留 -->
       <Message v-show="route.path === '/'" />
       <router-view v-slot="{ Component }">
-        <keep-alive :include="['Media', 'Actor']">
-          <component :is="Component" />
-        </keep-alive>
+        <Transition name="route" mode="out-in">
+          <keep-alive :include="['Media', 'Actor']">
+            <component :is="Component" />
+          </keep-alive>
+        </Transition>
       </router-view>
     </div>
     <BottomNavBar />
     <ToastContainer />
+    <ConfirmDialog />
   </div>
 </template>
 
@@ -21,6 +24,7 @@ import { useRoute } from 'vue-router'
 import Navbar from './components/Navbar.vue'
 import BottomNavBar from './components/BottomNavBar.vue'
 import ToastContainer from './components/ToastContainer.vue'
+import ConfirmDialog from './components/ConfirmDialog.vue'
 import Message from './views/Message.vue'
 import { useTheme } from './composables/useTheme'
 

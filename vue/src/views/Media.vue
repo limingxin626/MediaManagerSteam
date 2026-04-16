@@ -43,7 +43,7 @@
           <div
             v-for="item in items"
             :key="item.id"
-            class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity bg-gray-200 dark:bg-gray-900"
+            class="group aspect-square overflow-hidden relative rounded cursor-pointer transition-transform duration-200 hover:scale-[1.03] bg-gray-200 dark:bg-gray-900"
             @click="openPreview(item)"
           >
             <img
@@ -52,6 +52,7 @@
               class="w-full h-full object-cover"
               loading="lazy"
             />
+            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
             <!-- Video icon -->
             <div v-if="isVideo(item.mime_type)" class="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div class="w-8 h-8 bg-black/40 rounded-full flex items-center justify-center border border-white/30">
@@ -66,14 +67,14 @@
             </div>
             <!-- Star toggle -->
             <button
-              @click.stop="toggleMediaStar(item)"
+              @click.stop="mediaBounceId = item.id; setTimeout(() => mediaBounceId = null, 300); toggleMediaStar(item)"
               class="absolute top-1 right-1 p-1 rounded-full transition-all"
               :class="item.starred
                 ? 'text-yellow-400'
                 : 'text-white/70 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
               "
             >
-              <svg class="w-4 h-4" :fill="item.starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" :class="{ 'star-bounce': mediaBounceId === item.id }" :fill="item.starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
               </svg>
             </button>
@@ -91,11 +92,17 @@
         </div>
 
         <!-- Empty -->
-        <div v-if="!loading && items.length === 0" class="flex flex-col items-center justify-center py-24 text-gray-400">
-          <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          <p class="text-sm">暂无媒体</p>
+        <div v-if="!loading && items.length === 0" class="flex flex-col items-center justify-center py-24">
+          <div class="relative w-24 h-24 mb-4">
+            <div class="absolute inset-0 rounded-full bg-[var(--color-primary-500)]/10 scale-110"></div>
+            <div class="absolute inset-2 rounded-full bg-[var(--color-primary-500)]/5"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <svg class="w-10 h-10 text-[var(--color-primary-500)]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+          <p class="text-sm text-[var(--text-muted)]">暂无媒体</p>
         </div>
 
         <!-- Scroll sentinel -->
@@ -144,6 +151,7 @@ const sentinel = ref<HTMLElement | null>(null)
 const previewOpen = ref(false)
 const previewItems = ref<any[]>([])
 const previewStartIndex = ref(0)
+const mediaBounceId = ref<number | null>(null)
 
 const { items, loading, hasMore, reset, setupObserver } = useInfiniteScroll<Media>({
   fetchFn: ({ cursor, limit }) => api.get<CursorResponse<Media>>('/media', {

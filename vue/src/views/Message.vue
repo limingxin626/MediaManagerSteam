@@ -6,13 +6,13 @@
       <div class="flex flex-col gap-0.5 px-2 pb-4">
         <button @click="selectTag(null)"
           class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === null
-            ? 'bg-indigo-600/30 text-indigo-600 dark:text-indigo-300'
+            ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
           <span>全部</span>
         </button>
         <button v-for="tag in tags" :key="tag.id" @click="selectTag(tag.id)"
           class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === tag.id
-            ? 'bg-indigo-600/30 text-indigo-600 dark:text-indigo-300'
+            ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
           <span class="truncate">{{ tag.name }}</span>
           <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ tag.message_count }}</span>
@@ -31,7 +31,7 @@
               <h2 class="text-base font-semibold text-gray-900 dark:text-white">消息流</h2>
               <!-- Merge toggle -->
               <button @click="toggleMergeMode" class="px-2 py-1 text-xs rounded-md transition-colors" :class="mergeMode
-                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                ? 'bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)]'
                 : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'">
                 {{ mergeMode ? '取消合并' : '合并' }}
               </button>
@@ -54,6 +54,10 @@
 
         <!-- Scrollable Content Area -->
         <div ref="scrollContainer" class="flex-1 overflow-y-auto min-h-0 relative">
+          <!-- Floating date badge -->
+          <div v-if="currentVisibleDate" class="sticky top-0 z-20 flex justify-center py-2 pointer-events-none">
+            <span class="px-3 py-1 text-xs text-[var(--text-secondary)] bg-[var(--bg-card)]/80 dark:bg-white/10 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-sm">{{ currentVisibleDate }}</span>
+          </div>
           <!-- Scroll sentinel for loading older messages -->
           <div ref="topSentinel" class="h-1"></div>
 
@@ -75,7 +79,7 @@
               </div>
             </div>
             <div v-if="loading && messages.length > 0" class="text-center py-4">
-              <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
+              <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[var(--color-primary-500)]"></div>
             </div>
 
             <!-- No more data -->
@@ -88,10 +92,8 @@
               <template v-for="(message, idx) in messages" :key="message.id">
                 <!-- Date separator -->
                 <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1]?.created_at ?? '')"
-                  class="flex items-center gap-3 py-2">
-                  <div class="flex-1 h-px bg-[var(--divider)]"></div>
-                  <span class="text-xs text-gray-400 whitespace-nowrap">{{ formatDateLabel(message.created_at) }}</span>
-                  <div class="flex-1 h-px bg-[var(--divider)]"></div>
+                  class="flex justify-center py-2">
+                  <span class="px-3 py-1 text-xs text-[var(--text-secondary)] bg-[var(--bg-card)]/80 dark:bg-white/10 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-sm">{{ formatDateLabel(message.created_at) }}</span>
                 </div>
                 <div :data-message-date="message.created_at.substring(0, 10)">
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
@@ -105,18 +107,24 @@
             </div>
 
             <!-- Empty State -->
-            <div v-if="messages.length === 0 && !loading" class="text-center py-12">
-              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无消息</h3>
-              <p class="mt-1 text-sm text-gray-400">还没有任何消息内容</p>
+            <div v-if="messages.length === 0 && !loading" class="flex flex-col items-center justify-center py-20">
+              <div class="relative w-24 h-24 mb-4">
+                <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/10 rotate-6"></div>
+                <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/5 -rotate-3"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                  <svg class="w-10 h-10 text-[var(--color-primary-500)]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+              </div>
+              <h3 class="text-sm font-medium text-[var(--text-primary)]">暂无消息</h3>
+              <p class="mt-1 text-sm text-[var(--text-muted)]">还没有任何消息内容</p>
             </div>
 
             <!-- Loading indicator (bottom, for loading newer) -->
             <div v-if="loadingForward" class="text-center py-4">
-              <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
+              <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[var(--color-primary-500)]"></div>
             </div>
           </div>
 
@@ -130,7 +138,7 @@
               class="pointer-events-auto flex items-center gap-3 px-5 py-3 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl text-white text-sm">
               <span>已选 {{ selectedMessageIds.size }} 条</span>
               <button @click="handleMerge" :disabled="selectedMessageIds.size < 2"
-                class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 rounded-full font-medium transition-colors">
+                class="px-4 py-1.5 bg-[var(--color-primary-600)] hover:bg-[var(--color-primary-700)] disabled:bg-gray-600 rounded-full font-medium transition-colors">
                 合并
               </button>
               <button @click="toggleMergeMode"
@@ -142,7 +150,7 @@
 
           <!-- "回到最新" floating button -->
           <button v-if="isViewingHistory" @click="backToLatest"
-            class="sticky bottom-4 left-full -translate-x-6 z-50 flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-full shadow-lg transition-colors w-fit ml-auto mr-6">
+            class="sticky bottom-4 left-full -translate-x-6 z-50 flex items-center gap-2 px-4 py-2 bg-[var(--color-primary-600)] hover:bg-[var(--color-primary-700)] text-white text-sm font-medium rounded-full shadow-lg transition-colors w-fit ml-auto mr-6">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
             </svg>
@@ -150,14 +158,18 @@
           </button>
         </div>
 
-        <!-- FAB: New Message -->
-        <button @click="openCreateDialog"
-          class="absolute bottom-6 right-6 z-50 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
-          title="新消息">
-          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
+        <!-- Bottom Input Bar -->
+        <div class="shrink-0 px-4 py-3 border-t border-[var(--border-color)] mb-20 md:mb-0">
+          <div class="max-w-4xl mx-auto">
+            <button @click="openCreateDialog"
+              class="w-full flex items-center gap-3 px-4 py-3 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full text-sm text-[var(--text-muted)] hover:border-[var(--color-primary-500)] transition-colors cursor-text">
+              <span class="flex-1 text-left">写点什么...</span>
+              <svg class="w-5 h-5 text-[var(--color-primary-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Right Detail Panel -->
@@ -167,7 +179,7 @@
           <span class="text-sm font-semibold text-gray-900 dark:text-white">消息详情</span>
           <div class="flex items-center gap-2">
             <div v-if="selectedMessageLoading"
-              class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-500">
+              class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[var(--color-primary-500)]">
             </div>
             <button @click="selectedMessage = null"
               class="p-1 text-gray-400 hover:text-gray-200 rounded transition-colors" title="关闭">
@@ -241,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { marked } from 'marked'
 import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
@@ -250,6 +262,7 @@ import SearchInput from '../components/SearchInput.vue'
 import MessageComposeDialog from '../components/MessageComposeDialog.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
+import { useConfirm } from '../composables/useConfirm'
 import { resolveUrl, formatDuration } from '../utils/media'
 import { formatDateLabel } from '../utils/date'
 
@@ -257,6 +270,7 @@ import { formatDateLabel } from '../utils/date'
 defineOptions({ name: 'Message' })
 
 const toast = useToast()
+const { confirm } = useConfirm()
 
 const tags = ref<TagWithCount[]>([])
 const selectedTagId = ref<number | null | undefined>(undefined)
@@ -601,7 +615,8 @@ const handleToggleStar = async (messageId: number) => {
 // --- Delete ---
 
 const handleDeleteMessage = async (messageId: number) => {
-  if (!confirm('确定要删除这条消息吗？')) return
+  const ok = await confirm({ title: '确认删除', message: '确定要删除这条消息吗？', danger: true })
+  if (!ok) return
 
   try {
     await api.del(`/messages/${messageId}`)
@@ -632,7 +647,12 @@ const handleMerge = async () => {
     toast.error('请至少选择两条消息')
     return
   }
-  if (!confirm(`确定要合并这 ${selectedMessageIds.value.size} 条消息吗？合并后不可撤销。`)) return
+  const ok = await confirm({
+    title: '确认合并',
+    message: `确定要合并这 ${selectedMessageIds.value.size} 条消息吗？合并后不可撤销。`,
+    danger: true,
+  })
+  if (!ok) return
 
   try {
     const merged = await api.post<MessageDetail>('/messages/merge', {
@@ -695,6 +715,44 @@ const renderDetailText = (text: string) => {
 
 const getDateStr = (dateString: string) => dateString.substring(0, 10)
 
+// --- Floating date badge ---
+const currentVisibleDate = ref('')
+
+const updateVisibleDate = () => {
+  const container = scrollContainer.value
+  if (!container || messages.value.length === 0) return
+
+  // Find the first message element whose top is at or below the container's scroll top
+  const containerRect = container.getBoundingClientRect()
+  // offset to account for the sticky date badge height (~36px)
+  const probeY = containerRect.top + 40
+
+  const dateEls = container.querySelectorAll<HTMLElement>('[data-message-date]')
+  let found = ''
+  for (const el of dateEls) {
+    const rect = el.getBoundingClientRect()
+    if (rect.top <= probeY) {
+      found = el.dataset.messageDate || ''
+    } else {
+      break
+    }
+  }
+
+  if (!found && dateEls.length > 0) {
+    found = dateEls[0].dataset.messageDate || ''
+  }
+
+  if (found) {
+    currentVisibleDate.value = formatDateLabel(found + 'T00:00:00')
+  }
+}
+
+let scrollRaf = 0
+const onScrollForDate = () => {
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+  scrollRaf = requestAnimationFrame(updateVisibleDate)
+}
+
 function onSearch() {
   activeMediaFilter.value = null
   resetAndFetch()
@@ -742,5 +800,15 @@ onMounted(() => {
   fetchTags()
   fetchMessages()
   setupObservers()
+  scrollContainer.value?.addEventListener('scroll', onScrollForDate, { passive: true })
 })
+
+onUnmounted(() => {
+  teardownObservers()
+  scrollContainer.value?.removeEventListener('scroll', onScrollForDate)
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+})
+
+// Update floating date after messages change
+watch(messages, () => nextTick(updateVisibleDate), { flush: 'post' })
 </script>
