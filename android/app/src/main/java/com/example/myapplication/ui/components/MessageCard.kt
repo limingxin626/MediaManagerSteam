@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.components
 
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -87,10 +89,32 @@ fun MessageCard(
 
     var showMenu by remember { mutableStateOf(false) }
 
-    Box(modifier = modifier, contentAlignment = androidx.compose.ui.Alignment.Center) {
+    // 单图时计算卡片宽度，使卡片收缩到图片宽度（Telegram 风格）
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+    val maxCardWidth = screenWidthDp * 0.9f
+    val singleImageMaxHeight = 360.dp
+    val singleImageMinWidth = singleImageMaxHeight * 9f / 16f
+
+    val cardWidthModifier = if (mediaList.size == 1) {
+        val media0 = mediaList[0]
+        val aspectRatio =
+            if (media0.width != null && media0.height != null && media0.width > 0 && media0.height > 0) {
+                media0.width.toFloat() / media0.height.toFloat()
+            } else {
+                1f
+            }
+        val clampedRatio = aspectRatio.coerceIn(0.5f, 2.5f)
+        // 图片自然宽度 = min(maxCardWidth, 按比例计算)
+        val naturalWidth = (singleImageMaxHeight * clampedRatio).coerceAtMost(maxCardWidth)
+        val cardWidth = naturalWidth.coerceAtLeast(singleImageMinWidth)
+        Modifier.width(cardWidth)
+    } else {
+        Modifier.fillMaxWidth(0.9f)
+    }
+
+    Box(modifier = modifier) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
+            modifier = cardWidthModifier
                 .combinedClickable(
                     onClick = {},
                     onLongClick = { showMenu = true }
