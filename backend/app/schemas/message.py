@@ -39,6 +39,8 @@ class MessageMediaItem(BaseModel):
     file_path: str
     file_url: str = ""
     mime_type: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
     duration_ms: Optional[int] = None
     thumb_url: str = ""
     starred: bool = False

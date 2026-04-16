@@ -3,6 +3,8 @@ export interface MessageMediaItem {
   id: number
   file_path: string
   mime_type: string | null
+  width: number | null
+  height: number | null
   duration_ms: number | null
   thumb_url: string
   starred?: boolean
@@ -118,4 +120,20 @@ export interface MessageDateCount {
 // 通用类型
 export interface ViewMode {
   type: 'grid' | 'list'
+}
+
+// 管理页面类型
+export interface AdminStats {
+  table_counts: Record<string, number>
+  storage: {
+    total_files: number
+    total_size: number
+  }
+  db_size: number
+  recent_messages: Array<{
+    id: number
+    text: string | null
+    actor_id: number | null
+    created_at: string | null
+  }>
 }

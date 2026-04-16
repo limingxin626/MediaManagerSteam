@@ -1,16 +1,17 @@
 <template>
-  <div class="flex items-end gap-2">
+  <div ref="cardRef" class="flex items-end gap-2" :class="{ 'animate-in': isVisible, 'opacity-0': !isVisible }"
+    :style="singleMediaCardStyle">
   <div
     class="group flex-1 min-w-0 bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-color)] overflow-hidden hover:shadow-lg transition-all duration-200"
-    :class="{ 'ring-2 ring-indigo-500 border-indigo-500': props.selected }">
+    :class="{ 'ring-2 ring-[var(--color-primary-500)] border-[var(--color-primary-500)]': props.selected }">
     <div class="px-4">
       <!-- Actor Info -->
       <div class="flex items-center justify-between gap-3">
         <!-- Selection checkbox -->
         <div v-if="props.selectable" @click.stop="emit('toggle-select', props.message.id)"
           class="shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors" :class="props.selected
-            ? 'bg-indigo-600 border-indigo-600 text-white'
-            : 'border-gray-600 hover:border-indigo-400'">
+            ? 'bg-[var(--color-primary-600)] border-[var(--color-primary-600)] text-white'
+            : 'border-gray-600 hover:border-[var(--color-primary-500)]'">
           <svg v-if="props.selected" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
           </svg>
@@ -27,72 +28,184 @@
       </div>
 
       <!-- Unified Media Preview -->
-      <div v-if="mediaPreviewItems.length > 0" class="relative rounded-xl overflow-hidden mb-2">
-        <div class="grid gap-0.5" :class="mediaGridClass">
-          <div v-for="(item, index) in mediaPreviewItems" :key="item.id"
-            class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer" :class="mediaItemClass(index)"
-            @click.stop="handleMediaClick(index)">
-            <img :src="resolveUrl(item.thumb_url)" :alt="`Media ${index + 1}`"
-              class="w-full h-full object-cover transition-transform duration-200 hover:scale-105" />
-
-            <!-- Video overlay -->
-            <div v-if="isVideo(item.mime_type)"
-              class="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div
-                class="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
-                <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
+      <div v-if="mediaPreviewItems.length > 0" class="relative overflow-hidden mb-2 -mx-4">
+        <!-- Single image -->
+        <template v-if="mediaPreviewItems.length === 1">
+          <div class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
+            :style="{ aspectRatio: getAspectRatio(mediaPreviewItems[0]) }"
+            @click.stop="handleMediaClick(0)">
+            <img :src="resolveUrl(mediaPreviewItems[0].thumb_url)" alt="Media 1"
+              class="w-full h-full object-cover transition-transform duration-200 group-hover/media:scale-105" />
+            <div class="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
+            <template v-if="isVideo(mediaPreviewItems[0].mime_type)">
+              <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+                  <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                </div>
               </div>
-            </div>
-
-            <!-- Duration badge -->
-            <div v-if="item.duration_ms"
+            </template>
+            <div v-if="mediaPreviewItems[0].duration_ms"
               class="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
-              {{ formatDuration(item.duration_ms) }}
+              {{ formatDuration(mediaPreviewItems[0].duration_ms) }}
             </div>
-
-            <!-- Star and Menu Buttons -->
+            <!-- Star and Menu for single -->
             <div class="absolute top-1.5 right-1.5 flex gap-1.5">
-              <!-- Star Button -->
-              <button @click.stop="handleMediaToggleStar(item)"
-                class="w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors" :class="item.starred
+              <button @click.stop="handleMediaToggleStar(mediaPreviewItems[0])"
+                class="w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors" :class="mediaPreviewItems[0].starred
                   ? 'text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/50'
-                  : 'text-white/70 hover:text-yellow-400 hover:bg-white/10'
-                  " :title="item.starred ? '取消收藏' : '收藏'">
-                <svg class="w-3.5 h-3.5" :fill="item.starred ? 'currentColor' : 'none'" stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  : 'text-white/70 hover:text-yellow-400 hover:bg-white/10'">
+                <svg class="w-3.5 h-3.5" :class="{ 'star-bounce': mediaStarBouncing === mediaPreviewItems[0].id }" :fill="mediaPreviewItems[0].starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                 </svg>
               </button>
-
-              <!-- Menu Button -->
-              <button @click.stop="toggleMenu(index)"
+              <button @click.stop="toggleMenu(0)"
                 class="w-6 h-6 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center backdrop-blur-sm transition-colors opacity-0 hover:opacity-100"
-                :class="{ 'opacity-100!': activeMenuIndex === index }">
+                :class="{ 'opacity-100!': activeMenuIndex === 0 }">
                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path
-                    d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                  <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
                 </svg>
               </button>
-
-              <div v-if="activeMenuIndex === index"
+              <div v-if="activeMenuIndex === 0"
                 class="absolute top-8 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-white/10 py-1 min-w-[140px] z-10">
-                <button @click.stop="findMessagesByMedia(item.id)"
+                <button @click.stop="findMessagesByMedia(mediaPreviewItems[0].id)"
                   class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
                   查找所有message
                 </button>
               </div>
             </div>
-
-            <!-- "More" overlay on last item -->
-            <div v-if="index === mediaPreviewItems.length - 1 && remainingCount > 0"
+            <div v-if="remainingCount > 0"
               class="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
               <span class="text-white text-2xl font-semibold">+{{ remainingCount }}</span>
             </div>
           </div>
-        </div>
+        </template>
+
+        <!-- Mosaic: ROWS layout -->
+        <template v-else-if="mosaicLayout.type === 'rows'">
+          <div class="flex flex-col gap-0.5" :style="{ aspectRatio: mosaicRowsAspectRatio }">
+            <div v-for="(row, rowIdx) in mosaicLayout.rows" :key="rowIdx"
+              class="flex gap-0.5" :style="{ flex: row.heightWeight }">
+              <div v-for="mosaicItem in row.items" :key="mosaicItem.index"
+                class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
+                :style="{ flex: mosaicItem.widthWeight }"
+                @click.stop="handleMediaClick(mosaicItem.index)">
+                <img :src="resolveUrl(mediaPreviewItems[mosaicItem.index].thumb_url)" :alt="`Media ${mosaicItem.index + 1}`"
+                  class="w-full h-full object-cover transition-transform duration-200 group-hover/media:scale-105" />
+                <div class="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
+                <template v-if="isVideo(mediaPreviewItems[mosaicItem.index].mime_type)">
+                  <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+                      <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                    </div>
+                  </div>
+                </template>
+                <div v-if="mediaPreviewItems[mosaicItem.index].duration_ms"
+                  class="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
+                  {{ formatDuration(mediaPreviewItems[mosaicItem.index].duration_ms) }}
+                </div>
+                <div class="absolute top-1.5 right-1.5 flex gap-1.5">
+                  <button @click.stop="handleMediaToggleStar(mediaPreviewItems[mosaicItem.index])"
+                    class="w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors" :class="mediaPreviewItems[mosaicItem.index].starred
+                      ? 'text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/50'
+                      : 'text-white/70 hover:text-yellow-400 hover:bg-white/10'">
+                    <svg class="w-3.5 h-3.5" :class="{ 'star-bounce': mediaStarBouncing === mediaPreviewItems[mosaicItem.index].id }" :fill="mediaPreviewItems[mosaicItem.index].starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                  </button>
+                  <button @click.stop="toggleMenu(mosaicItem.index)"
+                    class="w-6 h-6 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center backdrop-blur-sm transition-colors opacity-0 hover:opacity-100"
+                    :class="{ 'opacity-100!': activeMenuIndex === mosaicItem.index }">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                    </svg>
+                  </button>
+                  <div v-if="activeMenuIndex === mosaicItem.index"
+                    class="absolute top-8 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-white/10 py-1 min-w-[140px] z-10">
+                    <button @click.stop="findMessagesByMedia(mediaPreviewItems[mosaicItem.index].id)"
+                      class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+                      查找所有message
+                    </button>
+                  </div>
+                </div>
+                <div v-if="mosaicItem.index === mediaPreviewItems.length - 1 && remainingCount > 0"
+                  class="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
+                  <span class="text-white text-2xl font-semibold">+{{ remainingCount }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Mosaic: LEFT_COLUMN layout -->
+        <template v-else>
+          <div class="flex gap-0.5" :style="{ aspectRatio: `${MOSAIC_CONTAINER_WIDTH} / ${mosaicLeftColumnHeight}` }">
+            <!-- Left big image -->
+            <div class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
+              :style="{ width: (mosaicLayout.leftColumnWidth * 100) + '%' }"
+              @click.stop="handleMediaClick(mosaicLayout.leftColumnIndex)">
+              <img :src="resolveUrl(mediaPreviewItems[mosaicLayout.leftColumnIndex].thumb_url)" :alt="`Media ${mosaicLayout.leftColumnIndex + 1}`"
+                class="w-full h-full object-cover transition-transform duration-200 group-hover/media:scale-105" />
+              <div class="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
+              <template v-if="isVideo(mediaPreviewItems[mosaicLayout.leftColumnIndex].mime_type)">
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div class="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+                    <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  </div>
+                </div>
+              </template>
+              <div v-if="mediaPreviewItems[mosaicLayout.leftColumnIndex].duration_ms"
+                class="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
+                {{ formatDuration(mediaPreviewItems[mosaicLayout.leftColumnIndex].duration_ms) }}
+              </div>
+              <div class="absolute top-1.5 right-1.5 flex gap-1.5">
+                <button @click.stop="handleMediaToggleStar(mediaPreviewItems[mosaicLayout.leftColumnIndex])"
+                  class="w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors" :class="mediaPreviewItems[mosaicLayout.leftColumnIndex].starred
+                    ? 'text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/50'
+                    : 'text-white/70 hover:text-yellow-400 hover:bg-white/10'">
+                  <svg class="w-3.5 h-3.5" :class="{ 'star-bounce': mediaStarBouncing === mediaPreviewItems[mosaicLayout.leftColumnIndex].id }" :fill="mediaPreviewItems[mosaicLayout.leftColumnIndex].starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <!-- Right stacked images -->
+            <div class="flex flex-col gap-0.5" :style="{ width: ((1 - mosaicLayout.leftColumnWidth) * 100) + '%' }">
+              <div v-for="(row, rowIdx) in mosaicLayout.rows" :key="rowIdx"
+                class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
+                :style="{ flex: row.heightWeight }"
+                @click.stop="handleMediaClick(row.items[0].index)">
+                <img :src="resolveUrl(mediaPreviewItems[row.items[0].index].thumb_url)" :alt="`Media ${row.items[0].index + 1}`"
+                  class="w-full h-full object-cover transition-transform duration-200 group-hover/media:scale-105" />
+                <div class="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
+                <template v-if="isVideo(mediaPreviewItems[row.items[0].index].mime_type)">
+                  <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+                      <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                    </div>
+                  </div>
+                </template>
+                <div v-if="mediaPreviewItems[row.items[0].index].duration_ms"
+                  class="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
+                  {{ formatDuration(mediaPreviewItems[row.items[0].index].duration_ms) }}
+                </div>
+                <div class="absolute top-1.5 right-1.5 flex gap-1.5">
+                  <button @click.stop="handleMediaToggleStar(mediaPreviewItems[row.items[0].index])"
+                    class="w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors" :class="mediaPreviewItems[row.items[0].index].starred
+                      ? 'text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/50'
+                      : 'text-white/70 hover:text-yellow-400 hover:bg-white/10'">
+                    <svg class="w-3.5 h-3.5" :class="{ 'star-bounce': mediaStarBouncing === mediaPreviewItems[row.items[0].index].id }" :fill="mediaPreviewItems[row.items[0].index].starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                  </button>
+                </div>
+                <div v-if="row.items[0].index === mediaPreviewItems.length - 1 && remainingCount > 0"
+                  class="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
+                  <span class="text-white text-2xl font-semibold">+{{ remainingCount }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- Message Text -->
@@ -138,7 +251,7 @@
               ? 'text-yellow-400 hover:text-yellow-500'
               : 'text-gray-500 hover:text-yellow-400'"
               :title="props.message.starred ? '取消收藏' : '收藏'">
-              <svg class="w-3.5 h-3.5" :fill="props.message.starred ? 'currentColor' : 'none'" stroke="currentColor"
+              <svg class="w-3.5 h-3.5" :class="{ 'star-bounce': starBouncing }" :fill="props.message.starred ? 'currentColor' : 'none'" stroke="currentColor"
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -166,7 +279,7 @@
   </div>
     <!-- Detail arrow button (Telegram-style) -->
     <button @click="handleClick"
-      class="shrink-0 w-8 h-8 mb-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+      class="shrink-0 w-8 h-8 mb-1 rounded-full bg-[var(--color-primary-600)] hover:bg-[var(--color-primary-500)] text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
       title="查看详情">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
@@ -177,11 +290,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { marked } from 'marked'
 import type { Message, MessageMediaItem, TagItem } from '../types'
 import { isVideo, formatDuration, resolveUrl } from '../utils/media'
 import { formatRelativeTime } from '../utils/date'
+import { calculateMosaicLayout } from '../utils/mosaic'
 
 interface Props {
   message: Message
@@ -206,6 +320,31 @@ const emit = defineEmits<{
 
 const maxPreviewItems = 9
 const activeMenuIndex = ref<number | null>(null)
+const cardRef = ref<HTMLElement | null>(null)
+const isVisible = ref(false)
+const starBouncing = ref(false)
+const mediaStarBouncing = ref<number | null>(null)
+
+let observer: IntersectionObserver | null = null
+
+onMounted(() => {
+  if (cardRef.value) {
+    observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          isVisible.value = true
+          observer?.disconnect()
+        }
+      },
+      { rootMargin: '50px' }
+    )
+    observer.observe(cardRef.value)
+  }
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
+})
 
 const handleEdit = () => {
   emit('edit', props.message.id)
@@ -241,23 +380,61 @@ const renderedText = computed(() => {
   return marked.parse(normalized) as string
 })
 
-// Telegram-style grid: 1→full, 2→2col, 3→left big + right 2 small, 4→2x2, 5+→3col
-const mediaGridClass = computed(() => {
-  const count = mediaPreviewItems.value.length
-  if (count === 1) return 'grid-cols-1'
-  if (count === 2) return 'grid-cols-2'
-  if (count === 3) return 'grid-cols-3 grid-rows-2'
-  if (count === 4) return 'grid-cols-2'
-  return 'grid-cols-3'
+// Mosaic layout — 使用容器虚拟宽度 400px 计算
+const MOSAIC_CONTAINER_WIDTH = 400
+
+// 单图时限制卡片宽度，防止竖图过高
+// 最大图片高度 500px 等效，通过 max-width = maxHeight * ratio 限制
+const MAX_SINGLE_IMAGE_HEIGHT = 800
+const singleMediaCardStyle = computed(() => {
+  if (mediaPreviewItems.value.length !== 1) return {}
+  const rawRatio = mediaRatios.value[0]
+  const ratio = Math.min(1.7, Math.max(0.667, rawRatio))
+  if (ratio >= 1) return {} // 横图不限制
+  const maxWidth = MAX_SINGLE_IMAGE_HEIGHT * ratio
+  return { maxWidth: maxWidth + 'px' }
 })
 
-const mediaItemClass = (index: number) => {
-  const count = mediaPreviewItems.value.length
-  if (count === 1) return 'aspect-video'
-  if (count === 3 && index === 0) return 'col-span-2 row-span-2'
-  if (count === 3) return 'aspect-square'
-  return 'aspect-square'
+const getAspectRatio = (item: MessageMediaItem): string => {
+  if (item.width && item.height) {
+    const ratio = Math.min(1.7, Math.max(0.667, item.width / item.height))
+    return `${ratio}`
+  }
+  return '16 / 9'
 }
+
+const mediaRatios = computed(() => {
+  return mediaPreviewItems.value.map(item => {
+    if (item.width && item.height && item.height > 0) return item.width / item.height
+    return 1.5
+  })
+})
+
+const mosaicLayout = computed(() => {
+  if (mediaPreviewItems.value.length <= 1) return null!
+  return calculateMosaicLayout(mediaRatios.value, MOSAIC_CONTAINER_WIDTH)
+})
+
+// ROWS 布局：整个容器的宽高比 = containerWidth / totalHeight
+const mosaicRowsAspectRatio = computed(() => {
+  if (!mosaicLayout.value || mosaicLayout.value.type !== 'rows') return '16 / 9'
+  const totalHeight = mosaicLayout.value.rows.reduce((s, r) => s + r.heightWeight, 0)
+  // 加上 gap (rows.length - 1) * 2px 的近似，忽略不计
+  return `${MOSAIC_CONTAINER_WIDTH} / ${totalHeight}`
+})
+
+// ROWS 布局：每行高度占总高度的比例，用 flex 权重
+const mosaicRowFlex = (row: { heightWeight: number }) => {
+  return row.heightWeight
+}
+
+const mosaicLeftColumnHeight = computed(() => {
+  if (!mosaicLayout.value || mosaicLayout.value.type !== 'left_column') return 0
+  const leftIdx = mosaicLayout.value.leftColumnIndex
+  const leftRatio = mediaRatios.value[leftIdx]
+  const leftWidth = mosaicLayout.value.leftColumnWidth * MOSAIC_CONTAINER_WIDTH
+  return leftWidth / leftRatio
+})
 
 const formatDate = formatRelativeTime
 
@@ -274,6 +451,8 @@ const handleDelete = () => {
 }
 
 const handleToggleStar = () => {
+  starBouncing.value = true
+  setTimeout(() => { starBouncing.value = false }, 300)
   emit('toggle-star', props.message.id)
 }
 
@@ -291,6 +470,8 @@ const findMessagesByMedia = (mediaId: number) => {
 }
 
 const handleMediaToggleStar = (mediaItem: MessageMediaItem) => {
+  mediaStarBouncing.value = mediaItem.id
+  setTimeout(() => { mediaStarBouncing.value = null }, 300)
   emit('toggle-media-star', mediaItem.id)
 }
 </script>
