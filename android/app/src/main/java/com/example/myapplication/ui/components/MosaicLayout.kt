@@ -38,7 +38,7 @@ fun calculateMosaicLayout(ratios: List<Float>, containerWidth: Float = 400f): Mo
     require(ratios.size >= 2) { "Mosaic layout requires at least 2 images" }
 
     val count = ratios.size
-    val clamped = ratios.map { it.coerceIn(0.667f, 1.7f) }
+    val clamped = ratios.map { it.coerceIn(0.667f, 1.4f) }
 
     return when (count) {
         2 -> layoutTwo(clamped, ratios, containerWidth)
@@ -163,15 +163,13 @@ private fun layoutFour(clamped: List<Float>, original: List<Float>, w: Float): M
  */
 private fun layoutOptimized(ratios: List<Float>, containerWidth: Float): MosaicLayout {
     val count = ratios.size
-    val maxLines = 4.coerceAtMost(count)
-    val maxPerLine = 4.coerceAtMost(count)
+    val maxLines = 5.coerceAtMost(count)
+    val maxPerLine = 3
 
     var bestVariance = Float.MAX_VALUE
     var bestPartition: List<Int>? = null
 
-    // 硬约束
-    val minLineHeight = containerWidth * 0.28f
-    val minItemArea = containerWidth * containerWidth * 0.04f // 每张图至少占容器面积的 4%
+    val minItemArea = containerWidth * containerWidth * 0.04f
 
     fun search(remaining: Int, lines: Int, partition: MutableList<Int>) {
         if (lines == 0) {
@@ -181,7 +179,6 @@ private fun layoutOptimized(ratios: List<Float>, containerWidth: Float): MosaicL
                 for (lineCount in partition) {
                     val lineRatioSum = (idx until idx + lineCount).sumOf { ratios[it].toDouble() }.toFloat()
                     val lineHeight = containerWidth / lineRatioSum
-                    if (lineHeight < minLineHeight) return
                     for (i in idx until idx + lineCount) {
                         val itemWidth = containerWidth * ratios[i] / lineRatioSum
                         val area = itemWidth * lineHeight

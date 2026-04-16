@@ -88,7 +88,7 @@
             </div>
 
             <!-- Messages Feed -->
-            <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-4xl mx-auto">
+            <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-3xl mx-auto">
               <template v-for="(message, idx) in messages" :key="message.id">
                 <!-- Date separator -->
                 <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1]?.created_at ?? '')"

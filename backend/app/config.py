@@ -55,8 +55,6 @@ class AppConfig:
         "http://localhost:5173",
         "http://127.0.0.1:8002",
         "http://localhost:8002",
-        "http://127.0.0.1:9002",
-        "http://localhost:9002",
     ]
 
     # 支持的媒体文件扩展名
