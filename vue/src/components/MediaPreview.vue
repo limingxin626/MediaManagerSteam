@@ -10,7 +10,7 @@
           <div class="flex items-center gap-2">
             <button
             v-if="currentItem"
-            @click="previewStarBounce = true; setTimeout(() => previewStarBounce = false, 300); emit('toggle-star', currentItem.id)"
+            @click="handleStarClick()"
             class="p-2 rounded-full transition-colors"
             :class="isCurrentStarred
               ? 'text-yellow-400 hover:bg-white/10'
@@ -151,6 +151,12 @@ const currentIndex = ref(props.startIndex)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const thumbRefs = ref<Map<number, HTMLElement>>(new Map())
 const previewStarBounce = ref(false)
+function handleStarClick() {
+  if (!currentItem.value) return
+  previewStarBounce.value = true
+  setTimeout(() => previewStarBounce.value = false, 300)
+  emit('toggle-star', currentItem.value.id)
+}
 
 const setThumbRef = (idx: number, el: HTMLElement | null) => {
   if (el) {

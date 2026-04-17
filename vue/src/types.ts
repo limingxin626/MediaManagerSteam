@@ -9,8 +9,6 @@ export type MessageDetail = components['schemas']['MessageDetailResponse']
 
 // 演员相关
 export type Actor = components['schemas']['ActorResponse']
-export type ActorDetail = components['schemas']['ActorDetailResponse']
-
 // 媒体相关
 export type Media = components['schemas']['MediaResponse']
 

@@ -87,7 +87,7 @@ const toast = useToast()
 const { confirm } = useConfirm()
 const saving = ref(false)
 const deleting = ref(false)
-const editData = ref<Record<string, unknown>>({})
+const editData = ref<Record<string, any>>({})
 
 const hasEditableColumns = computed(() =>
   props.tableDef.columns.some(c => c.editable)

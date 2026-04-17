@@ -424,10 +424,6 @@ const mosaicRowsAspectRatio = computed(() => {
 })
 
 // ROWS 布局：每行高度占总高度的比例，用 flex 权重
-const mosaicRowFlex = (row: { heightWeight: number }) => {
-  return row.heightWeight
-}
-
 const mosaicLeftColumnHeight = computed(() => {
   if (!mosaicLayout.value || mosaicLayout.value.type !== 'left_column') return 0
   const leftIdx = mosaicLayout.value.leftColumnIndex

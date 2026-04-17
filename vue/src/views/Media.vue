@@ -67,7 +67,7 @@
             </div>
             <!-- Star toggle -->
             <button
-              @click.stop="mediaBounceId = item.id; setTimeout(() => mediaBounceId = null, 300); toggleMediaStar(item)"
+              @click.stop="starWithBounce(item)"
               class="absolute top-1 right-1 p-1 rounded-full transition-all"
               :class="item.starred
                 ? 'text-yellow-400'
@@ -152,6 +152,11 @@ const previewOpen = ref(false)
 const previewItems = ref<any[]>([])
 const previewStartIndex = ref(0)
 const mediaBounceId = ref<number | null>(null)
+function starWithBounce(item: Media) {
+  mediaBounceId.value = item.id
+  setTimeout(() => mediaBounceId.value = null, 300)
+  toggleMediaStar(item)
+}
 
 const { items, loading, hasMore, reset, setupObserver } = useInfiniteScroll<Media>({
   fetchFn: ({ cursor, limit }) => api.get<CursorResponse<Media>>('/media', {
