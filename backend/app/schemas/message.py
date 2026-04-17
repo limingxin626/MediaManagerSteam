@@ -38,10 +38,10 @@ class MessageMediaItem(BaseModel):
     id: int
     file_path: str
     file_url: str = ""
-    mime_type: Optional[str] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
-    duration_ms: Optional[int] = None
+    mime_type: str | None
+    width: int | None
+    height: int | None
+    duration_ms: int | None
     thumb_url: str = ""
     starred: bool = False
 
@@ -62,14 +62,14 @@ class MessageMediaItem(BaseModel):
 class MessageTagItem(BaseModel):
     id: int
     name: str
-    category: Optional[str] = None
+    category: str | None = None
 
 
 class MessageResponse(BaseModel):
     id: int
-    text: Optional[str] = None
-    actor_id: Optional[int] = None
-    actor_name: Optional[str] = None
+    text: str | None = None
+    actor_id: int | None = None
+    actor_name: str | None = None
     media_count: int
     starred: bool = False
     created_at: str
@@ -123,11 +123,11 @@ class MessageSyncMediaItem(BaseModel):
     file_url: str = ""
     file_path: str
     file_hash: str = ""
-    file_size: Optional[int] = None
-    mime_type: Optional[str] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
-    duration_ms: Optional[int] = None
+    file_size: int | None
+    mime_type: str | None
+    width: int | None
+    height: int | None
+    duration_ms: int | None
     rating: int = 0
     starred: bool = False
     thumb_url: str = ""

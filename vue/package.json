@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen:types": "openapi-typescript http://127.0.0.1:8002/openapi.json -o src/types/api.generated.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
@@ -27,6 +28,7 @@
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/tsconfig": "^0.8.1",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",

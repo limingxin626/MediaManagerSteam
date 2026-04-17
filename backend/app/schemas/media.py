@@ -8,11 +8,11 @@ class MediaResponse(BaseModel):
     id: int
     file_path: str
     file_url: str = ""
-    file_size: Optional[int] = None
-    mime_type: Optional[str] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
-    duration_ms: Optional[int] = None
+    file_size: int | None
+    mime_type: str | None
+    width: int | None
+    height: int | None
+    duration_ms: int | None
     rating: int
     starred: bool = False
     view_count: int

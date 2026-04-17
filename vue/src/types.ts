@@ -1,108 +1,27 @@
-// 消息相关类型
-export interface MessageMediaItem {
-  id: number
-  file_path: string
-  mime_type: string | null
-  width: number | null
-  height: number | null
-  duration_ms: number | null
-  thumb_url: string
-  starred?: boolean
-}
+import type { components } from './types/api.generated'
 
-export interface Message {
-  id: number
-  text: string | null
-  actor_id: number | null
-  actor_name: string | null
-  media_count: number
-  starred: boolean
-  created_at: string
-  updated_at: string
-}
+// --- 从 OpenAPI 生成的类型中派生 ---
 
-export interface MessageDetail extends Message {
-  media_items: MessageMediaItem[]
-  tags?: TagItem[]
-}
+// 消息相关
+export type MessageMediaItem = components['schemas']['MessageMediaItem']
+export type Message = components['schemas']['MessageResponse']
+export type MessageDetail = components['schemas']['MessageDetailResponse']
 
-// 演员相关类型
-export interface Actor {
-  id: number
-  name: string
-  description: string | null
-  avatar_path: string | null
-  avatar_url: string
-  message_count: number
-  created_at: string
-  updated_at: string
-}
+// 演员相关
+export type Actor = components['schemas']['ActorResponse']
+export type ActorDetail = components['schemas']['ActorDetailResponse']
 
-export interface ActorDetail extends Actor {
-  messages: Array<{
-    id: number
-    text: string | null
-    media_count: number
-    created_at: string
-  }>
-}
+// 媒体相关
+export type Media = components['schemas']['MediaResponse']
 
-// 媒体相关类型
-export interface Media {
-  id: number
-  file_path: string
-  file_hash: string | null
-  file_size: number | null
-  mime_type: string | null
-  width: number | null
-  height: number | null
-  duration_ms: number | null
-  rating: number
-  starred: boolean
-  view_count: number
-  thumb_url: string
-  last_viewed_at: string | null
-  created_at: string
-  updated_at: string
-}
+// 标签相关
+export type TagItem = components['schemas']['MessageTagItem']
+export type TagWithCount = components['schemas']['TagResponse']
 
-// 分组相关类型
-export interface Group {
-  id: number
-  name: string
-  description: string | null
-  cover_image: string | null
-  serial_number: string | null
-  release_date: string | null
-  rating: number | null
-  actor_id: number
-  size: number
-  media_cnt: number
-  created_at: string
-  updated_at: string
-}
+// 日历日期统计
+export type MessageDateCount = components['schemas']['MessageDateCount']
 
-// 标签相关类型
-export interface TagItem {
-  id: number
-  name: string
-  category: string | null
-}
-
-export interface TagWithCount {
-  id: number
-  name: string
-  category: string | null
-  message_count: number
-}
-
-export interface Tag {
-  id: number
-  type: string
-  name: string
-}
-
-// 游标分页响应
+// --- 游标分页（泛型，生成的类型不支持泛型，保留手写） ---
 export interface CursorResponse<T> {
   items: T[]
   next_cursor: string | null
@@ -111,18 +30,12 @@ export interface CursorResponse<T> {
   has_more_before?: boolean
 }
 
-// 日历日期统计
-export interface MessageDateCount {
-  date: string
-  count: number
-}
+// --- 纯前端类型（后端无对应 schema） ---
 
-// 通用类型
 export interface ViewMode {
   type: 'grid' | 'list'
 }
 
-// 管理页面类型
 export interface AdminStats {
   table_counts: Record<string, number>
   storage: {
