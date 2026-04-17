@@ -44,26 +44,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/actors/{actor_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Actor Detail
-         * @description 获取演员详情
-         */
-        get: operations["get_actor_detail_actors__actor_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/messages": {
         parameters: {
             query?: never;
@@ -216,26 +196,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/messages/around/{message_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Messages Around
-         * @description 以指定消息为中心，向前/向后加载消息
-         */
-        get: operations["get_messages_around_messages_around__message_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/media": {
         parameters: {
             query?: never;
@@ -268,26 +228,6 @@ export interface paths {
          * @description 按 MessageMedia 展开的媒体流（Telegram风格，媒体可重复），支持 tag/actor 筛选
          */
         get: operations["get_media_feed_media_feed_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/media/{media_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Media Detail
-         * @description 获取媒体详情
-         */
-        get: operations["get_media_detail_media__media_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -329,46 +269,6 @@ export interface paths {
          * @description 更新媒体评分
          */
         put: operations["update_media_rating_media__media_id__rating_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/media/{media_id}/view": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Increment View Count
-         * @description 增加媒体查看次数
-         */
-        put: operations["increment_view_count_media__media_id__view_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/media/around/{media_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Media Around
-         * @description 以指定媒体为中心，向前/向后加载媒体
-         */
-        get: operations["get_media_around_media_around__media_id__get"];
-        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -644,26 +544,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Stats
-         * @description 获取数据库统计信息：各表记录数、存储统计、最近活动。
-         */
-        get: operations["get_stats_admin_stats_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/admin/sync-logs": {
         parameters: {
             query?: never;
@@ -688,32 +568,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** ActorDetailResponse */
-        ActorDetailResponse: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Description */
-            description?: string | null;
-            /** Avatar Path */
-            avatar_path?: string | null;
-            /**
-             * Avatar Url
-             * @default
-             */
-            avatar_url: string;
-            /** Message Count */
-            message_count: number;
-            /** Created At */
-            created_at: string;
-            /** Updated At */
-            updated_at: string;
-            /** Messages */
-            messages: {
-                [key: string]: unknown;
-            }[];
-        };
         /** ActorResponse */
         ActorResponse: {
             /** Id */
@@ -837,52 +691,12 @@ export interface components {
              */
             has_more_before: boolean;
         };
-        /** MediaDetailResponse */
-        MediaDetailResponse: {
-            /** Id */
-            id: number;
-            /** File Path */
-            file_path: string;
-            /**
-             * File Url
-             * @default
-             */
-            file_url: string;
-            /** File Size */
-            file_size: number | null;
-            /** Mime Type */
-            mime_type: string | null;
-            /** Width */
-            width: number | null;
-            /** Height */
-            height: number | null;
-            /** Duration Ms */
-            duration_ms: number | null;
-            /** Rating */
-            rating: number;
-            /**
-             * Starred
-             * @default false
-             */
-            starred: boolean;
-            /** View Count */
-            view_count: number;
-            /**
-             * Thumb Url
-             * @default
-             */
-            thumb_url: string;
-            /** Created At */
-            created_at: string;
-            /** Updated At */
-            updated_at: string;
-            /** Messages */
-            messages: {
-                [key: string]: unknown;
-            }[];
-        };
         /** MediaResponse */
         MediaResponse: {
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
             /** Id */
             id: number;
             /** File Path */
@@ -892,6 +706,11 @@ export interface components {
              * @default
              */
             file_url: string;
+            /**
+             * Thumb Url
+             * @default
+             */
+            thumb_url: string;
             /** File Size */
             file_size: number | null;
             /** Mime Type */
@@ -911,15 +730,6 @@ export interface components {
             starred: boolean;
             /** View Count */
             view_count: number;
-            /**
-             * Thumb Url
-             * @default
-             */
-            thumb_url: string;
-            /** Created At */
-            created_at: string;
-            /** Updated At */
-            updated_at: string;
         };
         /** MessageCreate */
         MessageCreate: {
@@ -984,6 +794,10 @@ export interface components {
         };
         /** MessageDetailResponse */
         MessageDetailResponse: {
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
             /** Id */
             id: number;
             /** Text */
@@ -999,10 +813,6 @@ export interface components {
              * @default false
              */
             starred: boolean;
-            /** Created At */
-            created_at: string;
-            /** Updated At */
-            updated_at: string;
             /** Media Items */
             media_items: components["schemas"]["MessageMediaItem"][];
             /**
@@ -1022,6 +832,11 @@ export interface components {
              * @default
              */
             file_url: string;
+            /**
+             * Thumb Url
+             * @default
+             */
+            thumb_url: string;
             /** Mime Type */
             mime_type: string | null;
             /** Width */
@@ -1030,11 +845,6 @@ export interface components {
             height: number | null;
             /** Duration Ms */
             duration_ms: number | null;
-            /**
-             * Thumb Url
-             * @default
-             */
-            thumb_url: string;
             /**
              * Starred
              * @default false
@@ -1048,6 +858,10 @@ export interface components {
         };
         /** MessageResponse */
         MessageResponse: {
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
             /** Id */
             id: number;
             /** Text */
@@ -1063,29 +877,23 @@ export interface components {
              * @default false
              */
             starred: boolean;
-            /** Created At */
-            created_at: string;
-            /** Updated At */
-            updated_at: string;
         };
         /** MessageSyncMediaItem */
         MessageSyncMediaItem: {
             /** Id */
             id: number;
+            /** File Path */
+            file_path: string;
             /**
              * File Url
              * @default
              */
             file_url: string;
-            /** File Path */
-            file_path: string;
             /**
-             * File Hash
+             * Thumb Url
              * @default
              */
-            file_hash: string;
-            /** File Size */
-            file_size: number | null;
+            thumb_url: string;
             /** Mime Type */
             mime_type: string | null;
             /** Width */
@@ -1095,20 +903,22 @@ export interface components {
             /** Duration Ms */
             duration_ms: number | null;
             /**
-             * Rating
-             * @default 0
-             */
-            rating: number;
-            /**
              * Starred
              * @default false
              */
             starred: boolean;
             /**
-             * Thumb Url
+             * File Hash
              * @default
              */
-            thumb_url: string;
+            file_hash: string;
+            /** File Size */
+            file_size?: number | null;
+            /**
+             * Rating
+             * @default 0
+             */
+            rating: number;
             /**
              * Position
              * @default 0
@@ -1117,6 +927,10 @@ export interface components {
         };
         /** MessageSyncResponse */
         MessageSyncResponse: {
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
             /** Id */
             id: number;
             /** Text */
@@ -1125,15 +939,13 @@ export interface components {
             actor_id?: number | null;
             /** Actor Name */
             actor_name?: string | null;
+            /** Media Count */
+            media_count: number;
             /**
              * Starred
              * @default false
              */
             starred: boolean;
-            /** Created At */
-            created_at: string;
-            /** Updated At */
-            updated_at: string;
             /** Media Items */
             media_items: components["schemas"]["MessageSyncMediaItem"][];
             /**
@@ -1295,37 +1107,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActorResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_actor_detail_actors__actor_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                actor_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ActorDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1668,44 +1449,6 @@ export interface operations {
             };
         };
     };
-    get_messages_around_messages_around__message_id__get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                actor_id?: number | null;
-                query_text?: string | null;
-                media_id?: number | null;
-                tag_id?: number | null;
-                starred?: boolean | null;
-            };
-            header?: never;
-            path: {
-                message_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MessageDetailCursorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_media_media_get: {
         parameters: {
             query?: {
@@ -1781,37 +1524,6 @@ export interface operations {
             };
         };
     };
-    get_media_detail_media__media_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                media_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MediaDetailResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     toggle_media_starred_media__media_id__starred_put: {
         parameters: {
             query: {
@@ -1865,71 +1577,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    increment_view_count_media__media_id__view_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                media_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_media_around_media_around__media_id__get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                starred?: boolean | null;
-            };
-            header?: never;
-            path: {
-                media_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MediaCursorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2268,26 +1915,6 @@ export interface operations {
         };
     };
     sync_events_sync_events_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_stats_admin_stats_get: {
         parameters: {
             query?: never;
             header?: never;

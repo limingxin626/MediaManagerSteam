@@ -1,9 +1,10 @@
 from pydantic import BaseModel, model_validator
 from typing import List, Optional
 from app.config import config
+from app.schemas.base import OrmBase
 
 
-class ActorResponse(BaseModel):
+class ActorResponse(OrmBase):
     id: int
     name: str
     description: Optional[str] = None
@@ -12,9 +13,6 @@ class ActorResponse(BaseModel):
     message_count: int
     created_at: str
     updated_at: str
-
-    class Config:
-        from_attributes = True
 
     @model_validator(mode="after")
     def _fill_avatar_url(self):

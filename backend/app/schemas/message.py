@@ -1,7 +1,6 @@
-from pydantic import BaseModel, model_validator, field_validator
+from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
-from app.config import config
+from app.schemas.base import OrmBase, TimestampMixin, MediaUrlMixin
 
 MEDIA_PREVIEW_LIMIT = 9  # 消息内媒体预览上限（3×3 宫格）
 
@@ -34,29 +33,12 @@ class MessageUpdate(BaseModel):
     media_order: Optional[List[int]] = None  # media_id 数组，定义新的 position 顺序
 
 
-class MessageMediaItem(BaseModel):
-    id: int
-    file_path: str
-    file_url: str = ""
+class MessageMediaItem(MediaUrlMixin):
     mime_type: str | None
     width: int | None
     height: int | None
     duration_ms: int | None
-    thumb_url: str = ""
     starred: bool = False
-
-    @model_validator(mode="after")
-    def _fill_urls(self):
-        # 自动填充缩略图URL
-        if not self.thumb_url:
-            self.thumb_url = config.get_thumbnail_url(self.id)
-        # 将绝对路径转换为URL路径
-        if not self.file_url and self.file_path:
-            self.file_url = config.to_url_path(self.file_path)
-        return self
-
-    class Config:
-        from_attributes = True
 
 
 class MessageTagItem(BaseModel):
@@ -65,25 +47,13 @@ class MessageTagItem(BaseModel):
     category: str | None = None
 
 
-class MessageResponse(BaseModel):
+class MessageResponse(TimestampMixin):
     id: int
     text: str | None = None
     actor_id: int | None = None
     actor_name: str | None = None
     media_count: int
     starred: bool = False
-    created_at: str
-    updated_at: str
-
-    @field_validator('created_at', 'updated_at', mode='before')
-    @classmethod
-    def convert_datetime_to_str(cls, v):
-        if isinstance(v, datetime):
-            return v.isoformat()
-        return v
-
-    class Config:
-        from_attributes = True
 
 
 class MessageDetailResponse(MessageResponse):
@@ -118,50 +88,13 @@ class MessageDatesResponse(BaseModel):
     dates: List[MessageDateCount]
 
 
-class MessageSyncMediaItem(BaseModel):
-    id: int
-    file_url: str = ""
-    file_path: str
+class MessageSyncMediaItem(MessageMediaItem):
     file_hash: str = ""
-    file_size: int | None
-    mime_type: str | None
-    width: int | None
-    height: int | None
-    duration_ms: int | None
+    file_size: int | None = None
     rating: int = 0
-    starred: bool = False
-    thumb_url: str = ""
     position: int = 0
 
-    @model_validator(mode="after")
-    def _fill_urls(self):
-        if not self.thumb_url:
-            self.thumb_url = config.get_thumbnail_url(self.id)
-        if not self.file_url and self.file_path:
-            self.file_url = config.to_url_path(self.file_path)
-        return self
 
-    class Config:
-        from_attributes = True
-
-
-class MessageSyncResponse(BaseModel):
-    id: int
-    text: Optional[str] = None
-    actor_id: Optional[int] = None
-    actor_name: Optional[str] = None
-    starred: bool = False
-    created_at: str
-    updated_at: str
+class MessageSyncResponse(MessageResponse):
     media_items: List[MessageSyncMediaItem]
     tags: List[MessageTagItem] = []
-
-    @field_validator('created_at', 'updated_at', mode='before')
-    @classmethod
-    def convert_datetime_to_str(cls, v):
-        if isinstance(v, datetime):
-            return v.isoformat()
-        return v
-
-    class Config:
-        from_attributes = True
