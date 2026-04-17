@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.models import get_db, Actor, Message, MessageMedia
+from app.models import get_db, Actor, Message
 from typing import List, Optional
-from app.schemas.actor import ActorResponse, ActorDetailResponse, ActorSyncResponse
+from app.schemas.actor import ActorResponse, ActorSyncResponse
 from app.config import config
 
 router = APIRouter(prefix="/actors", tags=["actors"])
@@ -70,49 +70,3 @@ def get_actors(
     return result
 
 
-@router.get("/{actor_id}", response_model=ActorDetailResponse)
-def get_actor_detail(
-    actor_id: int,
-    db: Session = Depends(get_db)
-):
-    """获取演员详情"""
-    actor = db.query(Actor).filter(Actor.id == actor_id).first()
-    if not actor:
-        raise HTTPException(status_code=404, detail="Actor not found")
-
-    messages = db.query(Message).filter(
-        Message.actor_id == actor_id
-    ).order_by(Message.created_at.desc()).all()
-
-    if messages:
-        message_ids = [m.id for m in messages]
-        # 批量获取各消息的媒体数，避免 N+1
-        media_counts = (
-            db.query(MessageMedia.message_id, func.count(MessageMedia.id).label("cnt"))
-            .filter(MessageMedia.message_id.in_(message_ids))
-            .group_by(MessageMedia.message_id)
-            .all()
-        )
-        media_count_map = {row.message_id: row.cnt for row in media_counts}
-    else:
-        media_count_map = {}
-
-    message_list = []
-    for message in messages:
-        message_list.append({
-            "id": message.id,
-            "text": message.text,
-            "media_count": media_count_map.get(message.id, 0),
-            "created_at": message.created_at.isoformat()
-        })
-
-    return ActorDetailResponse(
-        id=actor.id,
-        name=actor.name,
-        description=actor.description,
-        avatar_path=actor.avatar_path,
-        message_count=len(message_list),
-        messages=message_list,
-        created_at=actor.created_at.isoformat(),
-        updated_at=actor.updated_at.isoformat()
-    )

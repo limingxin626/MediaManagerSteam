@@ -531,61 +531,6 @@ def merge_messages(
     return _build_detail_response(db, target, media_limit=None)
 
 
-@router.get("/around/{message_id}", response_model=MessageDetailCursorResponse)
-def get_messages_around(
-    message_id: int,
-    limit: int = Query(20, ge=1, le=100),
-    actor_id: Optional[int] = None,
-    query_text: Optional[str] = Query(None),
-    media_id: Optional[int] = Query(None),
-    tag_id: Optional[int] = Query(None),
-    starred: Optional[bool] = Query(None),
-    db: Session = Depends(get_db),
-):
-    """以指定消息为中心，向前/向后加载消息"""
-    # 找到目标消息
-    target = db.query(Message).filter(Message.id == message_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    half_limit = limit // 2
-
-    # 向后加载：更旧的消息（created_at < target.created_at）
-    older_query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred).filter(
-        Message.created_at < target.created_at
-    ).order_by(Message.created_at.desc())
-    older = older_query.limit(half_limit + 1).all()
-    has_more_older = len(older) > half_limit
-    older = older[:half_limit]
-
-    # 向前加载：更新的消息（created_at > target.created_at）
-    newer_query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred).filter(
-        Message.created_at > target.created_at
-    ).order_by(Message.created_at.asc())
-    newer = newer_query.limit(half_limit + 1).all()
-    has_more_newer = len(newer) > half_limit
-    newer = newer[:half_limit]
-
-    # 合并结果：older(旧) + [target] + newer(新)
-    # 按时间正序排列（旧 → 新），方便聊天界面展示
-    messages = list(reversed(older)) + [target] + newer
-
-    # 批量加载媒体，避免 N+1
-    all_ids = [m.id for m in messages]
-    media_by_msg = _batch_media_items(db, all_ids, limit=None) if all_ids else {}
-
-    # 构建响应
-    result = [_build_detail_response(db, msg, media_limit=None, media_by_msg=media_by_msg) for msg in messages]
-
-    return MessageDetailCursorResponse(
-        items=result,
-        next_cursor=older[-1].created_at.isoformat() if has_more_older and older else None,
-        prev_cursor=newer[-1].created_at.isoformat() if has_more_newer and newer else None,
-        has_more=has_more_older,
-        has_more_before=has_more_newer,
-    )
-
-
 @router.delete("/{message_id}", status_code=204)
 def delete_message(
     message_id: int,

@@ -6,7 +6,7 @@ from app.schemas.message import (
     CursorResponse,
     MessageDetailCursorResponse,
 )
-from app.schemas.actor import ActorResponse, ActorDetailResponse
-from app.schemas.media import MediaResponse, MediaDetailResponse, MediaCursorResponse
+from app.schemas.actor import ActorResponse
+from app.schemas.media import MediaResponse, MediaCursorResponse
 from app.schemas.tag import TagResponse
 from app.schemas.file import FileInfo, FileListResponse, FileOperationResponse, FileUploadResponse

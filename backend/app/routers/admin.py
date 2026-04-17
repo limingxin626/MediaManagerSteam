@@ -1,64 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from app.models import get_db, Message, Media, Actor, Tag, MessageMedia, SyncLog, message_tag
-from app.config import config
-import os
+from app.models import get_db, SyncLog
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-@router.get("/stats")
-def get_stats(db: Session = Depends(get_db)):
-    """获取数据库统计信息：各表记录数、存储统计、最近活动。"""
-    # 各表记录数
-    table_counts = {
-        "message": db.query(func.count(Message.id)).scalar(),
-        "media": db.query(func.count(Media.id)).scalar(),
-        "actor": db.query(func.count(Actor.id)).scalar(),
-        "tag": db.query(func.count(Tag.id)).scalar(),
-        "message_media": db.query(func.count(MessageMedia.id)).scalar(),
-        "message_tag": db.query(func.count()).select_from(message_tag).scalar(),
-        "sync_log": db.query(func.count(SyncLog.id)).scalar(),
-    }
-
-    # 媒体存储统计
-    storage = db.query(
-        func.count(Media.id),
-        func.coalesce(func.sum(Media.file_size), 0),
-    ).one()
-    storage_stats = {
-        "total_files": storage[0],
-        "total_size": storage[1],
-    }
-
-    # 最近 5 条 Message
-    recent_messages = (
-        db.query(Message)
-        .order_by(Message.created_at.desc())
-        .limit(5)
-        .all()
-    )
-    recent = [
-        {
-            "id": m.id,
-            "text": (m.text[:100] if m.text else None),
-            "actor_id": m.actor_id,
-            "created_at": m.created_at.isoformat() if m.created_at else None,
-        }
-        for m in recent_messages
-    ]
-
-    # 数据库文件大小
-    db_path = config.get_db_path()
-    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-
-    return {
-        "table_counts": table_counts,
-        "storage": storage_stats,
-        "db_size": db_size,
-        "recent_messages": recent,
-    }
 
 
 @router.get("/sync-logs")
