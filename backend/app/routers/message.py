@@ -173,6 +173,7 @@ def _build_sync_response(db: Session, db_message: Message) -> MessageSyncRespons
         text=db_message.text,
         actor_id=db_message.actor_id,
         actor_name=db_message.actor.name if db_message.actor else None,
+        media_count=len(media_items),
         starred=bool(db_message.starred),
         created_at=db_message.created_at.isoformat(),
         updated_at=db_message.updated_at.isoformat(),

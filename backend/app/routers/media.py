@@ -168,9 +168,25 @@ def update_media_rating(
     media = db.query(Media).filter(Media.id == media_id).first()
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
-    
+
     media.rating = rating
     db.commit()
-    
+
     return {"message": "Rating updated successfully", "rating": rating}
+
+@router.delete("/{media_id}")
+def delete_media(
+    media_id: int,
+    db: Session = Depends(get_db)
+):
+    """删除媒体"""
+    media = db.query(Media).filter(Media.id == media_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    db.query(MessageMedia).filter(MessageMedia.media_id == media_id).delete()
+    db.delete(media)
+    db.commit()
+
+    return {"message": "Media deleted successfully"}
 

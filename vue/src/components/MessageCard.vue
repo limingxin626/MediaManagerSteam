@@ -209,22 +209,15 @@
       </div>
 
       <!-- Message Text -->
-      <div v-if="message.text" class="mb-2 prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300">
+      <div v-if="message.text" class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300">
         <div class="line-clamp-10" v-html="renderedText"></div>
       </div>
 
       <!-- Tags & Media count row -->
-      <div v-if="messageTags.length > 0 || message.media_count > 0" class="flex items-center gap-2 mt-2 flex-wrap">
+      <div v-if="messageTags.length > 0" class="flex items-center gap-2 mt-2 flex-wrap">
         <span v-for="tag in messageTags" :key="tag.id"
           class="tag-chip">
           {{ tag.name }}
-        </span>
-        <span v-if="message.media_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500 ml-auto">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          {{ message.media_count }}
         </span>
       </div>
 
@@ -385,7 +378,7 @@ const MOSAIC_CONTAINER_WIDTH = 400
 
 // 单图时限制卡片宽度，防止竖图过高
 // 最大图片高度 500px 等效，通过 max-width = maxHeight * ratio 限制
-const MAX_SINGLE_IMAGE_HEIGHT = 800
+const MAX_SINGLE_IMAGE_HEIGHT = 600
 const singleMediaCardStyle = computed(() => {
   if (mediaPreviewItems.value.length !== 1) return {}
   const rawRatio = mediaRatios.value[0]

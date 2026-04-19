@@ -10,7 +10,7 @@ def sync_tags_from_text(db: Session, message: Message, text: Optional[str], merg
     merge=False（默认）：全量替换，message.tags 只含文本中解析出的标签。
     merge=True：合并模式，保留原有标签，仅添加文本中新增的标签（用于 sync/apply 避免删除手动标签）。
     """
-    tag_names = list(dict.fromkeys(re.findall(r'#([\w\u4e00-\u9fff]+)', text or "")))
+    tag_names = list(dict.fromkeys(re.findall(r'#([\w\u4e00-\u9fff/]+)', text or "")))
 
     text_tags = []
     for name in tag_names:

@@ -11,6 +11,10 @@ export function useTagAutocomplete(
   const tagSuggestionIndex = ref(0)
   const tagSuggestionPosition = ref({ top: 0, left: 0 })
   let currentTagStart = -1
+  
+  // 存储最近使用的标签ID，按使用顺序排列（最近的在前）
+  const recentTags = ref<number[]>([])
+  const MAX_RECENT_TAGS = 10
 
   const getTags = () => (typeof allTags === 'function' ? allTags() : allTags.value)
 
@@ -85,9 +89,14 @@ export function useTagAutocomplete(
 
     currentTagStart = hashPos
     const query = afterHash.toLowerCase()
-    tagSuggestions.value = getTags().filter(tag =>
+    
+    // 筛选匹配的标签
+    const matchedTags = getTags().filter(tag =>
       tag.name.toLowerCase().includes(query)
-    ).slice(0, 8)
+    )
+    
+    // 按最近使用排序
+    tagSuggestions.value = sortTagsByRecentUse(matchedTags).slice(0, 8)
 
     if (tagSuggestions.value.length > 0) {
       tagSuggestionVisible.value = true
@@ -95,6 +104,39 @@ export function useTagAutocomplete(
       updateSuggestionPosition()
     } else {
       tagSuggestionVisible.value = false
+    }
+  }
+
+  // 按最近使用排序标签
+  const sortTagsByRecentUse = (tags: TagItem[]): TagItem[] => {
+    return tags.sort((a, b) => {
+      const aIndex = recentTags.value.indexOf(a.id)
+      const bIndex = recentTags.value.indexOf(b.id)
+      
+      // 最近使用的标签排前面
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex
+      }
+      // 只有一个在最近使用列表中，排前面
+      if (aIndex !== -1) return -1
+      if (bIndex !== -1) return 1
+      // 都不在最近使用列表中，按名称排序
+      return a.name.localeCompare(b.name)
+    })
+  }
+
+  // 更新最近使用的标签
+  const updateRecentTags = (tagId: number) => {
+    // 移除已存在的，放到最前面
+    const currentIndex = recentTags.value.indexOf(tagId)
+    if (currentIndex !== -1) {
+      recentTags.value.splice(currentIndex, 1)
+    }
+    // 添加到最前面
+    recentTags.value.unshift(tagId)
+    // 限制数量
+    if (recentTags.value.length > MAX_RECENT_TAGS) {
+      recentTags.value = recentTags.value.slice(0, MAX_RECENT_TAGS)
     }
   }
 
@@ -137,6 +179,9 @@ export function useTagAutocomplete(
     const tagName = tag.name.includes(' ') ? `#${tag.name}#` : `#${tag.name}`
 
     text.value = before + tagName + (after.startsWith(' ') ? '' : ' ') + after
+
+    // 更新最近使用的标签
+    updateRecentTags(tag.id)
 
     tagSuggestionVisible.value = false
     currentTagStart = -1

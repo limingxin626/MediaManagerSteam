@@ -10,13 +10,26 @@
             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
           <span>全部</span>
         </button>
-        <button v-for="tag in tags" :key="tag.id" @click="selectTag(tag.id)"
-          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === tag.id
-            ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
-          <span class="truncate">{{ tag.name }}</span>
-          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ tag.message_count }}</span>
-        </button>
+        <div v-for="(parentTag, index) in tagTree" :key="index" class="flex flex-col gap-0.5">
+          <!-- 一级标签 -->
+          <button @click="selectTag(parentTag.id)"
+            class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === parentTag.id
+              ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
+            <span class="truncate">{{ parentTag.name }}</span>
+            <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ parentTag.message_count }}</span>
+          </button>
+          <!-- 二级标签 -->
+          <div v-if="parentTag.children && parentTag.children.length > 0" class="pl-6 flex flex-col gap-0.5">
+            <button v-for="childTag in parentTag.children" :key="childTag.id" @click="selectTag(childTag.id)"
+              class="flex items-center justify-between px-3 py-1.5 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === childTag.id
+                ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
+                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10'">
+              <span class="truncate">{{ childTag.name }}</span>
+              <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ childTag.message_count }}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -246,7 +259,7 @@
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
         :starred="previewMessageStarred" @close="closePreview" @navigate-prev="navigateToPrevMessage"
-        @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" />
+        @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @delete-media="handleDeleteMedia" />
 
     </div>
   </div>
@@ -284,9 +297,80 @@ const fetchTags = async () => {
 }
 
 const selectTag = (tagId: number | null) => {
+  // 虚拟标签（ID 为负数）不触发筛选
+  if (tagId !== null && tagId < 0) {
+    return
+  }
   selectedTagId.value = tagId
   resetAndFetch()
 }
+
+// 计算标签树结构，支持二级标签
+const tagTree = computed(() => {
+  const tagMap = new Map<number, TagWithCount & { children?: TagWithCount[] }>()
+  const rootTags: (TagWithCount & { children?: TagWithCount[] })[] = []
+  const virtualParentTags = new Map<string, TagWithCount & { children?: TagWithCount[] }>()
+  
+  // 首先将所有标签放入映射
+  tags.value.forEach(tag => {
+    tagMap.set(tag.id, { ...tag, children: [] })
+  })
+  
+  // 构建树形结构
+  tags.value.forEach(tag => {
+    const parts = tag.name.split('/')
+    if (parts.length === 1) {
+      // 一级标签
+      rootTags.push(tagMap.get(tag.id)!)
+    } else if (parts.length === 2) {
+      // 二级标签，找到对应的一级标签
+      const parentName = parts[0]
+      let parentTag = tags.value.find(t => t.name === parentName)
+      
+      if (parentTag && tagMap.has(parentTag.id)) {
+        // 一级标签存在
+        tagMap.get(parentTag.id)!.children!.push(tag)
+      } else {
+        // 一级标签不存在，创建虚拟一级标签
+        if (!virtualParentTags.has(parentName)) {
+          const virtualTag: TagWithCount & { children?: TagWithCount[] } = {
+            id: -1, // 虚拟标签，使用负数 ID
+            name: parentName,
+            message_count: 0, // 虚拟标签的消息数为 0
+            children: []
+          }
+          virtualParentTags.set(parentName, virtualTag)
+          rootTags.push(virtualTag)
+        }
+        // 将二级标签添加到虚拟一级标签下
+        virtualParentTags.get(parentName)!.children!.push(tag)
+      }
+    } else {
+      // 超过二级的标签，作为一级标签处理
+      rootTags.push(tagMap.get(tag.id)!)
+    }
+  })
+  
+  // 按消息数量降序排序，数量相同则按名称排序
+  rootTags.sort((a, b) => {
+    if (b.message_count !== a.message_count) {
+      return b.message_count - a.message_count
+    }
+    return a.name.localeCompare(b.name)
+  })
+  rootTags.forEach(tag => {
+    if (tag.children) {
+      tag.children.sort((a, b) => {
+        if (b.message_count !== a.message_count) {
+          return b.message_count - a.message_count
+        }
+        return a.name.localeCompare(b.name)
+      })
+    }
+  })
+  
+  return rootTags
+})
 
 const messages = ref<MessageDetail[]>([])
 const loading = ref(false)
@@ -552,6 +636,36 @@ const handlePreviewToggleStar = async (mediaId: number) => {
   }
 }
 
+const handleDeleteMedia = async (mediaId: number) => {
+  try {
+    await api.del(`/media/${mediaId}`)
+
+    // 从预览项中移除
+    const mediaIndex = previewItems.value.findIndex(item => item.id === mediaId)
+    previewItems.value.splice(mediaIndex, 1)
+
+    // 更新消息中的媒体项
+    if (currentMessageIndex.value >= 0) {
+      const msg = messages.value[currentMessageIndex.value]
+      if (msg?.media_items) {
+        const itemIndex = msg.media_items.findIndex(item => item.id === mediaId)
+        if (itemIndex !== -1) {
+          msg.media_items.splice(itemIndex, 1)
+        }
+      }
+    }
+
+    // 如果没有更多媒体，关闭预览
+    if (previewItems.value.length === 0) {
+      closePreview()
+    }
+
+    toast.success('媒体已删除')
+  } catch (error) {
+    console.error('删除媒体失败:', error)
+    toast.error('删除失败')
+  }
+}
 const handleToggleMediaStar = async (mediaId: number) => {
   try {
     // 找到包含该媒体的消息
@@ -812,3 +926,4 @@ onUnmounted(() => {
 // Update floating date after messages change
 watch(messages, () => nextTick(updateVisibleDate), { flush: 'post' })
 </script>
+

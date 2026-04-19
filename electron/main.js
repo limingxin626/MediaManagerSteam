@@ -35,7 +35,7 @@ function createWindow() {
   
   if (isDev) {
     // 开发环境：加载 Vue 的开发地址
-    win.loadURL('http://localhost:5173');
+    win.loadURL('http://localhost:5174');
     // 打开开发者工具
     win.webContents.openDevTools();
   } else {

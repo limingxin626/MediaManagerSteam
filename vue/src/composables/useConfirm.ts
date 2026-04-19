@@ -45,3 +45,4 @@ export function useConfirm() {
 
   return { state, confirm, handleConfirm, handleCancel }
 }
+
