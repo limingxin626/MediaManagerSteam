@@ -5,6 +5,7 @@ declare global {
         canceled: boolean
         filePaths: string[]
       }>
+      showItemInFolder: (path: string) => void
     }
   }
 }

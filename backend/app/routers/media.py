@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -177,6 +178,7 @@ def update_media_rating(
 @router.delete("/{media_id}")
 def delete_media(
     media_id: int,
+    delete_source: bool = Query(False, description="是否同时删除源文件"),
     db: Session = Depends(get_db)
 ):
     """删除媒体"""
@@ -184,9 +186,22 @@ def delete_media(
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
 
+    # 保存文件路径，以便后续删除
+    file_path = media.file_path
+
     db.query(MessageMedia).filter(MessageMedia.media_id == media_id).delete()
     db.delete(media)
     db.commit()
+
+    # 如果需要删除源文件
+    if delete_source and file_path:
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"成功删除源文件: {file_path}")
+        except Exception as e:
+            print(f"删除源文件失败: {e}")
+            # 不影响媒体删除的成功返回
 
     return {"message": "Media deleted successfully"}
 

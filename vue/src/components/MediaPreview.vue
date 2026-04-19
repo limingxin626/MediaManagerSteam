@@ -23,12 +23,22 @@
             </button>
             <button
               v-if="currentItem"
-              @click="handleDeleteClick()"
+              @click="showDeleteConfirm = true"
               class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
               title="删除媒体"
             >
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+            <button
+              v-if="currentItem"
+              @click="openFileLocation"
+              class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+              title="打开文件位置"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
               </svg>
             </button>
             <button
@@ -131,12 +141,56 @@
       </div>
     </div>
   </Transition>
+
+  <!-- Delete confirmation dialog -->
+  <Transition name="fade">
+    <div v-if="showDeleteConfirm" class="fixed inset-0 z-[200] flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showDeleteConfirm = false"></div>
+      <div class="relative bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
+        <h3 class="text-xl font-semibold text-white mb-4">确认删除</h3>
+        <p class="text-gray-300 mb-6">确定要删除此媒体吗？</p>
+        <div class="flex items-center mb-6">
+          <input
+            type="checkbox"
+            id="deleteSource"
+            v-model="deleteSourceFile"
+            class="mr-2 h-4 w-4 rounded border-gray-600 text-blue-500 focus:ring-blue-500"
+          />
+          <label for="deleteSource" class="text-gray-300">同时删除源文件</label>
+        </div>
+        <div class="flex gap-3 justify-end">
+          <button
+            @click="showDeleteConfirm = false"
+            class="px-4 py-2 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+          >
+            取消
+          </button>
+          <button
+            @click="confirmDelete"
+            class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
+          >
+            删除
+          </button>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { MessageMediaItem } from '../types'
 import { isVideo, isImage, resolveUrl } from '../utils/media'
+
+// 扩展 Window 接口以包含 Electron API
+declare global {
+  interface Window {
+    electronAPI?: {
+      openFileDialog: (options: any) => Promise<any>
+      showItemInFolder: (path: string) => void
+    }
+  }
+}
 
 interface Props {
   isOpen: boolean
@@ -155,13 +209,16 @@ const emit = defineEmits<{
   'navigate-prev': []
   'navigate-next': []
   'toggle-star': [mediaId: number]
-  'delete-media': [mediaId: number]
+  'delete-media': [mediaId: number, deleteSource: boolean]
 }>()
 
 const currentIndex = ref(props.startIndex)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const thumbRefs = ref<Map<number, HTMLElement>>(new Map())
 const previewStarBounce = ref(false)
+const showDeleteConfirm = ref(false)
+const deleteSourceFile = ref(false)
+
 function handleStarClick() {
   if (!currentItem.value) return
   previewStarBounce.value = true
@@ -171,7 +228,26 @@ function handleStarClick() {
 
 function handleDeleteClick() {
   if (!currentItem.value) return
-  emit('delete-media', currentItem.value.id)
+  showDeleteConfirm.value = true
+}
+
+function confirmDelete() {
+  if (!currentItem.value) return
+  emit('delete-media', currentItem.value.id, deleteSourceFile.value)
+  showDeleteConfirm.value = false
+  deleteSourceFile.value = false
+}
+
+function openFileLocation() {
+  if (!currentItem.value) return
+  
+  // 使用 Electron 的 shell API 打开文件位置
+  if (window.electronAPI && window.electronAPI.showItemInFolder) {
+    window.electronAPI.showItemInFolder(currentItem.value.file_path)
+  } else {
+    // 提供更友好的用户提示
+    alert('无法打开文件位置：Electron shell API 不可用')
+  }
 }
 
 const setThumbRef = (idx: number, el: HTMLElement | null) => {

@@ -443,7 +443,7 @@ def update_message(
 
     if update_data.text is not None:
         message.text = update_data.text
-        sync_tags_from_text(db, message, update_data.text, merge=True)
+        sync_tags_from_text(db, message, update_data.text, merge=False)
 
     if update_data.actor_id is not None:
         message.actor_id = update_data.actor_id

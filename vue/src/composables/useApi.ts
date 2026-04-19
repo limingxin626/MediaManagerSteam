@@ -80,8 +80,8 @@ export const api = {
   patch<T>(path: string, body?: unknown) {
     return request<T>('PATCH', path, body)
   },
-  del<T = null>(path: string) {
-    return request<T>('DELETE', path)
+  del<T = null>(path: string, params?: Params) {
+    return request<T>('DELETE', path, undefined, params)
   },
 }
 

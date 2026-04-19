@@ -636,9 +636,9 @@ const handlePreviewToggleStar = async (mediaId: number) => {
   }
 }
 
-const handleDeleteMedia = async (mediaId: number) => {
+const handleDeleteMedia = async (mediaId: number, deleteSource: boolean = false) => {
   try {
-    await api.del(`/media/${mediaId}`)
+    await api.del(`/media/${mediaId}`, { delete_source: deleteSource })
 
     // 从预览项中移除
     const mediaIndex = previewItems.value.findIndex(item => item.id === mediaId)
