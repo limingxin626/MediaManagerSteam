@@ -136,7 +136,7 @@
                     @click="handleMessageClick(message)" @media-click="(index) => handleMediaClick(message.id, index)"
                     @delete="handleDeleteMessage" @find-messages-by-media="handleFindMessagesByMedia"
                     @toggle-select="toggleSelectMessage" @toggle-star="handleToggleStar"
-                    @toggle-media-star="handleToggleMediaStar" @edit="openEditDialog"
+                    @toggle-media-star="(mediaId, msgId) => handleToggleMediaStar(mediaId, msgId)" @edit="openEditDialog"
                     @add-tag="handleQuickAddTag" />
                 </div>
               </template>
@@ -281,7 +281,7 @@
         @created="onDialogCreated" @updated="onDialogUpdated" />
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
-        :starred="previewMessageStarred" @close="closePreview" @navigate-prev="navigateToPrevMessage"
+        :starred="previewMessageStarred" :message-id="previewMessageId" @close="closePreview" @navigate-prev="navigateToPrevMessage"
         @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @media-deleted="handleMediaDeleted" />
 
     </div>
@@ -290,7 +290,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { marked } from 'marked'
+import { renderMarkdown } from '../utils/markdown'
 import { Calendar } from 'v-calendar'
 import 'v-calendar/style.css'
 import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
@@ -301,7 +301,7 @@ import MessageComposeDialog from '../components/MessageComposeDialog.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
-import { resolveUrl, formatDuration } from '../utils/media'
+import { resolveUrl, formatDuration, toggleMediaStar } from '../utils/media'
 import { formatDateLabel } from '../utils/date'
 import { useTheme } from '../composables/useTheme'
 
@@ -426,7 +426,7 @@ const onDocumentClick = (e: MouseEvent) => {
 }
 
 const tags = ref<TagWithCount[]>([])
-const selectedTagId = ref<number | null | undefined>(undefined)
+const selectedTagId = ref<number | null>(null)
 
 const fetchTags = async () => {
   try {
@@ -529,6 +529,7 @@ const bottomSentinel = ref<HTMLElement | null>(null)
 const previewOpen = ref(false)
 const previewItems = ref<MessageMediaItem[]>([])
 const previewStartIndex = ref(0)
+const previewMessageId = ref<number | undefined>(undefined)
 const currentMessageIndex = ref(-1)
 const selectedMessage = ref<MessageDetail | null>(null)
 const selectedMessageLoading = ref(false)
@@ -720,13 +721,14 @@ const resetAndFetch = (params?: { mediaId?: number }) => {
   forwardCursor.value = null
   hasMoreForward.value = false
   isViewingHistory.value = false
+  calendarDatesCache.clear()
+  calendarAttributes.value = []
   fetchMessages()
 }
 
 const fetchMessages = async (isLoadingMore = false) => {
   if (loading.value) return
   if (isLoadingMore && !hasMoreData.value) return
-  if (selectedTagId.value === undefined) return
 
   loading.value = true
   try {
@@ -778,9 +780,9 @@ const handleMediaClick = (messageId: number, mediaIndex: number) => {
   currentMessageIndex.value = messages.value.findIndex(m => m.id === messageId)
   previewItems.value = message.media_items
   previewStartIndex.value = mediaIndex
+  previewMessageId.value = messageId
   previewOpen.value = true
 }
-
 const closePreview = () => {
   previewOpen.value = false
   previewItems.value = []
@@ -788,29 +790,17 @@ const closePreview = () => {
 }
 
 const handlePreviewToggleStar = async (mediaId: number) => {
-  try {
-    const currentItem = previewItems.value.find(item => item.id === mediaId)
-    if (!currentItem) return
+  const currentItem = previewItems.value.find(item => item.id === mediaId)
+  if (!currentItem) return
 
-    const newStarredState = !currentItem.starred
-    await api.put(`/media/${mediaId}/starred?starred=${newStarredState}`)
+  await toggleMediaStar(currentItem)
 
-    // 更新当前预览项的状态
-    currentItem.starred = newStarredState
-
-    // 更新消息中的媒体项状态
-    if (currentMessageIndex.value >= 0) {
-      const msg = messages.value[currentMessageIndex.value]
-      if (msg?.media_items) {
-        const mediaItem = msg.media_items.find(item => item.id === mediaId)
-        if (mediaItem) {
-          mediaItem.starred = newStarredState
-        }
-      }
+  if (currentMessageIndex.value >= 0) {
+    const msg = messages.value[currentMessageIndex.value]
+    const mediaItem = msg?.media_items?.find(item => item.id === mediaId)
+    if (mediaItem) {
+      mediaItem.starred = currentItem.starred
     }
-  } catch (error) {
-    console.error('切换收藏状态失败:', error)
-    toast.error('操作失败')
   }
 }
 
@@ -826,23 +816,13 @@ const handleMediaDeleted = (mediaId: number) => {
     }
   }
 }
-const handleToggleMediaStar = async (mediaId: number) => {
-  try {
-    // 找到包含该媒体的消息
-    for (const message of messages.value) {
-      if (message.media_items) {
-        const mediaItem = message.media_items.find(item => item.id === mediaId)
-        if (mediaItem) {
-          const newStarredState = !mediaItem.starred
-          await api.put(`/media/${mediaId}/starred?starred=${newStarredState}`)
-          mediaItem.starred = newStarredState
-          return
-        }
-      }
-    }
-  } catch (error) {
-    console.error('切换媒体收藏状态失败:', error)
-    toast.error('操作失败')
+const handleToggleMediaStar = async (mediaId: number, messageId?: number) => {
+  const msg = messageId
+    ? messages.value.find(m => m.id === messageId)
+    : messages.value.find(m => m.media_items?.some(item => item.id === mediaId))
+  const mediaItem = msg?.media_items?.find(item => item.id === mediaId)
+  if (mediaItem) {
+    await toggleMediaStar(mediaItem)
   }
 }
 
@@ -853,6 +833,7 @@ const navigateToPrevMessage = () => {
       currentMessageIndex.value = i
       previewItems.value = msg.media_items
       previewStartIndex.value = msg.media_items.length - 1
+      previewMessageId.value = msg.id
       return
     }
   }
@@ -865,6 +846,7 @@ const navigateToNextMessage = () => {
       currentMessageIndex.value = i
       previewItems.value = msg.media_items
       previewStartIndex.value = 0
+      previewMessageId.value = msg.id
       return
     }
   }
@@ -958,6 +940,7 @@ const handleSelectedMessageMediaClick = (mediaIndex: number) => {
   currentMessageIndex.value = messages.value.findIndex(m => m.id === selectedMessage.value!.id)
   previewItems.value = selectedMessage.value.media_items
   previewStartIndex.value = mediaIndex
+  previewMessageId.value = selectedMessage.value.id
   previewOpen.value = true
 }
 
@@ -977,13 +960,8 @@ const handleMessageClick = async (message: MessageDetail) => {
 }
 
 const renderDetailText = (text: string) => {
-  const normalized = text.replace(/([^\n])\n([-=]{2,})\n/g, '$1\n\n$2\n\n')
-  marked.setOptions({ breaks: true })
-  return marked.parse(normalized) as string
+  return renderMarkdown(text)
 }
-
-// --- Search debounce ---
-
 
 // --- Date helpers ---
 

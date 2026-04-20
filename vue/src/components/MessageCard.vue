@@ -295,9 +295,9 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { marked } from 'marked'
 import type { Message, MessageMediaItem, TagItem, TagWithCount } from '../types'
 import { isVideo, formatDuration, resolveUrl } from '../utils/media'
+import { renderMarkdown } from '../utils/markdown'
 import TagPickerPopover from './TagPickerPopover.vue'
 import { formatRelativeTime } from '../utils/date'
 import { calculateMosaicLayout } from '../utils/mosaic'
@@ -320,7 +320,7 @@ const emit = defineEmits<{
   'find-messages-by-media': [mediaId: number]
   'toggle-select': [id: number]
   'toggle-star': [id: number]
-  'toggle-media-star': [mediaId: number]
+  'toggle-media-star': [mediaId: number, messageId: number]
   'edit': [id: number]
   'add-tag': [messageId: number, tagName: string]
 }>()
@@ -407,14 +407,7 @@ const remainingCount = computed(() => {
 
 const renderedText = computed(() => {
   if (!props.message.text) return ''
-  // 在 --- 或 === 独占行前后插入空行，防止上方文字被解析为 setext heading
-  const normalized = props.message.text.replace(
-    /([^\n])\n([-=]{2,})\n/g,
-    '$1\n\n$2\n\n'
-  )
-  marked.setOptions({ breaks: true })
-  const html = marked.parse(normalized) as string
-  // 高亮 #hashtag：匹配不在 HTML 标签内的 hashtag
+  const html = renderMarkdown(props.message.text)
   return html.replace(/(^|(?<=(?:>|;|\s)))#([\w\u4e00-\u9fff]+)/g, '$1<span class="hashtag-inline">#$2</span>')
 })
 
@@ -506,6 +499,6 @@ const findMessagesByMedia = (mediaId: number) => {
 const handleMediaToggleStar = (mediaItem: MessageMediaItem) => {
   mediaStarBouncing.value = mediaItem.id
   setTimeout(() => { mediaStarBouncing.value = null }, 300)
-  emit('toggle-media-star', mediaItem.id)
+  emit('toggle-media-star', mediaItem.id, props.message.id)
 }
 </script>

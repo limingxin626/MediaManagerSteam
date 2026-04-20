@@ -201,6 +201,7 @@ interface Props {
   items: MessageMediaItem[]
   startIndex?: number
   starred?: boolean
+  messageId?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -234,23 +235,12 @@ async function confirmDelete() {
   if (!currentItem.value) return
   const mediaId = currentItem.value.id
   try {
-    await api.del(`/media/${mediaId}`, { delete_source: deleteSourceFile.value })
+    const params: Record<string, any> = { delete_source: deleteSourceFile.value }
+    if (props.messageId) params.message_id = props.messageId
+    const res = await api.del<{ unlinked: boolean }>(`/media/${mediaId}`, params)
     emit('media-deleted', mediaId)
 
-    // 从预览项中移除
-    const idx = props.items.findIndex(item => item.id === mediaId)
-    if (idx !== -1) {
-      props.items.splice(idx, 1)
-    }
-
-    // 调整当前索引
-    if (props.items.length === 0) {
-      close()
-    } else if (currentIndex.value >= props.items.length) {
-      currentIndex.value = props.items.length - 1
-    }
-
-    toast.success('媒体已删除')
+    toast.success(res.unlinked ? '已从当前消息移除' : '媒体已删除')
   } catch (error) {
     console.error('删除媒体失败:', error)
     toast.error('删除失败')
@@ -341,6 +331,14 @@ const handleKeydown = (e: KeyboardEvent) => {
       break
   }
 }
+
+watch(() => props.items.length, (newLen) => {
+  if (newLen === 0) {
+    close()
+  } else if (currentIndex.value >= newLen) {
+    currentIndex.value = newLen - 1
+  }
+})
 
 watch(() => props.isOpen, async (newValue) => {
   if (newValue) {

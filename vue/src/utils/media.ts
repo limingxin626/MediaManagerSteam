@@ -30,7 +30,7 @@ export function resolveUrl(path: string): string {
 export async function toggleMediaStar(item: { id: number; starred: boolean }): Promise<void> {
   const toast = useToast()
   try {
-    await api.put(`/media/${item.id}/starred?starred=${!item.starred}`)
+    await api.put(`/media/${item.id}/starred`, undefined, { starred: !item.starred })
     item.starred = !item.starred
   } catch {
     toast.error('操作失败')
