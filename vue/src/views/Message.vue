@@ -67,9 +67,30 @@
 
         <!-- Scrollable Content Area -->
         <div ref="scrollContainer" class="flex-1 overflow-y-auto min-h-0 relative">
-          <!-- Floating date badge -->
-          <div v-if="currentVisibleDate" class="sticky top-0 z-20 flex justify-center py-2 pointer-events-none">
-            <span class="px-3 py-1 text-xs text-[var(--text-secondary)] bg-[var(--bg-card)]/80 dark:bg-white/10 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-sm">{{ currentVisibleDate }}</span>
+          <!-- Floating date badge (clickable to open calendar) -->
+          <div v-if="currentVisibleDate" class="sticky top-0 z-20 flex justify-center py-2">
+            <div class="relative">
+              <button @click="toggleCalendar"
+                class="px-3 py-1 text-xs text-[var(--text-secondary)] bg-[var(--bg-card)]/80 dark:bg-white/10 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-sm hover:bg-[var(--bg-card)] dark:hover:bg-white/20 transition-colors cursor-pointer flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {{ currentVisibleDate }}
+              </button>
+              <!-- Calendar popover -->
+              <div v-show="calendarOpen" ref="calendarPopover"
+                class="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl p-3"
+                @focusin.stop @focusout.stop>
+                <Calendar
+                  :attributes="calendarAttributes"
+                  :is-dark="isDark"
+                  @update:pages="onCalendarPageChange"
+                  @dayclick="onCalendarDayClick"
+                  borderless
+                  transparent
+                />
+              </div>
+            </div>
           </div>
           <!-- Scroll sentinel for loading older messages -->
           <div ref="topSentinel" class="h-1"></div>
@@ -268,6 +289,8 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { marked } from 'marked'
+import { Calendar } from 'v-calendar'
+import 'v-calendar/style.css'
 import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
@@ -278,12 +301,127 @@ import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
 import { resolveUrl, formatDuration } from '../utils/media'
 import { formatDateLabel } from '../utils/date'
+import { useTheme } from '../composables/useTheme'
 
 
 defineOptions({ name: 'Message' })
 
 const toast = useToast()
 const { confirm } = useConfirm()
+const { theme } = useTheme()
+const isDark = computed(() => theme.value === 'dark')
+
+// --- Calendar date jump ---
+const calendarOpen = ref(false)
+const calendarPopover = ref<HTMLElement | null>(null)
+const calendarDatesCache = new Map<string, Set<string>>() // "YYYY-MM" -> Set of "YYYY-MM-DD"
+let calendarAttributesUpdating = false
+
+const calendarAttributes = ref<Array<{ key: string; dot: { color: string }; dates: Date[] }>>([])
+
+const toggleCalendar = () => {
+  calendarOpen.value = !calendarOpen.value
+}
+
+const loadCalendarMonth = async (year: number, month: number) => {
+  const key = `${year}-${String(month).padStart(2, '0')}`
+  if (calendarDatesCache.has(key)) {
+    return
+  }
+  try {
+    const data = await api.get<{ dates: Array<{ date: string; count: number }> }>('/messages/dates', {
+      year,
+      month,
+      tag_id: selectedTagId.value ?? undefined,
+      query_text: searchQuery.value || undefined,
+    })
+    const dateSet = new Set(data.dates.map(d => d.date))
+    calendarDatesCache.set(key, dateSet)
+    updateCalendarAttributes()
+  } catch {
+    // silent fail
+  }
+}
+
+const updateCalendarAttributes = () => {
+  if (calendarAttributesUpdating) return
+  calendarAttributesUpdating = true
+  const dotDates: Date[] = []
+  for (const [, dateSet] of calendarDatesCache) {
+    for (const dateStr of dateSet) {
+      dotDates.push(new Date(dateStr + 'T12:00:00'))
+    }
+  }
+  calendarAttributes.value = dotDates.length > 0
+    ? [{ key: 'messages', dot: { color: 'indigo' }, dates: dotDates }]
+    : []
+  queueMicrotask(() => { calendarAttributesUpdating = false })
+}
+
+const onCalendarPageChange = (pages: Array<{ year: number; month: number }>) => {
+  for (const page of pages) {
+    loadCalendarMonth(page.year, page.month)
+  }
+}
+
+const onCalendarDayClick = (day: { id: string; date: Date }) => {
+  // day.id is "YYYY-MM-DD"
+  const monthKey = day.id.substring(0, 7)
+  const dateSet = calendarDatesCache.get(monthKey)
+  if (!dateSet || !dateSet.has(day.id)) return // disabled date
+
+  calendarOpen.value = false
+  jumpToDate(day.id)
+}
+
+const jumpToDate = async (dateStr: string) => {
+  // Use end-of-day as cursor to get messages from this date (desc order)
+  const cursor = `${dateStr}T23:59:59.999999`
+  loading.value = true
+  try {
+    const data = await api.get<{ items: MessageDetail[]; next_cursor: string | null; has_more: boolean }>(
+      '/messages/with-detail',
+      {
+        limit: pageSize,
+        cursor,
+        query_text: searchQuery.value || undefined,
+        media_id: activeMediaFilter.value ?? undefined,
+        starred: starredFilter.value || undefined,
+        tag_id: selectedTagId.value ?? undefined,
+      },
+    )
+
+    hasMoreData.value = data.has_more
+    nextCursor.value = data.next_cursor
+    messages.value = data.items.reverse()
+
+    // Enable forward scrolling from the last message's time
+    if (messages.value.length > 0) {
+      const lastMsg = messages.value[messages.value.length - 1]
+      forwardCursor.value = lastMsg.created_at
+      hasMoreForward.value = true
+      isViewingHistory.value = true
+    }
+
+    await nextTick()
+    // Scroll to bottom where the target date's messages are
+    scrollToBottom('auto')
+  } catch {
+    toast.error('加载消息失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// Close calendar on outside click
+const onDocumentClick = (e: MouseEvent) => {
+  if (calendarOpen.value && calendarPopover.value && !calendarPopover.value.contains(e.target as Node)) {
+    // Check if click was on the toggle button
+    const btn = calendarPopover.value.parentElement?.querySelector('button')
+    if (btn && btn.contains(e.target as Node)) return
+    calendarOpen.value = false
+  }
+}
 
 const tags = ref<TagWithCount[]>([])
 const selectedTagId = ref<number | null | undefined>(undefined)
@@ -897,11 +1035,13 @@ onMounted(() => {
   fetchMessages()
   setupObservers()
   scrollContainer.value?.addEventListener('scroll', onScrollForDate, { passive: true })
+  document.addEventListener('click', onDocumentClick, true)
 })
 
 onUnmounted(() => {
   teardownObservers()
   scrollContainer.value?.removeEventListener('scroll', onScrollForDate)
+  document.removeEventListener('click', onDocumentClick, true)
   if (scrollRaf) cancelAnimationFrame(scrollRaf)
 })
 
