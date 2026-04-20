@@ -309,9 +309,9 @@
       </div>
 
       <MessageComposeDialog :visible="dialogVisible" :mode="dialogMode" :message-id="dialogMessageId"
-        :initial-text="dialogInitialText" :initial-date="dialogInitialDate" :all-tags="tags"
-        :tag-id="selectedTagId ?? null" :actor-id="undefined" @close="dialogVisible = false"
-        @created="onDialogCreated" @updated="onDialogUpdated" />
+        :initial-text="dialogInitialText" :initial-date="dialogInitialDate" :initial-media="dialogInitialMedia"
+        :all-tags="tags" :tag-id="selectedTagId ?? null" :actor-id="undefined" @close="dialogVisible = false"
+        @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" />
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
         :starred="previewMessageStarred" :message-id="previewMessageId" @close="closePreview" @navigate-prev="navigateToPrevMessage"
@@ -653,6 +653,7 @@ const dialogMode = ref<'create' | 'edit'>('create')
 const dialogMessageId = ref<number | undefined>(undefined)
 const dialogInitialText = ref('')
 const dialogInitialDate = ref('')
+const dialogInitialMedia = ref<MessageMediaItem[]>([])
 
 const openCreateDialog = () => {
   dialogMode.value = 'create'
@@ -669,6 +670,7 @@ const openEditDialog = (messageId: number) => {
   dialogMode.value = 'edit'
   dialogMessageId.value = messageId
   dialogInitialText.value = msg.text || ''
+  dialogInitialMedia.value = msg.media_items || []
 
   const dateStr = msg.created_at
   if (dateStr) {
@@ -708,6 +710,22 @@ const onDialogUpdated = async (messageId: number, text: string, date: string) =>
     toast.success('消息已更新')
   } catch {
     toast.error('更新消息失败')
+  }
+}
+
+const onMediaChanged = async (messageId: number) => {
+  try {
+    const updated = await api.get<MessageDetail>(`/messages/${messageId}`)
+    const msg = messages.value.find(m => m.id === messageId)
+    if (msg) {
+      msg.media_items = updated.media_items
+      msg.media_count = updated.media_count
+    }
+    if (selectedMessage.value?.id === messageId) {
+      selectedMessage.value = updated
+    }
+  } catch {
+    // silent
   }
 }
 

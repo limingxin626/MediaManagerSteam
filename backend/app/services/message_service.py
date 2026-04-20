@@ -55,9 +55,15 @@ def reorder_message_media(db: Session, message_id: int, media_ids: List[int]) ->
 
     relation_map = {r.media_id: r for r in relations}
 
-    for pos, media_id in enumerate(media_ids):
+    for media_id in media_ids:
         if media_id not in relation_map:
             return False
+
+    for i, r in enumerate(relations):
+        r.position = -(i + 1)
+    db.flush()
+
+    for pos, media_id in enumerate(media_ids):
         relation_map[media_id].position = pos
 
     return True

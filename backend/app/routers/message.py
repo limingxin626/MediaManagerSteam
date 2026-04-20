@@ -595,6 +595,69 @@ def split_message(
     return _build_detail_response(db, new_msg, media_limit=None)
 
 
+@router.post("/{message_id}/media", response_model=MessageDetailResponse)
+def add_media_to_message(
+    message_id: int,
+    file_paths: List[str],
+    db: Session = Depends(get_db),
+):
+    """向已有消息添加媒体文件"""
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    max_pos = (
+        db.query(func.coalesce(func.max(MessageMedia.position), -1))
+        .filter(MessageMedia.message_id == message_id)
+        .scalar()
+    )
+    position = max_pos + 1
+
+    for file_path in file_paths:
+        result = process_file(db, file_path, message_id, position)
+        if result is not None:
+            position += 1
+
+    db.commit()
+    db.refresh(message)
+    return _build_detail_response(db, message, media_limit=None)
+
+
+@router.delete("/{message_id}/media/{media_id}", response_model=MessageDetailResponse)
+def remove_media_from_message(
+    message_id: int,
+    media_id: int,
+    db: Session = Depends(get_db),
+):
+    """从消息中移除媒体（仅解除关联，不删除文件）"""
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    relation = (
+        db.query(MessageMedia)
+        .filter(MessageMedia.message_id == message_id, MessageMedia.media_id == media_id)
+        .first()
+    )
+    if not relation:
+        raise HTTPException(status_code=404, detail="Media not found in this message")
+
+    db.delete(relation)
+
+    remaining = (
+        db.query(MessageMedia)
+        .filter(MessageMedia.message_id == message_id)
+        .order_by(MessageMedia.position)
+        .all()
+    )
+    for i, rel in enumerate(remaining):
+        rel.position = i
+
+    db.commit()
+    db.refresh(message)
+    return _build_detail_response(db, message, media_limit=None)
+
+
 @router.delete("/{message_id}", status_code=204)
 def delete_message(
     message_id: int,
