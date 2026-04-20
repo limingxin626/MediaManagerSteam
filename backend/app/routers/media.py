@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.models import get_db, Media, MessageMedia, Message, message_tag
 from typing import Optional
 from app.schemas.media import MediaResponse, MediaCursorResponse
+from app.config import AppConfig
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -179,21 +180,37 @@ def update_media_rating(
 def delete_media(
     media_id: int,
     delete_source: bool = Query(False, description="是否同时删除源文件"),
+    message_id: Optional[int] = Query(None, description="来源消息ID，传入时仅在无其他关联时才删除媒体本身"),
     db: Session = Depends(get_db)
 ):
-    """删除媒体"""
+    """删除媒体。若指定 message_id 且该媒体被多条消息引用，则仅解除当前关联。"""
     media = db.query(Media).filter(Media.id == media_id).first()
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
 
-    # 保存文件路径，以便后续删除
+    if message_id is not None:
+        ref_count = db.query(MessageMedia).filter(MessageMedia.media_id == media_id).count()
+        if ref_count > 1:
+            db.query(MessageMedia).filter(
+                MessageMedia.media_id == media_id,
+                MessageMedia.message_id == message_id
+            ).delete()
+            db.commit()
+            return {"message": "Media unlinked from message", "unlinked": True}
+
     file_path = media.file_path
 
     db.query(MessageMedia).filter(MessageMedia.media_id == media_id).delete()
     db.delete(media)
     db.commit()
 
-    # 如果需要删除源文件
+    thumb_path = AppConfig.get_thumbnail_path(media_id)
+    if os.path.exists(thumb_path):
+        try:
+            os.remove(thumb_path)
+        except Exception as e:
+            print(f"删除缩略图失败: {e}")
+
     if delete_source and file_path:
         try:
             if os.path.exists(file_path):
@@ -201,7 +218,6 @@ def delete_media(
                 print(f"成功删除源文件: {file_path}")
         except Exception as e:
             print(f"删除源文件失败: {e}")
-            # 不影响媒体删除的成功返回
 
-    return {"message": "Media deleted successfully"}
+    return {"message": "Media deleted successfully", "unlinked": False}
 

@@ -30,7 +30,14 @@
       "Bash(mkdir:*)",
       "Bash(python:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm gen:types:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(pip install:*)",
+      "Bash(npx:*)",
+      "Bash(echo exit: $?:*)"
     ]
   }
 }

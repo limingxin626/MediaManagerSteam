@@ -49,6 +49,9 @@ function createWindow() {
   }
 }
 
+// 开发环境下禁用 Electron 安全警告（webSecurity 必须关闭以播放本地视频）
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+
 app.whenReady().then(() => {
   createWindow(); // 启动前端
 });

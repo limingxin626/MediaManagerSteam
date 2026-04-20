@@ -1,8 +1,59 @@
+import os
+
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
-from app.models import get_db, SyncLog
+
+from app.config import config
+from app.models import get_db, Message, Media, Actor, Tag, MessageMedia, SyncLog, message_tag
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db)):
+    table_counts = {
+        "message": db.query(func.count(Message.id)).scalar() or 0,
+        "media": db.query(func.count(Media.id)).scalar() or 0,
+        "actor": db.query(func.count(Actor.id)).scalar() or 0,
+        "tag": db.query(func.count(Tag.id)).scalar() or 0,
+        "message_media": db.query(func.count(MessageMedia.message_id)).scalar() or 0,
+        "message_tag": db.scalar(text("SELECT COUNT(*) FROM message_tag")) or 0,
+        "sync_log": db.query(func.count(SyncLog.id)).scalar() or 0,
+    }
+
+    storage_row = db.query(
+        func.count(Media.id).label("total_files"),
+        func.coalesce(func.sum(Media.file_size), 0).label("total_size"),
+    ).one()
+
+    db_path = config.get_db_path()
+    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+
+    recent = (
+        db.query(Message.id, Message.text, Message.actor_id, Message.created_at)
+        .order_by(Message.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    return {
+        "table_counts": table_counts,
+        "storage": {
+            "total_files": storage_row.total_files,
+            "total_size": storage_row.total_size,
+        },
+        "db_size": db_size,
+        "recent_messages": [
+            {
+                "id": r.id,
+                "text": r.text,
+                "actor_id": r.actor_id,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in recent
+        ],
+    }
 
 
 @router.get("/sync-logs")
