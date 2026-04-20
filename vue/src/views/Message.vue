@@ -131,11 +131,13 @@
                 </div>
                 <div :data-message-date="message.created_at.substring(0, 10)">
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
+                    :all-tags="tags"
                     :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
                     @click="handleMessageClick(message)" @media-click="(index) => handleMediaClick(message.id, index)"
                     @delete="handleDeleteMessage" @find-messages-by-media="handleFindMessagesByMedia"
                     @toggle-select="toggleSelectMessage" @toggle-star="handleToggleStar"
-                    @toggle-media-star="handleToggleMediaStar" @edit="openEditDialog" />
+                    @toggle-media-star="handleToggleMediaStar" @edit="openEditDialog"
+                    @add-tag="handleQuickAddTag" />
                 </div>
               </template>
             </div>
@@ -668,6 +670,44 @@ const onDialogUpdated = async (messageId: number, text: string, date: string) =>
     toast.success('消息已更新')
   } catch {
     toast.error('更新消息失败')
+  }
+}
+
+const handleQuickAddTag = async (messageId: number, tagName: string) => {
+  const msg = messages.value.find(m => m.id === messageId)
+  if (!msg) return
+
+  const text = msg.text || ''
+  // Check if tag already exists in text
+  const escaped = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (new RegExp(`#${escaped}(?![\\w\\u4e00-\\u9fff])`).test(text)) {
+    toast.error('该 Tag 已存在')
+    return
+  }
+
+  // Insert tag: if text starts with hashtags, prepend with space; otherwise prepend with newline
+  const hashtagLineRegex = /^((?:#[\w\u4e00-\u9fff\u3400-\u4dbf/\-]+\s*)+)/
+  let newText: string
+  const match = text.match(hashtagLineRegex)
+  if (match) {
+    // Existing hashtags at start — prepend before them with space
+    newText = `#${tagName} ${text}`
+  } else if (text) {
+    // No hashtags at start — prepend with newline
+    newText = `#${tagName}\n${text}`
+  } else {
+    newText = `#${tagName}`
+  }
+
+  try {
+    const updated = await api.patch<MessageDetail>(`/messages/${messageId}`, { text: newText })
+    msg.text = updated.text
+    msg.updated_at = updated.updated_at
+    if (updated.tags) msg.tags = updated.tags
+    toast.success('标签已添加')
+    fetchTags()
+  } catch {
+    toast.error('添加标签失败')
   }
 }
 

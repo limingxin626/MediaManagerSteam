@@ -249,6 +249,8 @@
             </span>
           </div>
           <div class="flex items-center gap-1">
+            <TagPickerPopover v-if="props.allTags" :all-tags="props.allTags" :message-tags="messageTags"
+              @select="(tag) => emit('add-tag', props.message.id, tag.name)" />
             <button @click.stop="handleToggleStar" class="p-1 rounded transition-colors" :class="props.message.starred
               ? 'text-yellow-400 hover:text-yellow-500'
               : 'text-gray-500 hover:text-yellow-400'"
@@ -294,8 +296,9 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { marked } from 'marked'
-import type { Message, MessageMediaItem, TagItem } from '../types'
+import type { Message, MessageMediaItem, TagItem, TagWithCount } from '../types'
 import { isVideo, formatDuration, resolveUrl } from '../utils/media'
+import TagPickerPopover from './TagPickerPopover.vue'
 import { formatRelativeTime } from '../utils/date'
 import { calculateMosaicLayout } from '../utils/mosaic'
 
@@ -303,6 +306,7 @@ interface Props {
   message: Message
   mediaItems?: MessageMediaItem[]
   tags?: TagItem[]
+  allTags?: TagWithCount[]
   selectable?: boolean
   selected?: boolean
 }
@@ -318,6 +322,7 @@ const emit = defineEmits<{
   'toggle-star': [id: number]
   'toggle-media-star': [mediaId: number]
   'edit': [id: number]
+  'add-tag': [messageId: number, tagName: string]
 }>()
 
 const maxPreviewItems = 9
