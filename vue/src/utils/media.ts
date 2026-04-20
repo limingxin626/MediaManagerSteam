@@ -36,3 +36,8 @@ export async function toggleMediaStar(item: { id: number; starred: boolean }): P
     toast.error('操作失败')
   }
 }
+
+/** Rotate media file on server, returns updated media data */
+export async function rotateMedia(mediaId: number, degrees: number): Promise<any> {
+  return api.post(`/media/${mediaId}/rotate`, { degrees })
+}

@@ -156,6 +156,7 @@
       @close="previewOpen = false"
       @toggle-star="handlePreviewToggleStar"
       @media-deleted="handleMediaDeleted"
+      @media-rotated="handleMediaRotated"
     />
   </div>
 </template>
@@ -389,6 +390,19 @@ const handlePreviewToggleStar = async (mediaId: number) => {
 const handleMediaDeleted = (mediaId: number) => {
   const idx = items.value.findIndex(m => m.id === mediaId)
   if (idx !== -1) items.value.splice(idx, 1)
+}
+
+const handleMediaRotated = async (mediaId: number) => {
+  const t = Date.now()
+  const item = items.value.find(m => m.id === mediaId)
+  if (item) {
+    item.thumb_url = item.thumb_url.split('?')[0] + `?t=${t}`
+  }
+  const pItem = previewItems.value.find(m => m.id === mediaId)
+  if (pItem) {
+    pItem.thumb_url = pItem.thumb_url.split('?')[0] + `?t=${t}`
+    pItem.file_path = pItem.file_path.split('?')[0] + `?t=${t}`
+  }
 }
 
 const openPreview = (item: Media) => {

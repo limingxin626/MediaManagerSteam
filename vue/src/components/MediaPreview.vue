@@ -32,6 +32,25 @@
               </svg>
             </button>
             <button
+              v-if="currentItem && rotationDegrees !== 0"
+              @click="confirmRotation"
+              :disabled="isRotating"
+              class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-full transition-colors disabled:opacity-50"
+            >
+              {{ isRotating ? '旋转中...' : '确认旋转' }}
+            </button>
+            <button
+              v-if="currentItem"
+              @click="handleRotate"
+              class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+              :class="{ 'text-blue-400': rotationDegrees !== 0 }"
+              title="旋转 90°"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
               v-if="currentItem"
               @click="openFileLocation"
               class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
@@ -71,6 +90,7 @@
               ref="videoRef"
               :src="getMediaUrl(currentItem)"
               class="max-w-[90vw] max-h-[80vh] rounded-lg shadow-2xl"
+              :style="mediaTransformStyle"
               controls
               playsinline
               loop
@@ -82,6 +102,7 @@
               :src="getMediaUrl(currentItem)"
               :alt="`Media ${currentIndex + 1}`"
               class="max-w-[90vw] max-h-[80vh] object-contain rounded-lg shadow-2xl"
+              :style="mediaTransformStyle"
             />
           </div>
 
@@ -180,7 +201,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { MessageMediaItem } from '../types'
-import { isVideo, isImage, resolveUrl } from '../utils/media'
+import { isVideo, isImage, resolveUrl, rotateMedia } from '../utils/media'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 
@@ -215,6 +236,7 @@ const emit = defineEmits<{
   'navigate-next': []
   'toggle-star': [mediaId: number]
   'media-deleted': [mediaId: number]
+  'media-rotated': [mediaId: number]
 }>()
 
 const currentIndex = ref(props.startIndex)
@@ -223,6 +245,8 @@ const thumbRefs = ref<Map<number, HTMLElement>>(new Map())
 const previewStarBounce = ref(false)
 const showDeleteConfirm = ref(false)
 const deleteSourceFile = ref(false)
+const rotationDegrees = ref(0)
+const isRotating = ref(false)
 
 function handleStarClick() {
   if (!currentItem.value) return
@@ -261,6 +285,34 @@ function openFileLocation() {
   }
 }
 
+function handleRotate() {
+  rotationDegrees.value = (rotationDegrees.value + 90) % 360
+}
+
+async function confirmRotation() {
+  if (!currentItem.value || rotationDegrees.value === 0) return
+  isRotating.value = true
+  try {
+    await rotateMedia(currentItem.value.id, rotationDegrees.value)
+    emit('media-rotated', currentItem.value.id)
+    toast.success('旋转成功')
+    rotationDegrees.value = 0
+  } catch {
+    toast.error('旋转失败')
+  } finally {
+    isRotating.value = false
+  }
+}
+
+const mediaTransformStyle = computed(() => {
+  if (rotationDegrees.value === 0) return {}
+  const isSwapped = rotationDegrees.value === 90 || rotationDegrees.value === 270
+  return {
+    transform: `rotate(${rotationDegrees.value}deg)${isSwapped ? ' scale(0.75)' : ''}`,
+    transition: 'transform 0.2s ease',
+  }
+})
+
 const setThumbRef = (idx: number, el: HTMLElement | null) => {
   if (el) {
     thumbRefs.value.set(idx, el)
@@ -295,6 +347,7 @@ const close = () => {
   if (videoRef.value) {
     videoRef.value.pause()
   }
+  rotationDegrees.value = 0
   emit('close')
 }
 
@@ -351,6 +404,7 @@ watch(() => props.isOpen, async (newValue) => {
 })
 
 watch(currentIndex, async () => {
+  rotationDegrees.value = 0
   await nextTick()
   if (videoRef.value) {
     videoRef.value.play().catch(() => {})

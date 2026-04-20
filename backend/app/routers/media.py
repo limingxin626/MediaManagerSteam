@@ -1,12 +1,14 @@
 import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func, Integer
 from app.models import get_db, Media, MessageMedia, Message, message_tag
-from typing import Optional
+from typing import Optional, Literal
 from app.schemas.media import MediaResponse, MediaCursorResponse, TimelineItem
 from app.config import AppConfig
+from app.services.media_service import rotate_media
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -205,6 +207,25 @@ def update_media_rating(
     db.commit()
 
     return {"message": "Rating updated successfully", "rating": rating}
+
+class RotateRequest(BaseModel):
+    degrees: Literal[90, 180, 270]
+
+
+@router.post("/{media_id}/rotate", response_model=MediaResponse)
+def rotate_media_endpoint(
+    media_id: int,
+    body: RotateRequest,
+    db: Session = Depends(get_db)
+):
+    try:
+        media = rotate_media(db, media_id, body.degrees)
+        return MediaResponse.model_validate(media)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.delete("/{media_id}")
 def delete_media(

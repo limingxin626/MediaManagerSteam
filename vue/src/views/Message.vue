@@ -315,7 +315,8 @@
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
         :starred="previewMessageStarred" :message-id="previewMessageId" @close="closePreview" @navigate-prev="navigateToPrevMessage"
-        @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @media-deleted="handleMediaDeleted" />
+        @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @media-deleted="handleMediaDeleted"
+        @media-rotated="handleMediaRotated" />
 
     </div>
   </div>
@@ -871,6 +872,26 @@ const handleMediaDeleted = (mediaId: number) => {
     }
   }
 }
+
+const handleMediaRotated = (mediaId: number) => {
+  const t = Date.now()
+  for (const msg of messages.value) {
+    if (!msg.media_items) continue
+    for (const item of msg.media_items) {
+      if (item.id === mediaId) {
+        item.thumb_url = item.thumb_url.split('?')[0] + `?t=${t}`
+        item.file_path = item.file_path.split('?')[0] + `?t=${t}`
+      }
+    }
+  }
+  for (const item of previewItems.value) {
+    if (item.id === mediaId) {
+      item.thumb_url = item.thumb_url.split('?')[0] + `?t=${t}`
+      item.file_path = item.file_path.split('?')[0] + `?t=${t}`
+    }
+  }
+}
+
 const handleToggleMediaStar = async (mediaId: number, messageId?: number) => {
   const msg = messageId
     ? messages.value.find(m => m.id === messageId)
