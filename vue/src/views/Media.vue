@@ -120,6 +120,7 @@
       :start-index="previewStartIndex"
       @close="previewOpen = false"
       @toggle-star="handlePreviewToggleStar"
+      @media-deleted="handleMediaDeleted"
     />
   </div>
 </template>
@@ -178,6 +179,12 @@ const toggleStarredFilter = () => {
 const handlePreviewToggleStar = async (mediaId: number) => {
   const item = items.value.find(m => m.id === mediaId)
   if (item) await toggleMediaStar(item)
+}
+
+const handleMediaDeleted = (mediaId: number) => {
+  const idx = items.value.findIndex(m => m.id === mediaId)
+  if (idx !== -1) items.value.splice(idx, 1)
+  // previewItems 已由 MediaPreview 内部 splice 更新
 }
 
 const openPreview = (item: Media) => {

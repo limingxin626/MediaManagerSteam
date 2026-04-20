@@ -259,7 +259,7 @@
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
         :starred="previewMessageStarred" @close="closePreview" @navigate-prev="navigateToPrevMessage"
-        @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @delete-media="handleDeleteMedia" />
+        @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @media-deleted="handleMediaDeleted" />
 
     </div>
   </div>
@@ -636,34 +636,16 @@ const handlePreviewToggleStar = async (mediaId: number) => {
   }
 }
 
-const handleDeleteMedia = async (mediaId: number, deleteSource: boolean = false) => {
-  try {
-    await api.del(`/media/${mediaId}`, { delete_source: deleteSource })
-
-    // 从预览项中移除
-    const mediaIndex = previewItems.value.findIndex(item => item.id === mediaId)
-    previewItems.value.splice(mediaIndex, 1)
-
-    // 更新消息中的媒体项
-    if (currentMessageIndex.value >= 0) {
-      const msg = messages.value[currentMessageIndex.value]
-      if (msg?.media_items) {
-        const itemIndex = msg.media_items.findIndex(item => item.id === mediaId)
-        if (itemIndex !== -1) {
-          msg.media_items.splice(itemIndex, 1)
-        }
+const handleMediaDeleted = (mediaId: number) => {
+  // 更新消息中的媒体项（API调用已在MediaPreview中完成）
+  if (currentMessageIndex.value >= 0) {
+    const msg = messages.value[currentMessageIndex.value]
+    if (msg?.media_items) {
+      const itemIndex = msg.media_items.findIndex(item => item.id === mediaId)
+      if (itemIndex !== -1) {
+        msg.media_items.splice(itemIndex, 1)
       }
     }
-
-    // 如果没有更多媒体，关闭预览
-    if (previewItems.value.length === 0) {
-      closePreview()
-    }
-
-    toast.success('媒体已删除')
-  } catch (error) {
-    console.error('删除媒体失败:', error)
-    toast.error('删除失败')
   }
 }
 const handleToggleMediaStar = async (mediaId: number) => {

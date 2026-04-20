@@ -181,6 +181,10 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { MessageMediaItem } from '../types'
 import { isVideo, isImage, resolveUrl } from '../utils/media'
+import { api } from '../composables/useApi'
+import { useToast } from '../composables/useToast'
+
+const toast = useToast()
 
 // 扩展 Window 接口以包含 Electron API
 declare global {
@@ -209,7 +213,7 @@ const emit = defineEmits<{
   'navigate-prev': []
   'navigate-next': []
   'toggle-star': [mediaId: number]
-  'delete-media': [mediaId: number, deleteSource: boolean]
+  'media-deleted': [mediaId: number]
 }>()
 
 const currentIndex = ref(props.startIndex)
@@ -226,14 +230,31 @@ function handleStarClick() {
   emit('toggle-star', currentItem.value.id)
 }
 
-function handleDeleteClick() {
+async function confirmDelete() {
   if (!currentItem.value) return
-  showDeleteConfirm.value = true
-}
+  const mediaId = currentItem.value.id
+  try {
+    await api.del(`/media/${mediaId}`, { delete_source: deleteSourceFile.value })
+    emit('media-deleted', mediaId)
 
-function confirmDelete() {
-  if (!currentItem.value) return
-  emit('delete-media', currentItem.value.id, deleteSourceFile.value)
+    // 从预览项中移除
+    const idx = props.items.findIndex(item => item.id === mediaId)
+    if (idx !== -1) {
+      props.items.splice(idx, 1)
+    }
+
+    // 调整当前索引
+    if (props.items.length === 0) {
+      close()
+    } else if (currentIndex.value >= props.items.length) {
+      currentIndex.value = props.items.length - 1
+    }
+
+    toast.success('媒体已删除')
+  } catch (error) {
+    console.error('删除媒体失败:', error)
+    toast.error('删除失败')
+  }
   showDeleteConfirm.value = false
   deleteSourceFile.value = false
 }
