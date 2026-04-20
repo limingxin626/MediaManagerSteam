@@ -33,6 +33,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { TagWithCount, TagItem } from '../types'
+import { getPinyinInitials } from '../utils/pinyinInitial'
 
 const props = defineProps<{
   allTags: TagWithCount[]
@@ -54,7 +55,11 @@ const filteredTags = computed(() => {
   const sorted = [...props.allTags].sort((a, b) => b.message_count - a.message_count)
   if (!search.value) return sorted
   const q = search.value.toLowerCase()
-  return sorted.filter(t => t.name.toLowerCase().includes(q))
+  const textMatched = sorted.filter(t => t.name.toLowerCase().includes(q))
+  if (!(/^[a-z]+$/.test(q))) return textMatched
+  const textIds = new Set(textMatched.map(t => t.id))
+  const pinyinMatched = sorted.filter(t => !textIds.has(t.id) && getPinyinInitials(t.name).startsWith(q))
+  return [...textMatched, ...pinyinMatched]
 })
 
 const selectTag = (tag: TagWithCount) => {

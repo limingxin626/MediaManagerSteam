@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue'
 import type { TagItem } from '../types'
+import { getPinyinInitials } from '../utils/pinyinInitial'
 
 export function useTagAutocomplete(
   textareaRef: Ref<HTMLTextAreaElement | null>,
@@ -90,13 +91,33 @@ export function useTagAutocomplete(
     currentTagStart = hashPos
     const query = afterHash.toLowerCase()
     
-    // 筛选匹配的标签
-    const matchedTags = getTags().filter(tag =>
-      tag.name.toLowerCase().includes(query)
-    )
-    
-    // 按最近使用排序
-    tagSuggestions.value = sortTagsByRecentUse(matchedTags).slice(0, 8)
+    const allTagList = getTags()
+    const textMatched = new Set<number>()
+    const textResults: TagItem[] = []
+    const pinyinResults: TagItem[] = []
+
+    for (const tag of allTagList) {
+      if (tag.name.toLowerCase().includes(query)) {
+        textResults.push(tag)
+        textMatched.add(tag.id)
+      }
+    }
+
+    if (query && /^[a-z]+$/.test(query)) {
+      for (const tag of allTagList) {
+        if (!textMatched.has(tag.id)) {
+          const initials = getPinyinInitials(tag.name)
+          if (initials.startsWith(query)) {
+            pinyinResults.push(tag)
+          }
+        }
+      }
+    }
+
+    tagSuggestions.value = [
+      ...sortTagsByRecentUse(textResults),
+      ...sortTagsByRecentUse(pinyinResults),
+    ].slice(0, 8)
 
     if (tagSuggestions.value.length > 0) {
       tagSuggestionVisible.value = true
