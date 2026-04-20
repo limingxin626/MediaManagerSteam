@@ -23,9 +23,9 @@
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Search Header -->
       <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
-        <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div class="flex gap-4 items-center max-w-2xl mx-auto">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">演员消息</h2>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">演员消息</h2>
             <!-- Search -->
             <SearchInput v-model="filterName" placeholder="搜索演员..." @search="resetAndFetch" />
           </div>
@@ -90,12 +90,18 @@
           </div>
 
           <!-- Empty State -->
-          <div v-if="messages.length === 0 && !loading" class="text-center py-12">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无消息</h3>
-            <p class="mt-1 text-sm text-gray-400">选择一个演员查看消息</p>
+          <div v-if="messages.length === 0 && !loading" class="flex flex-col items-center justify-center py-20">
+            <div class="relative w-24 h-24 mb-4">
+              <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/10 rotate-6"></div>
+              <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/5 -rotate-3"></div>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <svg class="w-10 h-10 text-[var(--color-primary-500)]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+            </div>
+            <h3 class="text-sm font-medium text-[var(--text-primary)]">暂无消息</h3>
+            <p class="mt-1 text-sm text-[var(--text-muted)]">选择一个演员查看消息</p>
           </div>
         </div>
 
@@ -110,75 +116,6 @@
         @sent="onMessageSent"
       />
     </div>
-
-    <!-- Right Actor Detail Column -->
-    <aside class="w-72 shrink-0 border-l border-[var(--border-color)] overflow-y-auto">
-      <div v-if="selectedActor" class="p-6">
-        <!-- Actor Avatar -->
-        <div class="flex flex-col items-center mb-6">
-          <div class="w-32 h-32 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 mb-4">
-            <img
-              :src="resolveUrl(selectedActor.avatar_url)"
-              :alt="selectedActor.name"
-              class="w-full h-full object-cover"
-            />
-          </div>
-          <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-1">{{ selectedActor.name }}</h3>
-          <p class="text-sm text-gray-400">{{ selectedActor.message_count }} 条消息</p>
-        </div>
-
-        <!-- Actor Description -->
-        <div v-if="selectedActor.description" class="mb-6">
-          <h4 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">简介</h4>
-          <p class="text-sm text-gray-600 dark:text-gray-300">{{ selectedActor.description }}</p>
-        </div>
-
-        <!-- Actor Info -->
-        <div class="space-y-4">
-          <div>
-            <h4 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">信息</h4>
-            <div class="space-y-2">
-              <div class="flex justify-between text-sm">
-                <span class="text-gray-400">ID</span>
-                <span class="text-gray-600 dark:text-gray-300">{{ selectedActor.id }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-gray-400">创建时间</span>
-                <span class="text-gray-600 dark:text-gray-300">{{ formatDateTime(selectedActor.created_at) }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-gray-400">更新时间</span>
-                <span class="text-gray-600 dark:text-gray-300">{{ formatDateTime(selectedActor.updated_at) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Actions -->
-          <div class="pt-4 border-t border-[var(--border-color)]">
-            <button
-              @click="editActor(selectedActor)"
-              class="w-full px-4 py-2 bg-[var(--color-primary-600)] hover:bg-[var(--color-primary-700)] text-white rounded-lg transition-colors mb-2"
-            >
-              编辑
-            </button>
-            <button
-              @click="deleteActor(selectedActor.id)"
-              class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-            >
-              删除
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Empty State -->
-      <div v-else class="flex flex-col items-center justify-center h-full text-gray-400">
-        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-        <p class="text-sm">选择一个演员查看详情</p>
-      </div>
-    </aside>
 
     <!-- Add/Edit Modal -->
     <ActorEditModal
@@ -214,8 +151,7 @@ import MessageCompose from '../components/MessageCompose.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
-import { resolveUrl } from '../utils/media'
-import { formatDateLabel, formatDateTime } from '../utils/date'
+import { formatDateLabel } from '../utils/date'
 
 defineOptions({ name: 'Actor' })
 

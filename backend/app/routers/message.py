@@ -14,7 +14,7 @@ from app.schemas.message import (
     MessageSyncMediaItem, MessageSyncResponse,
     MEDIA_PREVIEW_LIMIT,
 )
-from app.services.message_service import sync_tags_from_text, reorder_message_media
+from app.services.message_service import sync_tags_from_text, reorder_message_media, cleanup_orphan_tags
 from app.services.media_service import process_file
 
 router = APIRouter(prefix="/messages", tags=["messages"])
@@ -173,11 +173,11 @@ def _build_sync_response(db: Session, db_message: Message) -> MessageSyncRespons
         text=db_message.text,
         actor_id=db_message.actor_id,
         actor_name=db_message.actor.name if db_message.actor else None,
-        media_count=len(media_items),
         starred=bool(db_message.starred),
         created_at=db_message.created_at.isoformat(),
         updated_at=db_message.updated_at.isoformat(),
         media_items=media_items,
+        media_count=len(media_items),
         tags=tags,
     )
 
@@ -543,4 +543,5 @@ def delete_message(
         raise HTTPException(status_code=404, detail="Message not found")
 
     db.delete(message)
+    cleanup_orphan_tags(db)
     db.commit()

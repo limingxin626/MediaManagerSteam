@@ -1,7 +1,22 @@
 import re
 from typing import List, Optional
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models import Message, Tag, MessageMedia, message_tag
+
+
+def cleanup_orphan_tags(db: Session) -> int:
+    """删除没有任何 message 关联的 tag，返回删除数量。"""
+    orphans = (
+        db.query(Tag)
+        .outerjoin(message_tag, Tag.id == message_tag.c.tag_id)
+        .group_by(Tag.id)
+        .having(func.count(message_tag.c.message_id) == 0)
+        .all()
+    )
+    for tag in orphans:
+        db.delete(tag)
+    return len(orphans)
 
 
 def sync_tags_from_text(db: Session, message: Message, text: Optional[str], merge: bool = False) -> None:
@@ -10,7 +25,7 @@ def sync_tags_from_text(db: Session, message: Message, text: Optional[str], merg
     merge=False（默认）：全量替换，message.tags 只含文本中解析出的标签。
     merge=True：合并模式，保留原有标签，仅添加文本中新增的标签（用于 sync/apply 避免删除手动标签）。
     """
-    tag_names = list(dict.fromkeys(re.findall(r'#([\w\u4e00-\u9fff/]+)', text or "")))
+    tag_names = list(dict.fromkeys(re.findall(r'#([\w\u4e00-\u9fff\u3400-\u4dbf/\-]+)', text or "")))
 
     text_tags = []
     for name in tag_names:

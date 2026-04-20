@@ -39,9 +39,9 @@
       <div class="flex flex-col min-w-0 relative" :class="selectedMessage ? 'w-1/2' : 'flex-1'">
         <!-- Search Header -->
         <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
-          <div class="w-full mx-auto px-3 py-2">
+          <div class="w-full mx-auto px-3 py-3">
             <div class="flex gap-2 items-center max-w-4xl mx-auto">
-              <h2 class="text-base font-semibold text-gray-900 dark:text-white">消息流</h2>
+              <h2 class="text-lg font-bold text-gray-900 dark:text-white">消息流</h2>
               <!-- Merge toggle -->
               <button @click="toggleMergeMode" class="px-2 py-1 text-xs rounded-md transition-colors" :class="mergeMode
                 ? 'bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)]'

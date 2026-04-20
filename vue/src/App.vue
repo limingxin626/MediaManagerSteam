@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-[var(--bg-secondary)] dark:bg-gradient-to-b dark:from-[rgb(32,26,27)] dark:to-[rgb(65,32,68)] bg-fixed transition-colors">
+  <div class="h-screen overflow-hidden bg-[var(--bg-secondary)] dark:bg-gradient-to-b dark:from-[rgb(32,26,27)] dark:to-[rgb(65,32,68)] bg-fixed transition-colors">
     <Navbar />
     <div class="md:pl-16">
       <!-- Message 始终挂载，v-show 切显隐，滚动位置天然保留 -->

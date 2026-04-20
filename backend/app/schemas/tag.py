@@ -7,3 +7,13 @@ class TagResponse(OrmBase):
     name: str
     category: Optional[str] = None
     message_count: int = 0
+
+
+class TagCreate(OrmBase):
+    name: str
+    category: Optional[str] = None
+
+
+class TagUpdate(OrmBase):
+    name: Optional[str] = None
+    category: Optional[str] = None

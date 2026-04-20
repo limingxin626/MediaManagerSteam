@@ -209,15 +209,24 @@
       </div>
 
       <!-- Message Text -->
-      <div v-if="message.text" class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300">
-        <div class="line-clamp-10" v-html="renderedText"></div>
+      <div v-if="message.text" class="mb-2 prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300">
+        <div ref="textRef" class="line-clamp-10" v-html="renderedText"></div>
       </div>
 
       <!-- Tags & Media count row -->
-      <div v-if="messageTags.length > 0" class="flex items-center gap-2 mt-2 flex-wrap">
-        <span v-for="tag in messageTags" :key="tag.id"
-          class="tag-chip">
-          {{ tag.name }}
+      <div v-if="visibleTagChips.length > 0 || message.media_count > 0" class="flex items-center gap-2 mt-2 flex-wrap">
+        <template v-if="visibleTagChips.length > 0">
+          <span v-for="tag in visibleTagChips" :key="tag.id"
+            class="tag-chip">
+            {{ tag.name }}
+          </span>
+        </template>
+        <span v-if="message.media_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500 ml-auto">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          {{ message.media_count }}
         </span>
       </div>
 
@@ -283,7 +292,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { marked } from 'marked'
 import type { Message, MessageMediaItem, TagItem } from '../types'
 import { isVideo, formatDuration, resolveUrl } from '../utils/media'
@@ -314,9 +323,11 @@ const emit = defineEmits<{
 const maxPreviewItems = 9
 const activeMenuIndex = ref<number | null>(null)
 const cardRef = ref<HTMLElement | null>(null)
+const textRef = ref<HTMLElement | null>(null)
 const isVisible = ref(false)
 const starBouncing = ref(false)
 const mediaStarBouncing = ref<number | null>(null)
+
 
 let observer: IntersectionObserver | null = null
 
@@ -333,6 +344,7 @@ onMounted(() => {
     )
     observer.observe(cardRef.value)
   }
+  nextTick(checkTextClamped)
 })
 
 onUnmounted(() => {
@@ -350,6 +362,32 @@ const actorInitial = computed(() => {
 
 const messageTags = computed(() => {
   return props.tags || []
+})
+
+const isTextClamped = ref(false)
+
+const checkTextClamped = () => {
+  if (textRef.value) {
+    isTextClamped.value = textRef.value.scrollHeight > textRef.value.clientHeight
+  }
+}
+
+watch(() => props.message.text, () => {
+  nextTick(checkTextClamped)
+})
+
+// 过滤掉文本可见部分中已有 #hashtag 的 tag（行内已高亮，无需重复显示）
+// 未折叠：全部 hashtag 都可见，过滤全部；折叠：只过滤前10行中出现的
+const visibleTagChips = computed(() => {
+  if (messageTags.value.length === 0) return []
+  if (!props.message.text) return messageTags.value
+  const text = isTextClamped.value
+    ? props.message.text.split('\n').slice(0, 10).join('\n')
+    : props.message.text
+  return messageTags.value.filter(tag => {
+    const escaped = tag.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return !new RegExp(`#${escaped}(?![\\w\\u4e00-\\u9fff])`).test(text)
+  })
 })
 
 const mediaPreviewItems = computed(() => {
@@ -370,7 +408,9 @@ const renderedText = computed(() => {
     '$1\n\n$2\n\n'
   )
   marked.setOptions({ breaks: true })
-  return marked.parse(normalized) as string
+  const html = marked.parse(normalized) as string
+  // 高亮 #hashtag：匹配不在 HTML 标签内的 hashtag
+  return html.replace(/(^|(?<=(?:>|;|\s)))#([\w\u4e00-\u9fff]+)/g, '$1<span class="hashtag-inline">#$2</span>')
 })
 
 // Mosaic layout — 使用容器虚拟宽度 400px 计算
