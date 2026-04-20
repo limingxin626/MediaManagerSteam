@@ -2,9 +2,10 @@ import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func, Integer
 from app.models import get_db, Media, MessageMedia, Message, message_tag
 from typing import Optional
-from app.schemas.media import MediaResponse, MediaCursorResponse
+from app.schemas.media import MediaResponse, MediaCursorResponse, TimelineItem
 from app.config import AppConfig
 
 router = APIRouter(prefix="/media", tags=["media"])
@@ -93,6 +94,35 @@ def get_media(
             has_more=has_more,
             has_more_before=False
         )
+
+@router.get("/timeline", response_model=list[TimelineItem])
+def get_media_timeline(
+    starred: Optional[bool] = Query(None),
+    type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
+    db: Session = Depends(get_db)
+):
+    year_col = func.cast(func.strftime('%Y', Media.created_at), Integer)
+    month_col = func.cast(func.strftime('%m', Media.created_at), Integer)
+
+    query = db.query(
+        year_col.label('year'),
+        month_col.label('month'),
+        func.count().label('count'),
+    )
+
+    if starred is not None:
+        query = query.filter(Media.starred == (1 if starred else 0))
+    if type == 'video':
+        query = query.filter(Media.mime_type.like('video/%'))
+    elif type == 'image':
+        query = query.filter(Media.mime_type.like('image/%'))
+
+    rows = query.group_by('year', 'month').order_by(
+        year_col.desc(), month_col.desc()
+    ).all()
+
+    return [TimelineItem(year=r.year, month=r.month, count=r.count) for r in rows]
+
 
 @router.get("/feed", response_model=MediaCursorResponse)
 def get_media_feed(

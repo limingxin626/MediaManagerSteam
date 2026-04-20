@@ -18,6 +18,12 @@ class MediaDetailResponse(MediaResponse):
     messages: List[dict]
 
 
+class TimelineItem(BaseModel):
+    year: int
+    month: int
+    count: int
+
+
 class MediaCursorResponse(BaseModel):
     items: List[MediaResponse]
     next_cursor: Optional[str] = None

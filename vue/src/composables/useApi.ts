@@ -153,9 +153,16 @@ export function useInfiniteScroll<T>(options: InfiniteScrollOptions<T>) {
 
   const reset = () => load(true)
 
+  const jumpToCursor = async (cursor: string) => {
+    items.value = []
+    nextCursor.value = cursor
+    hasMore.value = true
+    await load()
+  }
+
   onUnmounted(() => {
     observer?.disconnect()
   })
 
-  return { items, loading, hasMore, load, reset, setupObserver }
+  return { items, loading, hasMore, load, reset, jumpToCursor, setupObserver }
 }
