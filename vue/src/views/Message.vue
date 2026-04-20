@@ -214,6 +214,16 @@
         <div class="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
           <span class="text-sm font-semibold text-gray-900 dark:text-white">消息详情</span>
           <div class="flex items-center gap-2">
+            <button v-if="selectedMessage.media_items && selectedMessage.media_items.length > 1"
+              @click="toggleSplitMode"
+              class="p-1 rounded transition-colors" :class="splitMode
+                ? 'text-[var(--color-primary-500)]'
+                : 'text-gray-400 hover:text-gray-200'"
+              :title="splitMode ? '退出拆分' : '拆分媒体'">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8M8 12h4m-4 5h8M4 4v16m16-16v16" />
+              </svg>
+            </button>
             <div v-if="selectedMessageLoading"
               class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[var(--color-primary-500)]">
             </div>
@@ -244,8 +254,18 @@
             class="grid grid-cols-3 gap-1">
             <div v-for="(media, index) in selectedMessage.media_items" :key="media.id"
               class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity"
+              :class="splitMode && splitSelectedIds.has(media.id) ? 'ring-2 ring-[var(--color-primary-500)]' : ''"
               @click="handleSelectedMessageMediaClick(index)">
               <img :src="resolveUrl(media.thumb_url)" class="w-full h-full object-cover" />
+              <div v-if="splitMode"
+                class="absolute top-1 left-1 w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                :class="splitSelectedIds.has(media.id)
+                  ? 'bg-[var(--color-primary-500)] border-[var(--color-primary-500)]'
+                  : 'border-white/70 bg-black/30'">
+                <svg v-if="splitSelectedIds.has(media.id)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
               <div v-if="media.mime_type && media.mime_type.startsWith('video')"
                 class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div class="w-8 h-8 bg-black/40 rounded-full flex items-center justify-center border border-white/30">
@@ -267,6 +287,19 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                 </svg>
+              </button>
+            </div>
+          </div>
+          <!-- Split action bar -->
+          <div v-if="splitMode && splitSelectedIds.size > 0"
+            class="flex items-center justify-between bg-[var(--color-primary-500)]/10 border border-[var(--color-primary-500)]/30 rounded-lg px-3 py-2">
+            <span class="text-sm text-[var(--color-primary-400)]">已选 {{ splitSelectedIds.size }} 项</span>
+            <div class="flex gap-2">
+              <button @click="toggleSplitMode"
+                class="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors">取消</button>
+              <button @click="handleSplit"
+                class="px-3 py-1 text-sm bg-[var(--color-primary-500)] text-white rounded hover:bg-[var(--color-primary-600)] transition-colors">
+                确认拆分
               </button>
             </div>
           </div>
@@ -543,6 +576,10 @@ const previewMessageStarred = computed(() => {
 // --- Merge selection mode ---
 const mergeMode = ref(false)
 const selectedMessageIds = ref<Set<number>>(new Set())
+
+// --- Split mode ---
+const splitMode = ref(false)
+const splitSelectedIds = ref<Set<number>>(new Set())
 
 // --- Forward (newer) pagination state ---
 const forwardCursor = ref<string | null>(null)
@@ -936,6 +973,17 @@ const handleFindMessagesByMedia = (mediaId: number) => {
 }
 
 const handleSelectedMessageMediaClick = (mediaIndex: number) => {
+  if (splitMode.value) {
+    const media = selectedMessage.value?.media_items?.[mediaIndex]
+    if (!media) return
+    if (splitSelectedIds.value.has(media.id)) {
+      splitSelectedIds.value.delete(media.id)
+    } else {
+      splitSelectedIds.value.add(media.id)
+    }
+    splitSelectedIds.value = new Set(splitSelectedIds.value)
+    return
+  }
   if (!selectedMessage.value?.media_items) return
   currentMessageIndex.value = messages.value.findIndex(m => m.id === selectedMessage.value!.id)
   previewItems.value = selectedMessage.value.media_items
@@ -944,9 +992,33 @@ const handleSelectedMessageMediaClick = (mediaIndex: number) => {
   previewOpen.value = true
 }
 
+const toggleSplitMode = () => {
+  splitMode.value = !splitMode.value
+  splitSelectedIds.value = new Set()
+}
+
+const handleSplit = async () => {
+  if (!selectedMessage.value || splitSelectedIds.value.size === 0) return
+  try {
+    await api.post(`/messages/${selectedMessage.value.id}/split`, {
+      media_ids: Array.from(splitSelectedIds.value),
+    })
+    toast.success('拆分成功')
+    splitMode.value = false
+    splitSelectedIds.value = new Set()
+    const full = await api.get<MessageDetail>(`/messages/${selectedMessage.value.id}`)
+    selectedMessage.value = full
+    await resetAndFetch({})
+  } catch (e: any) {
+    toast.error(e?.message || '拆分失败')
+  }
+}
+
 const handleMessageClick = async (message: MessageDetail) => {
   selectedMessage.value = message
   selectedMessageLoading.value = true
+  splitMode.value = false
+  splitSelectedIds.value = new Set()
   try {
     const full = await api.get<MessageDetail>(`/messages/${message.id}`)
     if (selectedMessage.value?.id === message.id) {

@@ -84,6 +84,10 @@ class MessageMerge(BaseModel):
     message_ids: List[int]  # 要合并的消息 ID 列表，第一个为目标消息
 
 
+class MessageSplit(BaseModel):
+    media_ids: List[int]
+
+
 class MessageDatesResponse(BaseModel):
     dates: List[MessageDateCount]
 

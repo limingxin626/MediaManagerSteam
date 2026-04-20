@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from app.models import get_db, Message, MessageMedia, Tag, message_tag
 from app.schemas.message import (
-    MessageCreate, MessageCreateFromClient, MessageUpdate, MessageMerge,
+    MessageCreate, MessageCreateFromClient, MessageUpdate, MessageMerge, MessageSplit,
     MessageResponse, MessageDetailResponse,
     MessageMediaItem, MessageTagItem,
     CursorResponse, MessageDetailCursorResponse,
@@ -530,6 +530,69 @@ def merge_messages(
     db.commit()
     db.refresh(target)
     return _build_detail_response(db, target, media_limit=None)
+
+
+@router.post("/{message_id}/split", response_model=MessageDetailResponse)
+def split_message(
+    message_id: int,
+    split_data: MessageSplit,
+    db: Session = Depends(get_db),
+):
+    """拆分消息：将选中的媒体移动到新消息中，复制 text/actor/starred/tags。"""
+    source = db.query(Message).filter(Message.id == message_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    media_ids_set = set(split_data.media_ids)
+    relations = (
+        db.query(MessageMedia)
+        .filter(MessageMedia.message_id == message_id)
+        .order_by(MessageMedia.position)
+        .all()
+    )
+    source_media_ids = {r.media_id for r in relations}
+    if not media_ids_set.issubset(source_media_ids):
+        raise HTTPException(status_code=422, detail="部分 media_id 不属于该消息")
+    if len(media_ids_set) == len(relations):
+        raise HTTPException(status_code=422, detail="不能拆分全部媒体，至少保留一个")
+
+    nearby_count = (
+        db.query(func.count(Message.id))
+        .filter(
+            Message.created_at > source.created_at,
+            Message.created_at <= source.created_at + timedelta(seconds=30),
+        )
+        .scalar()
+    )
+
+    new_msg = Message(
+        text=source.text,
+        actor_id=source.actor_id,
+        starred=source.starred,
+        created_at=source.created_at + timedelta(seconds=nearby_count + 1),
+    )
+    db.add(new_msg)
+    db.flush()
+
+    # 复制 tags
+    for tag in source.tags:
+        new_msg.tags.append(tag)
+
+    # 移动选中的 media 到新 message，重新编号 position
+    new_pos = 0
+    src_pos = 0
+    for rel in relations:
+        if rel.media_id in media_ids_set:
+            rel.message_id = new_msg.id
+            rel.position = new_pos
+            new_pos += 1
+        else:
+            rel.position = src_pos
+            src_pos += 1
+
+    db.commit()
+    db.refresh(new_msg)
+    return _build_detail_response(db, new_msg, media_limit=None)
 
 
 @router.delete("/{message_id}", status_code=204)
