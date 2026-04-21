@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, nextTick, type Ref } from 'vue'
 import type { TagItem } from '../types'
 import { getPinyinInitials } from '../utils/pinyinInitial'
 
@@ -11,6 +11,7 @@ export function useTagAutocomplete(
   const tagSuggestionVisible = ref(false)
   const tagSuggestionIndex = ref(0)
   const tagSuggestionPosition = ref({ top: 0, left: 0 })
+  const suggestionListRef = ref<HTMLElement | null>(null)
   let currentTagStart = -1
   
   // 存储最近使用的标签ID，按使用顺序排列（最近的在前）
@@ -107,7 +108,7 @@ export function useTagAutocomplete(
       for (const tag of allTagList) {
         if (!textMatched.has(tag.id)) {
           const initials = getPinyinInitials(tag.name)
-          if (initials.startsWith(query)) {
+          if (initials.includes(query)) {
             pinyinResults.push(tag)
           }
         }
@@ -161,6 +162,15 @@ export function useTagAutocomplete(
     }
   }
 
+  const scrollToActiveItem = () => {
+    nextTick(() => {
+      const list = suggestionListRef.value
+      if (!list) return
+      const item = list.children[tagSuggestionIndex.value] as HTMLElement | undefined
+      item?.scrollIntoView({ block: 'nearest' })
+    })
+  }
+
   // Returns true if the key event was handled (caller should return early)
   const onKeydown = (e: KeyboardEvent): boolean => {
     if (!tagSuggestionVisible.value) return false
@@ -168,11 +178,13 @@ export function useTagAutocomplete(
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       tagSuggestionIndex.value = Math.min(tagSuggestionIndex.value + 1, tagSuggestions.value.length - 1)
+      scrollToActiveItem()
       return true
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault()
       tagSuggestionIndex.value = Math.max(tagSuggestionIndex.value - 1, 0)
+      scrollToActiveItem()
       return true
     }
     if (e.key === 'Enter' || e.key === 'Tab') {
@@ -223,6 +235,7 @@ export function useTagAutocomplete(
     tagSuggestionVisible,
     tagSuggestionIndex,
     tagSuggestionPosition,
+    suggestionListRef,
     onInput,
     onKeydown,
     selectTag,

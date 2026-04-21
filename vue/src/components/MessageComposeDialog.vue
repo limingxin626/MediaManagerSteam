@@ -21,6 +21,7 @@
 
       <!-- Tag Suggestions -->
       <div v-if="tag.tagSuggestionVisible.value && tag.tagSuggestions.value.length > 0"
+        ref="tagSuggestionListEl"
         class="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[100]"
         :style="{ top: tag.tagSuggestionPosition.value.top + 'px', left: tag.tagSuggestionPosition.value.left + 'px', transform: 'translateY(-100%)' }">
         <div v-for="(t, index) in tag.tagSuggestions.value" :key="t.id" @click="tag.selectTag(t)"
@@ -171,6 +172,8 @@ let dragId: number | null = null
 let dragType: 'existing' | 'new' = 'existing'
 
 const tag = useTagAutocomplete(textareaRef, text, computed(() => props.allTags || []))
+const tagSuggestionListEl = ref<HTMLElement | null>(null)
+watch(tagSuggestionListEl, (el) => { tag.suggestionListRef.value = el })
 
 const canSubmit = computed(() => {
   if (submitting.value) return false

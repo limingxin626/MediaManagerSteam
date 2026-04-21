@@ -12,17 +12,23 @@
       <div class="p-2 border-b border-[var(--border-color)]">
         <input ref="searchRef" v-model="search" type="text" placeholder="搜索标签..."
           class="w-full px-2 py-1 text-sm bg-transparent border border-[var(--border-color)] rounded focus:outline-none focus:border-[var(--color-primary-500)] text-[var(--text-primary)]"
-          @click.stop />
+          @click.stop @keydown="onKeydown" />
       </div>
-      <div class="max-h-48 overflow-y-auto py-1">
-        <button v-for="tag in filteredTags" :key="tag.id" @click.stop="selectTag(tag)"
+      <div ref="listRef" class="max-h-48 overflow-y-auto py-1">
+        <button v-for="(tag, index) in filteredTags" :key="tag.id" @click.stop="selectTag(tag)"
           class="w-full px-3 py-1.5 text-left text-sm transition-colors flex items-center justify-between"
-          :class="existingTagNames.has(tag.name)
-            ? 'text-gray-400 dark:text-gray-500'
-            : 'text-[var(--text-primary)] hover:bg-gray-100 dark:hover:bg-white/10'">
+          :class="[
+            existingTagNames.has(tag.name)
+              ? 'text-gray-400 dark:text-gray-500'
+              : index === activeIndex
+                ? 'bg-indigo-600 text-white'
+                : 'text-[var(--text-primary)] hover:bg-gray-100 dark:hover:bg-white/10'
+          ]">
           <span class="truncate">#{{ tag.name }}</span>
-          <span v-if="existingTagNames.has(tag.name)" class="text-xs text-gray-400 shrink-0 ml-1">已添加</span>
-          <span v-else class="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-1">{{ tag.message_count }}</span>
+          <span v-if="existingTagNames.has(tag.name)" class="text-xs shrink-0 ml-1"
+            :class="index === activeIndex ? 'text-indigo-200' : 'text-gray-400'">已添加</span>
+          <span v-else class="text-xs shrink-0 ml-1"
+            :class="index === activeIndex ? 'text-indigo-200' : 'text-gray-400 dark:text-gray-500'">{{ tag.message_count }}</span>
         </button>
         <div v-if="filteredTags.length === 0" class="px-3 py-2 text-sm text-gray-400">无匹配标签</div>
       </div>
@@ -46,8 +52,10 @@ const emit = defineEmits<{
 
 const open = ref(false)
 const search = ref('')
+const activeIndex = ref(0)
 const popoverRef = ref<HTMLElement | null>(null)
 const searchRef = ref<HTMLInputElement | null>(null)
+const listRef = ref<HTMLElement | null>(null)
 
 const existingTagNames = computed(() => new Set(props.messageTags.map(t => t.name)))
 
@@ -58,14 +66,44 @@ const filteredTags = computed(() => {
   const textMatched = sorted.filter(t => t.name.toLowerCase().includes(q))
   if (!(/^[a-z]+$/.test(q))) return textMatched
   const textIds = new Set(textMatched.map(t => t.id))
-  const pinyinMatched = sorted.filter(t => !textIds.has(t.id) && getPinyinInitials(t.name).startsWith(q))
+  const pinyinMatched = sorted.filter(t => !textIds.has(t.id) && getPinyinInitials(t.name).includes(q))
   return [...textMatched, ...pinyinMatched]
 })
 
+watch(filteredTags, (newList) => {
+  if (activeIndex.value >= newList.length) activeIndex.value = Math.max(newList.length - 1, 0)
+})
+
+const scrollToActive = () => {
+  nextTick(() => {
+    const list = listRef.value
+    if (!list) return
+    const item = list.children[activeIndex.value] as HTMLElement | undefined
+    item?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
+const onKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    activeIndex.value = Math.min(activeIndex.value + 1, filteredTags.value.length - 1)
+    scrollToActive()
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    activeIndex.value = Math.max(activeIndex.value - 1, 0)
+    scrollToActive()
+  } else if (e.key === 'Enter') {
+    e.preventDefault()
+    const tag = filteredTags.value[activeIndex.value]
+    if (tag) selectTag(tag)
+  } else if (e.key === 'Escape') {
+    open.value = false
+  }
+}
+
 const selectTag = (tag: TagWithCount) => {
+  if (existingTagNames.value.has(tag.name)) return
   emit('select', tag)
-  open.value = false
-  search.value = ''
 }
 
 watch(open, (val) => {
@@ -73,6 +111,7 @@ watch(open, (val) => {
     nextTick(() => searchRef.value?.focus())
   } else {
     search.value = ''
+    activeIndex.value = 0
   }
 })
 
