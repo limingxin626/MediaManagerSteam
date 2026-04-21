@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models import get_db, Actor, Message
 from typing import List, Optional
-from app.schemas.actor import ActorResponse, ActorSyncResponse
+from app.schemas.actor import ActorResponse, ActorSyncResponse, ActorListResponse
 from app.config import config
 
 router = APIRouter(prefix="/actors", tags=["actors"])
@@ -24,7 +24,7 @@ def sync_actors(db: Session = Depends(get_db)):
     ]
 
 
-@router.get("", response_model=List[ActorResponse])
+@router.get("", response_model=ActorListResponse)
 def get_actors(
     name: Optional[str] = None,
     db: Session = Depends(get_db)
@@ -36,12 +36,14 @@ def get_actors(
         query = query.filter(Actor.name.ilike(f"%{name}%"))
 
     actors = query.all()
+
+    no_actor_count = db.query(func.count(Message.id)).filter(Message.actor_id.is_(None)).scalar() or 0
+
     if not actors:
-        return []
+        return ActorListResponse(items=[], no_actor_count=no_actor_count)
 
     actor_ids = [a.id for a in actors]
 
-    # 批量获取各演员的消息数，避免 N+1
     counts = (
         db.query(Message.actor_id, func.count(Message.id).label("cnt"))
         .filter(Message.actor_id.in_(actor_ids))
@@ -64,9 +66,8 @@ def get_actors(
                 updated_at=actor.updated_at.isoformat()
             ))
 
-    # 按消息数量倒序排列
     result.sort(key=lambda x: x.message_count, reverse=True)
 
-    return result
+    return ActorListResponse(items=result, no_actor_count=no_actor_count)
 
 

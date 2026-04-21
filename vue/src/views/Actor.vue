@@ -5,6 +5,17 @@
       <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">演员列表</div>
       <div class="flex flex-col gap-0.5 px-2 pb-4">
         <button
+          v-if="noActorCount > 0 || selectedActorId === 0"
+          @click="selectActor(0)"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
+          :class="selectedActorId === 0
+            ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
+        >
+          <span class="truncate">无</span>
+          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ noActorCount }}</span>
+        </button>
+        <button
           v-for="actor in actorsData"
           :key="actor.id"
           @click="selectActor(actor.id)"
@@ -111,7 +122,7 @@
 
       <!-- Input Area at Bottom -->
       <MessageCompose
-        v-if="selectedActorId != null"
+        v-if="selectedActorId != null && selectedActorId !== 0"
         :actor-id="selectedActorId"
         @sent="onMessageSent"
       />
@@ -161,6 +172,7 @@ const { confirm } = useConfirm()
 
 const pageSize = 20
 const actorsData = ref<Actor[]>([])
+const noActorCount = ref(0)
 const loading = ref(false)
 
 const filterName = ref('')
@@ -203,13 +215,14 @@ const fetchActors = async (reset = false) => {
 
   loading.value = true
   try {
-    const data = await api.get<Actor[]>('/actors', {
+    const data = await api.get<{ items: Actor[]; no_actor_count: number }>('/actors', {
       name: filterName.value || undefined,
     })
 
-    actorsData.value = data
+    actorsData.value = data.items
+    noActorCount.value = data.no_actor_count
 
-    if (actorsData.value.length > 0 && !selectedActorId.value) {
+    if (actorsData.value.length > 0 && selectedActorId.value == null) {
       selectActor(actorsData.value[0]!.id)
     }
   } catch (error) {
@@ -233,7 +246,7 @@ const selectActor = (id: number) => {
 // --- Fetch Messages ---
 
 const fetchMessages = async (reset = false) => {
-  if (!selectedActorId.value) return
+  if (selectedActorId.value == null) return
 
   if (reset) {
     messages.value = []

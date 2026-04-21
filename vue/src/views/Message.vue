@@ -5,7 +5,7 @@
       <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">标签</div>
       <div class="flex flex-col gap-0.5 px-2 pb-4">
         <button @click="selectTag(null)"
-          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === null
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === null && selectedActorId === null
             ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
           <span>全部</span>
@@ -30,6 +30,34 @@
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Actor List -->
+      <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">演员</div>
+      <div class="flex flex-col gap-0.5 px-2 pb-4">
+        <button
+          v-if="noActorCount > 0 || selectedActorId === 0"
+          @click="selectActor(0)"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
+          :class="selectedActorId === 0
+            ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
+        >
+          <span class="truncate">无</span>
+          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ noActorCount }}</span>
+        </button>
+        <button
+          v-for="actor in actors"
+          :key="actor.id"
+          @click="selectActor(actor.id)"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
+          :class="selectedActorId === actor.id
+            ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
+        >
+          <span class="truncate">{{ actor.name }}</span>
+          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ actor.message_count }}</span>
+        </button>
       </div>
     </div>
 
@@ -310,7 +338,7 @@
 
       <MessageComposeDialog :visible="dialogVisible" :mode="dialogMode" :message-id="dialogMessageId"
         :initial-text="dialogInitialText" :initial-date="dialogInitialDate" :initial-media="dialogInitialMedia"
-        :all-tags="tags" :tag-id="selectedTagId ?? null" :actor-id="undefined" @close="dialogVisible = false"
+        :all-tags="tags" :tag-id="selectedTagId ?? null" :actor-id="selectedActorId ?? undefined" @close="dialogVisible = false"
         @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" />
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
@@ -327,7 +355,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { renderMarkdown } from '../utils/markdown'
 import { Calendar } from 'v-calendar'
 import 'v-calendar/style.css'
-import { type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
+import { type Actor, type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import SearchInput from '../components/SearchInput.vue'
@@ -369,6 +397,7 @@ const loadCalendarMonth = async (year: number, month: number) => {
       year,
       month,
       tag_id: selectedTagId.value ?? undefined,
+      actor_id: selectedActorId.value ?? undefined,
       query_text: searchQuery.value || undefined,
     })
     const dateSet = new Set(data.dates.map(d => d.date))
@@ -424,6 +453,7 @@ const jumpToDate = async (dateStr: string) => {
         media_id: activeMediaFilter.value ?? undefined,
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
+        actor_id: selectedActorId.value ?? undefined,
       },
     )
 
@@ -462,6 +492,10 @@ const onDocumentClick = (e: MouseEvent) => {
 const tags = ref<TagWithCount[]>([])
 const selectedTagId = ref<number | null>(null)
 
+const actors = ref<Actor[]>([])
+const noActorCount = ref(0)
+const selectedActorId = ref<number | null>(null)
+
 const fetchTags = async () => {
   try {
     tags.value = await api.get<TagWithCount[]>('/tags')
@@ -470,12 +504,28 @@ const fetchTags = async () => {
   }
 }
 
+const fetchActors = async () => {
+  try {
+    const data = await api.get<{ items: Actor[]; no_actor_count: number }>('/actors')
+    actors.value = data.items
+    noActorCount.value = data.no_actor_count
+  } catch {
+    // silent fail
+  }
+}
+
 const selectTag = (tagId: number | null) => {
-  // 虚拟标签（ID 为负数）不触发筛选
   if (tagId !== null && tagId < 0) {
     return
   }
   selectedTagId.value = tagId
+  selectedActorId.value = null
+  resetAndFetch()
+}
+
+const selectActor = (actorId: number | null) => {
+  selectedActorId.value = actorId
+  selectedTagId.value = null
   resetAndFetch()
 }
 
@@ -612,6 +662,7 @@ const fetchForwardMessages = async () => {
       media_id: activeMediaFilter.value ?? undefined,
       starred: starredFilter.value || undefined,
       tag_id: selectedTagId.value ?? undefined,
+      actor_id: selectedActorId.value ?? undefined,
     })
 
     const container = scrollContainer.value
@@ -797,6 +848,7 @@ const fetchMessages = async (isLoadingMore = false) => {
         media_id: activeMediaFilter.value ?? undefined,
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
+        actor_id: selectedActorId.value ?? undefined,
       },
     )
 
@@ -1161,6 +1213,7 @@ const teardownObservers = () => {
 
 onMounted(() => {
   fetchTags()
+  fetchActors()
   fetchMessages()
   setupObservers()
   scrollContainer.value?.addEventListener('scroll', onScrollForDate, { passive: true })

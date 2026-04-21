@@ -391,7 +391,7 @@ const visibleTagChips = computed(() => {
     : props.message.text
   return messageTags.value.filter(tag => {
     const escaped = tag.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    return !new RegExp(`#${escaped}(?![\\w\\u4e00-\\u9fff])`).test(text)
+    return !new RegExp(`#${escaped}(?![\\w\\u4e00-\\u9fff\\u3400-\\u4dbf/\\-])`).test(text)
   })
 })
 
@@ -408,7 +408,7 @@ const remainingCount = computed(() => {
 const renderedText = computed(() => {
   if (!props.message.text) return ''
   const html = renderMarkdown(props.message.text)
-  return html.replace(/(^|(?<=(?:>|;|\s)))#([\w\u4e00-\u9fff]+)/g, '$1<span class="hashtag-inline">#$2</span>')
+  return html.replace(/(^|(?<=(?:>|;|\s)))#([\w\u4e00-\u9fff\u3400-\u4dbf/\-]+)/g, '$1<span class="hashtag-inline">#$2</span>')
 })
 
 // Mosaic layout — 使用容器虚拟宽度 400px 计算

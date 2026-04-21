@@ -43,8 +43,11 @@ def _build_detail_query(
 ):
     """공통 필터만 적용한 Message 쿼리를 반환 (정렬·커서 없음)."""
     query = db.query(Message)
-    if actor_id:
-        query = query.filter(Message.actor_id == actor_id)
+    if actor_id is not None:
+        if actor_id == 0:
+            query = query.filter(Message.actor_id.is_(None))
+        else:
+            query = query.filter(Message.actor_id == actor_id)
     if query_text:
         query = query.filter(Message.text.ilike(f"%{query_text}%"))
     if media_id:
@@ -238,8 +241,11 @@ def get_message_dates(
     date_label = func.strftime('%Y-%m-%d', Message.created_at).label('date_str')
     query = db.query(date_label, func.count().label('cnt'))
 
-    if actor_id:
-        query = query.filter(Message.actor_id == actor_id)
+    if actor_id is not None:
+        if actor_id == 0:
+            query = query.filter(Message.actor_id.is_(None))
+        else:
+            query = query.filter(Message.actor_id == actor_id)
     if query_text:
         query = query.filter(Message.text.ilike(f"%{query_text}%"))
     if media_id:

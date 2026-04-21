@@ -25,6 +25,11 @@ class ActorDetailResponse(ActorResponse):
     messages: List[dict]
 
 
+class ActorListResponse(BaseModel):
+    items: List[ActorResponse]
+    no_actor_count: int
+
+
 class ActorSyncResponse(BaseModel):
     id: int
     name: str

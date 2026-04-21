@@ -6,7 +6,7 @@
       <Message v-show="route.path === '/'" />
       <router-view v-slot="{ Component }">
         <Transition name="route" mode="out-in">
-          <keep-alive :include="['Media', 'Actor']">
+          <keep-alive :include="['Media']">
             <component :is="Component" />
           </keep-alive>
         </Transition>
