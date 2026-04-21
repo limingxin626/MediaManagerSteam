@@ -157,7 +157,7 @@
                   class="flex justify-center py-2">
                   <span class="px-3 py-1 text-xs text-[var(--text-secondary)] bg-[var(--bg-card)]/80 dark:bg-white/10 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-sm">{{ formatDateLabel(message.created_at) }}</span>
                 </div>
-                <div :data-message-date="message.created_at.substring(0, 10)">
+                <div :data-message-id="message.id" :data-message-date="message.created_at.substring(0, 10)">
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
                     :all-tags="tags"
                     :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
@@ -496,6 +496,95 @@ const actors = ref<Actor[]>([])
 const noActorCount = ref(0)
 const selectedActorId = ref<number | null>(null)
 
+interface FilterScrollCache {
+  messageId: number
+  scrollOffset: number
+  nextCursor: string | null
+  cachedMessages: MessageDetail[]
+  hasMoreData: boolean
+  forwardCursor: string | null
+  hasMoreForward: boolean
+}
+
+const scrollPositionCache = new Map<string, FilterScrollCache>()
+
+const getFilterKey = (): string => {
+  if (selectedTagId.value !== null) return `tag:${selectedTagId.value}`
+  if (selectedActorId.value !== null) return `actor:${selectedActorId.value}`
+  return 'all'
+}
+
+const getFirstVisibleMessageId = (): { messageId: number; scrollOffset: number } | null => {
+  const container = scrollContainer.value
+  if (!container) return null
+  const containerRect = container.getBoundingClientRect()
+  const elements = container.querySelectorAll<HTMLElement>('[data-message-id]')
+  for (const el of elements) {
+    const rect = el.getBoundingClientRect()
+    if (rect.bottom > containerRect.top) {
+      return { messageId: parseInt(el.dataset.messageId!), scrollOffset: rect.top - containerRect.top }
+    }
+  }
+  return null
+}
+
+const saveScrollPosition = () => {
+  const visible = getFirstVisibleMessageId()
+  if (!visible) return
+  const key = getFilterKey()
+  scrollPositionCache.set(key, {
+    messageId: visible.messageId,
+    scrollOffset: visible.scrollOffset,
+    nextCursor: nextCursor.value,
+    cachedMessages: [...messages.value],
+    hasMoreData: hasMoreData.value,
+    forwardCursor: forwardCursor.value,
+    hasMoreForward: hasMoreForward.value,
+  })
+}
+
+const restoreFromCache = (key: string): boolean => {
+  const cached = scrollPositionCache.get(key)
+  if (!cached) return false
+  messages.value = [...cached.cachedMessages]
+  nextCursor.value = cached.nextCursor
+  hasMoreData.value = cached.hasMoreData
+  forwardCursor.value = cached.forwardCursor
+  hasMoreForward.value = cached.hasMoreForward
+  isViewingHistory.value = false
+  nextTick(() => {
+    const container = scrollContainer.value
+    if (!container) return
+    const el = container.querySelector<HTMLElement>(`[data-message-id="${cached.messageId}"]`)
+    if (el) {
+      const containerRect = container.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      container.scrollTo({ top: container.scrollTop + (elRect.top - containerRect.top) - cached.scrollOffset, behavior: 'auto' })
+    }
+  })
+  return true
+}
+
+const SCROLL_POS_KEY = 'msg_scroll_pos'
+
+const saveScrollPositionToStorage = () => {
+  const visible = getFirstVisibleMessageId()
+  if (!visible || messages.value.length === 0) return
+  const msg = messages.value.find(m => m.id === visible.messageId)
+  if (!msg) return
+  localStorage.setItem(SCROLL_POS_KEY, JSON.stringify({
+    messageId: msg.id,
+    createdAt: msg.created_at,
+    scrollOffset: visible.scrollOffset,
+  }))
+}
+
+let scrollSaveTimer: ReturnType<typeof setTimeout> | null = null
+const debouncedSaveToStorage = () => {
+  if (scrollSaveTimer) clearTimeout(scrollSaveTimer)
+  scrollSaveTimer = setTimeout(saveScrollPositionToStorage, 500)
+}
+
 const fetchTags = async () => {
   try {
     tags.value = await api.get<TagWithCount[]>('/tags')
@@ -518,15 +607,21 @@ const selectTag = (tagId: number | null) => {
   if (tagId !== null && tagId < 0) {
     return
   }
+  saveScrollPosition()
   selectedTagId.value = tagId
   selectedActorId.value = null
-  resetAndFetch()
+  if (!restoreFromCache(getFilterKey())) {
+    resetAndFetch()
+  }
 }
 
 const selectActor = (actorId: number | null) => {
+  saveScrollPosition()
   selectedActorId.value = actorId
   selectedTagId.value = null
-  resetAndFetch()
+  if (!restoreFromCache(getFilterKey())) {
+    resetAndFetch()
+  }
 }
 
 // 计算标签树结构，支持二级标签
@@ -1214,17 +1309,94 @@ const teardownObservers = () => {
 onMounted(() => {
   fetchTags()
   fetchActors()
-  fetchMessages()
-  setupObservers()
+  const saved = localStorage.getItem(SCROLL_POS_KEY)
+  if (saved) {
+    try {
+      const { messageId, createdAt, scrollOffset } = JSON.parse(saved) as { messageId: number; createdAt: string; scrollOffset?: number }
+      const backwardCursor = createdAt.includes('.') ? createdAt : createdAt + '.999999'
+      loading.value = true
+      Promise.all([
+        api.get<{ items: MessageDetail[]; next_cursor: string | null; has_more: boolean }>(
+          '/messages/with-detail',
+          {
+            limit: pageSize,
+            cursor: backwardCursor,
+            query_text: searchQuery.value || undefined,
+            media_id: activeMediaFilter.value ?? undefined,
+            starred: starredFilter.value || undefined,
+            tag_id: selectedTagId.value ?? undefined,
+            actor_id: selectedActorId.value ?? undefined,
+          },
+        ),
+        api.get<{ items: MessageDetail[]; next_cursor: string | null; has_more: boolean }>(
+          '/messages/with-detail',
+          {
+            limit: pageSize,
+            cursor: createdAt,
+            query_text: searchQuery.value || undefined,
+            media_id: activeMediaFilter.value ?? undefined,
+            starred: starredFilter.value || undefined,
+            tag_id: selectedTagId.value ?? undefined,
+            actor_id: selectedActorId.value ?? undefined,
+            direction: 'forward',
+          },
+        ),
+      ]).then(([backwardData, forwardData]) => {
+        const allItems = [...backwardData.items.reverse(), ...forwardData.items]
+        const seen = new Set<number>()
+        messages.value = allItems.filter(m => {
+          if (seen.has(m.id)) return false
+          seen.add(m.id)
+          return true
+        })
+        nextCursor.value = backwardData.next_cursor
+        hasMoreData.value = backwardData.has_more
+        if (forwardData.items.length > 0) {
+          const lastMsg = forwardData.items[forwardData.items.length - 1]
+          forwardCursor.value = lastMsg.created_at
+          hasMoreForward.value = forwardData.has_more
+          isViewingHistory.value = true
+        } else {
+          forwardCursor.value = null
+          hasMoreForward.value = false
+        }
+        nextTick(() => {
+          const container = scrollContainer.value
+          if (!container) return
+          const el = container.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
+          if (el) {
+            const containerRect = container.getBoundingClientRect()
+            const elRect = el.getBoundingClientRect()
+            container.scrollTo({ top: container.scrollTop + (elRect.top - containerRect.top) - (scrollOffset ?? 0), behavior: 'auto' })
+          }
+          setupObservers()
+        })
+      }).catch(() => {
+        fetchMessages()
+        setupObservers()
+      }).finally(() => {
+        loading.value = false
+      })
+    } catch {
+      fetchMessages()
+      setupObservers()
+    }
+  } else {
+    fetchMessages()
+    setupObservers()
+  }
   scrollContainer.value?.addEventListener('scroll', onScrollForDate, { passive: true })
+  scrollContainer.value?.addEventListener('scroll', debouncedSaveToStorage, { passive: true })
   document.addEventListener('click', onDocumentClick, true)
 })
 
 onUnmounted(() => {
   teardownObservers()
   scrollContainer.value?.removeEventListener('scroll', onScrollForDate)
+  scrollContainer.value?.removeEventListener('scroll', debouncedSaveToStorage)
   document.removeEventListener('click', onDocumentClick, true)
   if (scrollRaf) cancelAnimationFrame(scrollRaf)
+  if (scrollSaveTimer) clearTimeout(scrollSaveTimer)
 })
 
 // Update floating date after messages change
