@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func, Integer
-from app.models import get_db, Media, MessageMedia, Message, message_tag
-from typing import Optional, Literal
+from app.models import get_db, Media, MessageMedia, Message, Tag, message_tag, media_tag
+from typing import Optional, List, Literal
 from app.schemas.media import MediaResponse, MediaCursorResponse, TimelineItem
 from app.config import AppConfig
 from app.services.media_service import rotate_media
@@ -20,6 +20,8 @@ def get_media(
     message_id: Optional[int] = None,
     starred: Optional[bool] = Query(None),
     type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
+    tag_id: Optional[int] = Query(None, description="标签 ID"),
+    actor_id: Optional[int] = Query(None, description="演员 ID"),
     db: Session = Depends(get_db)
 ):
     """获取媒体列表（游标分页，显示所有媒体）"""
@@ -52,6 +54,21 @@ def get_media(
             query = query.filter(Media.mime_type.like('video/%'))
         elif type == 'image':
             query = query.filter(Media.mime_type.like('image/%'))
+
+        if tag_id is not None:
+            msg_ids = db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
+            media_ids_msg = db.query(MessageMedia.media_id.label('mid')).filter(MessageMedia.message_id.in_(msg_ids))
+            media_ids_direct = db.query(media_tag.c.media_id.label('mid')).filter(media_tag.c.tag_id == tag_id)
+            combined = media_ids_msg.union(media_ids_direct).subquery()
+            query = query.filter(Media.id.in_(db.query(combined.c.mid)))
+
+        if actor_id is not None:
+            media_ids_actor = (
+                db.query(MessageMedia.media_id)
+                .join(Message, Message.id == MessageMedia.message_id)
+                .filter(Message.actor_id == actor_id)
+            )
+            query = query.filter(Media.id.in_(media_ids_actor))
 
         # 游标格式："{created_at}|{id}"
         if cursor:
@@ -101,6 +118,8 @@ def get_media(
 def get_media_timeline(
     starred: Optional[bool] = Query(None),
     type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
+    tag_id: Optional[int] = Query(None),
+    actor_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
     year_col = func.cast(func.strftime('%Y', Media.created_at), Integer)
@@ -118,6 +137,21 @@ def get_media_timeline(
         query = query.filter(Media.mime_type.like('video/%'))
     elif type == 'image':
         query = query.filter(Media.mime_type.like('image/%'))
+
+    if tag_id is not None:
+        msg_ids = db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
+        media_ids_msg = db.query(MessageMedia.media_id.label('mid')).filter(MessageMedia.message_id.in_(msg_ids))
+        media_ids_direct = db.query(media_tag.c.media_id.label('mid')).filter(media_tag.c.tag_id == tag_id)
+        combined = media_ids_msg.union(media_ids_direct).subquery()
+        query = query.filter(Media.id.in_(db.query(combined.c.mid)))
+
+    if actor_id is not None:
+        media_ids_actor = (
+            db.query(MessageMedia.media_id)
+            .join(Message, Message.id == MessageMedia.message_id)
+            .filter(Message.actor_id == actor_id)
+        )
+        query = query.filter(Media.id.in_(media_ids_actor))
 
     rows = query.group_by('year', 'month').order_by(
         year_col.desc(), month_col.desc()
@@ -143,11 +177,14 @@ def get_media_feed(
     )
 
     if tag_id is not None:
-        query = query.filter(
-            Message.id.in_(
-                db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
-            )
+        msg_with_tag = db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
+        media_with_tag = (
+            db.query(MessageMedia.message_id)
+            .join(media_tag, MessageMedia.media_id == media_tag.c.media_id)
+            .filter(media_tag.c.tag_id == tag_id)
         )
+        combined = msg_with_tag.union(media_with_tag).subquery()
+        query = query.filter(Message.id.in_(db.query(combined.c.message_id)))
 
     if actor_id is not None:
         query = query.filter(Message.actor_id == actor_id)
@@ -227,6 +264,25 @@ def rotate_media_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class TagsRequest(BaseModel):
+    tag_ids: List[int]
+
+
+@router.put("/{media_id}/tags")
+def set_media_tags(
+    media_id: int,
+    body: TagsRequest,
+    db: Session = Depends(get_db)
+):
+    media = db.query(Media).filter(Media.id == media_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+    tags = db.query(Tag).filter(Tag.id.in_(body.tag_ids)).all()
+    media.tags = tags
+    db.commit()
+    return [{"id": t.id, "name": t.name, "category": t.category} for t in media.tags]
+
+
 @router.delete("/{media_id}")
 def delete_media(
     media_id: int,
@@ -252,6 +308,7 @@ def delete_media(
     file_path = media.file_path
 
     db.query(MessageMedia).filter(MessageMedia.media_id == media_id).delete()
+    db.execute(media_tag.delete().where(media_tag.c.media_id == media_id))
     db.delete(media)
     db.commit()
 
