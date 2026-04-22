@@ -266,7 +266,7 @@ const noActorCount = ref(0)
 
 const fetchTags = async () => {
   try {
-    tags.value = await api.get<TagWithCount[]>('/tags')
+    tags.value = await api.get<TagWithCount[]>('/tags?has_media=true')
   } catch {
   }
 }
