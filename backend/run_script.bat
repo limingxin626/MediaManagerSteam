@@ -1,14 +1,16 @@
 @echo off
-set DATA_ROOT=E:\AskTao\data
-set UPLOAD_DIR=E:\AskTao\Uploads
-set STATIC_DIRS=E:\AskTao
-set HOST=0.0.0.0
+set DATA_ROOT=./Data
+set UPLOAD_DIR=./Uploads
+set STATIC_DIRS=./Static
 set PORT=8002
-set FFMPEG_PATH=C:\Users\christluck\Documents\ffmpeg\bin\ffmpeg.exe
-set FFPROBE_PATH=C:\Users\christluck\Documents\ffmpeg\bin\ffprobe.exe
+set FFMPEG_PATH=C:\Users\jieli4\Documents\ffmpeg\bin\ffmpeg.exe
+set FFPROBE_PATH=C:\Users\jieli4\Documents\ffmpeg\bin\ffprobe.exe
 cd /d %~dp0
 
-
+if not exist "%DATA_ROOT%\db.sqlite3" (
+    echo 数据库不存在，正在初始化...
+    uv run alembic upgrade head
+)
 @REM uv run scripts/check_tags_consistency.py
 
 uv run scripts/rename_tag.py 正面 正常

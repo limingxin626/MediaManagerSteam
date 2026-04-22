@@ -342,9 +342,9 @@
         @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" />
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
-        :starred="previewMessageStarred" :message-id="previewMessageId" @close="closePreview" @navigate-prev="navigateToPrevMessage"
+        :starred="previewMessageStarred" :message-id="previewMessageId" :all-tags="tags" @close="closePreview" @navigate-prev="navigateToPrevMessage"
         @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @media-deleted="handleMediaDeleted"
-        @media-rotated="handleMediaRotated" />
+        @media-rotated="handleMediaRotated" @media-tags-changed="handleMediaTagsChanged" />
 
     </div>
   </div>
@@ -1037,6 +1037,18 @@ const handleMediaRotated = (mediaId: number) => {
       item.file_path = item.file_path.split('?')[0] + `?t=${t}`
     }
   }
+}
+
+const handleMediaTagsChanged = (mediaId: number, newTags: { id: number; name: string; category?: string | null }[]) => {
+  for (const msg of messages.value) {
+    if (!msg.media_items) continue
+    for (const item of msg.media_items) {
+      if (item.id === mediaId) {
+        item.tags = newTags
+      }
+    }
+  }
+  fetchTags()
 }
 
 const handleToggleMediaStar = async (mediaId: number, messageId?: number) => {

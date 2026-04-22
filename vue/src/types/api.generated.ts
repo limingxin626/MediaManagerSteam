@@ -730,6 +730,11 @@ export interface components {
             starred: boolean;
             /** View Count */
             view_count: number;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: components["schemas"]["MessageTagItem"][];
         };
         /** MessageCreate */
         MessageCreate: {
@@ -850,6 +855,11 @@ export interface components {
              * @default false
              */
             starred: boolean;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: components["schemas"]["MessageTagItem"][];
         };
         /** MessageMerge */
         MessageMerge: {

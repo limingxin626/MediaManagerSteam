@@ -37,7 +37,11 @@
       "Bash(npx vue-tsc:*)",
       "Bash(pip install:*)",
       "Bash(npx:*)",
-      "Bash(echo exit: $?:*)"
+      "Bash(echo exit: $?:*)",
+      "Bash(.venv/Scripts/alembic revision *)",
+      "Bash(ASKTAO_DATA_ROOT=E:/AskTao .venv/Scripts/alembic revision --autogenerate -m \"add_media_tag\")",
+      "Bash(DATA_ROOT=E:/AskTao .venv/Scripts/alembic revision *)",
+      "Bash(DATA_ROOT=E:/AskTao UPLOAD_DIR=E:/AskTao/uploads .venv/Scripts/alembic revision *)"
     ]
   }
 }

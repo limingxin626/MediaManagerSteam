@@ -84,26 +84,46 @@
             </svg>
           </button>
 
-          <div class="relative max-w-[90vw] max-h-[80vh]">
-            <video
-              v-if="currentItem && isVideo(currentItem.mime_type)"
-              ref="videoRef"
-              :src="getMediaUrl(currentItem)"
-              class="max-w-[90vw] max-h-[80vh] rounded-lg shadow-2xl"
-              :style="mediaTransformStyle"
-              controls
-              playsinline
-              loop
-              autoplay
-            ></video>
+          <div class="flex flex-col items-center gap-2 max-w-[90vw] max-h-[80vh]">
+            <div class="relative">
+              <video
+                v-if="currentItem && isVideo(currentItem.mime_type)"
+                ref="videoRef"
+                :src="getMediaUrl(currentItem)"
+                class="max-w-[90vw] max-h-[70vh] rounded-lg shadow-2xl"
+                :style="mediaTransformStyle"
+                controls
+                playsinline
+                loop
+                autoplay
+              ></video>
 
-            <img
-              v-else-if="currentItem && isImage(currentItem.mime_type)"
-              :src="getMediaUrl(currentItem)"
-              :alt="`Media ${currentIndex + 1}`"
-              class="max-w-[90vw] max-h-[80vh] object-contain rounded-lg shadow-2xl"
-              :style="mediaTransformStyle"
-            />
+              <img
+                v-else-if="currentItem && isImage(currentItem.mime_type)"
+                :src="getMediaUrl(currentItem)"
+                :alt="`Media ${currentIndex + 1}`"
+                class="max-w-[90vw] max-h-[70vh] object-contain rounded-lg shadow-2xl"
+                :style="mediaTransformStyle"
+              />
+            </div>
+
+            <!-- Media tags -->
+            <div v-if="currentItem" class="flex items-center gap-1.5 flex-wrap justify-center">
+              <span
+                v-for="tag in (currentItem.tags || [])"
+                :key="tag.id"
+                @click.stop="removeMediaTag(tag.id)"
+                class="px-2 py-0.5 text-xs rounded-full bg-white/15 text-white/90 hover:bg-red-500/40 hover:line-through cursor-pointer transition-colors"
+              >
+                #{{ tag.name }}
+              </span>
+              <TagPickerPopover
+                v-if="allTags.length"
+                :all-tags="allTags"
+                :message-tags="currentItem.tags || []"
+                @select="addMediaTag"
+              />
+            </div>
           </div>
 
           <!-- Next button (right) -->
@@ -200,10 +220,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import type { MessageMediaItem } from '../types'
+import type { MessageMediaItem, TagWithCount, TagItem } from '../types'
 import { isVideo, isImage, resolveUrl, rotateMedia } from '../utils/media'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
+import TagPickerPopover from './TagPickerPopover.vue'
 
 const toast = useToast()
 
@@ -223,11 +244,13 @@ interface Props {
   startIndex?: number
   starred?: boolean
   messageId?: number
+  allTags?: TagWithCount[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   startIndex: 0,
   starred: false,
+  allTags: () => [],
 })
 
 const emit = defineEmits<{
@@ -237,6 +260,7 @@ const emit = defineEmits<{
   'toggle-star': [mediaId: number]
   'media-deleted': [mediaId: number]
   'media-rotated': [mediaId: number]
+  'media-tags-changed': [mediaId: number, tags: TagItem[]]
 }>()
 
 const currentIndex = ref(props.startIndex)
@@ -301,6 +325,32 @@ async function confirmRotation() {
     toast.error('旋转失败')
   } finally {
     isRotating.value = false
+  }
+}
+
+async function addMediaTag(tag: TagWithCount) {
+  if (!currentItem.value) return
+  const existing = currentItem.value.tags || []
+  if (existing.some(t => t.id === tag.id)) return
+  const newTags = [...existing, { id: tag.id, name: tag.name, category: tag.category }]
+  try {
+    await api.put(`/media/${currentItem.value.id}/tags`, { tag_ids: newTags.map(t => t.id) })
+    currentItem.value.tags = newTags
+    emit('media-tags-changed', currentItem.value.id, newTags)
+  } catch {
+    toast.error('添加标签失败')
+  }
+}
+
+async function removeMediaTag(tagId: number) {
+  if (!currentItem.value) return
+  const newTags = (currentItem.value.tags || []).filter(t => t.id !== tagId)
+  try {
+    await api.put(`/media/${currentItem.value.id}/tags`, { tag_ids: newTags.map(t => t.id) })
+    currentItem.value.tags = newTags
+    emit('media-tags-changed', currentItem.value.id, newTags)
+  } catch {
+    toast.error('移除标签失败')
   }
 }
 

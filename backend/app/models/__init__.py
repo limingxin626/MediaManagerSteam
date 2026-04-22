@@ -19,6 +19,13 @@ message_tag = Table(
     Column('tag_id', Integer, ForeignKey('tag.id'), primary_key=True)
 )
 
+media_tag = Table(
+    'media_tag',
+    Base.metadata,
+    Column('media_id', Integer, ForeignKey('media.id'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tag.id'), primary_key=True)
+)
+
 class Message(Base):
     __tablename__ = "message"
 
@@ -57,6 +64,7 @@ class Tag(Base):
     category = Column(String(128), nullable=True, index=True)
 
     messages = relationship("Message", secondary=message_tag, back_populates="tags")
+    media_items = relationship("Media", secondary=media_tag, back_populates="tags")
 
     __table_args__ = (
         UniqueConstraint("name", name="uq_tag_name"),
@@ -81,6 +89,7 @@ class Media(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     message_media = relationship("MessageMedia", back_populates="media")
+    tags = relationship("Tag", secondary=media_tag, back_populates="media_items")
 
 class MessageMedia(Base):
     __tablename__ = "message_media"

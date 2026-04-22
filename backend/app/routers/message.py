@@ -4,7 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from app.models import get_db, Message, MessageMedia, Tag, message_tag
+from app.models import get_db, Message, MessageMedia, Tag, message_tag, media_tag
 from app.schemas.message import (
     MessageCreate, MessageCreateFromClient, MessageUpdate, MessageMerge, MessageSplit,
     MessageResponse, MessageDetailResponse,
@@ -23,6 +23,15 @@ router = APIRouter(prefix="/messages", tags=["messages"])
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _aggregate_tags(msg: Message) -> list:
+    tag_map = {t.id: t for t in msg.tags}
+    for mm in msg.message_media:
+        if mm.media:
+            for t in mm.media.tags:
+                tag_map.setdefault(t.id, t)
+    return [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in tag_map.values()]
+
 
 def _parse_cursor(cursor: Optional[str]) -> Optional[datetime]:
     if not cursor:
@@ -53,9 +62,14 @@ def _build_detail_query(
     if media_id:
         query = query.join(MessageMedia).filter(MessageMedia.media_id == media_id)
     if tag_id:
-        query = query.join(message_tag, Message.id == message_tag.c.message_id).filter(
-            message_tag.c.tag_id == tag_id
+        msg_with_tag = db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
+        media_with_tag = (
+            db.query(MessageMedia.message_id)
+            .join(media_tag, MessageMedia.media_id == media_tag.c.media_id)
+            .filter(media_tag.c.tag_id == tag_id)
         )
+        combined = msg_with_tag.union(media_with_tag)
+        query = query.filter(Message.id.in_(combined))
     if starred is not None:
         query = query.filter(Message.starred == (1 if starred else 0))
     return query
@@ -135,7 +149,7 @@ def _build_detail_response(
         media_items = media_by_msg.get(msg.id, [])
     else:
         media_items = _media_items_for(db, msg.id, limit=media_limit)
-    tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in msg.tags]
+    tags = _aggregate_tags(msg)
     actor_name = msg.actor.name if msg.actor else None
     return MessageDetailResponse(
         id=msg.id,
@@ -170,7 +184,7 @@ def _build_sync_response(db: Session, db_message: Message) -> MessageSyncRespons
         for r in relations
         if r.media
     ]
-    tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in db_message.tags]
+    tags = _aggregate_tags(db_message)
     return MessageSyncResponse(
         id=db_message.id,
         text=db_message.text,
@@ -251,9 +265,14 @@ def get_message_dates(
     if media_id:
         query = query.join(MessageMedia, Message.id == MessageMedia.message_id).filter(MessageMedia.media_id == media_id)
     if tag_id:
-        query = query.join(message_tag, Message.id == message_tag.c.message_id).filter(
-            message_tag.c.tag_id == tag_id
+        msg_with_tag = db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
+        media_with_tag = (
+            db.query(MessageMedia.message_id)
+            .join(media_tag, MessageMedia.media_id == media_tag.c.media_id)
+            .filter(media_tag.c.tag_id == tag_id)
         )
+        combined = msg_with_tag.union(media_with_tag)
+        query = query.filter(Message.id.in_(combined))
 
     query = query.filter(
         func.strftime('%Y', Message.created_at) == str(year),
@@ -288,7 +307,7 @@ def sync_messages(db: Session = Depends(get_db)):
     for msg in messages:
         relations = relations_by_msg.get(msg.id, [])
         media_items = [_sync_media_item(r) for r in relations if r.media]
-        tags = [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in msg.tags]
+        tags = _aggregate_tags(msg)
         results.append(MessageSyncResponse(
             id=msg.id,
             text=msg.text,

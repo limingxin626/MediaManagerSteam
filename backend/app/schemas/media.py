@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from app.schemas.base import TimestampMixin, MediaUrlMixin
+from app.schemas.message import MessageTagItem
 
 
 class MediaResponse(MediaUrlMixin, TimestampMixin):
@@ -12,6 +13,7 @@ class MediaResponse(MediaUrlMixin, TimestampMixin):
     rating: int
     starred: bool = False
     view_count: int
+    tags: List[MessageTagItem] = []
 
 
 class MediaDetailResponse(MediaResponse):

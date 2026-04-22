@@ -2,7 +2,7 @@ import re
 from typing import List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.models import Message, Tag, MessageMedia, message_tag
+from app.models import Message, Tag, MessageMedia, message_tag, media_tag
 
 
 def cleanup_orphan_tags(db: Session) -> int:
@@ -10,8 +10,12 @@ def cleanup_orphan_tags(db: Session) -> int:
     orphans = (
         db.query(Tag)
         .outerjoin(message_tag, Tag.id == message_tag.c.tag_id)
+        .outerjoin(media_tag, Tag.id == media_tag.c.tag_id)
         .group_by(Tag.id)
-        .having(func.count(message_tag.c.message_id) == 0)
+        .having(
+            func.count(message_tag.c.message_id) == 0,
+            func.count(media_tag.c.media_id) == 0
+        )
         .all()
     )
     for tag in orphans:

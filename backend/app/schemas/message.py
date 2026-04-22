@@ -39,9 +39,10 @@ class MessageMediaItem(MediaUrlMixin):
     height: int | None
     duration_ms: int | None
     starred: bool = False
+    tags: List['MessageTagItem'] = []
 
 
-class MessageTagItem(BaseModel):
+class MessageTagItem(OrmBase):
     id: int
     name: str
     category: str | None = None
