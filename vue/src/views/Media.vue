@@ -185,14 +185,14 @@
         <div ref="sentinel" class="h-1"></div>
       </div>
 
-      <!-- Timeline Bar -->
-      <TimelineBar
+      <!-- Date Scrubber -->
+      <DateScrubber
         v-if="timeline.length"
         :timeline="timeline"
-        :current-year="currentYear"
-        :current-month="currentMonth"
-        :compact="isCompact"
-        @jump="handleTimelineJump"
+        :min-date="timelineMinDate"
+        :max-date="timelineMaxDate"
+        :current-date="currentScrollDate"
+        @jump="handleDateScrubberJump"
       />
 
       <!-- Back to Latest -->
@@ -226,8 +226,8 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import MediaPreview from '../components/MediaPreview.vue'
-import TimelineBar from '../components/TimelineBar.vue'
-import type { TimelineEntry } from '../components/TimelineBar.vue'
+import DateScrubber from '../components/DateScrubber.vue'
+import type { TimelineEntry } from '../components/DateScrubber.vue'
 import type { Media, CursorResponse, TagWithCount, Actor } from '../types'
 import { api, useInfiniteScroll } from '../composables/useApi'
 import { isVideo, formatDuration, resolveUrl, toggleMediaStar } from '../utils/media'
@@ -245,8 +245,6 @@ const starredFilter = ref(false)
 const sentinel = ref<HTMLElement | null>(null)
 const topSentinel = ref<HTMLElement | null>(null)
 const scrollContainer = ref<HTMLElement | null>(null)
-const isCompact = ref(window.innerWidth < 768)
-
 const previewOpen = ref(false)
 const previewItems = ref<any[]>([])
 const previewStartIndex = ref(0)
@@ -348,7 +346,7 @@ const tagTree = computed(() => {
 })
 
 // --- Downward (older) infinite scroll via composable ---
-const { items, loading, hasMore, reset, jumpToCursor, setupObserver } = useInfiniteScroll<Media>({
+const { items, loading, hasMore, reset, jumpToCursor, seedItems, setupObserver } = useInfiniteScroll<Media>({
   fetchFn: ({ cursor, limit }) => api.get<CursorResponse<Media>>('/media', {
     cursor,
     limit,
@@ -447,6 +445,19 @@ function resetBidirectionalState() {
 const timeline = ref<TimelineEntry[]>([])
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth() + 1)
+const currentScrollDate = ref(new Date())
+
+const timelineMinDate = computed(() => {
+  if (!timeline.value.length) return new Date()
+  const last = timeline.value[timeline.value.length - 1]
+  return new Date(last.year, last.month - 1, 1)
+})
+
+const timelineMaxDate = computed(() => {
+  if (!timeline.value.length) return new Date()
+  const first = timeline.value[0]
+  return new Date(first.year, first.month, 0, 23, 59, 59)
+})
 
 async function loadTimeline() {
   timeline.value = await api.get<TimelineEntry[]>('/media/timeline', {
@@ -479,6 +490,32 @@ async function handleTimelineJump(entry: TimelineEntry) {
   currentMonth.value = entry.month
 }
 
+async function handleDateScrubberJump(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const cursorDate = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T12:00:00`
+  const cursor = `${cursorDate}|999999999`
+
+  const data = await api.get<CursorResponse<Media>>('/media', {
+    cursor,
+    direction: 'around',
+    limit: 40,
+    ...mediaParams(),
+  })
+
+  resetBidirectionalState()
+  seedItems(data.items, data.next_cursor ?? null, data.has_more)
+
+  if (data.prev_cursor) {
+    prevCursor.value = data.prev_cursor
+    hasMoreBefore.value = data.has_more_before ?? false
+  }
+
+  isJumped.value = true
+  currentYear.value = date.getFullYear()
+  currentMonth.value = date.getMonth() + 1
+  currentScrollDate.value = date
+}
+
 // --- Month separators ---
 function getYearMonth(item: Media): string {
   if (!item.created_at) return ''
@@ -509,6 +546,7 @@ function onScroll() {
         const d = new Date(created)
         currentYear.value = d.getFullYear()
         currentMonth.value = d.getMonth() + 1
+        currentScrollDate.value = d
       }
       break
     }

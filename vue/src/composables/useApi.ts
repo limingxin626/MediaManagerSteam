@@ -160,9 +160,15 @@ export function useInfiniteScroll<T>(options: InfiniteScrollOptions<T>) {
     await load()
   }
 
+  const seedItems = (newItems: T[], cursor: string | null, more: boolean) => {
+    items.value = newItems
+    nextCursor.value = cursor
+    hasMore.value = more
+  }
+
   onUnmounted(() => {
     observer?.disconnect()
   })
 
-  return { items, loading, hasMore, load, reset, jumpToCursor, setupObserver }
+  return { items, loading, hasMore, load, reset, jumpToCursor, seedItems, setupObserver }
 }

@@ -77,7 +77,45 @@ def get_media(
                 cursor_time = datetime.fromisoformat(parts[0])
                 cursor_id = int(parts[1])
 
-                if direction == 'forward':
+                if direction == 'around':
+                    half = limit // 2
+                    q_before = query.filter(
+                        (Media.created_at > cursor_time) |
+                        ((Media.created_at == cursor_time) & (Media.id >= cursor_id))
+                    ).order_by(Media.created_at.asc(), Media.id.asc()).limit(half + 1).all()
+
+                    q_after = query.filter(
+                        (Media.created_at < cursor_time) |
+                        ((Media.created_at == cursor_time) & (Media.id < cursor_id))
+                    ).order_by(Media.created_at.desc(), Media.id.desc()).limit(limit - half + 1).all()
+
+                    has_more_before = len(q_before) > half
+                    before_items = q_before[:half]
+                    before_items.reverse()
+
+                    has_more = len(q_after) > (limit - half)
+                    after_items = q_after[:(limit - half)]
+
+                    items = before_items + after_items
+                    next_cursor = None
+                    prev_cursor = None
+                    if has_more and items:
+                        last = items[-1]
+                        next_cursor = f"{last.created_at.isoformat()}|{last.id}"
+                    if has_more_before and items:
+                        first = items[0]
+                        prev_cursor = f"{first.created_at.isoformat()}|{first.id}"
+
+                    result = [MediaResponse.model_validate(item) for item in items]
+                    return MediaCursorResponse(
+                        items=result,
+                        next_cursor=next_cursor,
+                        prev_cursor=prev_cursor,
+                        has_more=has_more,
+                        has_more_before=has_more_before,
+                    )
+
+                elif direction == 'forward':
                     query = query.filter(
                         (Media.created_at > cursor_time) |
                         ((Media.created_at == cursor_time) & (Media.id > cursor_id))
