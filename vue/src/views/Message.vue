@@ -240,11 +240,37 @@
       <div v-if="selectedMessage" class="flex-1 min-w-0 border-l border-[var(--border-color)] flex flex-col overflow-hidden">
         <!-- Header -->
         <div class="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
-          <span class="text-sm font-semibold text-gray-900 dark:text-white">消息详情</span>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-col min-w-0">
+            <span class="text-sm font-semibold text-gray-900 dark:text-white">消息详情</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatDateLabel(selectedMessage.created_at) }}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button @click="handleDetailToggleStar"
+              class="p-1.5 rounded transition-colors" :class="selectedMessage.starred
+                ? 'text-yellow-400'
+                : 'text-gray-400 hover:text-yellow-400'"
+              title="收藏">
+              <svg class="w-4 h-4" :fill="selectedMessage.starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+            </button>
+            <button @click="openEditDialog(selectedMessage.id)"
+              class="p-1.5 rounded text-gray-400 hover:text-blue-400 transition-colors" title="编辑">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button @click="handleDetailDelete"
+              class="p-1.5 rounded text-gray-400 hover:text-red-400 transition-colors" title="删除">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+            <div class="w-px h-4 bg-[var(--border-color)] mx-0.5"></div>
             <button v-if="selectedMessage.media_items && selectedMessage.media_items.length > 1"
               @click="toggleSplitMode"
-              class="p-1 rounded transition-colors" :class="splitMode
+              class="p-1.5 rounded transition-colors" :class="splitMode
                 ? 'text-[var(--color-primary-500)]'
                 : 'text-gray-400 hover:text-gray-200'"
               :title="splitMode ? '退出拆分' : '拆分媒体'">
@@ -256,7 +282,7 @@
               class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[var(--color-primary-500)]">
             </div>
             <button @click="selectedMessage = null"
-              class="p-1 text-gray-400 hover:text-gray-200 rounded transition-colors" title="关闭">
+              class="p-1.5 text-gray-400 hover:text-gray-200 rounded transition-colors" title="关闭">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -264,10 +290,17 @@
           </div>
         </div>
         <!-- Scrollable body -->
-        <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-5">
+          <!-- Actor -->
+          <div v-if="selectedMessage.actor_name" class="flex items-center gap-2.5">
+            <img :src="resolveUrl(`/data/actor_cover/${selectedMessage.actor_id}.webp`)"
+              class="w-8 h-8 rounded-full object-cover bg-gray-700"
+              @error="($event.target as HTMLImageElement).style.display = 'none'" />
+            <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ selectedMessage.actor_name }}</span>
+          </div>
           <!-- Full text -->
           <div v-if="selectedMessage.text"
-            class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300"
+            class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300 leading-relaxed"
             v-html="renderDetailText(selectedMessage.text)">
           </div>
           <!-- Tags -->
@@ -279,9 +312,13 @@
           </div>
           <!-- All media -->
           <div v-if="selectedMessage.media_items && selectedMessage.media_items.length > 0"
-            class="grid grid-cols-3 gap-1">
+            :class="[
+              'grid gap-1.5',
+              selectedMessage.media_items.length === 1 ? 'grid-cols-1' :
+              selectedMessage.media_items.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
+            ]">
             <div v-for="(media, index) in selectedMessage.media_items" :key="media.id"
-              class="group aspect-square overflow-hidden relative rounded cursor-pointer hover:opacity-90 transition-opacity"
+              class="group aspect-square overflow-hidden relative rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
               :class="splitMode && splitSelectedIds.has(media.id) ? 'ring-2 ring-[var(--color-primary-500)]' : ''"
               @click="handleSelectedMessageMediaClick(index)">
               <img :src="resolveUrl(media.thumb_url)" class="w-full h-full object-cover" />
@@ -331,8 +368,6 @@
               </button>
             </div>
           </div>
-          <!-- Date -->
-          <p class="text-xs text-gray-500">{{ formatDateLabel(selectedMessage.created_at) }}</p>
         </div>
       </div>
 
@@ -1227,6 +1262,21 @@ const handleMessageClick = async (message: MessageDetail) => {
   } finally {
     selectedMessageLoading.value = false
   }
+}
+
+const handleDetailToggleStar = async () => {
+  if (!selectedMessage.value) return
+  await handleToggleStar(selectedMessage.value.id)
+  if (selectedMessage.value) {
+    selectedMessage.value = { ...selectedMessage.value, starred: !selectedMessage.value.starred }
+  }
+}
+
+const handleDetailDelete = async () => {
+  if (!selectedMessage.value) return
+  const id = selectedMessage.value.id
+  await handleDeleteMessage(id)
+  selectedMessage.value = null
 }
 
 const renderDetailText = (text: string) => {
