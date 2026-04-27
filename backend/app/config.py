@@ -53,6 +53,8 @@ class AppConfig:
         "http://localhost",
         "http://127.0.0.1:5173",
         "http://localhost:5173",
+        "http://127.0.0.1:5174",
+        "http://localhost:5174",
         "http://127.0.0.1:8002",
         "http://localhost:8002",
     ]
@@ -175,6 +177,13 @@ class AppConfig:
     @classmethod
     def get_db_path(cls) -> str:
         return os.path.join(cls.DATA_ROOT, "db.sqlite3")
+
+    @classmethod
+    def get_dashboard_md_path(cls) -> str:
+        return os.path.join(cls.DATA_ROOT, "dashboard.md")
+
+
+DASHBOARD_DEFAULT_CONTENT = "# 当前状态\n\n"
 
 
 # 创建全局配置实例

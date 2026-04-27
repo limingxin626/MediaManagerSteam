@@ -83,11 +83,15 @@ def _build_message_query(
     tag_id: Optional[int],
     cursor_time: Optional[datetime],
     starred: Optional[bool] = None,
+    inclusive: bool = False,
 ):
-    """공통 필터·정렬을 적용한 Message 쿼리를 반환한다."""
+    """공통 필터·정렬을 적용한 Message 쿼리를 반환한다。"""
     query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred)
     if cursor_time:
-        query = query.filter(Message.created_at < cursor_time)
+        if inclusive:
+            query = query.filter(Message.created_at <= cursor_time)
+        else:
+            query = query.filter(Message.created_at < cursor_time)
     return query.order_by(Message.created_at.desc())
 
 
@@ -326,6 +330,7 @@ def sync_messages(db: Session = Depends(get_db)):
 def get_messages_with_detail(
     cursor: Optional[str] = Query(None, description="游标，ISO 格式的 created_at"),
     direction: Optional[str] = Query(None, description="分页方向: 'forward' 加载更新的消息（cursor 之后）"),
+    inclusive: bool = Query(False, description="是否包含 cursor 本身（用 <= / >= 而非 < / >），用于位置恢复"),
     limit: int = Query(20, ge=1, le=100),
     actor_id: Optional[int] = None,
     query_text: Optional[str] = Query(None, description="搜索文本，匹配 message.text"),
@@ -338,7 +343,7 @@ def get_messages_with_detail(
 
     if direction == "forward" and cursor:
         pivot = _parse_cursor(cursor)
-        op = Message.created_at > pivot
+        op = Message.created_at >= pivot if inclusive else Message.created_at > pivot
         query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred)
         query = query.filter(op).order_by(Message.created_at.asc())
         rows = query.limit(limit + 1).all()
@@ -361,7 +366,7 @@ def get_messages_with_detail(
 
     # 默认：向后（desc）分页
     cursor_time = _parse_cursor(cursor)
-    query = _build_message_query(db, actor_id, query_text, media_id, tag_id, cursor_time, starred=starred)
+    query = _build_message_query(db, actor_id, query_text, media_id, tag_id, cursor_time, starred=starred, inclusive=inclusive)
     items, has_more, next_cursor = _paginate(query, limit)
 
     ids = [m.id for m in items]

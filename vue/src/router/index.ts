@@ -3,6 +3,11 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
+    name: 'Dashboard',
+    component: () => import('../views/Dashboard.vue')
+  },
+  {
+    path: '/messages',
     name: 'Message',
     // Message 组件由 App.vue 通过 v-show 管理，此处仅保留路由占位
     component: () => import('../views/Empty.vue')

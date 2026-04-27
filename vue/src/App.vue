@@ -3,7 +3,7 @@
     <Navbar />
     <div class="md:pl-16">
       <!-- Message 始终挂载，v-show 切显隐，滚动位置天然保留 -->
-      <Message v-show="route.path === '/'" />
+      <Message v-show="route.path === '/messages'" />
       <router-view v-slot="{ Component }">
         <Transition name="route" mode="out-in">
           <keep-alive :include="['Media']">

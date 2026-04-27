@@ -387,6 +387,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { renderMarkdown } from '../utils/markdown'
 import { Calendar } from 'v-calendar'
 import 'v-calendar/style.css'
@@ -404,6 +405,9 @@ import { useTheme } from '../composables/useTheme'
 
 
 defineOptions({ name: 'Message' })
+
+const route = useRoute()
+const pendingRestore = ref<{ messageId: number; scrollOffset: number } | null>(null)
 
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -1368,6 +1372,34 @@ const teardownObservers = () => {
   bottomObserver = null
 }
 
+const tryRestoreScroll = () => {
+  if (!pendingRestore.value) return
+  const container = scrollContainer.value
+  if (!container) return
+  const { messageId, scrollOffset } = pendingRestore.value
+  const attempt = (n: number) => {
+    if (!pendingRestore.value) return
+    const el = container.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
+    // 容器不可见（v-show: none）时 scrollHeight 为 0，等可见再试
+    if (!el || container.scrollHeight === 0 || container.clientHeight === 0) {
+      if (n < 60) requestAnimationFrame(() => attempt(n + 1))
+      return
+    }
+    const containerRect = container.getBoundingClientRect()
+    const elRect = el.getBoundingClientRect()
+    const targetTop = container.scrollTop + (elRect.top - containerRect.top) - scrollOffset
+    container.scrollTo({ top: targetTop, behavior: 'auto' })
+    pendingRestore.value = null
+  }
+  attempt(0)
+}
+
+watch(() => route.path, (path) => {
+  if (path === '/messages' && pendingRestore.value) {
+    nextTick(tryRestoreScroll)
+  }
+}, { immediate: true })
+
 onMounted(() => {
   fetchTags()
   fetchActors()
@@ -1375,14 +1407,14 @@ onMounted(() => {
   if (saved) {
     try {
       const { messageId, createdAt, scrollOffset } = JSON.parse(saved) as { messageId: number; createdAt: string; scrollOffset?: number }
-      const backwardCursor = createdAt.includes('.') ? createdAt : createdAt + '.999999'
       loading.value = true
       Promise.all([
         api.get<{ items: MessageDetail[]; next_cursor: string | null; has_more: boolean }>(
           '/messages/with-detail',
           {
             limit: pageSize,
-            cursor: backwardCursor,
+            cursor: createdAt,
+            inclusive: true,
             query_text: searchQuery.value || undefined,
             media_id: activeMediaFilter.value ?? undefined,
             starred: starredFilter.value || undefined,
@@ -1423,14 +1455,8 @@ onMounted(() => {
           hasMoreForward.value = false
         }
         nextTick(() => {
-          const container = scrollContainer.value
-          if (!container) return
-          const el = container.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
-          if (el) {
-            const containerRect = container.getBoundingClientRect()
-            const elRect = el.getBoundingClientRect()
-            container.scrollTo({ top: container.scrollTop + (elRect.top - containerRect.top) - (scrollOffset ?? 0), behavior: 'auto' })
-          }
+          pendingRestore.value = { messageId, scrollOffset: scrollOffset ?? 0 }
+          tryRestoreScroll()
           setupObservers()
         })
       }).catch(() => {
