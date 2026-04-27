@@ -1,6 +1,6 @@
 <template>
   <div class="h-screen flex flex-col">
-    <div class="max-w-3xl w-full mx-auto px-4 pt-6 flex flex-col flex-1 min-h-0">
+    <div class="max-w-5xl w-full mx-auto px-4 pt-6 flex flex-col flex-1 min-h-0">
       <!-- 顶部栏（固定不滚动） -->
       <div class="flex items-center justify-between mb-4 shrink-0">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">主页</h1>
@@ -48,12 +48,10 @@
       <!-- 阅读模式 -->
       <div
         v-else
-        @click="enterEdit"
-        class="prose dark:prose-invert max-w-none p-4 rounded-lg bg-white/60 dark:bg-black/20 border border-[var(--border-color)] cursor-text flex-1 min-h-0 overflow-y-auto mb-24 md:mb-8"
-        :title="'点击编辑'"
+        class="prose dark:prose-invert max-w-none p-4 rounded-lg bg-white/60 dark:bg-black/20 border border-[var(--border-color)] flex-1 min-h-0 overflow-y-auto mb-24 md:mb-8"
       >
         <div v-if="content.trim()" v-html="renderedContent"></div>
-        <p v-else class="text-gray-400 dark:text-gray-500 italic">（空白，点击此处开始编辑）</p>
+        <p v-else class="text-gray-400 dark:text-gray-500 italic">（空白，点击右上角「编辑」开始）</p>
       </div>
     </div>
   </div>

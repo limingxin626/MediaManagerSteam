@@ -1,12 +1,19 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Table, Index, UniqueConstraint
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Table, Index, UniqueConstraint, event
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, backref
 from datetime import datetime
 import os
 from app.config import config
 
 DATABASE_URL = f"sqlite:///{config.get_db_path()}"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+
+@event.listens_for(engine, "connect")
+def _enable_sqlite_fk(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -75,7 +82,7 @@ class Media(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     file_path = Column(String(255), nullable=False)
-    file_hash = Column(String(128), nullable=True, index=True, unique=True)
+    file_hash = Column(String(128), nullable=True, index=True)
     file_size = Column(Integer, nullable=True)
     mime_type = Column(String(100), nullable=True)
     width = Column(Integer, nullable=True)
@@ -88,8 +95,28 @@ class Media(Base):
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
+    video_media_id = Column(Integer, ForeignKey("media.id", ondelete="CASCADE"), nullable=True, index=True)
+    frame_ms = Column(Integer, nullable=True)
+    start_ms = Column(Integer, nullable=True)
+    end_ms = Column(Integer, nullable=True)
+
     message_media = relationship("MessageMedia", back_populates="media")
     tags = relationship("Tag", secondary=media_tag, back_populates="media_items")
+    video = relationship(
+        "Media",
+        remote_side="Media.id",
+        foreign_keys=[video_media_id],
+        backref=backref(
+            "previews",
+            order_by="Media.frame_ms",
+            cascade="all, delete-orphan",
+            passive_deletes=True,
+        ),
+    )
+
+    __table_args__ = (
+        Index("ix_media_video_frame", "video_media_id", "frame_ms"),
+    )
 
 class MessageMedia(Base):
     __tablename__ = "message_media"

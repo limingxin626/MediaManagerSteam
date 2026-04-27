@@ -23,6 +23,12 @@ const routes = [
     component: () => import('../views/MediaFeed.vue')
   },
   {
+    path: '/media/:id(\\d+)',
+    name: 'MediaDetail',
+    component: () => import('../views/MediaDetail.vue'),
+    props: route => ({ mediaId: Number(route.params.id) })
+  },
+  {
     path: '/admin',
     name: 'Admin',
     component: () => import('../views/Admin.vue')

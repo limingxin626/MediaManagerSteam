@@ -14,9 +14,16 @@ from app.config import config
 logger = logging.getLogger(__name__)
 
 
-def process_file(db: Session, file_path: str, message_id: int, position: int, media_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+def process_standalone_file(
+    db: Session,
+    file_path: str,
+    media_id: Optional[int] = None,
+    skip_dedup: bool = False,
+) -> Optional[Dict[str, Any]]:
     """
-    处理单个文件：hash 去重 → 媒体信息提取 → 缩略图生成 → 创建 MessageMedia。
+    处理单个文件落地为 Media 行（不创建 MessageMedia 链接）。
+    - 计算 hash、提取媒体信息、生成缩略图、`db.flush()`。
+    - skip_dedup=True 时强制创建新行（用于预览图独占语义）。
     返回 {"media": Media, "is_new": bool} 或 None（文件不存在或不支持的类型）。
     """
     if not os.path.exists(file_path):
@@ -32,12 +39,11 @@ def process_file(db: Session, file_path: str, message_id: int, position: int, me
         logger.error(f"Failed to calculate hash, skipping: {file_path}")
         return None
 
-    existing_media = db.query(Media).filter(Media.file_hash == file_hash).first()
-    if existing_media:
-        _link_media(db, message_id, existing_media.id, position)
-        return {"media": existing_media, "is_new": False}
+    if not skip_dedup:
+        existing_media = db.query(Media).filter(Media.file_hash == file_hash).first()
+        if existing_media:
+            return {"media": existing_media, "is_new": False}
 
-    # 非挂载目录的文件复制到 uploads
     if not config.is_mounted_path(file_path):
         ext = os.path.splitext(file_path)[1]
         upload_dir = config.get_upload_dir()
@@ -77,8 +83,27 @@ def process_file(db: Session, file_path: str, message_id: int, position: int, me
     except Exception as e:
         logger.error(f"Failed to generate thumbnail: {e}")
 
-    _link_media(db, message_id, media.id, position)
     return {"media": media, "is_new": True}
+
+
+def create_preview_media(db: Session, file_path: str) -> Media:
+    """为视频预览图强制创建一条新的 Media 行（不去重）。返回 Media。"""
+    result = process_standalone_file(db, file_path, skip_dedup=True)
+    if result is None:
+        raise ValueError("Failed to process preview file")
+    return result["media"]
+
+
+def process_file(db: Session, file_path: str, message_id: int, position: int, media_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+    """
+    处理单个文件并链接到消息：复用 process_standalone_file 后再 _link_media。
+    返回 {"media": Media, "is_new": bool} 或 None。
+    """
+    result = process_standalone_file(db, file_path, media_id=media_id)
+    if result is None:
+        return None
+    _link_media(db, message_id, result["media"].id, position)
+    return result
 
 
 def rotate_media(db: Session, media_id: int, degrees: int) -> Media:

@@ -1,14 +1,22 @@
 import os
+import time
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, Integer
 from app.models import get_db, Media, MessageMedia, Message, Tag, message_tag, media_tag
 from typing import Optional, List, Literal
-from app.schemas.media import MediaResponse, MediaCursorResponse, TimelineItem
-from app.config import AppConfig
-from app.services.media_service import rotate_media
+from app.schemas.media import (
+    MediaResponse,
+    MediaCursorResponse,
+    TimelineItem,
+    VideoPreviewItem,
+    VideoPreviewCreate,
+    VideoPreviewUpdate,
+)
+from app.config import AppConfig, config as app_config
+from app.services.media_service import rotate_media, create_preview_media
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -44,8 +52,8 @@ def get_media(
             has_more=False
         )
     else:
-        # 直接查 Media 表，显示所有媒体（包括孤立媒体）
-        query = db.query(Media)
+        # 直接查 Media 表，显示所有媒体（包括孤立媒体），但隐藏作为视频预览的 Media
+        query = db.query(Media).filter(Media.video_media_id.is_(None))
 
         if starred is not None:
             query = query.filter(Media.starred == (1 if starred else 0))
@@ -167,7 +175,7 @@ def get_media_timeline(
         year_col.label('year'),
         month_col.label('month'),
         func.count().label('count'),
-    )
+    ).filter(Media.video_media_id.is_(None))
 
     if starred is not None:
         query = query.filter(Media.starred == (1 if starred else 0))
@@ -249,6 +257,70 @@ def get_media_feed(
         next_cursor=next_cursor,
         has_more=has_more,
     )
+
+
+# ===== 视频预览（章节）扁平路径端点（必须在 /{media_id} 之前声明） =====
+
+def _validate_range(frame_ms: Optional[int], start_ms: Optional[int], end_ms: Optional[int]) -> None:
+    if frame_ms is not None and frame_ms < 0:
+        raise HTTPException(status_code=400, detail="frame_ms must be >= 0")
+    if start_ms is not None and start_ms < 0:
+        raise HTTPException(status_code=400, detail="start_ms must be >= 0")
+    if end_ms is not None and end_ms < 0:
+        raise HTTPException(status_code=400, detail="end_ms must be >= 0")
+    if start_ms is not None and end_ms is not None and start_ms > end_ms:
+        raise HTTPException(status_code=400, detail="start_ms must be <= end_ms")
+
+
+@router.patch("/previews/{preview_id}", response_model=VideoPreviewItem)
+def update_preview(preview_id: int, body: VideoPreviewUpdate, db: Session = Depends(get_db)):
+    image = db.query(Media).filter(Media.id == preview_id).first()
+    if not image or image.video_media_id is None:
+        raise HTTPException(status_code=404, detail="Preview not found")
+    new_frame = body.frame_ms if body.frame_ms is not None else image.frame_ms
+    new_start = body.start_ms if body.start_ms is not None else image.start_ms
+    new_end = body.end_ms if body.end_ms is not None else image.end_ms
+    _validate_range(new_frame, new_start, new_end)
+    if body.frame_ms is not None:
+        image.frame_ms = body.frame_ms
+    if body.start_ms is not None:
+        image.start_ms = body.start_ms
+    if body.end_ms is not None:
+        image.end_ms = body.end_ms
+    db.commit()
+    db.refresh(image)
+    return VideoPreviewItem.model_validate(image)
+
+
+@router.delete("/previews/{preview_id}", status_code=204)
+def delete_preview(preview_id: int, db: Session = Depends(get_db)):
+    image = db.query(Media).filter(Media.id == preview_id).first()
+    if not image or image.video_media_id is None:
+        raise HTTPException(status_code=404, detail="Preview not found")
+    file_path = image.file_path
+    db.delete(image)
+    db.commit()
+
+    thumb_path = AppConfig.get_thumbnail_path(preview_id)
+    if os.path.exists(thumb_path):
+        try:
+            os.remove(thumb_path)
+        except Exception:
+            pass
+    if file_path and os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception:
+            pass
+    return None
+
+
+@router.get("/{media_id}", response_model=MediaResponse)
+def get_media_by_id(media_id: int, db: Session = Depends(get_db)):
+    media = db.query(Media).filter(Media.id == media_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+    return MediaResponse.model_validate(media)
 
 
 @router.put("/{media_id}/starred")
@@ -366,4 +438,115 @@ def delete_media(
             print(f"删除源文件失败: {e}")
 
     return {"message": "Media deleted successfully", "unlinked": False}
+
+
+# ===== 视频预览（章节）相关端点 =====
+
+def _require_video(db: Session, media_id: int) -> Media:
+    media = db.query(Media).filter(Media.id == media_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+    if not (media.mime_type or "").startswith("video/"):
+        raise HTTPException(status_code=400, detail="Target media is not a video")
+    return media
+
+
+@router.get("/{media_id}/previews", response_model=List[VideoPreviewItem])
+def list_previews(media_id: int, db: Session = Depends(get_db)):
+    _require_video(db, media_id)
+    rows = (
+        db.query(Media)
+        .filter(Media.video_media_id == media_id)
+        .order_by(Media.frame_ms.asc())
+        .all()
+    )
+    return [VideoPreviewItem.model_validate(r) for r in rows]
+
+
+@router.post("/{media_id}/previews", response_model=VideoPreviewItem)
+def add_preview(media_id: int, body: VideoPreviewCreate, db: Session = Depends(get_db)):
+    _require_video(db, media_id)
+    if body.preview_media_id == media_id:
+        raise HTTPException(status_code=400, detail="preview_media_id cannot equal video media id")
+    image = db.query(Media).filter(Media.id == body.preview_media_id).first()
+    if not image:
+        raise HTTPException(status_code=404, detail="Preview media not found")
+    if not (image.mime_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="Preview media must be an image")
+    if image.video_media_id is not None:
+        raise HTTPException(status_code=409, detail="Preview media is already used by another video")
+    _validate_range(body.frame_ms, body.start_ms, body.end_ms)
+
+    image.video_media_id = media_id
+    image.frame_ms = body.frame_ms
+    image.start_ms = body.start_ms
+    image.end_ms = body.end_ms
+    db.commit()
+    db.refresh(image)
+    return VideoPreviewItem.model_validate(image)
+
+
+@router.post("/{media_id}/previews/screenshot", response_model=VideoPreviewItem)
+def add_preview_from_screenshot(
+    media_id: int,
+    file: UploadFile = File(...),
+    frame_ms: int = Form(...),
+    start_ms: Optional[int] = Form(None),
+    end_ms: Optional[int] = Form(None),
+    db: Session = Depends(get_db),
+):
+    _require_video(db, media_id)
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="Uploaded file must be an image")
+    _validate_range(frame_ms, start_ms, end_ms)
+
+    upload_dir = app_config.get_upload_dir()
+    os.makedirs(upload_dir, exist_ok=True)
+    ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
+    if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+        ext = ".jpg"
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    base = f"preview_{media_id}_{timestamp}{ext}"
+    dest_path = os.path.join(upload_dir, base)
+    counter = 1
+    while os.path.exists(dest_path):
+        dest_path = os.path.join(upload_dir, f"preview_{media_id}_{timestamp}_{counter}{ext}")
+        counter += 1
+    with open(dest_path, "wb") as f:
+        f.write(file.file.read())
+
+    try:
+        image = create_preview_media(db, dest_path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    image.video_media_id = media_id
+    image.frame_ms = frame_ms
+    image.start_ms = start_ms
+    image.end_ms = end_ms
+    db.flush()
+
+    earliest_mm = (
+        db.query(MessageMedia)
+        .filter(MessageMedia.media_id == media_id)
+        .order_by(MessageMedia.created_at.asc(), MessageMedia.id.asc())
+        .first()
+    )
+    if earliest_mm is not None:
+        target_message_id = earliest_mm.message_id
+        max_position = (
+            db.query(func.coalesce(func.max(MessageMedia.position), -1))
+            .filter(MessageMedia.message_id == target_message_id)
+            .scalar()
+        )
+        db.add(MessageMedia(
+            message_id=target_message_id,
+            media_id=image.id,
+            position=int(max_position) + 1,
+        ))
+
+    db.commit()
+    db.refresh(image)
+    return VideoPreviewItem.model_validate(image)
+
 

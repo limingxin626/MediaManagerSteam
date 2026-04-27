@@ -52,6 +52,16 @@
             </button>
             <button
               v-if="currentItem"
+              @click="openDetailPage"
+              class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+              title="打开详情页"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+            </button>
+            <button
+              v-if="currentItem"
               @click="openFileLocation"
               class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
               title="打开文件位置"
@@ -220,6 +230,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import type { MessageMediaItem, TagWithCount, TagItem } from '../types'
 import { isVideo, isImage, resolveUrl, rotateMedia } from '../utils/media'
 import { api } from '../composables/useApi'
@@ -227,6 +238,7 @@ import { useToast } from '../composables/useToast'
 import TagPickerPopover from './TagPickerPopover.vue'
 
 const toast = useToast()
+const router = useRouter()
 
 // 扩展 Window 接口以包含 Electron API
 declare global {
@@ -295,6 +307,13 @@ async function confirmDelete() {
   }
   showDeleteConfirm.value = false
   deleteSourceFile.value = false
+}
+
+function openDetailPage() {
+  if (!currentItem.value) return
+  const id = currentItem.value.id
+  emit('close')
+  router.push(`/media/${id}`)
 }
 
 function openFileLocation() {

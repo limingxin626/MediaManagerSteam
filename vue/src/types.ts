@@ -12,6 +12,31 @@ export type Actor = components['schemas']['ActorResponse']
 // 媒体相关
 export type Media = components['schemas']['MediaResponse']
 
+// 视频预览（章节）—— 后端尚未重新生成 OpenAPI 类型，先手写
+export interface VideoPreviewItem {
+  id: number
+  file_path: string
+  file_url: string
+  thumb_url: string
+  mime_type: string | null
+  frame_ms: number
+  start_ms: number | null
+  end_ms: number | null
+}
+
+export interface VideoPreviewCreate {
+  preview_media_id: number
+  frame_ms: number
+  start_ms?: number | null
+  end_ms?: number | null
+}
+
+export interface VideoPreviewUpdate {
+  frame_ms?: number | null
+  start_ms?: number | null
+  end_ms?: number | null
+}
+
 // 标签相关
 export type TagItem = components['schemas']['MessageTagItem']
 export type TagWithCount = components['schemas']['TagResponse']
