@@ -325,7 +325,7 @@ const emit = defineEmits<{
   'add-tag': [messageId: number, tagName: string]
 }>()
 
-const maxPreviewItems = 9
+const maxPreviewItems = 10
 const activeMenuIndex = ref<number | null>(null)
 const cardRef = ref<HTMLElement | null>(null)
 const isVisible = ref(false)
