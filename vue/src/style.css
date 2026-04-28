@@ -124,15 +124,6 @@ video {
   color: rgb(224, 231, 255);
 }
 
-.hashtag-inline {
-  color: rgb(79, 70, 229);
-  font-weight: 600;
-}
-
-.dark .hashtag-inline {
-  color: rgb(165, 180, 252);
-}
-
 .dark ::-webkit-scrollbar-track {
   background: #1a1a1a;
 }

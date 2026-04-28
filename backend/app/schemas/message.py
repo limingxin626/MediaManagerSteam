@@ -9,7 +9,7 @@ class MessageCreate(BaseModel):
     text: Optional[str] = None
     actor_id: Optional[int] = None
     files: List[str] = []
-    tag_ids: List[int] = []
+    tag_ids: Optional[List[int]] = None
 
 
 class ClientMediaFile(BaseModel):
@@ -31,6 +31,7 @@ class MessageUpdate(BaseModel):
     starred: Optional[bool] = None
     created_at: Optional[str] = None  # ISO 时间戳
     media_order: Optional[List[int]] = None  # media_id 数组，定义新的 position 顺序
+    tag_ids: Optional[List[int]] = None  # 显式 tag 绑定；传入则替换、不调用文本解析
 
 
 class MessageMediaItem(MediaUrlMixin):

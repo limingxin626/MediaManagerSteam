@@ -210,13 +210,13 @@
 
       <!-- Message Text -->
       <div v-if="message.text" class="mb-2 prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300">
-        <div ref="textRef" class="line-clamp-10" v-html="renderedText"></div>
+        <div class="line-clamp-10" v-html="renderedText"></div>
       </div>
 
       <!-- Tags & Media count row -->
-      <div v-if="visibleTagChips.length > 0 || message.media_count > 0" class="flex items-center gap-2 mt-2 flex-wrap">
-        <template v-if="visibleTagChips.length > 0">
-          <span v-for="tag in visibleTagChips" :key="tag.id"
+      <div v-if="messageTags.length > 0 || message.media_count > 0" class="flex items-center gap-2 mt-2 flex-wrap">
+        <template v-if="messageTags.length > 0">
+          <span v-for="tag in messageTags" :key="tag.id"
             class="tag-chip">
             {{ tag.name }}
           </span>
@@ -294,7 +294,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import type { Message, MessageMediaItem, TagItem, TagWithCount } from '../types'
 import { isVideo, formatDuration, resolveUrl } from '../utils/media'
 import { renderMarkdown } from '../utils/markdown'
@@ -328,7 +328,6 @@ const emit = defineEmits<{
 const maxPreviewItems = 9
 const activeMenuIndex = ref<number | null>(null)
 const cardRef = ref<HTMLElement | null>(null)
-const textRef = ref<HTMLElement | null>(null)
 const isVisible = ref(false)
 const starBouncing = ref(false)
 const mediaStarBouncing = ref<number | null>(null)
@@ -349,7 +348,6 @@ onMounted(() => {
     )
     observer.observe(cardRef.value)
   }
-  nextTick(checkTextClamped)
 })
 
 onUnmounted(() => {
@@ -369,32 +367,6 @@ const messageTags = computed(() => {
   return props.tags || []
 })
 
-const isTextClamped = ref(false)
-
-const checkTextClamped = () => {
-  if (textRef.value) {
-    isTextClamped.value = textRef.value.scrollHeight > textRef.value.clientHeight
-  }
-}
-
-watch(() => props.message.text, () => {
-  nextTick(checkTextClamped)
-})
-
-// 过滤掉文本可见部分中已有 #hashtag 的 tag（行内已高亮，无需重复显示）
-// 未折叠：全部 hashtag 都可见，过滤全部；折叠：只过滤前10行中出现的
-const visibleTagChips = computed(() => {
-  if (messageTags.value.length === 0) return []
-  if (!props.message.text) return messageTags.value
-  const text = isTextClamped.value
-    ? props.message.text.split('\n').slice(0, 10).join('\n')
-    : props.message.text
-  return messageTags.value.filter(tag => {
-    const escaped = tag.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    return !new RegExp(`#${escaped}(?![\\w\\u4e00-\\u9fff\\u3400-\\u4dbf/\\-])`).test(text)
-  })
-})
-
 const mediaPreviewItems = computed(() => {
   if (!props.mediaItems) return []
   return props.mediaItems.slice(0, maxPreviewItems)
@@ -407,8 +379,7 @@ const remainingCount = computed(() => {
 
 const renderedText = computed(() => {
   if (!props.message.text) return ''
-  const html = renderMarkdown(props.message.text)
-  return html.replace(/(^|(?<=(?:>|;|\s)))#([\w\u4e00-\u9fff\u3400-\u4dbf/\-]+)/g, '$1<span class="hashtag-inline">#$2</span>')
+  return renderMarkdown(props.message.text)
 })
 
 // Mosaic layout — 使用容器虚拟宽度 400px 计算

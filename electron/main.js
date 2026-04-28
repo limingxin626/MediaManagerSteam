@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
 import path from 'path';
 import url from 'url';
 import { fileURLToPath } from 'url';
@@ -27,6 +27,25 @@ function createWindow() {
   
   // 直接最大化窗口
   win.maximize();
+
+  // 所有外部链接（http/https/mailto）在系统默认浏览器中打开
+  const isExternal = (target) => /^(https?:|mailto:)/i.test(target);
+
+  win.webContents.setWindowOpenHandler(({ url: target }) => {
+    if (isExternal(target)) {
+      shell.openExternal(target);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
+
+  win.webContents.on('will-navigate', (event, target) => {
+    const currentUrl = win.webContents.getURL();
+    if (isExternal(target) && target !== currentUrl) {
+      event.preventDefault();
+      shell.openExternal(target);
+    }
+  });
   
   // 窗口准备就绪后显示
   win.on('ready-to-show', () => {

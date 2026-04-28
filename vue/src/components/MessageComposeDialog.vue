@@ -14,6 +14,20 @@
           class="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
       </div>
 
+      <!-- Selected tags -->
+      <div class="flex flex-wrap gap-1.5 mb-2 min-h-[1.75rem]">
+        <span v-for="t in selectedTags" :key="t.id"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+          #{{ t.name }}
+          <button @click="removeTag(t.id)" class="hover:text-red-500" title="移除标签">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </span>
+        <span v-if="selectedTags.length === 0" class="text-xs text-gray-400 dark:text-gray-500 self-center">输入 # 选择标签</span>
+      </div>
+
       <!-- Textarea -->
       <textarea ref="textareaRef" v-model="text" placeholder="输入消息内容..."
         class="flex-1 w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
@@ -138,6 +152,7 @@ interface Props {
   initialText?: string
   initialDate?: string
   initialMedia?: MessageMediaItem[]
+  initialTags?: TagItem[]
   allTags?: TagItem[]
   tagId?: number | null
   actorId?: number | null
@@ -148,7 +163,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   close: []
   created: [message: MessageDetail]
-  updated: [messageId: number, text: string, date: string]
+  updated: [messageId: number, text: string, date: string, tagIds: number[]]
   mediaChanged: [messageId: number]
 }>()
 
@@ -171,7 +186,18 @@ const mediaChanged = ref(false)
 let dragId: number | null = null
 let dragType: 'existing' | 'new' = 'existing'
 
-const tag = useTagAutocomplete(textareaRef, text, computed(() => props.allTags || []))
+const selectedTags = ref<TagItem[]>([])
+
+const addTag = (tag: TagItem) => {
+  if (selectedTags.value.some(t => t.id === tag.id)) return
+  selectedTags.value = [...selectedTags.value, tag]
+}
+
+const removeTag = (tagId: number) => {
+  selectedTags.value = selectedTags.value.filter(t => t.id !== tagId)
+}
+
+const tag = useTagAutocomplete(textareaRef, text, computed(() => props.allTags || []), addTag)
 const tagSuggestionListEl = ref<HTMLElement | null>(null)
 watch(tagSuggestionListEl, (el) => { tag.suggestionListRef.value = el })
 
@@ -191,6 +217,14 @@ watch(() => props.visible, async (visible) => {
     newFiles.value = []
     newFilePreviews.value = []
     mediaChanged.value = false
+    if (props.mode === 'edit') {
+      selectedTags.value = props.initialTags ? [...props.initialTags] : []
+    } else {
+      const preselect = props.tagId != null
+        ? (props.allTags || []).find(t => t.id === props.tagId)
+        : undefined
+      selectedTags.value = preselect ? [preselect] : []
+    }
     await nextTick()
     textareaRef.value?.focus()
   } else {
@@ -235,7 +269,7 @@ const handleSubmit = async () => {
         text: text.value || null,
         files: files.value,
         actor_id: props.actorId ?? undefined,
-        tag_ids: props.tagId != null ? [props.tagId] : undefined,
+        tag_ids: selectedTags.value.map(t => t.id),
       })
       emit('created', result)
       toast.success('消息已发送')
@@ -263,7 +297,7 @@ const handleSubmit = async () => {
         }
       }
 
-      emit('updated', props.messageId!, text.value, editDate.value)
+      emit('updated', props.messageId!, text.value, editDate.value, selectedTags.value.map(t => t.id))
       if (mediaChanged.value) {
         emit('mediaChanged', props.messageId!)
       }

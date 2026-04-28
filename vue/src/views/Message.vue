@@ -373,6 +373,7 @@
 
       <MessageComposeDialog :visible="dialogVisible" :mode="dialogMode" :message-id="dialogMessageId"
         :initial-text="dialogInitialText" :initial-date="dialogInitialDate" :initial-media="dialogInitialMedia"
+        :initial-tags="dialogInitialTags"
         :all-tags="tags" :tag-id="selectedTagId ?? null" :actor-id="selectedActorId ?? undefined" @close="dialogVisible = false"
         @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" />
 
@@ -840,12 +841,14 @@ const dialogMessageId = ref<number | undefined>(undefined)
 const dialogInitialText = ref('')
 const dialogInitialDate = ref('')
 const dialogInitialMedia = ref<MessageMediaItem[]>([])
+const dialogInitialTags = ref<{ id: number; name: string }[]>([])
 
 const openCreateDialog = () => {
   dialogMode.value = 'create'
   dialogMessageId.value = undefined
   dialogInitialText.value = ''
   dialogInitialDate.value = ''
+  dialogInitialTags.value = []
   dialogVisible.value = true
 }
 
@@ -857,6 +860,7 @@ const openEditDialog = (messageId: number) => {
   dialogMessageId.value = messageId
   dialogInitialText.value = msg.text || ''
   dialogInitialMedia.value = msg.media_items || []
+  dialogInitialTags.value = msg.tags ? msg.tags.map(t => ({ id: t.id, name: t.name })) : []
 
   const dateStr = msg.created_at
   if (dateStr) {
@@ -878,14 +882,15 @@ const onDialogCreated = async (message: MessageDetail) => {
   messages.value.push(message)
   await nextTick()
   scrollToBottom()
+  fetchTags()
 }
 
-const onDialogUpdated = async (messageId: number, text: string, date: string) => {
+const onDialogUpdated = async (messageId: number, text: string, date: string, tagIds: number[]) => {
   const msg = messages.value.find(m => m.id === messageId)
   if (!msg) return
 
   try {
-    const updateData: Record<string, unknown> = { text: text || null }
+    const updateData: Record<string, unknown> = { text: text || null, tag_ids: tagIds }
     if (date) updateData.created_at = date
 
     const updated = await api.patch<MessageDetail>(`/messages/${messageId}`, updateData)
@@ -894,6 +899,7 @@ const onDialogUpdated = async (messageId: number, text: string, date: string) =>
     msg.updated_at = updated.updated_at
     if (updated.tags) msg.tags = updated.tags
     toast.success('消息已更新')
+    fetchTags()
   } catch {
     toast.error('更新消息失败')
   }
@@ -1152,6 +1158,7 @@ const handleDeleteMessage = async (messageId: number) => {
     await api.del(`/messages/${messageId}`)
     messages.value = messages.value.filter((m: MessageDetail) => m.id !== messageId)
     toast.success('消息已删除')
+    fetchTags()
   } catch (error) {
     toast.error('删除消息失败')
   }
@@ -1198,6 +1205,7 @@ const handleMerge = async () => {
     mergeMode.value = false
     selectedMessageIds.value.clear()
     toast.success('消息合并成功')
+    fetchTags()
   } catch (error) {
     toast.error('合并消息失败')
   }

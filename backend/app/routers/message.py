@@ -397,14 +397,14 @@ def create_message(
     db.add(db_message)
     db.flush()
 
-    sync_tags_from_text(db, db_message, message_data.text)
-
-    if message_data.tag_ids:
-        existing_ids = {t.id for t in db_message.tags}
-        extra_tags = db.query(Tag).filter(Tag.id.in_(message_data.tag_ids)).all()
-        for tag in extra_tags:
-            if tag.id not in existing_ids:
-                db_message.tags.append(tag)
+    if message_data.tag_ids is not None:
+        # 显式 tag_ids（即使为空 []）：跳过文本解析，纯由 tag_ids 决定
+        if message_data.tag_ids:
+            tags = db.query(Tag).filter(Tag.id.in_(message_data.tag_ids)).all()
+            db_message.tags = tags
+    else:
+        # 老客户端兼容路径：从文本解析
+        sync_tags_from_text(db, db_message, message_data.text)
 
     position = 0
     for file_path in message_data.files:
@@ -473,7 +473,13 @@ def update_message(
 
     if update_data.text is not None:
         message.text = update_data.text
-        sync_tags_from_text(db, message, update_data.text, merge=False)
+        if update_data.tag_ids is None:
+            # 仅在前端未显式传 tag_ids 时回退到文本解析（兼容老客户端）
+            sync_tags_from_text(db, message, update_data.text, merge=False)
+
+    if update_data.tag_ids is not None:
+        tags = db.query(Tag).filter(Tag.id.in_(update_data.tag_ids)).all() if update_data.tag_ids else []
+        message.tags = tags
 
     if update_data.actor_id is not None:
         message.actor_id = update_data.actor_id

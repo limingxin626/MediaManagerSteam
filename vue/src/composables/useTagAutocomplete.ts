@@ -5,7 +5,8 @@ import { getPinyinInitials } from '../utils/pinyinInitial'
 export function useTagAutocomplete(
   textareaRef: Ref<HTMLTextAreaElement | null>,
   text: Ref<string>,
-  allTags: Ref<TagItem[]> | (() => TagItem[])
+  allTags: Ref<TagItem[]> | (() => TagItem[]),
+  onTagPicked?: (tag: TagItem) => void
 ) {
   const tagSuggestions = ref<TagItem[]>([])
   const tagSuggestionVisible = ref(false)
@@ -209,19 +210,18 @@ export function useTagAutocomplete(
     const cursorPos = textarea.selectionStart
     const before = text.value.substring(0, currentTagStart)
     const after = text.value.substring(cursorPos)
-    const tagName = tag.name.includes(' ') ? `#${tag.name}#` : `#${tag.name}`
 
-    text.value = before + tagName + (after.startsWith(' ') ? '' : ' ') + after
+    text.value = before + after
 
-    // 更新最近使用的标签
     updateRecentTags(tag.id)
+    onTagPicked?.(tag)
 
     tagSuggestionVisible.value = false
+    const restorePos = before.length
     currentTagStart = -1
 
     setTimeout(() => {
-      const newPos = before.length + tagName.length + 1
-      textarea.setSelectionRange(newPos, newPos)
+      textarea.setSelectionRange(restorePos, restorePos)
       textarea.focus()
     }, 0)
   }
