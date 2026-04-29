@@ -540,15 +540,12 @@ def merge_messages(
     next_pos = max_pos + 1
 
     for other in others:
-        relations = (
-            db.query(MessageMedia)
-            .filter(MessageMedia.message_id == other.id)
-            .order_by(MessageMedia.position)
-            .all()
-        )
+        relations = sorted(list(other.message_media), key=lambda r: r.position)
         for rel in relations:
+            other.message_media.remove(rel)
             rel.message_id = target.id
             rel.position = next_pos
+            target.message_media.append(rel)
             next_pos += 1
 
     # 合并 tags（去重）
@@ -556,12 +553,14 @@ def merge_messages(
     for other in others:
         for t in other.tags:
             all_tags[t.id] = t
+        other.tags = []
     target.tags = list(all_tags.values())
 
+    db.flush()
+
     # 删除其余消息
-    other_ids = [m.id for m in others]
-    db.execute(message_tag.delete().where(message_tag.c.message_id.in_(other_ids)))
-    db.query(Message).filter(Message.id.in_(other_ids)).delete(synchronize_session="fetch")
+    for other in others:
+        db.delete(other)
 
     db.commit()
     db.refresh(target)

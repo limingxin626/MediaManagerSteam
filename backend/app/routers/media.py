@@ -16,7 +16,7 @@ from app.schemas.media import (
     VideoPreviewUpdate,
 )
 from app.config import AppConfig, config as app_config
-from app.services.media_service import rotate_media, create_preview_media
+from app.services.media_service import rotate_media, create_preview_media, replace_media_file
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -372,6 +372,48 @@ def rotate_media_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{media_id}/replace", response_model=MediaResponse)
+def replace_media_endpoint(
+    media_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """用上传文件替换该 media 对应的实际文件，保留 Media 行 id 及所有关联。"""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if app_config.get_media_type(f"x{ext}") is None:
+        raise HTTPException(status_code=400, detail="Unsupported media type")
+
+    upload_dir = app_config.get_upload_dir()
+    os.makedirs(upload_dir, exist_ok=True)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    tmp_path = os.path.join(upload_dir, f"replace_{media_id}_{timestamp}{ext}")
+    counter = 1
+    while os.path.exists(tmp_path):
+        tmp_path = os.path.join(upload_dir, f"replace_{media_id}_{timestamp}_{counter}{ext}")
+        counter += 1
+    with open(tmp_path, "wb") as f:
+        f.write(file.file.read())
+
+    try:
+        media = replace_media_file(db, media_id, tmp_path)
+    except ValueError as e:
+        if os.path.exists(tmp_path):
+            try: os.remove(tmp_path)
+            except Exception: pass
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        if os.path.exists(tmp_path):
+            try: os.remove(tmp_path)
+            except Exception: pass
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(tmp_path):
+            try: os.remove(tmp_path)
+            except Exception: pass
+
+    return MediaResponse.model_validate(media)
 
 
 class TagsRequest(BaseModel):

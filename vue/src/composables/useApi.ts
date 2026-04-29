@@ -42,8 +42,12 @@ async function request<T>(
 
   const init: RequestInit = { method }
   if (body !== undefined) {
-    init.headers = { 'Content-Type': 'application/json' }
-    init.body = JSON.stringify(body)
+    if (body instanceof FormData) {
+      init.body = body
+    } else {
+      init.headers = { 'Content-Type': 'application/json' }
+      init.body = JSON.stringify(body)
+    }
   }
 
   const res = await fetch(url, init)

@@ -7,7 +7,7 @@ import tempfile
 import time
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
-from app.models import Media, MessageMedia
+from app.models import Media, MessageMedia, media_tag
 from app.utils import calculate_file_hash, ThumbnailUtils, MediaInfoUtils
 from app.config import config
 
@@ -104,6 +104,146 @@ def process_file(db: Session, file_path: str, message_id: int, position: int, me
         return None
     _link_media(db, message_id, result["media"].id, position)
     return result
+
+
+def _merge_media_into(db: Session, src: Media, dst: Media) -> None:
+    """将 src 的所有引用迁移到 dst，然后删除 src 行（及其缩略图、文件）。
+    调用方需保证 src 与 dst 都不是预览帧（video_media_id 为 None）。
+    """
+    # 1) MessageMedia: 把 src 的链接迁到 dst；遇到 dst 已在同 message 的链接则丢弃
+    src_mms = db.query(MessageMedia).filter(MessageMedia.media_id == src.id).all()
+    for mm in src_mms:
+        existing = db.query(MessageMedia).filter(
+            MessageMedia.message_id == mm.message_id,
+            MessageMedia.media_id == dst.id,
+        ).first()
+        if existing is not None:
+            db.delete(mm)
+        else:
+            mm.media_id = dst.id
+    db.flush()
+
+    # 2) media_tag: 迁移 tag 关联，跳过重复
+    src_tag_rows = db.execute(
+        media_tag.select().where(media_tag.c.media_id == src.id)
+    ).fetchall()
+    dst_tag_ids = {
+        r.tag_id for r in db.execute(
+            media_tag.select().where(media_tag.c.media_id == dst.id)
+        ).fetchall()
+    }
+    for row in src_tag_rows:
+        if row.tag_id not in dst_tag_ids:
+            db.execute(media_tag.insert().values(media_id=dst.id, tag_id=row.tag_id))
+    db.execute(media_tag.delete().where(media_tag.c.media_id == src.id))
+
+    # 3) 预览帧：src 的 previews 重指向 dst（仅当 dst 是视频时）；否则连同文件/缩略图删除
+    preview_rows = db.query(Media).filter(Media.video_media_id == src.id).all()
+    if preview_rows:
+        if (dst.mime_type or "").startswith("video/"):
+            for p in preview_rows:
+                p.video_media_id = dst.id
+        else:
+            for p in preview_rows:
+                p_path = p.file_path
+                p_id = p.id
+                db.execute(media_tag.delete().where(media_tag.c.media_id == p_id))
+                db.query(MessageMedia).filter(MessageMedia.media_id == p_id).delete()
+                db.delete(p)
+                thumb = config.get_thumbnail_path(p_id)
+                if os.path.exists(thumb):
+                    try: os.remove(thumb)
+                    except Exception: pass
+                if p_path and os.path.exists(p_path):
+                    try: os.remove(p_path)
+                    except Exception: pass
+    db.flush()
+
+    # 4) 删除 src 的缩略图与文件
+    src_id = src.id
+    src_path = src.file_path
+    db.delete(src)
+    db.flush()
+
+    thumb = config.get_thumbnail_path(src_id)
+    if os.path.exists(thumb):
+        try: os.remove(thumb)
+        except Exception as e: logger.warning(f"Failed to remove old thumb {thumb}: {e}")
+    if src_path and os.path.exists(src_path):
+        try: os.remove(src_path)
+        except Exception as e: logger.warning(f"Failed to remove old file {src_path}: {e}")
+
+
+def replace_media_file(db: Session, media_id: int, src_path: str) -> Media:
+    """用 src_path 的文件覆盖 media 当前的文件，保留 Media 行 id。
+    - 若新文件的 hash 与另一条 Media 重复，则将当前 media 的引用迁移到那条 Media 并删除当前行，返回那条 Media。
+    - 否则原地覆盖：扩展名相同直接覆盖原 file_path，否则改写为新扩展名并删除旧文件。
+    - 重新计算 hash/size/mime/分辨率/时长，重生成缩略图
+    """
+    media = db.query(Media).filter(Media.id == media_id).first()
+    if not media:
+        raise ValueError("Media not found")
+    if media.video_media_id is not None:
+        raise ValueError("Cannot replace a video preview frame via this endpoint")
+
+    media_type = config.get_media_type(src_path)
+    if media_type is None:
+        raise ValueError("Unsupported media type")
+
+    new_hash = calculate_file_hash(src_path)
+    if new_hash is None:
+        raise RuntimeError("Failed to calculate hash for new file")
+
+    # 去重：若新内容已存在为另一条 Media，则合并
+    if new_hash != media.file_hash:
+        dup = db.query(Media).filter(
+            Media.file_hash == new_hash,
+            Media.id != media.id,
+        ).first()
+        if dup is not None:
+            if dup.video_media_id is not None:
+                raise ValueError("Replacement matches an existing preview frame; refusing to merge")
+            _merge_media_into(db, media, dup)
+            db.commit()
+            db.refresh(dup)
+            return dup
+
+    old_path = media.file_path
+    old_ext = os.path.splitext(old_path)[1].lower()
+    new_ext = os.path.splitext(src_path)[1].lower()
+
+    if new_ext == old_ext:
+        target_path = old_path
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        shutil.copy2(src_path, target_path)
+    else:
+        target_path = os.path.splitext(old_path)[0] + new_ext
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        shutil.copy2(src_path, target_path)
+        if old_path != target_path and os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except Exception as e:
+                logger.warning(f"Failed to remove old file {old_path}: {e}")
+        media.file_path = target_path
+
+    media_info = MediaInfoUtils.get_media_info(target_path, media_type, config.FFPROBE_PATH)
+    media.file_hash = new_hash
+    media.file_size = os.path.getsize(target_path)
+    media.mime_type = mimetypes.guess_type(target_path)[0] or 'application/octet-stream'
+    media.width = media_info["width"]
+    media.height = media_info["height"]
+    media.duration_ms = media_info["duration_ms"]
+
+    try:
+        thumb_path = config.get_thumbnail_path(media.id)
+        ThumbnailUtils.generate_thumbnail(target_path, thumb_path, media_type, config.FFMPEG_PATH)
+    except Exception as e:
+        logger.error(f"Failed to regenerate thumbnail after replace: {e}")
+
+    db.commit()
+    db.refresh(media)
+    return media
 
 
 def rotate_media(db: Session, media_id: int, degrees: int) -> Media:

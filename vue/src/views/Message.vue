@@ -643,6 +643,12 @@ const fetchActors = async () => {
   }
 }
 
+const resetFilters = () => {
+  searchQuery.value = ''
+  starredFilter.value = false
+  activeMediaFilter.value = null
+}
+
 const selectTag = (tagId: number | null) => {
   if (tagId !== null && tagId < 0) {
     return
@@ -650,6 +656,7 @@ const selectTag = (tagId: number | null) => {
   saveScrollPosition()
   selectedTagId.value = tagId
   selectedActorId.value = null
+  resetFilters()
   if (!restoreFromCache(getFilterKey())) {
     resetAndFetch()
   }
@@ -659,6 +666,7 @@ const selectActor = (actorId: number | null) => {
   saveScrollPosition()
   selectedActorId.value = actorId
   selectedTagId.value = null
+  resetFilters()
   if (!restoreFromCache(getFilterKey())) {
     resetAndFetch()
   }
@@ -890,7 +898,7 @@ const onDialogUpdated = async (messageId: number, text: string, date: string, ta
   if (!msg) return
 
   try {
-    const updateData: Record<string, unknown> = { text: text || null, tag_ids: tagIds }
+    const updateData: Record<string, unknown> = { text, tag_ids: tagIds }
     if (date) updateData.created_at = date
 
     const updated = await api.patch<MessageDetail>(`/messages/${messageId}`, updateData)

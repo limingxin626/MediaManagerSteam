@@ -52,6 +52,27 @@
             </button>
             <button
               v-if="currentItem"
+              @click="triggerReplace"
+              :disabled="isReplacing"
+              class="p-2 text-white hover:bg-white/10 rounded-full transition-colors disabled:opacity-50"
+              title="替换文件"
+            >
+              <svg v-if="!isReplacing" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+              <svg v-else class="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <input
+              ref="fileInput"
+              type="file"
+              accept="video/mp4,image/jpeg,image/png,image/gif"
+              class="hidden"
+              @change="onFileSelected"
+            />
+            <button
+              v-if="currentItem"
               @click="openDetailPage"
               class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
               title="打开详情页"
@@ -231,7 +252,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import type { MessageMediaItem, TagWithCount, TagItem } from '../types'
+import type { MessageMediaItem, TagWithCount, TagItem, Media } from '../types'
 import { isVideo, isImage, resolveUrl, rotateMedia } from '../utils/media'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
@@ -272,6 +293,7 @@ const emit = defineEmits<{
   'toggle-star': [mediaId: number]
   'media-deleted': [mediaId: number]
   'media-rotated': [mediaId: number]
+  'media-replaced': [mediaId: number]
   'media-tags-changed': [mediaId: number, tags: TagItem[]]
 }>()
 
@@ -283,6 +305,9 @@ const showDeleteConfirm = ref(false)
 const deleteSourceFile = ref(false)
 const rotationDegrees = ref(0)
 const isRotating = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+const isReplacing = ref(false)
+const mediaCacheBust = ref<Record<number, number>>({})
 
 function handleStarClick() {
   if (!currentItem.value) return
@@ -330,6 +355,49 @@ function openFileLocation() {
 
 function handleRotate() {
   rotationDegrees.value = (rotationDegrees.value + 90) % 360
+}
+
+function triggerReplace() {
+  if (isReplacing.value) return
+  fileInput.value?.click()
+}
+
+async function onFileSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || !currentItem.value) return
+
+  isReplacing.value = true
+  const mediaId = currentItem.value.id
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const updated = await api.post<Media>(`/media/${mediaId}/replace`, form)
+    const target = props.items[currentIndex.value]
+    if (target && target.id === mediaId) {
+      const ts = Date.now()
+      target.id = updated.id
+      target.file_path = updated.file_path
+      target.file_url = updated.file_url
+      target.thumb_url = (updated.thumb_url || '').split('?')[0] + `?t=${ts}`
+      target.mime_type = updated.mime_type
+      target.width = updated.width
+      target.height = updated.height
+      target.duration_ms = updated.duration_ms
+      mediaCacheBust.value = { ...mediaCacheBust.value, [updated.id]: ts }
+    }
+    emit('media-replaced', mediaId)
+    if (updated.id !== mediaId) {
+      toast.success('替换成功（已合并到已有媒体）')
+    } else {
+      toast.success('替换成功')
+    }
+  } catch (err: any) {
+    toast.error(err?.message || '替换失败')
+  } finally {
+    isReplacing.value = false
+  }
 }
 
 async function confirmRotation() {
@@ -408,8 +476,9 @@ const canGoNext = computed(() => {
 })
 
 const getMediaUrl = (item: MessageMediaItem) => {
-  // 对 URL 进行编码处理，特别是对 # 字符进行编码
-  return item.file_path.replace(/#/g, '%23')
+  const url = item.file_path.replace(/#/g, '%23')
+  const bust = mediaCacheBust.value[item.id]
+  return bust ? `${url}${url.includes('?') ? '&' : '?'}t=${bust}` : url
 }
 
 const close = () => {
