@@ -7,20 +7,30 @@
     <div v-if="loading" class="text-center py-6 text-gray-500 text-sm">加载中…</div>
     <div v-else-if="!items.length" class="text-center py-6 text-gray-400 text-sm italic">暂无媒体</div>
     <div v-else class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-      <router-link
-        v-for="m in items"
+      <div
+        v-for="(m, idx) in items"
         :key="m.id"
-        :to="`/media/${m.id}`"
-        class="aspect-square overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-700 hover:ring-2 hover:ring-[var(--color-primary-500)] transition"
+        class="aspect-square overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-700 hover:ring-2 hover:ring-[var(--color-primary-500)] transition cursor-pointer"
+        @click="openPreview(idx)"
       >
         <img
-          :src="m.thumb_url"
+          :src="resolveUrl(m.thumb_url)"
           :alt="`media-${m.id}`"
           class="w-full h-full object-cover"
           loading="lazy"
         />
-      </router-link>
+      </div>
     </div>
+
+    <Teleport to="body">
+      <MediaPreview
+        :is-open="previewOpen"
+        :items="previewItems"
+        :start-index="previewStartIndex"
+        @close="previewOpen = false"
+        @media-deleted="handleDeleted"
+      />
+    </Teleport>
   </section>
 </template>
 
@@ -28,25 +38,21 @@
 import { onMounted, ref } from 'vue'
 import { api } from '../../composables/useApi'
 import { useToast } from '../../composables/useToast'
-
-interface MediaThumb {
-  id: number
-  thumb_url: string
-}
-
-interface CursorResponse<T> {
-  items: T[]
-  next_cursor: string | null
-  has_more: boolean
-}
+import { resolveUrl } from '../../utils/media'
+import MediaPreview from '../MediaPreview.vue'
+import type { Media, CursorResponse } from '../../types'
 
 const toast = useToast()
 const loading = ref(true)
-const items = ref<MediaThumb[]>([])
+const items = ref<Media[]>([])
+
+const previewOpen = ref(false)
+const previewItems = ref<any[]>([])
+const previewStartIndex = ref(0)
 
 onMounted(async () => {
   try {
-    const data = await api.get<CursorResponse<MediaThumb>>('/media', { limit: 12 })
+    const data = await api.get<CursorResponse<Media>>('/media', { limit: 12 })
     items.value = data.items
   } catch (e) {
     toast.error(`加载最近媒体失败：${(e as Error).message}`)
@@ -54,4 +60,21 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+function openPreview(idx: number) {
+  previewItems.value = items.value.map(m => ({
+    id: m.id,
+    file_path: m.file_path,
+    mime_type: m.mime_type,
+    duration_ms: m.duration_ms,
+    thumb_url: m.thumb_url,
+    starred: m.starred,
+  }))
+  previewStartIndex.value = idx
+  previewOpen.value = true
+}
+
+function handleDeleted(mediaId: number) {
+  items.value = items.value.filter(m => m.id !== mediaId)
+}
 </script>
