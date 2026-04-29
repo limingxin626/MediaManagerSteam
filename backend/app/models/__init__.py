@@ -157,3 +157,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# 导入子模块模型，确保 Base.metadata 包含它们（alembic autogenerate 依赖此处）
+from app.models.todo import Todo  # noqa: E402,F401
