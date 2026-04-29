@@ -178,13 +178,5 @@ class AppConfig:
     def get_db_path(cls) -> str:
         return os.path.join(cls.DATA_ROOT, "db.sqlite3")
 
-    @classmethod
-    def get_dashboard_md_path(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "dashboard.md")
-
-
-DASHBOARD_DEFAULT_CONTENT = "# 当前状态\n\n"
-
-
 # 创建全局配置实例
 config = AppConfig()
