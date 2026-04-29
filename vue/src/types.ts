@@ -73,3 +73,32 @@ export interface AdminStats {
     created_at: string | null
   }>
 }
+
+// ---------------------------------------------------------------------------
+// Dashboard / Todo
+// ---------------------------------------------------------------------------
+
+export type TodoStatus = 'pending' | 'doing' | 'done'
+
+export interface Todo {
+  id: number
+  title: string
+  status: TodoStatus
+  position: number
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+}
+
+export interface TodoBoard {
+  pending: Todo[]
+  doing: Todo[]
+  done: Todo[]
+}
+
+export interface DashboardStats {
+  message_count: number
+  media_count: number
+  media_this_month: number
+  todo_doing_count: number
+}

@@ -20,7 +20,8 @@
     "vidstack": "^1.12.13",
     "vue": "^3.5.24",
     "vue-markdown-render": "^2.3.0",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.19",
