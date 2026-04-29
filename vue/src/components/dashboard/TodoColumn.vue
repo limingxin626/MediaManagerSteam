@@ -41,7 +41,6 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-// @ts-expect-error - vuedraggable v4 lacks bundled TS types
 import draggable from 'vuedraggable'
 import TodoCard from './TodoCard.vue'
 import type { Todo, TodoStatus } from '../../types'
