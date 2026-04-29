@@ -1,5 +1,6 @@
 """主页 dashboard 聚合统计端点。"""
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import List
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -15,6 +16,17 @@ class DashboardStats(BaseModel):
     media_count: int
     media_this_month: int
     todo_doing_count: int
+
+
+class HeatmapDay(BaseModel):
+    date: str
+    count: int
+
+
+class HeatmapResponse(BaseModel):
+    start_date: str
+    end_date: str
+    days: List[HeatmapDay]
 
 
 @router.get("/stats", response_model=DashboardStats)
@@ -34,3 +46,28 @@ def get_stats(db: Session = Depends(get_db)) -> DashboardStats:
         .scalar()
         or 0,
     )
+
+
+@router.get("/heatmap", response_model=HeatmapResponse)
+def get_heatmap(db: Session = Depends(get_db)) -> HeatmapResponse:
+    """过去 365 天每日消息数（GitHub 风格热力图）。"""
+    today = datetime.now().date()
+    start = today - timedelta(days=364)
+    start_dt = datetime.combine(start, datetime.min.time())
+
+    date_label = func.strftime('%Y-%m-%d', Message.created_at).label('date_str')
+    rows = (
+        db.query(date_label, func.count().label('cnt'))
+        .filter(Message.created_at >= start_dt)
+        .group_by(date_label)
+        .all()
+    )
+    counts = {row.date_str: row.cnt for row in rows}
+    days = [
+        HeatmapDay(
+            date=(start + timedelta(days=i)).isoformat(),
+            count=counts.get((start + timedelta(days=i)).isoformat(), 0),
+        )
+        for i in range(365)
+    ]
+    return HeatmapResponse(start_date=start.isoformat(), end_date=today.isoformat(), days=days)

@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col bg-white/40 dark:bg-black/20 border border-[var(--border-color)] rounded-xl p-3 min-h-[200px]">
+  <div class="flex flex-col bg-white/40 dark:bg-black/20 border border-[var(--border-color)] rounded-xl p-3 min-h-[400px]">
     <div class="flex items-center justify-between mb-2 px-1">
       <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">
         {{ title }}
