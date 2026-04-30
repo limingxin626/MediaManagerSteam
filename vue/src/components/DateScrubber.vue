@@ -48,7 +48,7 @@
     <!-- Tooltip -->
     <div
       v-if="(hovering || dragging) && tooltipDate"
-      class="absolute right-full mr-2 px-2 py-1 rounded bg-black/80 text-white text-xs whitespace-nowrap pointer-events-none"
+      class="absolute right-full mr-2 px-2 py-1 rounded bg-black/80 text-white text-xs whitespace-nowrap pointer-events-none z-40 shadow-lg"
       :style="{ top: tooltipY + 'px', transform: 'translateY(-50%)' }"
     >{{ tooltipLabel }}</div>
   </div>
