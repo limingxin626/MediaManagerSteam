@@ -50,7 +50,8 @@
     </div>
 
     <!-- Scrollable Content Area -->
-    <div ref="scrollContainer" class="flex-1 overflow-y-auto min-h-0 relative" @scroll="onScroll">
+    <div class="flex-1 min-h-0 relative">
+    <div ref="scrollContainer" class="absolute inset-0 overflow-y-auto" @scroll="onScroll">
       <div class="py-4 px-1 sm:px-2 max-w-4xl mx-auto">
         <!-- Top sentinel for loading newer content -->
         <div ref="topSentinel" class="h-1"></div>
@@ -147,6 +148,7 @@
         :current-date="currentScrollDate"
         @jump="handleDateScrubberJump"
       />
+    </div>
 
       <!-- Back to Latest -->
       <button

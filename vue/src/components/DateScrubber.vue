@@ -11,27 +11,36 @@
   >
     <!-- Track background -->
     <div class="relative flex-1">
-      <!-- Density bars -->
+      <!-- Center axis line -->
+      <div class="absolute right-1.5 top-0 bottom-0 w-px bg-gray-300/40 dark:bg-white/15 pointer-events-none"></div>
+
+      <!-- Month ticks (short) -->
       <div
-        v-for="seg in segments"
-        :key="`${seg.year}-${seg.month}`"
-        class="absolute left-0 right-0"
-        :style="{ top: seg.top + '%', height: seg.height + '%' }"
-      >
-        <div class="h-full w-full rounded-sm" :style="{ backgroundColor: `rgba(139, 92, 246, ${seg.opacity})` }"></div>
-      </div>
+        v-for="tick in monthTicks"
+        :key="`m-${tick.year}-${tick.month}`"
+        class="absolute right-1.5 h-px w-1.5 bg-gray-400/50 dark:bg-white/30 pointer-events-none"
+        :style="{ top: tick.top + '%' }"
+      ></div>
+
+      <!-- Year ticks (long) -->
+      <div
+        v-for="tick in yearTicks"
+        :key="`y-${tick.year}`"
+        class="absolute right-1.5 h-px w-3 bg-gray-500 dark:bg-white/70 pointer-events-none"
+        :style="{ top: tick.top + '%' }"
+      ></div>
 
       <!-- Year labels -->
       <div
         v-for="label in yearLabels"
         :key="label.year"
-        class="absolute right-1 text-[9px] text-gray-400 pointer-events-none leading-none"
-        :style="{ top: label.top + '%', transform: 'translateY(-50%)' }"
+        class="absolute right-5 text-[10px] font-medium text-gray-500 dark:text-gray-400 pointer-events-none leading-none whitespace-nowrap"
+        :style="{ top: label.top + '%', transform: `translateY(${label.anchor})` }"
       >{{ label.year }}</div>
 
       <!-- Current position indicator -->
       <div
-        class="absolute left-0 right-0 h-0.5 bg-white rounded pointer-events-none transition-[top] duration-150"
+        class="absolute right-0 w-3 h-0.5 bg-[var(--color-primary-500)] rounded-sm pointer-events-none transition-[top] duration-150 shadow"
         :style="{ top: indicatorTop + '%' }"
       ></div>
     </div>
@@ -98,36 +107,44 @@ const tooltipLabel = computed(() => {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
 })
 
-// Density segments
-const segments = computed(() => {
+// Month ticks — one per month present in timeline
+const monthTicks = computed(() => {
   if (!props.timeline.length || totalRange.value <= 0) return []
-  const maxCount = Math.max(...props.timeline.map(t => t.count))
-  return props.timeline.map(t => {
-    const start = new Date(t.year, t.month - 1, 1)
-    const end = new Date(t.year, t.month, 0, 23, 59, 59)
-    const top = dateToPercent(end)
-    const bottom = dateToPercent(start)
-    return {
-      year: t.year,
-      month: t.month,
-      top,
-      height: Math.max(bottom - top, 0.5),
-      opacity: 0.15 + (t.count / maxCount) * 0.55,
-    }
-  })
+  return props.timeline.map(t => ({
+    year: t.year,
+    month: t.month,
+    top: dateToPercent(new Date(t.year, t.month - 1, 15)),
+  }))
 })
 
-// Year labels
+// Year ticks — at Jan 1 of each year spanned by the range
+const yearTicks = computed(() => {
+  if (!props.timeline.length || totalRange.value <= 0) return []
+  const minY = props.minDate.getFullYear()
+  const maxY = props.maxDate.getFullYear()
+  const ticks: { year: number; top: number }[] = []
+  for (let y = minY; y <= maxY; y++) {
+    const d = new Date(y, 0, 1)
+    if (d < props.minDate || d > props.maxDate) continue
+    ticks.push({ year: y, top: dateToPercent(d) })
+  }
+  return ticks
+})
+
+// Year labels — positioned at year tick (Jan 1)
 const yearLabels = computed(() => {
-  if (!props.timeline.length) return []
-  const years = new Set<number>()
-  const labels: { year: number; top: number }[] = []
-  for (const t of props.timeline) {
-    if (!years.has(t.year)) {
-      years.add(t.year)
-      const mid = new Date(t.year, 6, 1)
-      labels.push({ year: t.year, top: Math.max(0, Math.min(100, dateToPercent(mid))) })
-    }
+  if (!props.timeline.length || totalRange.value <= 0) return []
+  const minY = props.minDate.getFullYear()
+  const maxY = props.maxDate.getFullYear()
+  const labels: { year: number; top: number; anchor: string }[] = []
+  for (let y = minY; y <= maxY; y++) {
+    const anchor = new Date(y, 0, 1)
+    const clamped = anchor < props.minDate ? props.minDate : anchor > props.maxDate ? props.maxDate : anchor
+    const top = Math.max(0, Math.min(100, dateToPercent(clamped)))
+    let translate = '-50%'
+    if (top > 92) translate = '-100%'
+    else if (top < 8) translate = '0%'
+    labels.push({ year: y, top, anchor: translate })
   }
   return labels
 })
@@ -217,7 +234,10 @@ onUnmounted(() => {
 .date-scrubber {
   cursor: pointer;
   transition: width 0.15s ease;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.2));
-  border-radius: 4px 0 0 4px;
+  background: transparent;
+}
+.date-scrubber:hover,
+.date-scrubber.dragging {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.04), rgba(0,0,0,0.08));
 }
 </style>
