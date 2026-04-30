@@ -393,9 +393,11 @@ class MediaInfoUtils:
 
         elif media_type == "IMAGE":
             try:
-                from PIL import Image
+                from PIL import Image, ImageOps
                 with Image.open(file_path) as img:
-                    info["width"], info["height"] = img.size
+                    # 应用 EXIF orientation，让 width/height 反映拍摄方向
+                    transposed = ImageOps.exif_transpose(img)
+                    info["width"], info["height"] = transposed.size
 
                     # EXIF 拍摄日期和 GPS (JPEG/TIFF 等有 EXIF 的格式)
                     info["taken_at"] = MediaInfoUtils._extract_exif_date(img)
