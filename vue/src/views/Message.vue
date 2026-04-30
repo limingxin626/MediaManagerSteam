@@ -1068,6 +1068,16 @@ const handleMediaDeleted = (mediaId: number) => {
       const itemIndex = msg.media_items.findIndex(item => item.id === mediaId)
       if (itemIndex !== -1) {
         msg.media_items.splice(itemIndex, 1)
+        if (typeof msg.media_count === 'number') msg.media_count = msg.media_items.length
+      }
+    }
+    if (selectedMessage.value?.id === messages.value[currentMessageIndex.value]?.id && selectedMessage.value.media_items) {
+      const itemIndex = selectedMessage.value.media_items.findIndex(item => item.id === mediaId)
+      if (itemIndex !== -1) {
+        selectedMessage.value.media_items.splice(itemIndex, 1)
+        if (typeof selectedMessage.value.media_count === 'number') {
+          selectedMessage.value.media_count = selectedMessage.value.media_items.length
+        }
       }
     }
   }
@@ -1090,12 +1100,27 @@ const handleMediaRotated = (mediaId: number) => {
       item.file_path = item.file_path.split('?')[0] + `?t=${t}`
     }
   }
+  if (selectedMessage.value?.media_items) {
+    for (const item of selectedMessage.value.media_items) {
+      if (item.id === mediaId) {
+        item.thumb_url = item.thumb_url.split('?')[0] + `?t=${t}`
+        item.file_path = item.file_path.split('?')[0] + `?t=${t}`
+      }
+    }
+  }
 }
 
 const handleMediaTagsChanged = (mediaId: number, newTags: { id: number; name: string; category?: string | null }[]) => {
   for (const msg of messages.value) {
     if (!msg.media_items) continue
     for (const item of msg.media_items) {
+      if (item.id === mediaId) {
+        item.tags = newTags
+      }
+    }
+  }
+  if (selectedMessage.value?.media_items) {
+    for (const item of selectedMessage.value.media_items) {
       if (item.id === mediaId) {
         item.tags = newTags
       }
@@ -1252,16 +1277,35 @@ const toggleSplitMode = () => {
 
 const handleSplit = async () => {
   if (!selectedMessage.value || splitSelectedIds.value.size === 0) return
+  const sourceId = selectedMessage.value.id
+  const container = scrollContainer.value
+  const anchorEl = container?.querySelector<HTMLElement>(`[data-message-id="${sourceId}"]`) ?? null
+  const anchorTopBefore = anchorEl?.getBoundingClientRect().top ?? 0
+
   try {
-    await api.post(`/messages/${selectedMessage.value.id}/split`, {
+    const newMsg = await api.post<MessageDetail>(`/messages/${sourceId}/split`, {
       media_ids: Array.from(splitSelectedIds.value),
     })
-    toast.success('拆分成功')
+    const full = await api.get<MessageDetail>(`/messages/${sourceId}`)
+
     splitMode.value = false
     splitSelectedIds.value = new Set()
-    const full = await api.get<MessageDetail>(`/messages/${selectedMessage.value.id}`)
     selectedMessage.value = full
-    await resetAndFetch({})
+
+    const idx = messages.value.findIndex(m => m.id === sourceId)
+    if (idx !== -1) {
+      messages.value[idx] = full
+      messages.value.splice(idx + 1, 0, newMsg)
+    } else {
+      messages.value.push(newMsg)
+    }
+
+    await nextTick()
+    if (container && anchorEl) {
+      const anchorTopAfter = anchorEl.getBoundingClientRect().top
+      container.scrollTop += anchorTopAfter - anchorTopBefore
+    }
+    toast.success('拆分成功')
   } catch (e: any) {
     toast.error(e?.message || '拆分失败')
   }

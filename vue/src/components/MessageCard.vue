@@ -84,7 +84,7 @@
         <template v-else-if="mosaicLayout.type === 'rows'">
           <div class="flex flex-col gap-0.5" :style="{ aspectRatio: mosaicRowsAspectRatio }">
             <div v-for="(row, rowIdx) in mosaicLayout.rows" :key="rowIdx"
-              class="flex gap-0.5" :style="{ flex: row.heightWeight }">
+              class="flex gap-0.5 min-h-0" :style="{ height: mosaicRowHeights[rowIdx] }">
               <div v-for="mosaicItem in row.items" :key="mosaicItem.index"
                 class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
                 :style="{ flex: mosaicItem.widthWeight }"
@@ -423,6 +423,13 @@ const mosaicRowsAspectRatio = computed(() => {
   const totalHeight = mosaicLayout.value.rows.reduce((s, r) => s + r.heightWeight, 0)
   // 加上 gap (rows.length - 1) * 2px 的近似，忽略不计
   return `${MOSAIC_CONTAINER_WIDTH} / ${totalHeight}`
+})
+
+// 每行的高度百分比（避免 aspect-ratio + flex-grow 与 img 内容互动导致容器被撑高）
+const mosaicRowHeights = computed(() => {
+  if (!mosaicLayout.value || mosaicLayout.value.type !== 'rows') return []
+  const total = mosaicLayout.value.rows.reduce((s, r) => s + r.heightWeight, 0)
+  return mosaicLayout.value.rows.map(r => `${(r.heightWeight / total) * 100}%`)
 })
 
 // ROWS 布局：每行高度占总高度的比例，用 flex 权重
