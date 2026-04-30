@@ -140,11 +140,7 @@ export function useVirtualGrid(opts: Options) {
     const top = scrollTop.value
     for (const b of arr) {
       if (b.endOffset > top) {
-        const daysInMonth = new Date(b.year, b.month, 0).getDate()
-        const frac = b.height > 0 ? Math.max(0, Math.min(1, (top - b.headerOffset) / b.height)) : 0
-        // top of month (frac=0) → newest day (daysInMonth); bottom (frac=1) → day 1
-        const day = Math.max(1, Math.min(daysInMonth, Math.round(daysInMonth - frac * daysInMonth)))
-        return new Date(b.year, b.month - 1, day)
+        return new Date(b.year, b.month - 1, 1)
       }
     }
     const last = arr[arr.length - 1]

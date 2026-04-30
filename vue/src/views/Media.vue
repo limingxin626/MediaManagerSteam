@@ -51,7 +51,7 @@
 
     <!-- Scrollable Content Area -->
     <div class="flex-1 min-h-0 relative">
-    <div ref="scrollContainer" class="absolute inset-0 overflow-y-auto media-scroll" @scroll="vg.onScroll">
+    <div ref="scrollContainer" class="absolute inset-0 overflow-y-auto" @scroll="vg.onScroll">
       <div ref="measureEl" class="relative max-w-4xl mx-auto px-1 sm:px-2 py-4" :style="{ height: vg.totalHeight.value + 'px' }">
 
         <!-- Month headers -->
@@ -357,8 +357,3 @@ onMounted(() => {
   fetchActors()
 })
 </script>
-
-<style scoped>
-.media-scroll { scrollbar-width: none; }
-.media-scroll::-webkit-scrollbar { display: none; }
-</style>

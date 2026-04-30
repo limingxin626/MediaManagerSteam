@@ -38,18 +38,17 @@
         :style="{ top: label.top + '%', transform: `translateY(${label.anchor})` }"
       >{{ label.year }}</div>
 
-      <!-- Current position indicator / handle -->
+      <!-- Current position indicator -->
       <div
-        class="absolute right-0 w-3 h-3 rounded-sm bg-[var(--color-primary-500)] pointer-events-none shadow"
-        :class="dragging ? 'ring-2 ring-white/50 scale-110' : 'transition-[top] duration-150'"
-        :style="{ top: indicatorTop + '%', transform: 'translateY(-50%)' }"
+        class="absolute right-0 w-3 h-0.5 bg-[var(--color-primary-500)] rounded-sm pointer-events-none transition-[top] duration-150 shadow"
+        :style="{ top: indicatorTop + '%' }"
       ></div>
     </div>
 
     <!-- Tooltip -->
     <div
       v-if="(hovering || dragging) && tooltipDate"
-      class="absolute right-full mr-2 px-2 py-1 rounded bg-black/80 text-white text-xs whitespace-nowrap pointer-events-none z-40 shadow-lg"
+      class="absolute right-full mr-2 px-2 py-1 rounded bg-black/80 text-white text-xs whitespace-nowrap pointer-events-none"
       :style="{ top: tooltipY + 'px', transform: 'translateY(-50%)' }"
     >{{ tooltipLabel }}</div>
   </div>
@@ -101,10 +100,7 @@ function yToPercent(y: number): number {
   return Math.max(0, Math.min(100, ((y - rect.top) / rect.height) * 100))
 }
 
-const indicatorTop = computed(() => {
-  const p = dateToPercent(props.currentDate)
-  return Math.max(0, Math.min(100, p))
-})
+const indicatorTop = computed(() => dateToPercent(props.currentDate))
 
 const tooltipLabel = computed(() => {
   if (!tooltipDate.value) return ''
