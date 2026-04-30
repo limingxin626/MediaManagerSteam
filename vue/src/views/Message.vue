@@ -1,9 +1,11 @@
 <template>
   <div class="h-screen flex transition-colors">
     <!-- Left Tag Column -->
-    <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] overflow-y-auto">
+    <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] min-h-0">
+      <!-- Tags (top half) -->
+      <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">标签</div>
-      <div class="flex flex-col gap-0.5 px-2 pb-4">
+      <div class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-4">
         <button @click="selectTag(null)"
           class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === null && selectedActorId === null
             ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
@@ -31,10 +33,12 @@
           </div>
         </div>
       </div>
+      </div>
 
-      <!-- Actor List -->
+      <!-- Actor List (bottom half) -->
+      <div class="flex-1 min-h-0 flex flex-col overflow-hidden border-t border-[var(--border-color)]">
       <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">演员</div>
-      <div class="flex flex-col gap-0.5 px-2 pb-4">
+      <div class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-4">
         <button
           v-if="noActorCount > 0 || selectedActorId === 0"
           @click="selectActor(0)"
@@ -59,6 +63,7 @@
           <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ actor.message_count }}</span>
         </button>
       </div>
+      </div>
     </div>
 
     <!-- Main Content -->
@@ -67,8 +72,8 @@
       <div class="flex flex-col min-w-0 relative" :class="selectedMessage ? 'w-1/2' : 'flex-1'">
         <!-- Search Header -->
         <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
-          <div class="w-full mx-auto px-3 py-3">
-            <div class="flex gap-2 items-center max-w-4xl mx-auto">
+          <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div class="flex gap-2 items-center justify-between max-w-3xl mx-auto pr-10">
               <h2 class="text-lg font-bold text-gray-900 dark:text-white">消息流</h2>
               <!-- Merge toggle -->
               <button @click="toggleMergeMode" class="px-2 py-1 text-xs rounded-md transition-colors" :class="mergeMode
@@ -223,8 +228,8 @@
         </div>
 
         <!-- Bottom Input Bar -->
-        <div class="shrink-0 px-4 py-3 border-t border-[var(--border-color)] mb-20 md:mb-0">
-          <div class="max-w-4xl mx-auto">
+        <div class="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-t border-[var(--border-color)] mb-20 md:mb-0">
+          <div class="max-w-3xl mx-auto pr-10">
             <button @click="openCreateDialog"
               class="w-full flex items-center gap-3 px-4 py-3 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full text-sm text-[var(--text-muted)] hover:border-[var(--color-primary-500)] transition-colors cursor-text">
               <span class="flex-1 text-left">写点什么...</span>
