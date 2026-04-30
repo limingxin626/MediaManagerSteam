@@ -101,7 +101,10 @@ function yToPercent(y: number): number {
   return Math.max(0, Math.min(100, ((y - rect.top) / rect.height) * 100))
 }
 
-const indicatorTop = computed(() => dateToPercent(props.currentDate))
+const indicatorTop = computed(() => {
+  const p = dateToPercent(props.currentDate)
+  return Math.max(0, Math.min(100, p))
+})
 
 const tooltipLabel = computed(() => {
   if (!tooltipDate.value) return ''
