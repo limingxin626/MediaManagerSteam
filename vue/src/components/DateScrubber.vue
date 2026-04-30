@@ -38,10 +38,11 @@
         :style="{ top: label.top + '%', transform: `translateY(${label.anchor})` }"
       >{{ label.year }}</div>
 
-      <!-- Current position indicator -->
+      <!-- Current position indicator / handle -->
       <div
-        class="absolute right-0 w-3 h-0.5 bg-[var(--color-primary-500)] rounded-sm pointer-events-none transition-[top] duration-150 shadow"
-        :style="{ top: indicatorTop + '%' }"
+        class="absolute right-0 w-3 h-3 rounded-sm bg-[var(--color-primary-500)] pointer-events-none shadow"
+        :class="dragging ? 'ring-2 ring-white/50 scale-110' : 'transition-[top] duration-150'"
+        :style="{ top: indicatorTop + '%', transform: 'translateY(-50%)' }"
       ></div>
     </div>
 
