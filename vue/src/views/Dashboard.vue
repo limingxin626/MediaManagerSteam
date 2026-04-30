@@ -16,4 +16,6 @@
 import HeatmapCard from '../components/dashboard/HeatmapCard.vue'
 import TodoBoard from '../components/dashboard/TodoBoard.vue'
 import RecentMedia from '../components/dashboard/RecentMedia.vue'
+
+defineOptions({ name: 'Dashboard' })
 </script>

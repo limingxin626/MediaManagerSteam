@@ -59,7 +59,7 @@
     </div>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col min-w-0 relative">
     <!-- Fixed Header -->
     <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -184,6 +184,7 @@
         <!-- Scroll sentinel (bottom, for loading older) -->
         <div ref="sentinel" class="h-1"></div>
       </div>
+    </div>
 
       <!-- Date Scrubber -->
       <DateScrubber
@@ -206,7 +207,6 @@
         </svg>
         回到最新
       </button>
-    </div>
 
     </div>
 
