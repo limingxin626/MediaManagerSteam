@@ -51,76 +51,68 @@
 
     <!-- Scrollable Content Area -->
     <div class="flex-1 min-h-0 relative">
-    <div ref="scrollContainer" class="absolute inset-0 overflow-y-auto" @scroll="onScroll">
-      <div class="py-4 px-1 sm:px-2 max-w-4xl mx-auto">
-        <!-- Top sentinel for loading newer content -->
-        <div ref="topSentinel" class="h-1"></div>
+    <div ref="scrollContainer" class="absolute inset-0 overflow-y-auto" @scroll="vg.onScroll">
+      <div ref="measureEl" class="relative max-w-4xl mx-auto px-1 sm:px-2 py-4" :style="{ height: vg.totalHeight.value + 'px' }">
 
-        <!-- Loading before (newer) -->
-        <div v-if="loadingBefore" class="flex justify-center py-4">
-          <div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[var(--color-primary-500)]"></div>
+        <!-- Month headers -->
+        <div
+          v-for="b in vg.buckets.value"
+          :key="'h-' + b.key"
+          class="absolute left-0 right-0 px-1 sm:px-2 py-2"
+          :style="{ top: b.headerOffset + 'px', height: vg.monthHeaderH.value + 'px' }"
+        >
+          <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ b.year }}年{{ b.month }}月</span>
         </div>
 
-        <div class="grid grid-cols-3 sm:grid-cols-4 gap-1">
-          <template v-for="(item, idx) in items" :key="item.id">
-            <!-- Month separator -->
-            <div v-if="shouldShowSeparator(idx)" class="col-span-3 sm:col-span-4 py-2" :class="idx > 0 ? 'mt-2' : ''">
-              <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ getMonthLabel(item) }}</span>
-            </div>
-            <!-- Media item -->
-            <div
-              class="group aspect-square overflow-hidden relative rounded cursor-pointer transition-transform duration-200 hover:scale-[1.03] bg-gray-200 dark:bg-gray-900"
-              :data-created="item.created_at"
-              @click="openPreview(item)"
-            >
-              <img
-                :src="resolveUrl(item.thumb_url)"
-                :alt="String(item.id)"
-                class="w-full h-full object-cover"
-                loading="lazy"
-              />
-              <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
-              <!-- Video icon -->
-              <div v-if="isVideo(item.mime_type)" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div class="w-8 h-8 bg-black/40 rounded-full flex items-center justify-center border border-white/30">
-                  <svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                </div>
-              </div>
-              <!-- Duration -->
-              <div v-if="item.duration_ms" class="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                {{ formatDuration(item.duration_ms) }}
-              </div>
-              <!-- Star toggle -->
-              <button
-                @click.stop="starWithBounce(item)"
-                class="absolute top-1 right-1 p-1 rounded-full transition-all"
-                :class="item.starred
-                  ? 'text-yellow-400'
-                  : 'text-white/70 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
-                "
+        <!-- Cells (placeholder + loaded) -->
+        <template v-for="b in vg.buckets.value" :key="'g-' + b.key">
+          <div
+            v-for="i in b.count"
+            :key="b.key + '-' + (i - 1)"
+            :style="cellStyle(b, i - 1)"
+            class="absolute rounded overflow-hidden bg-gray-200 dark:bg-gray-900"
+          >
+            <template v-if="vg.loadedItem(b, i - 1) as Media | undefined">
+              <div
+                class="group w-full h-full relative cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
+                @click="openPreview(b.key, i - 1)"
               >
-                <svg class="w-4 h-4" :class="{ 'star-bounce': mediaBounceId === item.id }" :fill="item.starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                </svg>
-              </button>
-            </div>
-          </template>
-        </div>
-
-        <!-- Loading -->
-        <div v-if="loading" class="flex justify-center py-8">
-          <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[var(--color-primary-500)]"></div>
-        </div>
-
-        <!-- End -->
-        <div v-if="!loading && !hasMore && items.length > 0" class="text-center py-8 text-sm text-gray-400">
-          已经到底了
-        </div>
+                <img
+                  :src="resolveUrl((vg.loadedItem(b, i - 1) as Media).thumb_url)"
+                  :alt="String((vg.loadedItem(b, i - 1) as Media).id)"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
+                <div v-if="isVideo((vg.loadedItem(b, i - 1) as Media).mime_type)" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div class="w-8 h-8 bg-black/40 rounded-full flex items-center justify-center border border-white/30">
+                    <svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div v-if="(vg.loadedItem(b, i - 1) as Media).duration_ms" class="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+                  {{ formatDuration((vg.loadedItem(b, i - 1) as Media).duration_ms!) }}
+                </div>
+                <button
+                  @click.stop="starWithBounce(vg.loadedItem(b, i - 1) as Media)"
+                  class="absolute top-1 right-1 p-1 rounded-full transition-all"
+                  :class="(vg.loadedItem(b, i - 1) as Media).starred
+                    ? 'text-yellow-400'
+                    : 'text-white/70 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
+                  "
+                >
+                  <svg class="w-4 h-4" :class="{ 'star-bounce': mediaBounceId === (vg.loadedItem(b, i - 1) as Media).id }" :fill="(vg.loadedItem(b, i - 1) as Media).starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </button>
+              </div>
+            </template>
+          </div>
+        </template>
 
         <!-- Empty -->
-        <div v-if="!loading && items.length === 0" class="flex flex-col items-center justify-center py-20">
+        <div v-if="!vg.buckets.value.length && !vg.loadingTimeline.value" class="flex flex-col items-center justify-center py-20">
           <div class="relative w-24 h-24 mb-4">
             <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/10 rotate-6"></div>
             <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/5 -rotate-3"></div>
@@ -133,26 +125,23 @@
           <h3 class="text-sm font-medium text-[var(--text-primary)]">暂无媒体</h3>
           <p class="mt-1 text-sm text-[var(--text-muted)]">还没有任何媒体内容</p>
         </div>
-
-        <!-- Scroll sentinel (bottom, for loading older) -->
-        <div ref="sentinel" class="h-1"></div>
       </div>
     </div>
 
       <!-- Date Scrubber -->
       <DateScrubber
-        v-if="timeline.length"
-        :timeline="timeline"
+        v-if="vg.timeline.value.length"
+        :timeline="vg.timeline.value"
         :min-date="timelineMinDate"
         :max-date="timelineMaxDate"
-        :current-date="currentScrollDate"
+        :current-date="vg.currentDate.value"
         @jump="handleDateScrubberJump"
       />
     </div>
 
       <!-- Back to Latest -->
       <button
-        v-if="isJumped"
+        v-if="showBackToLatest"
         @click="backToLatest"
         class="fixed bottom-20 right-4 z-30 flex items-center gap-1.5 px-3 py-2 rounded-full bg-[var(--color-primary-600)] text-white text-sm shadow-lg hover:bg-[var(--color-primary-700)] transition-colors"
       >
@@ -178,13 +167,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import DateScrubber from '../components/DateScrubber.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
-import type { TimelineEntry } from '../components/DateScrubber.vue'
-import type { Media, CursorResponse, TagWithCount, Actor } from '../types'
-import { api, useInfiniteScroll } from '../composables/useApi'
+import type { Media, TagWithCount, Actor } from '../types'
+import { api } from '../composables/useApi'
+import { useVirtualGrid, type BucketLayout } from '../composables/useVirtualGrid'
 import { isVideo, formatDuration, resolveUrl, toggleMediaStar } from '../utils/media'
 
 defineOptions({ name: 'Media' })
@@ -197,355 +186,166 @@ const typeOptions = [
 
 const selectedType = ref('')
 const starredFilter = ref(false)
-const sentinel = ref<HTMLElement | null>(null)
-const topSentinel = ref<HTMLElement | null>(null)
+const selectedTagId = ref<number | null>(null)
+const selectedActorId = ref<number | null>(null)
+
 const scrollContainer = ref<HTMLElement | null>(null)
+const measureEl = ref<HTMLElement | null>(null)
+
+const filters = computed(() => ({
+  starred: starredFilter.value || undefined,
+  type: selectedType.value || undefined,
+  tag_id: selectedTagId.value ?? undefined,
+  actor_id: selectedActorId.value ?? undefined,
+}))
+
+const vg = useVirtualGrid({
+  container: scrollContainer,
+  measureEl,
+  filters,
+})
+
 const previewOpen = ref(false)
 const previewItems = ref<any[]>([])
 const previewStartIndex = ref(0)
 const mediaBounceId = ref<number | null>(null)
+
 function starWithBounce(item: Media) {
   mediaBounceId.value = item.id
-  setTimeout(() => mediaBounceId.value = null, 300)
+  setTimeout(() => (mediaBounceId.value = null), 300)
   toggleMediaStar(item)
 }
 
-// --- Tag & Actor filtering ---
+// --- Tag & Actor sidebar data ---
 const tags = ref<TagWithCount[]>([])
 const actors = ref<Actor[]>([])
-const selectedTagId = ref<number | null>(null)
-const selectedActorId = ref<number | null>(null)
 const noActorCount = ref(0)
 
-const fetchTags = async () => {
+async function fetchTags() {
   try {
     tags.value = await api.get<TagWithCount[]>('/tags?has_media=true')
-  } catch {
-  }
+  } catch {}
 }
 
-const fetchActors = async () => {
+async function fetchActors() {
   try {
     const data = await api.get<{ items: Actor[]; no_actor_count: number }>('/actors')
     actors.value = data.items
     noActorCount.value = data.no_actor_count
-  } catch {
-  }
+  } catch {}
 }
 
-const selectTag = (tagId: number | null) => {
+function selectTag(tagId: number | null) {
   selectedTagId.value = tagId
   selectedActorId.value = null
-  resetBidirectionalState()
-  reset()
 }
 
-const selectActor = (actorId: number | null) => {
+function selectActor(actorId: number | null) {
   selectedActorId.value = actorId
   selectedTagId.value = null
-  resetBidirectionalState()
-  reset()
 }
 
-// --- Downward (older) infinite scroll via composable ---
-const { items, loading, hasMore, reset, jumpToCursor, seedItems, setupObserver } = useInfiniteScroll<Media>({
-  fetchFn: ({ cursor, limit }) => api.get<CursorResponse<Media>>('/media', {
-    cursor,
-    limit,
-    starred: starredFilter.value || undefined,
-    type: selectedType.value || undefined,
-    tag_id: selectedTagId.value ?? undefined,
-    actor_id: selectedActorId.value ?? undefined,
-  }),
-  sentinel,
-  limit: 40,
-})
+function setType(type: string) {
+  selectedType.value = type
+}
 
-// --- Upward (newer) loading state ---
-const prevCursor = ref<string | null>(null)
-const hasMoreBefore = ref(false)
-const loadingBefore = ref(false)
-const isJumped = ref(false)
-let topObserver: IntersectionObserver | null = null
+function toggleStarredFilter() {
+  starredFilter.value = !starredFilter.value
+}
 
-function mediaParams() {
+// --- Layout helpers ---
+function cellStyle(b: BucketLayout, idx: number) {
+  const p = vg.itemPosition(b, idx)
   return {
-    starred: starredFilter.value || undefined,
-    type: selectedType.value || undefined,
-    tag_id: selectedTagId.value ?? undefined,
-    actor_id: selectedActorId.value ?? undefined,
+    top: p.top + 'px',
+    left: p.left + 'px',
+    width: p.size + 'px',
+    height: p.size + 'px',
   }
 }
 
-async function loadBefore() {
-  if (loadingBefore.value || !hasMoreBefore.value || !prevCursor.value) return
-
-  loadingBefore.value = true
-  try {
-    const data = await api.get<CursorResponse<Media>>('/media', {
-      cursor: prevCursor.value,
-      direction: 'forward',
-      limit: 40,
-      ...mediaParams(),
-    })
-
-    const container = scrollContainer.value
-    const prevScrollTop = container?.scrollTop ?? 0
-    const prevHeight = container?.scrollHeight ?? 0
-
-    // forward returns ASC order (oldest first), reverse to DESC (newest first) then prepend
-    const newItems = data.items.reverse()
-    items.value = [...newItems, ...items.value]
-
-    hasMoreBefore.value = data.has_more
-    if (data.has_more && newItems.length) {
-      // newItems[0] is the newest after reverse — use it as next forward cursor
-      prevCursor.value = `${newItems[0].created_at}|${newItems[0].id}`
-    } else {
-      prevCursor.value = null
-      hasMoreBefore.value = false
-      isJumped.value = false
-    }
-
-    await nextTick()
-    if (container) {
-      const scrollDelta = container.scrollHeight - prevHeight
-      container.scrollTo({ top: prevScrollTop + scrollDelta, behavior: 'auto' })
-    }
-  } finally {
-    loadingBefore.value = false
-  }
-}
-
-function setupTopObserver() {
-  teardownTopObserver()
-  const root = scrollContainer.value
-  topObserver = new IntersectionObserver(
-    (entries) => {
-      if (entries[0]?.isIntersecting && !loadingBefore.value && hasMoreBefore.value && root && root.scrollTop > 0) {
-        loadBefore()
-      }
-    },
-    { root, rootMargin: '200px' },
-  )
-  if (topSentinel.value) topObserver.observe(topSentinel.value)
-}
-
-function teardownTopObserver() {
-  topObserver?.disconnect()
-  topObserver = null
-}
-
-function resetBidirectionalState() {
-  prevCursor.value = null
-  hasMoreBefore.value = false
-  loadingBefore.value = false
-  isJumped.value = false
-}
-
-// --- Timeline ---
-const timeline = ref<TimelineEntry[]>([])
-const currentYear = ref(new Date().getFullYear())
-const currentMonth = ref(new Date().getMonth() + 1)
-const currentScrollDate = ref(new Date())
-
+// --- DateScrubber ---
 const timelineMinDate = computed(() => {
-  if (!timeline.value.length) return new Date()
-  const last = timeline.value[timeline.value.length - 1]
+  const tl = vg.timeline.value
+  if (!tl.length) return new Date()
+  const last = tl[tl.length - 1]
   return new Date(last.year, last.month - 1, 1)
 })
 
 const timelineMaxDate = computed(() => {
-  if (!timeline.value.length) return new Date()
-  const first = timeline.value[0]
+  const tl = vg.timeline.value
+  if (!tl.length) return new Date()
+  const first = tl[0]
   return new Date(first.year, first.month, 0, 23, 59, 59)
 })
 
-async function loadTimeline() {
-  timeline.value = await api.get<TimelineEntry[]>('/media/timeline', {
-    ...mediaParams(),
-  })
-  if (timeline.value.length) {
-    currentYear.value = timeline.value[0].year
-    currentMonth.value = timeline.value[0].month
-  }
+function handleDateScrubberJump(date: Date) {
+  const target = vg.findBucketByDate(date)
+  if (target) vg.scrollToBucket(target.year, target.month)
 }
 
-async function handleTimelineJump(entry: TimelineEntry) {
-  const nextMonth = entry.month === 12
-    ? `${entry.year + 1}-01-01T00:00:00`
-    : `${entry.year}-${String(entry.month + 1).padStart(2, '0')}-01T00:00:00`
-  const cursor = `${nextMonth}|999999999`
-
-  // Use composable's jumpToCursor — it clears items, sets cursor, loads DESC
-  await jumpToCursor(cursor)
-
-  // After load, set up upward (newer) cursor from the first item
-  if (items.value.length) {
-    const first = items.value[0]
-    prevCursor.value = `${first.created_at}|${first.id}`
-    hasMoreBefore.value = true
-    isJumped.value = true
-  }
-
-  currentYear.value = entry.year
-  currentMonth.value = entry.month
-}
-
-async function handleDateScrubberJump(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const cursorDate = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T12:00:00`
-  const cursor = `${cursorDate}|999999999`
-
-  const data = await api.get<CursorResponse<Media>>('/media', {
-    cursor,
-    direction: 'around',
-    limit: 40,
-    ...mediaParams(),
-  })
-
-  resetBidirectionalState()
-  seedItems(data.items, data.next_cursor ?? null, data.has_more)
-
-  if (data.prev_cursor) {
-    prevCursor.value = data.prev_cursor
-    hasMoreBefore.value = data.has_more_before ?? false
-  }
-
-  isJumped.value = true
-  currentYear.value = date.getFullYear()
-  currentMonth.value = date.getMonth() + 1
-  currentScrollDate.value = date
-}
-
-// --- Month separators ---
-function getYearMonth(item: Media): string {
-  if (!item.created_at) return ''
-  return item.created_at.substring(0, 7)
-}
-
-function shouldShowSeparator(idx: number): boolean {
-  if (idx === 0) return true
-  return getYearMonth(items.value[idx]) !== getYearMonth(items.value[idx - 1])
-}
-
-function getMonthLabel(item: Media): string {
-  if (!item.created_at) return ''
-  const d = new Date(item.created_at)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月`
-}
-
-// --- Scroll sync ---
-function onScroll() {
-  const container = scrollContainer.value
-  if (!container) return
-  const gridItems = container.querySelectorAll<HTMLElement>('[data-created]')
-  for (const el of gridItems) {
-    const rect = el.getBoundingClientRect()
-    if (rect.top >= 0) {
-      const created = el.dataset.created
-      if (created) {
-        const d = new Date(created)
-        currentYear.value = d.getFullYear()
-        currentMonth.value = d.getMonth() + 1
-        currentScrollDate.value = d
-      }
-      break
-    }
-  }
-}
-
-// --- Filters ---
-const setType = (type: string) => {
-  selectedType.value = type
-  resetBidirectionalState()
-  reset()
-}
-
-const toggleStarredFilter = () => {
-  starredFilter.value = !starredFilter.value
-  resetBidirectionalState()
-  reset()
-}
-
-const backToLatest = () => {
-  resetBidirectionalState()
-  reset()
+// --- Back to latest ---
+const showBackToLatest = computed(
+  () => vg.scrollTop.value > vg.viewportH.value * 2,
+)
+function backToLatest() {
   scrollContainer.value?.scrollTo({ top: 0, behavior: 'auto' })
 }
 
-watch([selectedType, starredFilter, selectedTagId, selectedActorId], () => {
-  loadTimeline()
-})
+// --- Preview ---
+function openPreview(bucketKey: string, idx: number) {
+  const item = vg.cache.value.get(bucketKey)?.items[idx]
+  if (!item) return
 
-const handlePreviewToggleStar = async (mediaId: number) => {
-  const item = items.value.find(m => m.id === mediaId)
-  if (item) await toggleMediaStar(item)
-}
-
-const handleMediaDeleted = (mediaId: number) => {
-  const idx = items.value.findIndex(m => m.id === mediaId)
-  if (idx !== -1) items.value.splice(idx, 1)
-}
-
-const handleMediaRotated = async (mediaId: number) => {
-  const t = Date.now()
-  const item = items.value.find(m => m.id === mediaId)
-  if (item) {
-    item.thumb_url = item.thumb_url.split('?')[0] + `?t=${t}`
+  // Gather siblings: ±10 from same bucket's loaded items
+  const entry = vg.cache.value.get(bucketKey)!
+  const totalItems = 20
+  const half = Math.floor(totalItems / 2)
+  let start = Math.max(0, idx - half)
+  let end = Math.min(entry.items.length - 1, idx + half)
+  if (end - start < totalItems - 1) {
+    if (start === 0) end = Math.min(entry.items.length - 1, totalItems - 1)
+    else if (end === entry.items.length - 1) start = Math.max(0, end - (totalItems - 1))
   }
-  const pItem = previewItems.value.find(m => m.id === mediaId)
+
+  const slice = entry.items.slice(start, end + 1)
+  previewItems.value = slice.map((m: Media) => ({
+    id: m.id,
+    file_path: m.file_path,
+    mime_type: m.mime_type,
+    duration_ms: m.duration_ms,
+    thumb_url: m.thumb_url,
+    starred: m.starred,
+  }))
+  previewStartIndex.value = idx - start
+  previewOpen.value = true
+}
+
+async function handlePreviewToggleStar(mediaId: number) {
+  const found = vg.findItemBucketAndIndex(mediaId)
+  if (!found) return
+  const item = vg.cache.value.get(found.key)!.items[found.idx]
+  await toggleMediaStar(item)
+}
+
+function handleMediaDeleted(mediaId: number) {
+  vg.removeItem(mediaId)
+}
+
+function handleMediaRotated(mediaId: number) {
+  const t = Date.now()
+  vg.updateItem(mediaId, (m) => {
+    m.thumb_url = m.thumb_url.split('?')[0] + `?t=${t}`
+  })
+  const pItem = previewItems.value.find((m) => m.id === mediaId)
   if (pItem) {
     pItem.thumb_url = pItem.thumb_url.split('?')[0] + `?t=${t}`
     pItem.file_path = pItem.file_path.split('?')[0] + `?t=${t}`
   }
 }
 
-const openPreview = (item: Media) => {
-  const idx = items.value.findIndex(m => m.id === item.id)
-  if (idx === -1) return
-
-  const totalItems = 20
-  const half = Math.floor(totalItems / 2)
-
-  let start = idx - half
-  let end = idx + half
-
-  if (start < 0) {
-    end += Math.abs(start)
-    start = 0
-  }
-  if (end >= items.value.length) {
-    start -= (end - items.value.length + 1)
-    end = items.value.length - 1
-  }
-
-  start = Math.max(0, start)
-
-  const selectedItems = items.value.slice(start, end + 1)
-  previewItems.value = selectedItems.map((m: Media) => ({
-    id: m.id,
-    file_path: m.file_path,
-    mime_type: m.mime_type,
-    duration_ms: m.duration_ms,
-    thumb_url: m.thumb_url,
-    starred: m.starred
-  }))
-
-  previewStartIndex.value = idx - start
-  previewOpen.value = true
-}
-
 onMounted(() => {
-  reset()
-  setupObserver()
-  setupTopObserver()
-  loadTimeline()
   fetchTags()
   fetchActors()
-})
-
-onUnmounted(() => {
-  teardownTopObserver()
 })
 </script>
