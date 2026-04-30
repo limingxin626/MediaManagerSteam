@@ -136,6 +136,7 @@
         :max-date="timelineMaxDate"
         :current-date="vg.currentDate.value"
         @jump="handleDateScrubberJump"
+        @jump-final="handleDateScrubberJumpFinal"
       />
     </div>
 
@@ -280,8 +281,15 @@ const timelineMaxDate = computed(() => {
 })
 
 function handleDateScrubberJump(date: Date) {
+  vg.setDispatchPaused(true)
+  vg.scrollToDate(date)
+}
+
+function handleDateScrubberJumpFinal(date: Date) {
+  vg.scrollToDate(date)
+  vg.setDispatchPaused(false)
   const target = vg.findBucketByDate(date)
-  if (target) vg.scrollToBucket(target.year, target.month)
+  if (target) vg.loadBucketNow(`${target.year}-${String(target.month).padStart(2, '0')}`)
 }
 
 // --- Back to latest ---

@@ -90,6 +90,7 @@ export function useVirtualGrid(opts: Options) {
   const viewportH = ref(0)
 
   const cacheRef = shallowRef(new Map<string, BucketCacheEntry>())
+  const dispatchPaused = ref(false)
 
   function bumpCache() {
     triggerRef(cacheRef)
@@ -256,6 +257,7 @@ export function useVirtualGrid(opts: Options) {
   }
 
   function dispatchFetches() {
+    if (dispatchPaused.value) return
     const visibleKeys = new Set(visibleBuckets.value.map((b) => b.key))
     for (const k of dwellTimers.keys()) {
       if (!visibleKeys.has(k)) cancelLoad(k)
@@ -265,6 +267,16 @@ export function useVirtualGrid(opts: Options) {
       if (!e || e.status === 'idle' || e.status === 'partial') {
         scheduleLoad(b.key)
       }
+    }
+  }
+
+  function setDispatchPaused(v: boolean) {
+    dispatchPaused.value = v
+    if (v) {
+      for (const t of dwellTimers.values()) clearTimeout(t)
+      dwellTimers.clear()
+    } else {
+      dispatchFetches()
     }
   }
 
@@ -298,7 +310,19 @@ export function useVirtualGrid(opts: Options) {
     const b = buckets.value.find((x) => x.key === key)
     if (!b || !container.value) return
     container.value.scrollTo({ top: b.headerOffset, behavior: 'auto' })
-    loadBucketNow(key)
+  }
+
+  function scrollToDate(date: Date) {
+    const b = findBucketByDate(date)
+    if (!b || !container.value) return
+    // Fraction of month elapsed (newer = top, so day 1 → bottom of month)
+    const daysInMonth = new Date(b.year, b.month, 0).getDate()
+    const day = date.getFullYear() === b.year && date.getMonth() + 1 === b.month
+      ? Math.min(daysInMonth, Math.max(1, date.getDate()))
+      : daysInMonth
+    const frac = (daysInMonth - day) / daysInMonth
+    const top = b.headerOffset + frac * b.height
+    container.value.scrollTo({ top, behavior: 'auto' })
   }
 
   function findBucketByDate(date: Date): BucketLayout | null {
@@ -438,6 +462,8 @@ export function useVirtualGrid(opts: Options) {
     currentDate,
     onScroll,
     scrollToBucket,
+    scrollToDate,
+    setDispatchPaused,
     findBucketByDate,
     loadBucketNow,
     loadedItem,

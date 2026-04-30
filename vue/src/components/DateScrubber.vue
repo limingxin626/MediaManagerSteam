@@ -72,6 +72,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   jump: [date: Date]
+  'jump-final': [date: Date]
 }>()
 
 const barRef = ref<HTMLElement | null>(null)
@@ -165,12 +166,29 @@ function handleJump(clientY: number) {
   emit('jump', date)
 }
 
+function handleJumpFinal(clientY: number) {
+  const pct = yToPercent(clientY)
+  const date = percentToDate(pct)
+  emit('jump-final', date)
+}
+
+let rafPending = false
+function scheduleJump(clientY: number) {
+  if (rafPending) return
+  rafPending = true
+  requestAnimationFrame(() => {
+    rafPending = false
+    handleJump(clientY)
+  })
+}
+
 let lastJumpY = 0
 
 function onPointerDown(e: MouseEvent) {
   dragging.value = true
   lastJumpY = e.clientY
   handleMove(e.clientY)
+  handleJump(e.clientY)
   document.addEventListener('mousemove', onDocMouseMove)
   document.addEventListener('mouseup', onDocMouseUp)
 }
@@ -179,10 +197,11 @@ function onDocMouseMove(e: MouseEvent) {
   if (!dragging.value) return
   lastJumpY = e.clientY
   handleMove(e.clientY)
+  scheduleJump(e.clientY)
 }
 
 function onDocMouseUp() {
-  if (dragging.value) handleJump(lastJumpY)
+  if (dragging.value) handleJumpFinal(lastJumpY)
   dragging.value = false
   document.removeEventListener('mousemove', onDocMouseMove)
   document.removeEventListener('mouseup', onDocMouseUp)
@@ -193,6 +212,7 @@ function onTouchStart(e: TouchEvent) {
   const t = e.touches[0]
   lastJumpY = t.clientY
   handleMove(t.clientY)
+  handleJump(t.clientY)
   document.addEventListener('touchmove', onTouchMove, { passive: false })
   document.addEventListener('touchend', onTouchEnd)
 }
@@ -202,10 +222,11 @@ function onTouchMove(e: TouchEvent) {
   const t = e.touches[0]
   lastJumpY = t.clientY
   handleMove(t.clientY)
+  scheduleJump(t.clientY)
 }
 
 function onTouchEnd() {
-  if (dragging.value) handleJump(lastJumpY)
+  if (dragging.value) handleJumpFinal(lastJumpY)
   dragging.value = false
   document.removeEventListener('touchmove', onTouchMove)
   document.removeEventListener('touchend', onTouchEnd)
