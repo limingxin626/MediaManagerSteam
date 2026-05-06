@@ -30,7 +30,7 @@
               ]"
             >
               <img
-                :src="resolveUrl(item.thumb_url)"
+                :src="resolveThumb(item)"
                 :alt="`media-${item.id}`"
                 class="w-full h-full object-cover"
                 loading="lazy"
@@ -75,7 +75,7 @@
 import { ref, watch, nextTick } from 'vue'
 import type { Media } from '../types'
 import { api, useInfiniteScroll } from '../composables/useApi'
-import { resolveUrl } from '../utils/media'
+import { resolveThumb } from '../utils/media'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{

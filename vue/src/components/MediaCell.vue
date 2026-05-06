@@ -4,7 +4,7 @@
     @click="emit('open')"
   >
     <img
-      :src="resolveUrl(item.thumb_url)"
+      :src="resolveThumb(item)"
       :alt="String(item.id)"
       class="w-full h-full object-cover"
       loading="lazy"
@@ -37,7 +37,7 @@
 
 <script setup lang="ts">
 import type { Media } from '../types'
-import { isVideo, formatDuration, resolveUrl } from '../utils/media'
+import { isVideo, formatDuration, resolveThumb } from '../utils/media'
 
 defineProps<{ item: Media; bouncing: boolean }>()
 const emit = defineEmits<{ open: []; star: [] }>()

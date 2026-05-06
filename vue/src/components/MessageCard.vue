@@ -34,7 +34,7 @@
           <div class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
             :style="{ aspectRatio: getAspectRatio(mediaPreviewItems[0]) }"
             @click.stop="handleMediaClick(0)">
-            <img :src="resolveUrl(mediaPreviewItems[0].thumb_url)" alt="Media 1"
+            <img :src="resolveThumb(mediaPreviewItems[0])" alt="Media 1"
               class="w-full h-full object-cover transition-transform duration-200 group-hover/media:scale-105" />
             <div class="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
             <template v-if="isVideo(mediaPreviewItems[0].mime_type)">
@@ -89,7 +89,7 @@
                 class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
                 :style="{ flex: mosaicItem.widthWeight }"
                 @click.stop="handleMediaClick(mosaicItem.index)">
-                <img :src="resolveUrl(mediaPreviewItems[mosaicItem.index].thumb_url)" :alt="`Media ${mosaicItem.index + 1}`"
+                <img :src="resolveThumb(mediaPreviewItems[mosaicItem.index])" :alt="`Media ${mosaicItem.index + 1}`"
                   class="w-full h-full object-cover transition-transform duration-200 group-hover/media:scale-105" />
                 <div class="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
                 <template v-if="isVideo(mediaPreviewItems[mosaicItem.index].mime_type)">
@@ -143,7 +143,7 @@
             <div class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
               :style="{ width: (mosaicLayout.leftColumnWidth * 100) + '%' }"
               @click.stop="handleMediaClick(mosaicLayout.leftColumnIndex)">
-              <img :src="resolveUrl(mediaPreviewItems[mosaicLayout.leftColumnIndex].thumb_url)" :alt="`Media ${mosaicLayout.leftColumnIndex + 1}`"
+              <img :src="resolveThumb(mediaPreviewItems[mosaicLayout.leftColumnIndex])" :alt="`Media ${mosaicLayout.leftColumnIndex + 1}`"
                 class="w-full h-full object-cover transition-transform duration-200 group-hover/media:scale-105" />
               <div class="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
               <template v-if="isVideo(mediaPreviewItems[mosaicLayout.leftColumnIndex].mime_type)">
@@ -174,7 +174,7 @@
                 class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
                 :style="{ flex: row.heightWeight }"
                 @click.stop="handleMediaClick(row.items[0].index)">
-                <img :src="resolveUrl(mediaPreviewItems[row.items[0].index].thumb_url)" :alt="`Media ${row.items[0].index + 1}`"
+                <img :src="resolveThumb(mediaPreviewItems[row.items[0].index])" :alt="`Media ${row.items[0].index + 1}`"
                   class="w-full h-full object-cover transition-transform duration-200 group-hover/media:scale-105" />
                 <div class="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
                 <template v-if="isVideo(mediaPreviewItems[row.items[0].index].mime_type)">
@@ -296,7 +296,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import type { Message, MessageMediaItem, TagItem, TagWithCount } from '../types'
-import { isVideo, formatDuration, resolveUrl } from '../utils/media'
+import { isVideo, formatDuration, resolveThumb } from '../utils/media'
 import { renderMarkdown } from '../utils/markdown'
 import TagPickerPopover from './TagPickerPopover.vue'
 import { formatRelativeTime } from '../utils/date'

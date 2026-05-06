@@ -55,7 +55,7 @@
             @dragstart="onDragStart($event, media.id, 'existing')"
             @dragover.prevent="onDragOver($event)"
             @drop="onDrop($event, media.id, 'existing')">
-            <img :src="resolveUrl(media.thumb_url)" class="w-full h-full object-cover" />
+            <img :src="resolveThumb(media)" class="w-full h-full object-cover" />
             <button @click="removeExistingMedia(media.id)"
               class="absolute top-1 right-1 p-0.5 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,7 +142,7 @@ import type { MessageDetail, MessageMediaItem, TagItem } from '../types'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useTagAutocomplete } from '../composables/useTagAutocomplete'
-import { resolveUrl } from '../utils/media'
+import { resolveThumb } from '../utils/media'
 import { API_BASE_URL } from '../utils/constants'
 
 interface Props {

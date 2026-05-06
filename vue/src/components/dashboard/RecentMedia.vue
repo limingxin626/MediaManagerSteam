@@ -14,7 +14,7 @@
         @click="openPreview(idx)"
       >
         <img
-          :src="resolveUrl(m.thumb_url)"
+          :src="resolveThumb(m)"
           :alt="`media-${m.id}`"
           class="w-full h-full object-cover"
           loading="lazy"
@@ -38,7 +38,7 @@
 import { onMounted, ref } from 'vue'
 import { api } from '../../composables/useApi'
 import { useToast } from '../../composables/useToast'
-import { resolveUrl } from '../../utils/media'
+import { resolveThumb } from '../../utils/media'
 import MediaPreview from '../MediaPreview.vue'
 import type { Media, CursorResponse } from '../../types'
 
@@ -68,6 +68,7 @@ function openPreview(idx: number) {
     mime_type: m.mime_type,
     duration_ms: m.duration_ms,
     thumb_url: m.thumb_url,
+    thumb_path: m.thumb_path,
     starred: m.starred,
   }))
   previewStartIndex.value = idx

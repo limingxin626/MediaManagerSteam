@@ -37,7 +37,7 @@
             @click="openPreview(idx)"
           >
             <img
-              :src="resolveUrl(item.thumb_url)"
+              :src="resolveThumb(item)"
               :alt="String(item.id)"
               class="w-full h-full object-cover"
               loading="lazy"
@@ -112,7 +112,7 @@ import { useRoute, useRouter } from 'vue-router'
 import MediaPreview from '../components/MediaPreview.vue'
 import type { Media, CursorResponse } from '../types'
 import { api, useInfiniteScroll } from '../composables/useApi'
-import { isVideo, formatDuration, resolveUrl, toggleMediaStar } from '../utils/media'
+import { isVideo, formatDuration, resolveThumb, toggleMediaStar } from '../utils/media'
 
 defineOptions({ name: 'MediaFeed' })
 
@@ -182,6 +182,7 @@ const openPreview = (idx: number) => {
     mime_type: m.mime_type,
     duration_ms: m.duration_ms,
     thumb_url: m.thumb_url,
+    thumb_path: m.thumb_path,
     starred: m.starred,
   }))
   previewStartIndex.value = idx - start

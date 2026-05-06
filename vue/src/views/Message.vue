@@ -270,7 +270,7 @@
               class="group aspect-square overflow-hidden relative rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
               :class="splitMode && splitSelectedIds.has(media.id) ? 'ring-2 ring-[var(--color-primary-500)]' : ''"
               @click="handleSelectedMessageMediaClick(index)">
-              <img :src="resolveUrl(media.thumb_url)" class="w-full h-full object-cover" />
+              <img :src="resolveThumb(media)" class="w-full h-full object-cover" />
               <div v-if="splitMode"
                 class="absolute top-1 left-1 w-5 h-5 rounded-full border-2 flex items-center justify-center"
                 :class="splitSelectedIds.has(media.id)
@@ -350,7 +350,7 @@ import FilterSidebar from '../components/FilterSidebar.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
-import { resolveUrl, formatDuration, toggleMediaStar } from '../utils/media'
+import { resolveUrl, resolveThumb, formatDuration, toggleMediaStar } from '../utils/media'
 import { formatDateLabel } from '../utils/date'
 import { useTheme } from '../composables/useTheme'
 

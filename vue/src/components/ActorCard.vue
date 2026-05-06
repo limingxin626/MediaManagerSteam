@@ -7,7 +7,7 @@
     <!-- Thumbnail -->
     <div class="bg-gray-100 dark:bg-gray-700 overflow-hidden aspect-[3/4]">
       <img 
-        :src="resolveUrl(actor.avatar_url)" 
+        :src="resolveAvatar(actor)"
         :alt="actor.name" 
         class="w-full h-full object-cover"
       />
@@ -31,7 +31,7 @@
 
 <script setup lang="ts">
 import type { Actor } from '../types'
-import { resolveUrl } from '../utils/media'
+import { resolveAvatar } from '../utils/media'
 
 interface Props {
   actor: Actor

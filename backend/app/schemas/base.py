@@ -22,16 +22,19 @@ class TimestampMixin(OrmBase):
 
 
 class MediaUrlMixin(OrmBase):
-    """自动填充 file_url / thumb_url 的 mixin"""
+    """自动填充 file_url / thumb_url / thumb_path 的 mixin"""
     id: int
     file_path: str
     file_url: str = ""
     thumb_url: str = ""
+    thumb_path: str = ""
 
     @model_validator(mode="after")
     def _fill_urls(self):
         if not self.thumb_url:
             self.thumb_url = config.get_thumbnail_url(self.id)
+        if not self.thumb_path:
+            self.thumb_path = config.get_thumbnail_path(self.id)
         if not self.file_url and self.file_path:
             self.file_url = config.to_url_path(self.file_path)
         return self

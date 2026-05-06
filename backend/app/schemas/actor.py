@@ -10,6 +10,7 @@ class ActorResponse(OrmBase):
     description: Optional[str] = None
     avatar_path: Optional[str] = None
     avatar_url: str = ""
+    avatar_abs_path: str = ""
     message_count: int
     created_at: str
     updated_at: str
@@ -18,6 +19,8 @@ class ActorResponse(OrmBase):
     def _fill_avatar_url(self):
         if not self.avatar_url:
             self.avatar_url = config.get_actor_avatar_url(self.id)
+        if not self.avatar_abs_path:
+            self.avatar_abs_path = config.get_actor_avatar_path(self.id)
         return self
 
 

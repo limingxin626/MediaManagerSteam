@@ -24,7 +24,7 @@
       >
         <div class="flex gap-3 p-2">
           <img
-            :src="resolveUrl(p.thumb_url)"
+            :src="resolveThumb(p)"
             :alt="`preview-${p.id}`"
             class="w-24 h-16 object-cover rounded bg-black flex-shrink-0"
             loading="lazy"
@@ -184,7 +184,7 @@ import { ref, reactive } from 'vue'
 import type { VideoPreviewItem } from '../types'
 import { api, ApiError } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import { resolveUrl } from '../utils/media'
+import { resolveThumb } from '../utils/media'
 import MediaPickerModal from './MediaPickerModal.vue'
 
 const props = defineProps<{

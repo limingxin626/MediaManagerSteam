@@ -283,6 +283,7 @@ function openPreview(bucketKey: string, idx: number) {
     mime_type: m.mime_type,
     duration_ms: m.duration_ms,
     thumb_url: m.thumb_url,
+    thumb_path: m.thumb_path,
     starred: m.starred,
   }))
   previewStartIndex.value = idx - start

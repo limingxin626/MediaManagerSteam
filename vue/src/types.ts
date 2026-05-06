@@ -18,6 +18,7 @@ export interface VideoPreviewItem {
   file_path: string
   file_url: string
   thumb_url: string
+  thumb_path?: string
   mime_type: string | null
   frame_ms: number
   start_ms: number | null

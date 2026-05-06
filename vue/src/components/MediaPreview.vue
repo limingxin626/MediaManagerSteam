@@ -187,7 +187,7 @@
             >
               <img
                 v-if="isImage(item.mime_type)"
-                :src="resolveUrl(item.thumb_url)"
+                :src="resolveThumb(item)"
                 class="w-full h-full object-cover"
               />
               <div
@@ -195,7 +195,7 @@
                 class="w-full h-full relative bg-gray-800"
               >
                 <img
-                  :src="resolveUrl(item.thumb_url)"
+                  :src="resolveThumb(item)"
                   class="w-full h-full object-cover"
                 />
                 <svg class="absolute inset-0 m-auto w-4 h-4 text-white/80" fill="currentColor" viewBox="0 0 24 24">
@@ -253,7 +253,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import type { MessageMediaItem, TagWithCount, TagItem, Media } from '../types'
-import { isVideo, isImage, resolveUrl, rotateMedia } from '../utils/media'
+import { isVideo, isImage, resolveUrl, resolveThumb, rotateMedia } from '../utils/media'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import TagPickerPopover from './TagPickerPopover.vue'
