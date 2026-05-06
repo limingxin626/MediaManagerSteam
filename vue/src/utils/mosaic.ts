@@ -101,7 +101,7 @@ function layoutThree(clamped: number[], original: number[], w: number): MosaicLa
 function layoutOptimized(ratios: number[], containerWidth: number): MosaicLayout {
   const count = ratios.length
   const maxLines = Math.min(4, count)
-  const maxPerLine = Math.min(4, count)
+  const maxPerLine = 4
 
   let bestVariance = Infinity
   let bestPartition: number[] | null = null
@@ -147,7 +147,15 @@ function layoutOptimized(ratios: number[], containerWidth: number): MosaicLayout
     search(count, numLines, [])
   }
 
-  const partition = bestPartition ?? [count]
+  let partition: number[]
+  if (bestPartition) {
+    partition = bestPartition
+  } else {
+    const lines = Math.ceil(count / maxPerLine)
+    const base = Math.floor(count / lines)
+    const extra = count - base * lines
+    partition = Array.from({ length: lines }, (_, i) => base + (i < extra ? 1 : 0))
+  }
   const rows: MosaicRow[] = []
   let idx = 0
   for (const lineCount of partition) {
