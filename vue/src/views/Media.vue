@@ -56,7 +56,7 @@
 
         <!-- Month headers -->
         <div
-          v-for="b in vg.buckets.value"
+          v-for="b in vg.visibleBuckets.value"
           :key="'h-' + b.key"
           class="absolute left-0 right-0 px-1 sm:px-2 py-2"
           :style="{ top: b.headerOffset + 'px', height: vg.monthHeaderH.value + 'px' }"
@@ -64,52 +64,22 @@
           <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ b.year }}年{{ b.month }}月</span>
         </div>
 
-        <!-- Cells (placeholder + loaded) -->
-        <template v-for="b in vg.buckets.value" :key="'g-' + b.key">
-          <div
-            v-for="i in b.count"
-            :key="b.key + '-' + (i - 1)"
-            :style="cellStyle(b, i - 1)"
-            class="absolute rounded overflow-hidden bg-gray-200 dark:bg-gray-900"
-          >
-            <template v-if="vg.loadedItem(b, i - 1) as Media | undefined">
-              <div
-                class="group w-full h-full relative cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
-                @click="openPreview(b.key, i - 1)"
-              >
-                <img
-                  :src="resolveUrl((vg.loadedItem(b, i - 1) as Media).thumb_url)"
-                  :alt="String((vg.loadedItem(b, i - 1) as Media).id)"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
-                />
-                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
-                <div v-if="isVideo((vg.loadedItem(b, i - 1) as Media).mime_type)" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div class="w-8 h-8 bg-black/40 rounded-full flex items-center justify-center border border-white/30">
-                    <svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z"/>
-                    </svg>
-                  </div>
-                </div>
-                <div v-if="(vg.loadedItem(b, i - 1) as Media).duration_ms" class="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                  {{ formatDuration((vg.loadedItem(b, i - 1) as Media).duration_ms!) }}
-                </div>
-                <button
-                  @click.stop="starWithBounce(vg.loadedItem(b, i - 1) as Media)"
-                  class="absolute top-1 right-1 p-1 rounded-full transition-all"
-                  :class="(vg.loadedItem(b, i - 1) as Media).starred
-                    ? 'text-yellow-400'
-                    : 'text-white/70 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
-                  "
-                >
-                  <svg class="w-4 h-4" :class="{ 'star-bounce': mediaBounceId === (vg.loadedItem(b, i - 1) as Media).id }" :fill="(vg.loadedItem(b, i - 1) as Media).starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                  </svg>
-                </button>
-              </div>
-            </template>
-          </div>
-        </template>
+        <!-- Visible cells only (true virtualization) -->
+        <div
+          v-for="cell in vg.visibleCells.value"
+          :key="cell.bucket.key + '-' + cell.idx"
+          :style="{ top: cell.top + 'px', left: cell.left + 'px', width: cell.size + 'px', height: cell.size + 'px' }"
+          class="absolute rounded overflow-hidden bg-gray-200 dark:bg-gray-900"
+        >
+          <template v-if="vg.loadedItem(cell.bucket, cell.idx) as Media | undefined">
+            <MediaCell
+              :item="(vg.loadedItem(cell.bucket, cell.idx) as Media)"
+              :bouncing="mediaBounceId === (vg.loadedItem(cell.bucket, cell.idx) as Media).id"
+              @open="openPreview(cell.bucket.key, cell.idx)"
+              @star="starWithBounce(vg.loadedItem(cell.bucket, cell.idx) as Media)"
+            />
+          </template>
+        </div>
 
         <!-- Empty -->
         <div v-if="!vg.buckets.value.length && !vg.loadingTimeline.value" class="flex flex-col items-center justify-center py-20">
@@ -172,10 +142,11 @@ import { ref, computed, onMounted } from 'vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import DateScrubber from '../components/DateScrubber.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
+import MediaCell from '../components/MediaCell.vue'
 import type { Media, TagWithCount, Actor } from '../types'
 import { api } from '../composables/useApi'
-import { useVirtualGrid, type BucketLayout } from '../composables/useVirtualGrid'
-import { isVideo, formatDuration, resolveUrl, toggleMediaStar } from '../utils/media'
+import { useVirtualGrid } from '../composables/useVirtualGrid'
+import { toggleMediaStar } from '../utils/media'
 
 defineOptions({ name: 'Media' })
 
@@ -252,17 +223,6 @@ function setType(type: string) {
 
 function toggleStarredFilter() {
   starredFilter.value = !starredFilter.value
-}
-
-// --- Layout helpers ---
-function cellStyle(b: BucketLayout, idx: number) {
-  const p = vg.itemPosition(b, idx)
-  return {
-    top: p.top + 'px',
-    left: p.left + 'px',
-    width: p.size + 'px',
-    height: p.size + 'px',
-  }
 }
 
 // --- DateScrubber ---

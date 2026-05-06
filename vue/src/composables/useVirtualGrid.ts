@@ -47,9 +47,18 @@ const GAP = 4
 const WINDOW_GAP = 16
 const PAGE_LIMIT = 100
 const PREFETCH_PX = 800
+const RENDER_OVERSCAN_PX = 400
 const DWELL_MS = 150
 const MAX_CONCURRENT = 2
 const DEFAULT_HEADER_H = 44
+
+export interface VisibleCell {
+  bucket: BucketLayout
+  idx: number
+  top: number
+  left: number
+  size: number
+}
 
 interface Options {
   container: Ref<HTMLElement | null>
@@ -132,6 +141,39 @@ export function useVirtualGrid(opts: Options) {
     const top = scrollTop.value - PREFETCH_PX
     const bottom = scrollTop.value + viewportH.value + PREFETCH_PX
     return buckets.value.filter((b) => b.endOffset >= top && b.headerOffset <= bottom)
+  })
+
+  const visibleCells = computed<VisibleCell[]>(() => {
+    const cs = cellSize.value
+    const c = cols.value
+    if (cs <= 0 || c <= 0) return []
+    const top = scrollTop.value - RENDER_OVERSCAN_PX
+    const bottom = scrollTop.value + viewportH.value + RENDER_OVERSCAN_PX
+    const rowStride = cs + GAP
+    const out: VisibleCell[] = []
+    for (const b of buckets.value) {
+      if (b.endOffset < top || b.headerOffset > bottom) continue
+      const firstRow = Math.max(0, Math.floor((top - b.gridOffset) / rowStride))
+      const lastRow = Math.min(
+        b.rows - 1,
+        Math.floor((bottom - b.gridOffset) / rowStride),
+      )
+      if (lastRow < 0 || firstRow > b.rows - 1) continue
+      const startIdx = firstRow * c
+      const endIdx = Math.min(b.count, (lastRow + 1) * c)
+      for (let idx = startIdx; idx < endIdx; idx++) {
+        const row = Math.floor(idx / c)
+        const col = idx % c
+        out.push({
+          bucket: b,
+          idx,
+          top: b.gridOffset + row * rowStride,
+          left: col * rowStride,
+          size: cs,
+        })
+      }
+    }
+    return out
   })
 
   const currentDate = computed(() => {
@@ -459,6 +501,7 @@ export function useVirtualGrid(opts: Options) {
     scrollTop,
     viewportH,
     visibleBuckets,
+    visibleCells,
     currentDate,
     onScroll,
     scrollToBucket,
