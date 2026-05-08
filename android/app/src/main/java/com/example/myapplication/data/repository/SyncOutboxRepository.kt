@@ -65,9 +65,10 @@ class SyncOutboxRepository(
             return PushSyncResult.Skipped
         }
 
-        // 无 WiFi 时跳过，由 WorkManager 在网络恢复后重试
-        if (networkMonitor?.isWifiConnected?.value == false) {
-            Log.d(TAG, "syncToServer 跳过：当前无 WiFi 连接")
+        // 后端不可达时跳过，避免离线场景每次写操作都等 socket 超时
+        // 由 NetworkMonitor 30s 探活循环 + WorkManager 在恢复后批量重试
+        if (networkMonitor?.isBackendReachable?.value == false) {
+            Log.d(TAG, "syncToServer 跳过：后端不可达")
             return PushSyncResult.Skipped
         }
 
