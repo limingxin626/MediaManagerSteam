@@ -179,9 +179,9 @@ fun ZoomableContainer(
                                     }
                                 }
                             } else {
-                                // 没有拖拽/缩放 → 可能是点击，检测双击
+                                // 没有拖拽/缩放 → 可能是点击，先排除"滑动翻页"误判
                                 val upChange = event.changes.firstOrNull { it.changedToUp() }
-                                if (upChange != null) {
+                                if (upChange != null && !pastTouchSlop) {
                                     val now = System.currentTimeMillis()
                                     val tapPos = upChange.position
                                     val timeSinceLast = now - lastTapTimeMs
@@ -267,7 +267,15 @@ fun ZoomableContainer(
                                 event.changes.forEach { it.consume() }
                             }
                         }
-                        // else: scale <= 1 且单指 → 不消费，Pager 处理翻页
+                        // else: scale <= 1 且单指 → 不消费，Pager 处理翻页；
+                        // 仍需追踪 touchSlop，避免横滑被误判为单击
+                        if (activePointers.size == 1 && scale.value <= 1.01f && !pastTouchSlop) {
+                            val pointer = activePointers.first()
+                            val dist = (pointer.position - firstDown.position).getDistance()
+                            if (dist > viewConfiguration.touchSlop) {
+                                pastTouchSlop = true
+                            }
+                        }
                     }
                 }
             },

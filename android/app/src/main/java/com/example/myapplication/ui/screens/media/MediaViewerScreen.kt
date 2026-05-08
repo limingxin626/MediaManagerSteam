@@ -403,12 +403,16 @@ private fun MediaViewerContent(
     // 图片缩放状态 — 控制 Pager 是否允许滑动
     var currentScale by remember { mutableFloatStateOf(1f) }
 
-    // 控件与缩略图条统一显隐状态
-    var controlsVisible by remember { mutableStateOf(true) }
+    // 顶部栏 + 底部缩略图条的显隐（仅由图片单击翻转，不受视频自动隐藏影响）
+    var stripVisible by remember { mutableStateOf(true) }
 
-    // 切换页面时重置缩放状态
+    // 视频内部控件（进度条/播放按钮）的显隐，沿用 3s 自动隐藏
+    var videoControlsVisible by remember { mutableStateOf(false) }
+
+    // 切换页面时重置缩放状态，并清掉视频控件可见态避免跨页继承
     LaunchedEffect(pagerState.settledPage) {
         currentScale = 1f
+        videoControlsVisible = false
     }
 
     Box(
@@ -436,10 +440,10 @@ private fun MediaViewerContent(
                             .fillMaxSize()
                             .padding(bottom = if (mediaList.size > 1) 76.dp else 0.dp),
                         zoomEnabled = true,
-                        controlsVisible = controlsVisible,
+                        controlsVisible = videoControlsVisible,
                         onScaleChanged = { if (isCurrentPage) currentScale = it },
                         onControlsVisibilityChanged = { visible ->
-                            if (isCurrentPage) controlsVisible = visible
+                            if (isCurrentPage) videoControlsVisible = visible
                         }
                     )
                 } else {
@@ -453,7 +457,7 @@ private fun MediaViewerContent(
                     imagePath = imagePath,
                     onScaleChanged = { if (isCurrentPage) currentScale = it },
                     modifier = Modifier.fillMaxSize(),
-                    onSingleTap = { controlsVisible = !controlsVisible }
+                    onSingleTap = { stripVisible = !stripVisible }
                 )
             }
         }
@@ -512,10 +516,10 @@ private fun MediaViewerContent(
             }
         }
 
-        // 底部：横向缩略图导航条（多于1个媒体时显示，受 controlsVisible 控制）
+        // 底部：横向缩略图导航条（多于1个媒体时显示，受 stripVisible 控制）
         if (stripMediaList.size > 1) {
             AnimatedVisibility(
-                visible = controlsVisible,
+                visible = stripVisible,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier
