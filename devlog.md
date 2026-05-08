@@ -1,5 +1,22 @@
 # 开发日志
 
+## 2026-05-07
+
+### 消息编辑器升级为 Milkdown (Crepe) WYSIWYG
+
+将 `MessageComposeDialog` 的纯 textarea 替换为 Milkdown Crepe 一体化编辑器，写作时即可看到加粗/标题/列表等渲染效果，体验接近 Notion。
+
+1. **依赖**：新增 `@milkdown/crepe` + `@milkdown/kit` (7.20.0)
+2. **新组件 `MilkdownEditor.vue`**：封装 Crepe 实例，对外暴露 `v-model:modelValue`、`focus()`、`getMarkdown()`、`getCursorCoords()`、`getTextBeforeCursor()`、`deleteBeforeCursor()`、`registerKeydown()`，便于上层做 hashtag 联想等扩展
+3. **样式**：`style.css` 引入 `@milkdown/crepe/theme/common/style.css` 和 `frame.css`；为 `.dark .milkdown` 单独覆盖 `--crepe-color-*` 变量（基于 `frame-dark` 配色，主色改为项目紫 `#818cf8`），保持深色一致
+4. **Hashtag 适配 `useTagAutocompleteEditor.ts`**：在 ProseMirror View 上监听 keydown，从光标前文本反向扫到 `#` 检测查询；选择标签时通过 `tr.delete` 删除 `#xxx` 段落，复用 `addTag` 把标签加入 chips
+5. **共享匹配工具 `utils/tagMatch.ts`**：把原 `useTagAutocomplete` 中的 `matchTags()`/`pushRecentTag()` 抽出，新旧两个 composable 共用，避免逻辑漂移
+6. **保留**：`MessageCard` 渲染（marked + prose）、后端 `#hashtag` 抽取、媒体附件流程一律不变；旧 `useTagAutocomplete.ts` 暂保留以备后续清理
+
+涉及文件：
+- 新增：`vue/src/components/MilkdownEditor.vue`、`vue/src/composables/useTagAutocompleteEditor.ts`、`vue/src/utils/tagMatch.ts`
+- 修改：`vue/src/components/MessageComposeDialog.vue`、`vue/src/composables/useTagAutocomplete.ts`、`vue/src/style.css`、`vue/package.json`
+
 ## 2026-04-20
 
 ### 消息日期跳转功能

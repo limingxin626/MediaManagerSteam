@@ -1,6 +1,6 @@
 import { ref, nextTick, type Ref } from 'vue'
 import type { TagItem } from '../types'
-import { getPinyinInitials } from '../utils/pinyinInitial'
+import { matchTags, pushRecentTag } from '../utils/tagMatch'
 
 export function useTagAutocomplete(
   textareaRef: Ref<HTMLTextAreaElement | null>,
@@ -17,7 +17,6 @@ export function useTagAutocomplete(
   
   // 存储最近使用的标签ID，按使用顺序排列（最近的在前）
   const recentTags = ref<number[]>([])
-  const MAX_RECENT_TAGS = 10
 
   const getTags = () => (typeof allTags === 'function' ? allTags() : allTags.value)
 
@@ -92,34 +91,7 @@ export function useTagAutocomplete(
 
     currentTagStart = hashPos
     const query = afterHash.toLowerCase()
-    
-    const allTagList = getTags()
-    const textMatched = new Set<number>()
-    const textResults: TagItem[] = []
-    const pinyinResults: TagItem[] = []
-
-    for (const tag of allTagList) {
-      if (tag.name.toLowerCase().includes(query)) {
-        textResults.push(tag)
-        textMatched.add(tag.id)
-      }
-    }
-
-    if (query && /^[a-z]+$/.test(query)) {
-      for (const tag of allTagList) {
-        if (!textMatched.has(tag.id)) {
-          const initials = getPinyinInitials(tag.name)
-          if (initials.includes(query)) {
-            pinyinResults.push(tag)
-          }
-        }
-      }
-    }
-
-    tagSuggestions.value = [
-      ...sortTagsByRecentUse(textResults),
-      ...sortTagsByRecentUse(pinyinResults),
-    ].slice(0, 8)
+    tagSuggestions.value = matchTags(query, getTags(), recentTags.value, 8)
 
     if (tagSuggestions.value.length > 0) {
       tagSuggestionVisible.value = true
@@ -130,37 +102,9 @@ export function useTagAutocomplete(
     }
   }
 
-  // 按最近使用排序标签
-  const sortTagsByRecentUse = (tags: TagItem[]): TagItem[] => {
-    return tags.sort((a, b) => {
-      const aIndex = recentTags.value.indexOf(a.id)
-      const bIndex = recentTags.value.indexOf(b.id)
-      
-      // 最近使用的标签排前面
-      if (aIndex !== -1 && bIndex !== -1) {
-        return aIndex - bIndex
-      }
-      // 只有一个在最近使用列表中，排前面
-      if (aIndex !== -1) return -1
-      if (bIndex !== -1) return 1
-      // 都不在最近使用列表中，按名称排序
-      return a.name.localeCompare(b.name)
-    })
-  }
-
   // 更新最近使用的标签
   const updateRecentTags = (tagId: number) => {
-    // 移除已存在的，放到最前面
-    const currentIndex = recentTags.value.indexOf(tagId)
-    if (currentIndex !== -1) {
-      recentTags.value.splice(currentIndex, 1)
-    }
-    // 添加到最前面
-    recentTags.value.unshift(tagId)
-    // 限制数量
-    if (recentTags.value.length > MAX_RECENT_TAGS) {
-      recentTags.value = recentTags.value.slice(0, MAX_RECENT_TAGS)
-    }
+    recentTags.value = pushRecentTag(recentTags.value, tagId)
   }
 
   const scrollToActiveItem = () => {

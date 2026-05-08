@@ -28,10 +28,10 @@
         <span v-if="selectedTags.length === 0" class="text-xs text-gray-400 dark:text-gray-500 self-center">输入 # 选择标签</span>
       </div>
 
-      <!-- Textarea -->
-      <textarea ref="textareaRef" v-model="text" placeholder="输入消息内容..."
-        class="flex-1 w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-        @input="tag.onInput" @keydown="handleKeydown" @blur="tag.hide" />
+      <!-- Editor (Milkdown WYSIWYG) -->
+      <MilkdownEditor ref="editorRef" v-model="text" placeholder="输入消息内容..."
+        class="flex-1 w-full border border-gray-300 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/10"
+        @update="tag.onUpdate" @ready="onEditorReady" />
 
       <!-- Tag Suggestions -->
       <div v-if="tag.tagSuggestionVisible.value && tag.tagSuggestions.value.length > 0"
@@ -141,9 +141,10 @@ import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import type { MessageDetail, MessageMediaItem, TagItem } from '../types'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import { useTagAutocomplete } from '../composables/useTagAutocomplete'
+import { useTagAutocompleteEditor } from '../composables/useTagAutocompleteEditor'
 import { resolveThumb } from '../utils/media'
 import { API_BASE_URL } from '../utils/constants'
+import MilkdownEditor from './MilkdownEditor.vue'
 
 interface Props {
   visible: boolean
@@ -172,7 +173,7 @@ const toast = useToast()
 const text = ref('')
 const editDate = ref('')
 const files = ref<string[]>([])
-const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const editorRef = ref<InstanceType<typeof MilkdownEditor> | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const submitting = ref(false)
 
@@ -197,9 +198,13 @@ const removeTag = (tagId: number) => {
   selectedTags.value = selectedTags.value.filter(t => t.id !== tagId)
 }
 
-const tag = useTagAutocomplete(textareaRef, text, computed(() => props.allTags || []), addTag)
+const tag = useTagAutocompleteEditor(editorRef as any, computed(() => props.allTags || []), addTag)
 const tagSuggestionListEl = ref<HTMLElement | null>(null)
 watch(tagSuggestionListEl, (el) => { tag.suggestionListRef.value = el })
+
+const onEditorReady = () => {
+  tag.attach()
+}
 
 const canSubmit = computed(() => {
   if (submitting.value) return false
@@ -226,9 +231,10 @@ watch(() => props.visible, async (visible) => {
       selectedTags.value = preselect ? [preselect] : []
     }
     await nextTick()
-    textareaRef.value?.focus()
+    editorRef.value?.focus()
   } else {
     tag.hide()
+    tag.detach()
     cleanupPreviews()
   }
 })
@@ -241,10 +247,6 @@ const cleanupPreviews = () => {
 }
 
 onUnmounted(cleanupPreviews)
-
-const handleKeydown = (e: KeyboardEvent) => {
-  if (tag.onKeydown(e)) return
-}
 
 const handleEscape = () => {
   if (tag.tagSuggestionVisible.value) {
@@ -262,6 +264,10 @@ const handleClose = () => {
 const handleSubmit = async () => {
   if (!canSubmit.value) return
   submitting.value = true
+
+  // 兜底：从编辑器拉一次最新 markdown，避免 listener 未触发
+  const md = editorRef.value?.getMarkdown()
+  if (typeof md === 'string') text.value = md
 
   try {
     if (props.mode === 'create') {
