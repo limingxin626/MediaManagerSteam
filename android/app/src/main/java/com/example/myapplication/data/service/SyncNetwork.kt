@@ -71,6 +71,13 @@ data class MessageSyncRequest(
 
 data class MessageSyncResponse(
     val id: Long,
+    val text: String? = null,
+    val actor_id: Long? = null,
+    val actor_name: String? = null,
+    val starred: Boolean = false,
+    val created_at: String? = null,
+    val updated_at: String? = null,
+    val media_count: Int = 0,
     val media_items: List<RemoteMediaItem>,
     val tags: List<RemoteTagItem>
 )

@@ -71,7 +71,9 @@ data class RemoteMediaItem(
     val rating: Int,
     val starred: Boolean,
     val thumb_url: String,
-    val position: Int
+    val position: Int = 0,
+    val created_at: String? = null,
+    val updated_at: String? = null
 )
 
 data class RemoteTagItem(
@@ -91,9 +93,13 @@ data class RemoteChangesResponse(
 )
 
 data class RemoteChangeItem(
+    /** 实体类型：MESSAGE | ACTOR | MEDIA | TAG */
     val entity_type: String,
     val entity_id: Long,
-    val operation: String,   // UPSERT | DELETE
+    /** 操作类型：UPSERT | DELETE */
+    val operation: String,
     val timestamp: String,
     val data: Map<String, Any?>?  // 完整实体快照（DELETE 时为 null）
 )
+// TODO(sync v2): 后端 /sync/changes 已支持 (since, since_id) 复合游标，
+// 客户端目前只发 since，相同毫秒的多条变更存在漏拉风险，后续接入 since_id。

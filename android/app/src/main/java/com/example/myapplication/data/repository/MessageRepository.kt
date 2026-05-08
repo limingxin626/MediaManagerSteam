@@ -450,6 +450,7 @@ class MessageRepository(
 
                         // 2) Upsert Media (IGNORE + update 避免 REPLACE 级联删除 message_media)
                         for (rm in remote.media_items) {
+                            val nowMs = System.currentTimeMillis()
                             val media = Media(
                                 id = rm.id,
                                 remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
@@ -465,6 +466,8 @@ class MessageRepository(
                                 durationMs = rm.duration_ms?.toLong(),
                                 rating = rm.rating,
                                 starred = rm.starred,
+                                createdAt = rm.created_at?.let(::parseIsoToMs) ?: nowMs,
+                                updatedAt = rm.updated_at?.let(::parseIsoToMs) ?: nowMs,
                             )
                             val insertedId = mediaDao.insertMediaIgnore(media)
                             if (insertedId == -1L) {
@@ -634,6 +637,7 @@ class MessageRepository(
                                         "MEDIA" -> {
                                             val rm = parseRemoteMediaItem(data)
                                             if (rm != null) {
+                                                val nowMs = System.currentTimeMillis()
                                                 val media = Media(
                                                     id = rm.id,
                                                     remoteMediaUrl = buildFullUrl(
@@ -652,6 +656,8 @@ class MessageRepository(
                                                     durationMs = rm.duration_ms?.toLong(),
                                                     rating = rm.rating,
                                                     starred = rm.starred,
+                                                    createdAt = rm.created_at?.let(::parseIsoToMs) ?: nowMs,
+                                                    updatedAt = rm.updated_at?.let(::parseIsoToMs) ?: nowMs,
                                                 )
                                                 val inserted = mediaDao.insertMediaIgnore(media)
                                                 if (inserted == -1L) mediaDao.updateMedia(media)
@@ -759,6 +765,8 @@ class MessageRepository(
                 starred = data["starred"] as? Boolean ?: false,
                 thumb_url = data["thumb_url"] as? String ?: "",
                 position = (data["position"] as? Double)?.toInt() ?: 0,
+                created_at = data["created_at"] as? String,
+                updated_at = data["updated_at"] as? String,
             )
         } catch (e: Exception) {
             null

@@ -108,3 +108,15 @@ payload 容错策略：
 - entityType：`ACTOR` / `MEDIA` / `MESSAGE` / `TAG`
 
 你可以在服务端把每个 change 的处理结果记录到日志，便于定位冲突与失败。
+
+---
+
+## 已知差距（2026-05-08）
+
+后端在 2026-04-17 安卓最后一次同步后又有演进，以下能力客户端尚未跟进，按优先级记录：
+
+1. **`/sync/changes` 复合游标 `(since, since_id)`** — 后端在相同毫秒的多条变更间靠 `since_id`（SyncLog.id）保证不漏拉，目前安卓只发 `since`。`SyncService.getChanges` 与 `RemoteChangesResponse` 需要新增 `since_id: Long` 入参与 `next_cursor_id` 出参，并在 `SyncPreferences` 中持久化第二维。
+2. **`/sync/events` SSE 实时推送** — 后端已有 SSE 端点用于触发被动拉取，客户端尚未消费，目前依赖 15 分钟周期 + 网络恢复事件。
+3. **视频章节 / 预览（`video_media_id`、`frame_ms`、`start_ms`、`end_ms`）** — 出现在 `/media` 列表 schema，安卓不消费 `/media`，因此暂不影响；如未来要做视频章节 UI 需扩展 `Media` 实体。
+4. **消息合并 / 拆分 / 媒体替换 / 媒体旋转 / Todo / Dashboard 热力图** — 纯新功能 UI，未来再加。
+
