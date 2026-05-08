@@ -63,6 +63,10 @@ def _message_snapshot(db: Session, msg: Message) -> Dict[str, Any]:
                 "starred": bool(m.starred),
                 "thumb_url": config.get_thumbnail_url(m.id),
                 "position": r.position,
+                "video_media_id": m.video_media_id,
+                "frame_ms": m.frame_ms,
+                "start_ms": m.start_ms,
+                "end_ms": m.end_ms,
             })
     tags = [{"id": t.id, "name": t.name, "category": t.category} for t in msg.tags]
     return {
@@ -103,6 +107,10 @@ def _media_snapshot(media: Media) -> Dict[str, Any]:
         "rating": media.rating,
         "starred": bool(media.starred),
         "thumb_url": config.get_thumbnail_url(media.id),
+        "video_media_id": media.video_media_id,
+        "frame_ms": media.frame_ms,
+        "start_ms": media.start_ms,
+        "end_ms": media.end_ms,
         "created_at": media.created_at.isoformat(),
         "updated_at": media.updated_at.isoformat(),
     }

@@ -39,6 +39,12 @@ data class Media(
     val viewCount: Int = 0,
     val lastViewedAt: Long? = null,
 
+    // ==================== 视频预览（章节）字段 ====================
+    val videoMediaId: Long? = null,
+    val frameMs: Int? = null,
+    val startMs: Int? = null,
+    val endMs: Int? = null,
+
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {

@@ -72,6 +72,10 @@ data class RemoteMediaItem(
     val starred: Boolean,
     val thumb_url: String,
     val position: Int = 0,
+    val video_media_id: Long? = null,
+    val frame_ms: Int? = null,
+    val start_ms: Int? = null,
+    val end_ms: Int? = null,
     val created_at: String? = null,
     val updated_at: String? = null
 )

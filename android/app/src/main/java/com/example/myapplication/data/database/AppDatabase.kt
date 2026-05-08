@@ -32,7 +32,7 @@ import com.example.myapplication.data.database.entities.Tag
         MessageTag::class,
         MediaTag::class
     ],
-    version = 30,
+    version = 31,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

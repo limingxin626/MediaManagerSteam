@@ -656,6 +656,10 @@ class MessageRepository(
                                                     durationMs = rm.duration_ms?.toLong(),
                                                     rating = rm.rating,
                                                     starred = rm.starred,
+                                                    videoMediaId = rm.video_media_id,
+                                                    frameMs = rm.frame_ms,
+                                                    startMs = rm.start_ms,
+                                                    endMs = rm.end_ms,
                                                     createdAt = rm.created_at?.let(::parseIsoToMs) ?: nowMs,
                                                     updatedAt = rm.updated_at?.let(::parseIsoToMs) ?: nowMs,
                                                 )
@@ -765,6 +769,10 @@ class MessageRepository(
                 starred = data["starred"] as? Boolean ?: false,
                 thumb_url = data["thumb_url"] as? String ?: "",
                 position = (data["position"] as? Double)?.toInt() ?: 0,
+                video_media_id = (data["video_media_id"] as? Double)?.toLong(),
+                frame_ms = (data["frame_ms"] as? Double)?.toInt(),
+                start_ms = (data["start_ms"] as? Double)?.toInt(),
+                end_ms = (data["end_ms"] as? Double)?.toInt(),
                 created_at = data["created_at"] as? String,
                 updated_at = data["updated_at"] as? String,
             )

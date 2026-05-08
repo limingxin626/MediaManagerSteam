@@ -99,6 +99,10 @@ class MessageSyncMediaItem(MessageMediaItem):
     file_size: int | None = None
     rating: int = 0
     position: int = 0
+    video_media_id: int | None = None
+    frame_ms: int | None = None
+    start_ms: int | None = None
+    end_ms: int | None = None
 
 
 class MessageSyncResponse(MessageResponse):
