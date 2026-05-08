@@ -554,15 +554,17 @@ class MessageRepository(
      * - 410 响应 → 返回 SyncResult.NeedFullSync，调用方应回退到 syncFromRemote()
      * - has_more=true → 递归拉取直到完成
      */
-    suspend fun syncIncremental(since: String): SyncResult = withContext(Dispatchers.IO) {
+    suspend fun syncIncremental(since: String, sinceId: Long = 0L): SyncResult = withContext(Dispatchers.IO) {
         var cursor = since
+        var cursorId = sinceId
         var totalInserted = 0
         var totalUpdated = 0
         var totalDeleted = 0
+        var lastServerTime: String? = null
 
         while (true) {
             val response = try {
-                syncService.getChanges(since = cursor)
+                syncService.getChanges(since = cursor, sinceId = cursorId)
             } catch (e: Exception) {
                 Log.e(TAG, "增量同步网络请求失败: ${e.message}", e)
                 return@withContext SyncResult.Error(e.message ?: "网络错误")
@@ -687,14 +689,21 @@ class MessageRepository(
                 applyChanges()
             }
 
-            // 更新 cursor 为 server_time
-            cursor = body.server_time
-
-            if (!body.has_more) break
+            // 推进游标：has_more=true 时使用 next_cursor / next_cursor_id 继续翻页；
+            // 翻完最后一页后用 server_time 作为下次同步起点。
+            lastServerTime = body.server_time
+            if (body.has_more) {
+                cursor = body.next_cursor ?: body.server_time
+                cursorId = body.next_cursor_id ?: 0L
+            } else {
+                cursor = body.server_time
+                cursorId = 0L
+                break
+            }
         }
 
         Log.d(TAG, "增量同步完成：新增/更新 ${totalInserted + totalUpdated}，删除 $totalDeleted")
-        SyncResult.Success(totalInserted, totalUpdated, totalDeleted, serverTime = cursor)
+        SyncResult.Success(totalInserted, totalUpdated, totalDeleted, serverTime = lastServerTime, serverCursorId = 0L)
     }
 
     private suspend fun applyRemoteMessage(remote: RemoteMessage, validActorIds: Set<Long>) {

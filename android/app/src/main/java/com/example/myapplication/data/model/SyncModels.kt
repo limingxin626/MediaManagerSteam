@@ -33,7 +33,8 @@ sealed class SyncResult {
         val insertedCount: Int,
         val updatedCount: Int,
         val deletedCount: Int = 0,
-        val serverTime: String? = null
+        val serverTime: String? = null,
+        val serverCursorId: Long? = null
     ) : SyncResult() {
         val totalAffected: Int get() = insertedCount + updatedCount + deletedCount
     }
@@ -92,6 +93,7 @@ data class RemoteTagItem(
 data class RemoteChangesResponse(
     val changes: List<RemoteChangeItem>,
     val next_cursor: String?,
+    val next_cursor_id: Long? = null,
     val has_more: Boolean,
     val server_time: String
 )
@@ -105,5 +107,3 @@ data class RemoteChangeItem(
     val timestamp: String,
     val data: Map<String, Any?>?  // 完整实体快照（DELETE 时为 null）
 )
-// TODO(sync v2): 后端 /sync/changes 已支持 (since, since_id) 复合游标，
-// 客户端目前只发 since，相同毫秒的多条变更存在漏拉风险，后续接入 since_id。

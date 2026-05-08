@@ -52,23 +52,27 @@ class SyncWorker(
 
         // 2. Pull incremental（无 lastSyncTime 时跳过，需用户手动触发全量）
         val lastSyncTime = prefs.getString(KEY_LAST_SYNC_TIME, null)
+        val lastSyncId = prefs.getLong(KEY_LAST_SYNC_ID, 0L)
         if (lastSyncTime == null) {
             Log.d(TAG, "无同步游标，跳过增量拉取（请在设置页手动执行全量同步）")
             return Result.success()
         }
 
-        return when (val pullResult = db.messageRepository.syncIncremental(lastSyncTime)) {
+        return when (val pullResult = db.messageRepository.syncIncremental(lastSyncTime, lastSyncId)) {
             is SyncResult.NeedFullSync -> {
                 // 410：游标过期，不自动全量，提示用户手动操作
                 Log.w(TAG, "增量同步返回 410（游标已过期），请在设置页手动执行全量同步")
-                prefs.edit().remove(KEY_LAST_SYNC_TIME).apply()
+                prefs.edit().remove(KEY_LAST_SYNC_TIME).remove(KEY_LAST_SYNC_ID).apply()
                 Result.success()
             }
 
             is SyncResult.Success -> {
                 val serverTime = pullResult.serverTime
                 if (serverTime != null) {
-                    prefs.edit().putString(KEY_LAST_SYNC_TIME, serverTime).apply()
+                    prefs.edit()
+                        .putString(KEY_LAST_SYNC_TIME, serverTime)
+                        .putLong(KEY_LAST_SYNC_ID, pullResult.serverCursorId ?: 0L)
+                        .apply()
                 }
                 Log.d(TAG, "增量同步完成: ${pullResult.totalAffected} 条")
                 Result.success()
@@ -85,6 +89,7 @@ class SyncWorker(
         const val TAG = "SyncWorker"
         const val PREFS_NAME = "sync_prefs"
         const val KEY_LAST_SYNC_TIME = "last_sync_time"
+        const val KEY_LAST_SYNC_ID = "last_sync_id"
 
         private const val PERIODIC_WORK_NAME = "periodic_sync"
         private const val IMMEDIATE_WORK_NAME = "immediate_sync"

@@ -14,10 +14,12 @@ interface SyncService {
     @GET("messages/sync")
     suspend fun getMessages(): List<RemoteMessage>
 
-    /** 增量拉取变更日志。since 为空时后端返回 410（需全量同步）。*/
+    /** 增量拉取变更日志。since 为空时后端返回 410（需全量同步）。
+     *  since_id 为复合游标第二维（上一次 next_cursor_id），首次同步传 0。*/
     @GET("sync/changes")
     suspend fun getChanges(
         @Query("since") since: String,
+        @Query("since_id") sinceId: Long = 0L,
         @Query("limit") limit: Int = 500
     ): Response<RemoteChangesResponse>
 }

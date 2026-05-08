@@ -128,6 +128,6 @@ class SyncOutboxRepository(
 
     companion object {
         private const val TAG = "SyncOutboxRepository"
-        private const val MAX_RETRY_COUNT = 10
+        private const val MAX_RETRY_COUNT = 3
     }
 }

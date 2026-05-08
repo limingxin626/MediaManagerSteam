@@ -3,17 +3,12 @@
 
 - GET  /sync/changes      增量拉取变更
 - POST /api/sync/apply    推送客户端变更
-- GET  /sync/events       SSE 实时通知
 """
-import asyncio
-import json
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -24,14 +19,13 @@ from app.schemas.sync import (
     SyncApplyRequest, SyncApplyResponse,
 )
 from app.services.message_service import sync_tags_from_text
-from app.services.sync_log_service import subscribe, unsubscribe
 from app.config import config
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["sync"])
 
-SYNC_LOG_RETENTION_DAYS = 90
+SYNC_LOG_RETENTION_DAYS = 365
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +163,7 @@ def get_sync_changes(
     # 超过保留期
     cutoff = datetime.utcnow() - timedelta(days=SYNC_LOG_RETENTION_DAYS)
     if since_dt < cutoff:
-        raise HTTPException(status_code=410, detail="since 超过保留期（90天），请执行全量同步")
+        raise HTTPException(status_code=410, detail="since 超过保留期（1年），请执行全量同步")
 
     # 复合游标过滤：(timestamp > since_dt) OR (timestamp = since_dt AND id > since_id)
     rows = (
@@ -186,9 +180,16 @@ def get_sync_changes(
     rows = rows[:limit]
 
     # 去重：同一 (entity_type, entity_id) 只保留最新条目（rows 已按时间升序，取 last）
+    # 但若本页内出现过 DELETE，则强制保留 DELETE —— 否则后续 UPSERT 会让客户端误以为实体仍存在。
     seen: dict[tuple, SyncLog] = {}
+    deleted_keys: set[tuple] = set()
     for row in rows:
-        seen[(row.entity_type, row.entity_id)] = row
+        key = (row.entity_type, row.entity_id)
+        if row.operation == "DELETE":
+            deleted_keys.add(key)
+            seen[key] = row
+        elif key not in deleted_keys:
+            seen[key] = row
     deduped = sorted(seen.values(), key=lambda r: (r.timestamp, r.id))
 
     # 构建响应
@@ -313,9 +314,6 @@ def _upsert_message(db: Session, entity_id: int, payload: dict) -> None:
     incoming_updated = _parse_dt(payload.get("updatedAt") or payload.get("updated_at"))
 
     if existing:
-        # Last-write-wins：只有 incoming 更新才覆盖
-        if incoming_updated and existing.updated_at and incoming_updated <= existing.updated_at:
-            return
         if "text" in payload:
             existing.text = payload["text"]
             sync_tags_from_text(db, existing, existing.text, merge=True)
@@ -323,8 +321,7 @@ def _upsert_message(db: Session, entity_id: int, payload: dict) -> None:
             existing.actor_id = payload.get("actorId") or payload.get("actor_id")
         if "starred" in payload:
             existing.starred = 1 if payload["starred"] else 0
-        if incoming_updated:
-            existing.updated_at = incoming_updated
+        existing.updated_at = incoming_updated or datetime.utcnow()
     else:
         created_at = _parse_dt(payload.get("createdAt") or payload.get("created_at")) or datetime.utcnow()
         msg = Message(
@@ -345,14 +342,11 @@ def _upsert_actor(db: Session, entity_id: int, payload: dict) -> None:
     incoming_updated = _parse_dt(payload.get("updatedAt") or payload.get("updated_at"))
 
     if existing:
-        if incoming_updated and existing.updated_at and incoming_updated <= existing.updated_at:
-            return
         if "name" in payload:
             existing.name = payload["name"]
         if "description" in payload:
             existing.description = payload["description"]
-        if incoming_updated:
-            existing.updated_at = incoming_updated
+        existing.updated_at = incoming_updated or datetime.utcnow()
     else:
         created_at = _parse_dt(payload.get("createdAt") or payload.get("created_at")) or datetime.utcnow()
         actor = Actor(
@@ -370,17 +364,13 @@ def _upsert_media(db: Session, entity_id: int, payload: dict) -> None:
     incoming_updated = _parse_dt(payload.get("updatedAt") or payload.get("updated_at"))
 
     if existing:
-        if incoming_updated and existing.updated_at and incoming_updated <= existing.updated_at:
-            return
         for src, dst in [("rating", "rating"), ("starred", "starred")]:
             if src in payload:
                 val = payload[src]
                 setattr(existing, dst, (1 if val else 0) if dst == "starred" else val)
-        if incoming_updated:
-            existing.updated_at = incoming_updated
+        existing.updated_at = incoming_updated or datetime.utcnow()
     else:
         # Media 通常由后端通过文件上传创建；Android 一般不会创建新 Media
-        # 仅更新已存在的记录；不存在则忽略
         logger.debug("MEDIA UPSERT: id=%s 不存在，跳过", entity_id)
 
 
@@ -398,38 +388,3 @@ def _upsert_tag(db: Session, entity_id: int, payload: dict) -> None:
             category=payload.get("category"),
         )
         db.add(tag)
-
-
-# ---------------------------------------------------------------------------
-# GET /sync/events  (SSE)
-# ---------------------------------------------------------------------------
-
-@router.get("/sync/events")
-async def sync_events():
-    """SSE 端点：推送变更通知。客户端收到后调用 /sync/changes 拉取实际数据。"""
-    queue = subscribe()
-
-    async def event_generator():
-        try:
-            # 发送初始连接确认
-            yield "data: {\"type\":\"connected\"}\n\n"
-            while True:
-                try:
-                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
-                    yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.TimeoutError:
-                    # 心跳，保持连接
-                    yield ": ping\n\n"
-        except asyncio.CancelledError:
-            pass
-        finally:
-            unsubscribe(queue)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
-    )
