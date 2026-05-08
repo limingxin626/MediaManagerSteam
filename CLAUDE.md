@@ -11,7 +11,7 @@ Personal media management app with an Instagram-like feed architecture. Self-hos
 - **Backend**: FastAPI + SQLAlchemy + SQLite (`backend/`)
 - **Frontend**: Vue 3 + TypeScript + Tailwind CSS v4 (`vue/`)
 - **Desktop**: Electron wrapper (`electron/`)
-- **Android**: Native Kotlin/Compose app with Room DB + offline-first sync (`android/`, separate git repo)
+- **Android**: Native Kotlin/Compose app with Room DB + offline-first sync (`android/`, same git repo as backend/vue)
 - **PWA**: Workbox service worker with offline caching (`vue/vite.config.ts`)
 - **No auth** — designed for LAN use only
 
@@ -23,16 +23,24 @@ Key env vars:
 - `ASKTAO_DATA_ROOT` — data directory (default `E:/AskTao`), contains SQLite DB (`db_new.sqlite3`), uploads, thumbnails
 - `FFMPEG_PATH` / `FFPROBE_PATH` — paths to ffmpeg binaries
 
-Routers: `/messages`, `/media`, `/actors`, `/tags`, `/files`
+Routers (registered via `backend/app/routers/__init__.py:all_routers`): `actor`, `message`, `media`, `files`, `tags`, `sync`, `admin`, `dashboard`, `todos`.
 
 Services:
 - `media_service.py` — file hashing (Blake2b), deduplication, ffprobe info extraction, thumbnail generation. `process_file()` returns `{"media": Media, "is_new": bool}` — calls `db.flush()` (not commit) to get IDs; router commits.
-- `message_service.py` — `#hashtag` auto-extraction (regex `#[\w\u4e00-\u9fff]+`) from message text doing full tag replacement (not additive), media position reordering.
+- `message_service.py` — `#hashtag` auto-extraction (regex `#[\w\u4e00-\u9fff]+`) from message text. Web/HTTP path uses full replacement (`merge=False`); sync-apply path from Android uses `merge=True` to preserve manually-added tags. Also handles media position reordering.
 - `base.py` — static CRUD methods (`get_all`, `get_by_id`, `create`, `update`, `delete`) accepting SQLAlchemy model type.
 
 DB session: `get_db()` generator in `models/__init__.py`, injected via `Depends(get_db)`. Configured with `autocommit=False`, `autoflush=False`.
 
 Supported media types (in `config.py`): `.mp4` (video), `.jpg`/`.jpeg`/`.png`/`.gif` (image).
+
+### Sync (Backend ↔ Android)
+
+Single-user LAN-only model — no LWW conflict resolution, no SSE.
+
+- **Pull**: `GET /sync/changes?since=<ISO>&since_id=<int>` — incremental from `SyncLog`. Composite cursor `(timestamp, id)` to avoid same-millisecond skips. Same-page dedup keeps DELETE over later UPSERT. Returns 410 if `since` exceeds `SYNC_LOG_RETENTION_DAYS=365`.
+- **Push**: `POST /api/sync/apply` — Android Outbox batches mutations; backend applies all in a single transaction, rolls back on any failure. Upserts unconditionally overwrite (no `updated_at` comparison).
+- **SyncLog tracking**: `services/sync_log_service.py` registers SQLAlchemy `after_flush` listener to record `Message`/`Actor`/`Media`/`Tag` mutations. `Message.tags` / `Media.tags` collection events bump host `updated_at` so tag-association changes show up in SyncLog.
 
 ### Pagination
 
@@ -65,7 +73,9 @@ Loads Vue dev server (`http://localhost:5173`) in dev, bundled dist in productio
 
 ### Database Models
 
-`Message` → `MessageMedia` (junction with position) → `Media` (deduplicated by file_hash). `Tag` linked to Message via `message_tag`. `Actor` linked to Message via FK. `starred` fields use Integer 0|1 (not boolean) for SQLite compatibility.
+`Message` → `MessageMedia` (junction with position) → `Media` (deduplicated by file_hash). `Tag` linked to Message via `message_tag`, to Media via `media_tag`. `Actor` linked to Message via FK. `starred` fields use Integer 0|1 (not boolean) for SQLite compatibility.
+
+Video chapter/preview fields on `Media`: `video_media_id` (self-FK to parent video), `frame_ms`, `start_ms`, `end_ms` — child rows represent extracted frames or chapter clips of a parent video.
 
 ## Development Commands
 
