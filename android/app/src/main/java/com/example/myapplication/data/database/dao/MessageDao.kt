@@ -47,6 +47,9 @@ interface MessageDao {
     @Query("UPDATE messages SET sendStatus = :status WHERE id = :id")
     suspend fun updateSendStatus(id: Long, status: String)
 
+    @Query("SELECT * FROM messages WHERE sendStatus = :status ORDER BY createdAt ASC")
+    suspend fun getMessagesBySendStatus(status: String): List<Message>
+
     @Query("SELECT * FROM messages ORDER BY createdAt DESC")
     fun getAllMessages(): Flow<List<Message>>
 

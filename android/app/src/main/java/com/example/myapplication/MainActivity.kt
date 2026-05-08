@@ -143,7 +143,7 @@ class MainActivity : ComponentActivity() {
         object : ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return MessageViewModel(databaseManager.messageRepository) as T
+                return MessageViewModel(databaseManager.messageRepository, databaseManager.networkMonitor) as T
             }
         }
     }
@@ -180,15 +180,16 @@ class MainActivity : ComponentActivity() {
         // 调度后台定期同步（15 分钟，WiFi 下执行）
         SyncWorker.schedulePeriodicSync(this)
 
-        // 网络恢复时立即触发同步
+        // 后端可达性 false→true 边沿：立即触发 Outbox 推送 + 重推 PENDING_SYNC 消息
         val networkMonitor = databaseManager.networkMonitor
-        var wasConnected = networkMonitor.isWifiConnected.value
+        var wasOnline = networkMonitor.isOnline.value
         lifecycleScope.launch {
-            networkMonitor.isWifiConnected.collect { connected ->
-                if (connected && !wasConnected) {
+            networkMonitor.isOnline.collect { online ->
+                if (online && !wasOnline) {
                     SyncWorker.scheduleImmediateSync(this@MainActivity)
+                    messageViewModel.retryAllPending()
                 }
-                wasConnected = connected
+                wasOnline = online
             }
         }
 

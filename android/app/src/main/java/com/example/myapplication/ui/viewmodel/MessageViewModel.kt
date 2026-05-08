@@ -16,6 +16,7 @@ import com.example.myapplication.data.model.ProgressRequestBody
 import com.example.myapplication.data.repository.MessageRepository
 import com.example.myapplication.data.service.ClientMediaFile
 import com.example.myapplication.data.service.MessageSyncRequest
+import com.example.myapplication.data.service.NetworkMonitor
 import com.example.myapplication.data.service.SyncNetwork
 import com.example.myapplication.utils.MediaFileInfo
 import com.example.myapplication.utils.MediaFilePicker
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import okhttp3.MultipartBody
 import java.io.File
 import java.time.Instant
@@ -42,7 +44,10 @@ import java.time.format.DateTimeFormatter
 /**
  * 消息视图模型
  */
-class MessageViewModel(private val messageRepository: MessageRepository) : ViewModel() {
+class MessageViewModel(
+    private val messageRepository: MessageRepository,
+    private val networkMonitor: NetworkMonitor,
+) : ViewModel() {
     // 搜索查询
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
@@ -186,8 +191,7 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
             }
 
             // Step 2: 判断是否在线，决定初始状态
-            val isOnline = !databaseManager.syncPreferences.isOfflineMode.value &&
-                    databaseManager.networkMonitor.isWifiConnected.value == true
+            val isOnline = databaseManager.networkMonitor.isOnline.value
             val initialStatus =
                 if (isOnline) Message.MSG_STATUS_PUSHING else Message.MSG_STATUS_PENDING_SYNC
 
@@ -202,7 +206,7 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
 
             // Step 3: 后台上传 + 推送（离线时跳过，由 WorkManager/retrySync 重试）
             if (!isOnline) {
-                Log.d(TAG, "sendMessage 跳过上传：离线模式或无 WiFi 连接，消息已本地保存")
+                Log.d(TAG, "sendMessage 跳过上传：离线模式或后端不可达，消息已本地保存为 PENDING_SYNC")
                 return@launch
             }
             try {
@@ -245,10 +249,12 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
 
                 messageRepository.applyRemoteUrls(localMessageId, response)
                 onSuccess()
-            } catch (e: Exception) {
-                Log.e(TAG, "sendMessage 同步失败，已入队等待重试: ${e.message}", e)
-                // 不标记 PUSH_FAILED（避免用户看到错误），标记 PENDING_SYNC 静默等待重试
+            } catch (e: IOException) {
+                Log.w(TAG, "sendMessage 网络异常，标记 PENDING_SYNC 等待自动重试: ${e.message}")
                 messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PENDING_SYNC)
+            } catch (e: Exception) {
+                Log.e(TAG, "sendMessage 同步失败（业务异常）: ${e.message}", e)
+                messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PUSH_FAILED)
             }
         }
     }
@@ -258,6 +264,12 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
      */
     fun retrySync(messageId: Long) {
         viewModelScope.launch {
+            // 离线时不浪费时间走网络（否则会卡 5-15 秒在「同步中」转圈）
+            if (!networkMonitor.isOnline.value) {
+                Log.d(TAG, "retrySync 跳过：当前离线，保持 PENDING_SYNC")
+                messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PENDING_SYNC)
+                return@launch
+            }
             messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PUSHING)
             try {
                 val mediaList = messageRepository.getMediaByMessageId(messageId)
@@ -291,10 +303,31 @@ class MessageViewModel(private val messageRepository: MessageRepository) : ViewM
                     )
                 )
                 messageRepository.applyRemoteUrls(messageId, response)
+            } catch (e: IOException) {
+                Log.w(TAG, "retrySync 网络异常，回到 PENDING_SYNC: ${e.message}")
+                messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PENDING_SYNC)
             } catch (e: Exception) {
                 Log.e(TAG, "retrySync 失败: ${e.message}", e)
                 messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PUSH_FAILED)
             }
+        }
+    }
+
+    /**
+     * 扫描所有 PENDING_SYNC 消息并尝试重推（App 启动 / 网络恢复时调用）。
+     * 复用 retrySync 的幂等逻辑：后端按客户端 id 去重。
+     */
+    fun retryAllPending() {
+        viewModelScope.launch {
+            if (!networkMonitor.isOnline.value) {
+                Log.d(TAG, "retryAllPending 跳过：当前离线")
+                return@launch
+            }
+            val pending =
+                messageRepository.getMessagesBySendStatus(Message.MSG_STATUS_PENDING_SYNC)
+            if (pending.isEmpty()) return@launch
+            Log.i(TAG, "retryAllPending 发现 ${pending.size} 条待同步消息，开始重推")
+            pending.forEach { retrySync(it.id) }
         }
     }
 

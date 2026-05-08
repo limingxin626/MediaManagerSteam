@@ -112,6 +112,11 @@ fun MessageListScreen(
         }
     }
 
+    // 进入页面时扫描 PENDING_SYNC 消息：覆盖「冷启动且后端已可达」场景
+    LaunchedEffect(Unit) {
+        viewModel.retryAllPending()
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()

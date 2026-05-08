@@ -282,6 +282,10 @@ class MessageRepository(
         messageDao.updateSendStatus(messageId, status)
     }
 
+    suspend fun getMessagesBySendStatus(status: String): List<Message> {
+        return messageDao.getMessagesBySendStatus(status)
+    }
+
     /**
      * 推送成功后，用服务器返回的信息更新本地 Media 远程 URL + 补充 tags + 标记 SYNCED
      */

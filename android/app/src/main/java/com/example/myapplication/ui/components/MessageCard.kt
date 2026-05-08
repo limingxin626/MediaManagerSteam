@@ -248,6 +248,37 @@ fun MessageCard(
                                     }
                                 }
 
+                                Message.MSG_STATUS_PENDING_SYNC -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.tertiary)
+                                        )
+                                        Text(
+                                            text = "待同步",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                            fontSize = 12.sp
+                                        )
+                                        if (onRetrySync != null) {
+                                            Text(
+                                                text = "· 重试",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = FontWeight.SemiBold
+                                                ),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontSize = 12.sp,
+                                                modifier = Modifier.clickable { onRetrySync(message.id) }
+                                            )
+                                        }
+                                    }
+                                }
+
                                 else -> {
                                     // SYNCED: 正常显示演员名 + 时间
                                     Row(
