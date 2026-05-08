@@ -383,20 +383,25 @@ private fun MediaViewerContent(
 
             // 收藏按钮
             if (mediaList.isNotEmpty()) {
-                val currentMedia = mediaList[pagerState.currentPage]
+                val idx = pagerState.currentPage.coerceIn(0, mediaList.size - 1)
+                val currentMedia = mediaList[idx]
+                val starred = currentMedia.starred
                 IconButton(onClick = {
-                    coroutineScope.launch {
-                        databaseManager.mediaRepository.toggleMediaStarred(currentMedia.id)
-                        val idx = pagerState.currentPage
-                        mutableMediaList?.let {
-                            it[idx] = it[idx].copy(starred = !it[idx].starred)
+                    val targetId = currentMedia.id
+                    val newStarred = !starred
+                    mutableMediaList?.let {
+                        if (idx in it.indices && it[idx].id == targetId) {
+                            it[idx] = it[idx].copy(starred = newStarred)
                         }
+                    }
+                    coroutineScope.launch {
+                        databaseManager.mediaRepository.toggleMediaStarred(targetId)
                     }
                 }) {
                     Icon(
-                        imageVector = if (currentMedia.starred) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription = if (currentMedia.starred) "取消收藏" else "收藏",
-                        tint = if (currentMedia.starred) Color(0xFFFFD700) else Color.White
+                        imageVector = if (starred) Icons.Filled.Star else Icons.Outlined.Star,
+                        contentDescription = if (starred) "取消收藏" else "收藏",
+                        tint = if (starred) Color(0xFFFFD700) else Color.White
                     )
                 }
             }

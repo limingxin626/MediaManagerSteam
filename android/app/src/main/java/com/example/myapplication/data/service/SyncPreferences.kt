@@ -23,8 +23,31 @@ class SyncPreferences(context: Context) {
         _isOfflineMode.value = enabled
     }
 
+    fun getMessageScrollAnchor(): Pair<Long, Int>? {
+        val id = prefs.getLong(KEY_MSG_SCROLL_ID, -1L)
+        if (id <= 0L) return null
+        val offset = prefs.getInt(KEY_MSG_SCROLL_OFFSET, 0)
+        return id to offset
+    }
+
+    fun setMessageScrollAnchor(messageId: Long, offsetPx: Int) {
+        prefs.edit()
+            .putLong(KEY_MSG_SCROLL_ID, messageId)
+            .putInt(KEY_MSG_SCROLL_OFFSET, offsetPx)
+            .apply()
+    }
+
+    fun clearMessageScrollAnchor() {
+        prefs.edit()
+            .remove(KEY_MSG_SCROLL_ID)
+            .remove(KEY_MSG_SCROLL_OFFSET)
+            .apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "sync_preferences"
         private const val KEY_OFFLINE_MODE = "offline_mode"
+        private const val KEY_MSG_SCROLL_ID = "message_scroll_anchor_id"
+        private const val KEY_MSG_SCROLL_OFFSET = "message_scroll_anchor_offset"
     }
 }

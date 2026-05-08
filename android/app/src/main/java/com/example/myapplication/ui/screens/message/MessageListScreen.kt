@@ -33,6 +33,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -41,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -59,6 +61,10 @@ import com.example.myapplication.ui.components.SearchBar
 import com.example.myapplication.ui.theme.InstagramGradientMiddle
 import com.example.myapplication.ui.viewmodel.MessageViewModel
 import com.example.myapplication.ui.viewmodel.UIState
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -75,7 +81,7 @@ import java.util.Locale
  *     └─ MessageComposeBar（底部对齐）
  *   navigationBarsPadding
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, kotlinx.coroutines.FlowPreview::class)
 @Composable
 fun MessageListScreen(
     viewModel: MessageViewModel,
@@ -99,6 +105,81 @@ fun MessageListScreen(
     // reverseLayout=true 时，firstVisibleItemIndex==0 表示已在最新消息（视觉底部）
     val showScrollToBottom by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 2 }
+    }
+    val isAtBottom by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 80
+        }
+    }
+
+    // 恢复上次浏览位置（按 message id 锚定，跨进程持久化）
+    var scrollRestored by remember { mutableStateOf(false) }
+    LaunchedEffect(pagingItems.itemCount) {
+        if (scrollRestored || pagingItems.itemCount == 0) return@LaunchedEffect
+        val anchor = databaseManager.syncPreferences.getMessageScrollAnchor()
+        if (anchor == null) {
+            scrollRestored = true
+            return@LaunchedEffect
+        }
+        val (anchorId, anchorOffset) = anchor
+        var foundIndex = -1
+        for (i in 0 until pagingItems.itemCount) {
+            if (pagingItems.peek(i)?.message?.id == anchorId) {
+                foundIndex = i
+                break
+            }
+        }
+        if (foundIndex >= 0) {
+            listState.scrollToItem(foundIndex, anchorOffset)
+            scrollRestored = true
+        }
+        // 未找到：可能锚点在更深页，等下一次 itemCount 增长再尝试。
+        // 兜底：超过一定数量仍找不到则放弃，停留在底部。
+        if (foundIndex < 0 && pagingItems.itemCount > 500) {
+            scrollRestored = true
+        }
+    }
+
+    // 持久化滚动位置：debounce 写入，避免高频 IO
+    LaunchedEffect(scrollRestored, pagingItems.itemCount) {
+        if (!scrollRestored || pagingItems.itemCount == 0) return@LaunchedEffect
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .debounce(400)
+            .distinctUntilChanged()
+            .collectLatest { (idx, offset) ->
+                val safeIdx = idx.coerceIn(0, pagingItems.itemCount - 1)
+                val msgId = pagingItems.peek(safeIdx)?.message?.id ?: return@collectLatest
+                databaseManager.syncPreferences.setMessageScrollAnchor(msgId, offset)
+            }
+    }
+
+    // 离开页面时立即兜底保存一次
+    DisposableEffect(Unit) {
+        onDispose {
+            if (scrollRestored && pagingItems.itemCount > 0) {
+                val idx = listState.firstVisibleItemIndex
+                    .coerceIn(0, pagingItems.itemCount - 1)
+                val msgId = pagingItems.peek(idx)?.message?.id
+                if (msgId != null) {
+                    databaseManager.syncPreferences.setMessageScrollAnchor(
+                        msgId,
+                        listState.firstVisibleItemScrollOffset
+                    )
+                }
+            }
+        }
+    }
+
+    // 新消息到来时：仅当用户已在底部时才自动跟随到底
+    LaunchedEffect(scrollRestored) {
+        if (!scrollRestored) return@LaunchedEffect
+        snapshotFlow { pagingItems.itemCount }
+            .drop(1)
+            .collectLatest { newCount ->
+                if (newCount > 0 && isAtBottom) {
+                    listState.animateScrollToItem(0)
+                }
+            }
     }
 
     // 日期格式化
