@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -94,25 +93,6 @@ fun MediaCard(
                                 )
                             )
                     )
-                }
-
-                // 视频播放图标 - 居中半透明
-                if (isVideo) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(36.dp)
-                            .background(
-                                Color.Black.copy(alpha = 0.4f), RoundedCornerShape(18.dp)
-                            ), contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "播放",
-                            modifier = Modifier.size(20.dp),
-                            tint = Color.White
-                        )
-                    }
                 }
 
                 // 视频时长 - 右下角
