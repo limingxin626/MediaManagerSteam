@@ -28,7 +28,7 @@ object Routes {
     // 媒体相关
     const val MEDIA_DETAIL = "media/{mediaId}"
     const val MEDIA_FULLSCREEN =
-        "media/fullscreen/{mediaId}?mediaIdListJson={mediaIdListJson}&messageId={messageId}"
+        "media/fullscreen/{mediaId}?mediaIdListJson={mediaIdListJson}&messageId={messageId}&filterTagId={filterTagId}&filterActorId={filterActorId}&filterQuery={filterQuery}"
     const val MEDIA_EDIT = "media/edit?mediaId={mediaId}"
 
     // 标签相关
@@ -129,7 +129,10 @@ object Routes {
 fun androidx.navigation.NavController.navigateToMediaFullscreen(
     mediaId: Long,
     mediaList: List<Media>,
-    messageId: Long = -1L
+    messageId: Long = -1L,
+    filterTagId: Long? = null,
+    filterActorId: Long? = null,
+    filterQuery: String = ""
 ) {
     // 只传递 ID 列表，避免序列化整个 Media 对象导致 URL 过长
     val mediaIdList = mediaList.map { it.id }
@@ -137,7 +140,17 @@ fun androidx.navigation.NavController.navigateToMediaFullscreen(
         com.google.gson.Gson().toJson(mediaIdList),
         "UTF-8"
     )
-    navigate("media/fullscreen/$mediaId?mediaIdListJson=$mediaIdListJson&messageId=$messageId")
+    val tagArg = filterTagId ?: -1L
+    val actorArg = filterActorId ?: -1L
+    val queryArg = java.net.URLEncoder.encode(filterQuery, "UTF-8")
+    navigate(
+        "media/fullscreen/$mediaId" +
+                "?mediaIdListJson=$mediaIdListJson" +
+                "&messageId=$messageId" +
+                "&filterTagId=$tagArg" +
+                "&filterActorId=$actorArg" +
+                "&filterQuery=$queryArg"
+    )
 }
 
 fun androidx.navigation.NavController.navigateToMediaFullscreen(mediaId: Long) {

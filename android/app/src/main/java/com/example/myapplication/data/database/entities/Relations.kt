@@ -58,6 +58,13 @@ data class MessageWithDetails(
         )
     )
     val mediaList: List<Media> = emptyList(),
+    // 用于按 position 排序 mediaList。Room 不支持 @Relation 注解里写 ORDER BY，
+    // 所以单独取 junction 行，并通过 mediaListOrdered 在内存里 join。
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "messageId"
+    )
+    val messageMediaList: List<MessageMedia> = emptyList(),
     @Relation(
         parentColumn = "id",
         entityColumn = "id",
@@ -68,7 +75,17 @@ data class MessageWithDetails(
         )
     )
     val tagList: List<Tag> = emptyList()
-)
+) {
+    /** mediaList 按 MessageMedia.position 升序排列，与服务端口径一致 */
+    val mediaListOrdered: List<Media>
+        get() {
+            if (messageMediaList.isEmpty()) return mediaList
+            val byId = mediaList.associateBy { it.id }
+            return messageMediaList
+                .sortedBy { it.position }
+                .mapNotNull { byId[it.mediaId] }
+        }
+}
 
 /**
  * 演员及其消息列表

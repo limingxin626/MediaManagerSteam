@@ -496,8 +496,15 @@ fun AppNavHost(
                 onEditMessage = { messageId ->
                     navController.navigate(Routes.messageEdit(messageId))
                 },
-                onMediaClick = { mediaId, messageId, mediaList ->
-                    navController.navigateToMediaFullscreen(mediaId, mediaList, messageId)
+                onMediaClick = { mediaId, messageId, mediaList, filterTagId, filterActorId, filterQuery ->
+                    navController.navigateToMediaFullscreen(
+                        mediaId,
+                        mediaList,
+                        messageId,
+                        filterTagId,
+                        filterActorId,
+                        filterQuery
+                    )
                 }
             )
         }
@@ -538,8 +545,15 @@ fun AppNavHost(
                 onEditMessage = { messageId ->
                     navController.navigate(Routes.messageEdit(messageId))
                 },
-                onMediaClick = { mediaId, messageId, mediaList ->
-                    navController.navigateToMediaFullscreen(mediaId, mediaList, messageId)
+                onMediaClick = { mediaId, messageId, mediaList, filterTagId, filterActorId, filterQuery ->
+                    navController.navigateToMediaFullscreen(
+                        mediaId,
+                        mediaList,
+                        messageId,
+                        filterTagId,
+                        filterActorId,
+                        filterQuery
+                    )
                 }
             )
         }
@@ -579,12 +593,35 @@ fun AppNavHost(
                 navArgument("messageId") {
                     type = NavType.LongType
                     defaultValue = -1L
+                },
+                navArgument("filterTagId") {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                },
+                navArgument("filterActorId") {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                },
+                navArgument("filterQuery") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = ""
                 }
             )
         ) { backStackEntry ->
             val mediaId = backStackEntry.arguments?.getLong("mediaId") ?: return@composable
             val mediaIdListJson = backStackEntry.arguments?.getString("mediaIdListJson")
             val messageId = backStackEntry.arguments?.getLong("messageId") ?: -1L
+            val filterTagIdRaw = backStackEntry.arguments?.getLong("filterTagId") ?: -1L
+            val filterActorIdRaw = backStackEntry.arguments?.getLong("filterActorId") ?: -1L
+            val filterQueryRaw = backStackEntry.arguments?.getString("filterQuery") ?: ""
+            val filterQuery = remember(filterQueryRaw) {
+                try {
+                    URLDecoder.decode(filterQueryRaw, "UTF-8")
+                } catch (_: Exception) {
+                    ""
+                }
+            }
             val mediaIdList = remember(mediaIdListJson) {
                 if (mediaIdListJson != null) {
                     try {
@@ -604,6 +641,9 @@ fun AppNavHost(
                 initialMediaId = mediaId,
                 messageId = messageId,
                 mediaIdList = mediaIdList,
+                filterTagId = if (filterTagIdRaw == -1L) null else filterTagIdRaw,
+                filterActorId = if (filterActorIdRaw == -1L) null else filterActorIdRaw,
+                filterQuery = filterQuery,
                 databaseManager = databaseManager,
                 navController = navController
             )

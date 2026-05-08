@@ -385,6 +385,53 @@ class MessageRepository(
     }
 
     /**
+     * 媒体预览跨 group 滑动时使用的过滤上下文
+     */
+    data class MediaViewerFilter(
+        val tagId: Long? = null,
+        val actorId: Long? = null,
+        val searchQuery: String = ""
+    )
+
+    /**
+     * 获取相邻 message id（含 media，受过滤约束）。
+     * direction: NEXT = 更旧，PREV = 更新（与 MessageList DESC 排序口径一致）。
+     */
+    enum class AdjacentDirection { NEXT, PREV }
+
+    suspend fun getAdjacentMessageIdWithMedia(
+        anchorMessageId: Long,
+        direction: AdjacentDirection,
+        filter: MediaViewerFilter
+    ): Long? {
+        val anchor = messageDao.getMessageById(anchorMessageId) ?: return null
+        val anchorCreatedAt = anchor.createdAt
+        val q = filter.searchQuery
+        return when {
+            filter.actorId != null -> when (direction) {
+                AdjacentDirection.NEXT -> messageDao.getNextMessageIdWithMediaByActor(
+                    filter.actorId, anchorCreatedAt, q
+                )
+                AdjacentDirection.PREV -> messageDao.getPrevMessageIdWithMediaByActor(
+                    filter.actorId, anchorCreatedAt, q
+                )
+            }
+            filter.tagId != null -> when (direction) {
+                AdjacentDirection.NEXT -> messageDao.getNextMessageIdWithMediaByTag(
+                    filter.tagId, anchorCreatedAt, q
+                )
+                AdjacentDirection.PREV -> messageDao.getPrevMessageIdWithMediaByTag(
+                    filter.tagId, anchorCreatedAt, q
+                )
+            }
+            else -> when (direction) {
+                AdjacentDirection.NEXT -> messageDao.getNextMessageIdWithMedia(anchorCreatedAt, q)
+                AdjacentDirection.PREV -> messageDao.getPrevMessageIdWithMedia(anchorCreatedAt, q)
+            }
+        }
+    }
+
+    /**
      * 获取消息的标签ID列表
      */
     suspend fun getMessageTagIds(messageId: Long): List<Long> {

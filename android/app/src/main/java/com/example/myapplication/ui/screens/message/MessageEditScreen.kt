@@ -97,7 +97,7 @@ fun MessageEditScreen(
         if (details != null) {
             text = details.message.text ?: ""
             starred = details.message.starred
-            existingMedia = details.mediaList
+            existingMedia = details.mediaListOrdered
         }
         isLoading = false
     }

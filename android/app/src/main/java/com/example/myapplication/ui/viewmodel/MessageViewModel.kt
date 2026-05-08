@@ -58,9 +58,11 @@ class MessageViewModel(
 
     // 标签过滤
     private val _tagId = MutableStateFlow<Long?>(null)
+    val tagId: StateFlow<Long?> = _tagId.asStateFlow()
 
     // 演员过滤
     private val _actorId = MutableStateFlow<Long?>(null)
+    val actorId: StateFlow<Long?> = _actorId.asStateFlow()
 
     // 分页消息列表
     @OptIn(ExperimentalCoroutinesApi::class)

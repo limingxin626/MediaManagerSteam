@@ -88,13 +88,15 @@ fun MessageListScreen(
     databaseManager: DatabaseManager,
     onMessageClick: (Long) -> Unit = { },
     onEditMessage: (Long) -> Unit = { },
-    onMediaClick: (mediaId: Long, messageId: Long, mediaList: List<Media>) -> Unit = { _, _, _ -> },
+    onMediaClick: (mediaId: Long, messageId: Long, mediaList: List<Media>, filterTagId: Long?, filterActorId: Long?, filterQuery: String) -> Unit = { _, _, _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState(initial = UIState())
     val pagingItems = viewModel.messagesPaged.collectAsLazyPagingItems()
     val searchQuery by viewModel.searchQuery.collectAsState(initial = "")
+    val tagFilter by viewModel.tagId.collectAsState(initial = null)
+    val actorFilter by viewModel.actorId.collectAsState(initial = null)
     val isSending by viewModel.isSending.collectAsState()
 
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
@@ -292,7 +294,10 @@ fun MessageListScreen(
                                         onMediaClick(
                                             mediaId,
                                             item.message.id,
-                                            mediaList
+                                            mediaList,
+                                            tagFilter,
+                                            actorFilter,
+                                            searchQuery
                                         )
                                     },
                                     onEditClick = { onEditMessage(it) },

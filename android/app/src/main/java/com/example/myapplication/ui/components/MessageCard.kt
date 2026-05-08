@@ -81,7 +81,7 @@ fun MessageCard(
     onRetrySync: ((Long) -> Unit)? = null
 ) {
     val message = messageWithDetails.message
-    val mediaList = messageWithDetails.mediaList
+    val mediaList = messageWithDetails.mediaListOrdered
     val actor = messageWithDetails.actor
 
     val dateFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }

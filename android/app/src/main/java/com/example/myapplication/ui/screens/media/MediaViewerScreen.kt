@@ -52,6 +52,7 @@ import androidx.navigation.NavController
 import com.example.myapplication.LocalBottomBarVisible
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
+import com.example.myapplication.data.repository.MessageRepository
 import com.example.myapplication.ui.components.OptimizedThumbnail
 import com.example.myapplication.ui.components.TelegramVideoPlayer
 import com.example.myapplication.ui.components.ZoomableImage
@@ -75,7 +76,10 @@ fun MediaViewerScreen(
     messageId: Long,
     mediaIdList: List<Long>,
     databaseManager: DatabaseManager,
-    navController: NavController
+    navController: NavController,
+    filterTagId: Long? = null,
+    filterActorId: Long? = null,
+    filterQuery: String = ""
 ) {
     val bottomBarVisible = LocalBottomBarVisible.current
     val coroutineScope = rememberCoroutineScope()
@@ -86,11 +90,17 @@ fun MediaViewerScreen(
         onDispose { bottomBarVisible.value = true }
     }
 
-    if (mediaIdList.isNotEmpty()) {
-        // 模式1: 列表模式 — 来自 message，少量媒体，直接全部加载
-        ListModeViewer(
+    if (mediaIdList.isNotEmpty() && messageId > 0) {
+        // 模式1: 列表模式（联动）— 来自 message，可跨 group 滑动
+        FederatedListModeViewer(
             initialMediaId = initialMediaId,
-            mediaIdList = mediaIdList,
+            initialMessageId = messageId,
+            initialMediaIdList = mediaIdList,
+            filter = MessageRepository.MediaViewerFilter(
+                tagId = filterTagId,
+                actorId = filterActorId,
+                searchQuery = filterQuery
+            ),
             databaseManager = databaseManager,
             navController = navController
         )
@@ -105,26 +115,41 @@ fun MediaViewerScreen(
 }
 
 /**
- * 列表模式：直接加载所有 ID 对应的媒体（适用于 message 内少量媒体）
+ * 列表模式（联动）：以入口 message 为锚点，pager 数据 = 当前过滤集合下、按 createdAt DESC + 组内 position 拉平的 media 序列。
+ * 滑到边缘时按需加载相邻 message 的 media（append/prepend）。
  */
 @Composable
-private fun ListModeViewer(
+private fun FederatedListModeViewer(
     initialMediaId: Long,
-    mediaIdList: List<Long>,
+    initialMessageId: Long,
+    initialMediaIdList: List<Long>,
+    filter: MessageRepository.MediaViewerFilter,
     databaseManager: DatabaseManager,
     navController: NavController
 ) {
     val coroutineScope = rememberCoroutineScope()
     val mediaList = remember { mutableStateListOf<Media>() }
+    // 每个 page 对应所属 messageId，用于切片缩略图条
+    val mediaMessageIds = remember { mutableStateListOf<Long>() }
+    var isInitialized by remember { mutableStateOf(false) }
+    var isExpanding by remember { mutableStateOf(false) }
+    var headMessageId by remember { mutableStateOf(initialMessageId) } // 已加载序列中最新（视觉左侧）
+    var tailMessageId by remember { mutableStateOf(initialMessageId) } // 已加载序列中最旧（视觉右侧）
 
-    LaunchedEffect(mediaIdList) {
-        val loaded = databaseManager.mediaRepository.getMediaByIds(mediaIdList)
-            .sortedBy { mediaIdList.indexOf(it.id) }
+    LaunchedEffect(initialMessageId, initialMediaIdList) {
+        // 用入参 ID 列表初始化，确保顺序与列表卡片缩略图一致
+        // （Room @Relation 不保证 position 排序，而卡片渲染用的是 mediaList 的呈现顺序）
+        val loaded = databaseManager.mediaRepository.getMediaByIds(initialMediaIdList)
+            .associateBy { it.id }
+        val finalList = initialMediaIdList.mapNotNull { loaded[it] }
         mediaList.clear()
-        mediaList.addAll(loaded)
+        mediaMessageIds.clear()
+        mediaList.addAll(finalList)
+        repeat(finalList.size) { mediaMessageIds.add(initialMessageId) }
+        isInitialized = true
     }
 
-    if (mediaList.isEmpty()) {
+    if (!isInitialized || mediaList.isEmpty()) {
         LoadingBox()
         return
     }
@@ -133,23 +158,91 @@ private fun ListModeViewer(
     val pagerState = rememberPagerState(initialPage = startIndex) { mediaList.size }
     val stripListState = rememberLazyListState()
 
-    LaunchedEffect(pagerState.currentPage) {
+    // 当前 group 切片
+    val currentMessageId = mediaMessageIds.getOrNull(pagerState.currentPage) ?: initialMessageId
+    val groupRange = remember(currentMessageId, mediaMessageIds.size) {
+        val start = mediaMessageIds.indexOfFirst { it == currentMessageId }
+        val end = mediaMessageIds.indexOfLast { it == currentMessageId }
+        if (start < 0) 0..0 else start..end
+    }
+    val pageInGroup = (pagerState.currentPage - groupRange.first).coerceAtLeast(0)
+    val groupSize = (groupRange.last - groupRange.first + 1).coerceAtLeast(1)
+    val groupMediaList = remember(groupRange, mediaList.size) {
+        mediaList.subList(groupRange.first, groupRange.last + 1)
+    }
+
+    LaunchedEffect(pagerState.currentPage, groupRange) {
+        // 居中当前缩略图（缩略图条内的索引 = pageInGroup）
         val viewportWidth = stripListState.layoutInfo.viewportSize.width
         val itemWidthPx =
             stripListState.layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: viewportWidth
         val offset = -(viewportWidth / 2 - itemWidthPx / 2)
-        stripListState.scrollToItem(
-            index = pagerState.currentPage,
-            scrollOffset = offset
-        )
+        stripListState.scrollToItem(index = pageInGroup, scrollOffset = offset)
+    }
+
+    // 边界扩展：MessageList 是 reverseLayout（最新在视觉底部）。
+    // 用户视觉上「往右/下一张」= 进入更新的 message（createdAt 更大 = PREV）；
+    // 「往左/上一张」= 进入更旧的 message（createdAt 更小 = NEXT）。
+    LaunchedEffect(pagerState.currentPage) {
+        if (isExpanding) return@LaunchedEffect
+
+        val localIdx = pagerState.currentPage
+        val distToEnd = mediaList.size - 1 - localIdx
+        val distToStart = localIdx
+
+        if (distToEnd < PRELOAD_THRESHOLD) {
+            isExpanding = true
+            try {
+                val newerId = databaseManager.messageRepository.getAdjacentMessageIdWithMedia(
+                    anchorMessageId = tailMessageId,
+                    direction = MessageRepository.AdjacentDirection.PREV,
+                    filter = filter
+                )
+                if (newerId != null) {
+                    val moreMedia = databaseManager.messageRepository.getMediaByMessageId(newerId)
+                    if (moreMedia.isNotEmpty()) {
+                        mediaList.addAll(moreMedia)
+                        repeat(moreMedia.size) { mediaMessageIds.add(newerId) }
+                        tailMessageId = newerId
+                    }
+                }
+            } finally {
+                isExpanding = false
+            }
+        }
+
+        if (distToStart < PRELOAD_THRESHOLD) {
+            isExpanding = true
+            try {
+                val olderId = databaseManager.messageRepository.getAdjacentMessageIdWithMedia(
+                    anchorMessageId = headMessageId,
+                    direction = MessageRepository.AdjacentDirection.NEXT,
+                    filter = filter
+                )
+                if (olderId != null) {
+                    val moreMedia = databaseManager.messageRepository.getMediaByMessageId(olderId)
+                    if (moreMedia.isNotEmpty()) {
+                        mediaList.addAll(0, moreMedia)
+                        repeat(moreMedia.size) { mediaMessageIds.add(0, olderId) }
+                        headMessageId = olderId
+                        // 维持视觉位置：插入了 N 条到头部，currentPage 向后偏移 N
+                        pagerState.scrollToPage(pagerState.currentPage + moreMedia.size)
+                    }
+                }
+            } finally {
+                isExpanding = false
+            }
+        }
     }
 
     MediaViewerContent(
         mediaList = mediaList,
         pagerState = pagerState,
         stripListState = stripListState,
-        totalCount = mediaList.size,
-        currentGlobalIndex = pagerState.currentPage,
+        totalCount = groupSize,
+        currentGlobalIndex = pageInGroup,
+        stripMediaList = groupMediaList,
+        stripBaseIndex = groupRange.first,
         databaseManager = databaseManager,
         navController = navController,
         coroutineScope = coroutineScope
@@ -300,7 +393,9 @@ private fun MediaViewerContent(
     currentGlobalIndex: Int,
     databaseManager: DatabaseManager,
     navController: NavController,
-    coroutineScope: kotlinx.coroutines.CoroutineScope
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    stripMediaList: List<Media> = mediaList,
+    stripBaseIndex: Int = 0
 ) {
     // 用于收藏状态变更的可变列表引用
     val mutableMediaList = mediaList as? MutableList<Media>
@@ -418,7 +513,7 @@ private fun MediaViewerContent(
         }
 
         // 底部：横向缩略图导航条（多于1个媒体时显示，受 controlsVisible 控制）
-        if (mediaList.size > 1) {
+        if (stripMediaList.size > 1) {
             AnimatedVisibility(
                 visible = controlsVisible,
                 enter = fadeIn(),
@@ -428,10 +523,12 @@ private fun MediaViewerContent(
                     .fillMaxWidth()
             ) {
                 MediaStripBar(
-                    mediaList = mediaList,
-                    currentIndex = pagerState.currentPage,
+                    mediaList = stripMediaList,
+                    currentIndex = (pagerState.currentPage - stripBaseIndex)
+                        .coerceIn(0, stripMediaList.size - 1),
                     listState = stripListState,
-                    pagerState = pagerState
+                    pagerState = pagerState,
+                    baseIndex = stripBaseIndex
                 )
             }
         }
@@ -444,7 +541,8 @@ private fun MediaStripBar(
     currentIndex: Int,
     listState: androidx.compose.foundation.lazy.LazyListState,
     pagerState: androidx.compose.foundation.pager.PagerState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    baseIndex: Int = 0
 ) {
     val coroutineScope = rememberCoroutineScope()
 
@@ -478,7 +576,7 @@ private fun MediaStripBar(
                         .clip(RoundedCornerShape(4.dp))
                         .clickable {
                             coroutineScope.launch {
-                                pagerState.animateScrollToPage(index)
+                                pagerState.animateScrollToPage(baseIndex + index)
                             }
                         }
                 ) {

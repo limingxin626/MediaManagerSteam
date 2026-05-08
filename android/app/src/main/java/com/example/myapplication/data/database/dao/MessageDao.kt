@@ -170,6 +170,97 @@ interface MessageDao {
     @Query("DELETE FROM message_media WHERE messageId = :messageId")
     suspend fun deleteMessageMediaByMessageId(messageId: Long)
 
+    // ==================== 邻接 message 查询（含 media，用于跨 group 滑动） ====================
+
+    // next = 更旧（createdAt < anchor），prev = 更新（createdAt > anchor）。与列表 DESC 排序口径一致。
+    @Query(
+        """
+        SELECT id FROM messages m
+        WHERE m.createdAt < :anchorCreatedAt
+          AND (:query = '' OR m.text LIKE '%' || :query || '%')
+          AND EXISTS (SELECT 1 FROM message_media WHERE messageId = m.id)
+        ORDER BY m.createdAt DESC LIMIT 1
+        """
+    )
+    suspend fun getNextMessageIdWithMedia(anchorCreatedAt: Long, query: String): Long?
+
+    @Query(
+        """
+        SELECT id FROM messages m
+        WHERE m.createdAt > :anchorCreatedAt
+          AND (:query = '' OR m.text LIKE '%' || :query || '%')
+          AND EXISTS (SELECT 1 FROM message_media WHERE messageId = m.id)
+        ORDER BY m.createdAt ASC LIMIT 1
+        """
+    )
+    suspend fun getPrevMessageIdWithMedia(anchorCreatedAt: Long, query: String): Long?
+
+    @Query(
+        """
+        SELECT m.id FROM messages m
+        INNER JOIN message_tag mt ON m.id = mt.messageId
+        WHERE mt.tagId = :tagId
+          AND m.createdAt < :anchorCreatedAt
+          AND (:query = '' OR m.text LIKE '%' || :query || '%')
+          AND EXISTS (SELECT 1 FROM message_media WHERE messageId = m.id)
+        ORDER BY m.createdAt DESC LIMIT 1
+        """
+    )
+    suspend fun getNextMessageIdWithMediaByTag(
+        tagId: Long,
+        anchorCreatedAt: Long,
+        query: String
+    ): Long?
+
+    @Query(
+        """
+        SELECT m.id FROM messages m
+        INNER JOIN message_tag mt ON m.id = mt.messageId
+        WHERE mt.tagId = :tagId
+          AND m.createdAt > :anchorCreatedAt
+          AND (:query = '' OR m.text LIKE '%' || :query || '%')
+          AND EXISTS (SELECT 1 FROM message_media WHERE messageId = m.id)
+        ORDER BY m.createdAt ASC LIMIT 1
+        """
+    )
+    suspend fun getPrevMessageIdWithMediaByTag(
+        tagId: Long,
+        anchorCreatedAt: Long,
+        query: String
+    ): Long?
+
+    @Query(
+        """
+        SELECT id FROM messages m
+        WHERE m.actorId = :actorId
+          AND m.createdAt < :anchorCreatedAt
+          AND (:query = '' OR m.text LIKE '%' || :query || '%')
+          AND EXISTS (SELECT 1 FROM message_media WHERE messageId = m.id)
+        ORDER BY m.createdAt DESC LIMIT 1
+        """
+    )
+    suspend fun getNextMessageIdWithMediaByActor(
+        actorId: Long,
+        anchorCreatedAt: Long,
+        query: String
+    ): Long?
+
+    @Query(
+        """
+        SELECT id FROM messages m
+        WHERE m.actorId = :actorId
+          AND m.createdAt > :anchorCreatedAt
+          AND (:query = '' OR m.text LIKE '%' || :query || '%')
+          AND EXISTS (SELECT 1 FROM message_media WHERE messageId = m.id)
+        ORDER BY m.createdAt ASC LIMIT 1
+        """
+    )
+    suspend fun getPrevMessageIdWithMediaByActor(
+        actorId: Long,
+        anchorCreatedAt: Long,
+        query: String
+    ): Long?
+
     // ==================== MessageTag 相关 ====================
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
