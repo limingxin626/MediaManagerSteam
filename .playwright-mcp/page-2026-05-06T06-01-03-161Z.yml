@@ -1,0 +1,391 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - button "跳至内容" [ref=e3] [cursor=pointer]:
+      - generic [ref=e5]: 跳至内容
+    - button "辅助功能反馈" [ref=e6] [cursor=pointer]:
+      - generic [ref=e8]: 辅助功能反馈
+    - generic [ref=e9]:
+      - link "返回到必应搜索" [ref=e10] [cursor=pointer]:
+        - /url: /?FORM=Z9FD1
+        - heading "返回到必应搜索" [level=1] [ref=e11]
+      - search [ref=e12]:
+        - button "搜索" [ref=e15] [cursor=pointer]
+        - searchbox "在此处输入你的搜索 — 输入时会显示搜索建议" [ref=e16]: AI news today 2026
+        - button "使用图像搜索" [ref=e22] [cursor=pointer]
+    - complementary "帐户奖励和偏好设置" [ref=e24]:
+      - button "Microsoft Rewards" [ref=e25] [cursor=pointer]
+      - link "登录" [ref=e26] [cursor=pointer]:
+        - /url: javascript:void(0)
+        - generic "登录" [ref=e27]
+    - navigation "主菜单" [ref=e28]:
+      - list [ref=e29]:
+        - listitem [ref=e30]:
+          - link "全部" [ref=e31] [cursor=pointer]:
+            - /url: /?scope=web&FORM=HDRSC1
+        - listitem [ref=e32]:
+          - link "搜索" [ref=e33] [cursor=pointer]:
+            - /url: /copilotsearch?q=AI+news+today+2026&FORM=CSSCOP
+            - img [ref=e34]
+            - text: 搜索
+        - listitem [ref=e36]:
+          - link "资讯" [ref=e37] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=b7d55750764f4cb78bf5adbe4e008ccb984df3368279092ddcae3e019cfc03d8JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L25ld3Mvc2VhcmNoP3E9QUkrbmV3cyt0b2RheSsyMDI2JkZPUk09SERSU0M3&ntb=1
+        - listitem [ref=e38]:
+          - link "图片" [ref=e39] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=996f5db06b89bb4c41d235ed53d42f6bbe7d7ee45a731df9fc8b05299df32749JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L2ltYWdlcy9zZWFyY2g_cT1BSStuZXdzK3RvZGF5KzIwMjYmRk9STT1IRFJTQzM&ntb=1
+        - listitem [ref=e40]:
+          - link "视频" [ref=e41] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=d63566b52850084f2845199ef17c4d7f4821428932ea8a16df8632106332378fJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L3ZpZGVvcy9zZWFyY2g_cT1BSStuZXdzK3RvZGF5KzIwMjYmRk9STT1IRFJTQzQ&ntb=1
+        - listitem [ref=e42]:
+          - link "地图" [ref=e43] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=7431276a7bda9941775687a3face29888d71a96a9f0d02979a2a6f81752f6785JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L21hcHM_cT1BSStuZXdzK3RvZGF5KzIwMjYmRk9STT1IRFJTQzY&ntb=1
+        - listitem [ref=e44]:
+          - link "Copilot" [ref=e45] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=645c0137e0baaaae23dd5afc7742cae0c97c604f93d4cf722dcd160c50015b22JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L2NoYXQ_cHJvbXB0PUFJK25ld3MrdG9kYXkrMjAyNiZzZW5kcXVlcnk9MSZGT1JNPVNDQ09EWA&ntb=1
+        - listitem [ref=e46]:
+          - button "更多" [ref=e47] [cursor=pointer]:
+            - img [ref=e49]
+            - text: 更多
+  - generic [ref=e51]:
+    - main "搜索结果" [ref=e52]:
+      - generic [ref=e54]: 约 325,000 个结果
+      - list [ref=e65]:
+        - listitem [ref=e66]:
+          - generic [ref=e67]:
+            - generic [ref=e69]:
+              - generic [ref=e71]:
+                - link "AI news today 2026的最新相关信息" [ref=e73] [cursor=pointer]:
+                  - /url: https://www.bing.com/ck/a?!&&p=32aefcbdeddeb6d2b436fbed54c579cb5d2698eb8e8a26436bf764eb296b135fJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L25ld3Mvc2VhcmNoP3E9QUkrbmV3cyt0b2RheSsyMDI2JkZPUk09RVdSRQ&ntb=1
+                  - heading "AI news today 2026的最新相关信息" [level=2] [ref=e74]
+                  - generic:
+                    - img
+                - generic [ref=e78]:
+                  - generic [ref=e79]:
+                    - link "新浪财经 · 7 天 AI 世纪对决开庭，马斯克在OpenAI审判中出庭作证 自身拥有人工智能企业的马斯克在奥克兰法庭的证人席上坦言：“我对人工智能抱有极度担忧。” 他表示，人工智能既能让全人类走向繁荣，也可能给人类带来毁灭性后果。“我们绝不希望迎来《终结者》式的悲剧结局。” 马斯克说道。 AI 世纪对决开庭，马斯克在OpenAI审判中出庭作证" [ref=e80] [cursor=pointer]:
+                      - /url: https://www.bing.com/ck/a?!&&p=6e9063c5b01482622462a305b23aa5731c2aef0ce1b03695d1c138a31ca8745cJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9maW5hbmNlLnNpbmEuY29tLmNuL3dvcmxkLzIwMjYtMDQtMjkvZG9jLWluaHdjZWlxNzk3MzE4MS5zaHRtbA&ntb=1
+                      - generic [ref=e81]:
+                        - generic [ref=e82]:
+                          - generic "新浪财经" [ref=e85]:
+                            - img "新浪财经" [ref=e87]
+                            - generic [ref=e88]: · 7 天
+                          - generic [ref=e89]: AI 世纪对决开庭，马斯克在OpenAI审判中出庭作证
+                          - generic [ref=e90]: 自身拥有人工智能企业的马斯克在奥克兰法庭的证人席上坦言：“我对人工智能抱有极度担忧。” 他表示，人工智能既能让全人类走向繁荣，也可能给人类带来毁灭性后果。“我们绝不希望迎来《终结者》式的悲剧结局。” 马斯克说道。
+                        - img "AI 世纪对决开庭，马斯克在OpenAI审判中出庭作证" [ref=e92]
+                    - link "新浪财经":
+                      - /url: /news/search?q=site%3afinance.sina.com.cn&FORM=NWBCLM
+                  - generic [ref=e93]:
+                    - link "腾讯网 腾讯网 · 8 天 12张图表解读2026年AI发展现状和趋势……斯坦福大学发布《2026年人工 ... 设置星标★关注，从此你的世界多点科学~顶尖AI模型正加速升级，头部AI企业则正加速上市，比如准备于2026年下半年提交首次公开募股(IPO)申请的OpenAI和Anthropic。而在另一边，是大众对AI喜忧参半、爱恨交织的复杂情绪，以及部分地区已经爆发的人-机矛盾，例如，美国的某些地方政府开始限制甚至禁止新建数据中心。值得追踪的 ... 12张图表解读2026年AI发展现状和趋势……斯坦福大学发布《2026年人工 ..." [ref=e94] [cursor=pointer]:
+                      - /url: https://www.bing.com/ck/a?!&&p=d29f5efab754b1f649d2b5510f07f74c2a2e632e0f785bfa2b0251f15aa04e5bJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9uZXdzLnFxLmNvbS9yYWluL2EvMjAyNjA0MjdBMDZFNVkwMA&ntb=1
+                      - generic [ref=e95]:
+                        - generic [ref=e96]:
+                          - generic [ref=e98]:
+                            - img "腾讯网" [ref=e99]
+                            - generic "腾讯网" [ref=e100]: 腾讯网 · 8 天
+                          - generic [ref=e101]: 12张图表解读2026年AI发展现状和趋势……斯坦福大学发布《2026年人工 ...
+                          - generic [ref=e102]: 设置星标★关注，从此你的世界多点科学~顶尖AI模型正加速升级，头部AI企业则正加速上市，比如准备于2026年下半年提交首次公开募股(IPO)申请的OpenAI和Anthropic。而在另一边，是大众对AI喜忧参半、爱恨交织的复杂情绪，以及部分地区已经爆发的人-机矛盾，例如，美国的某些地方政府开始限制甚至禁止新建数据中心。值得追踪的 ...
+                        - img "12张图表解读2026年AI发展现状和趋势……斯坦福大学发布《2026年人工 ..." [ref=e104]
+                    - link "腾讯网":
+                      - /url: /news/search?q=site%3anews.qq.com&FORM=NWBCLM
+                  - generic [ref=e105]:
+                    - link "深圳新闻网 · 8 天 2026广东省人工智能应用对接大会在深举办 自变量机器人WALL-B模型 ... 深圳新闻网2026年4月28日讯 （记者 刘惠敏 王睿 ）4月27日，2026广东省人工智能应用对接大会在深圳举办。大会按照“1+5”形式，设置政策宣介、案例分享、平台发布、产品推介等核心环节，集中展现广东人工智能发展最新态势及创新举措。大会现场集中发布 华为 昇腾系列产品、 腾讯 智能体产品、 晶泰科技 ..." [ref=e106] [cursor=pointer]:
+                      - /url: https://www.bing.com/ck/a?!&&p=71d3a10fe4a76d64344fbf55d48c08c4a47a4871d43e0a27f0950e697c8082aeJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cuc3puZXdzLmNvbS9uZXdzL2NvbnRlbnQvMjAyNi0wNC8yOC9jb250ZW50XzMyMDMwNjM3Lmh0bQ&ntb=1
+                      - generic [ref=e108]:
+                        - generic "深圳新闻网" [ref=e111]:
+                          - img "深圳新闻网" [ref=e113]
+                          - generic [ref=e114]: · 8 天
+                        - generic [ref=e115]: 2026广东省人工智能应用对接大会在深举办 自变量机器人WALL-B模型 ...
+                        - generic [ref=e116]: 深圳新闻网2026年4月28日讯 （记者 刘惠敏 王睿 ）4月27日，2026广东省人工智能应用对接大会在深圳举办。大会按照“1+5”形式，设置政策宣介、案例分享、平台发布、产品推介等核心环节，集中展现广东人工智能发展最新态势及创新举措。大会现场集中发布 华为 昇腾系列产品、 腾讯 智能体产品、 晶泰科技 ...
+                    - link "深圳新闻网":
+                      - /url: /news/search?q=site%3awww.sznews.com&FORM=NWBCLM
+                  - generic [ref=e117]:
+                    - link "国家互联网信息办公室 国家互联网信息办公室 · 5 天 中央网信办部署开展“清朗·整治AI应用乱象”专项行动 为规范AI服务和应用，促进行业健康有序发展，保障公民合法权益，近日，中央网信办印发通知，在全国范围内部署开展为期4个月的“清朗·整治AI应用乱象”专项行动。 中央网信办有关负责人表示，本次专项行动分两个阶段开展。第一阶段为“清朗·AI应用服务典型违规问题”专项治理行动，重点整治未按规定履行大模型备案登记义务、安全审核能力不足、大模型训练语料安全、AI数据投毒、生成合成内容标识落实不到位等问题，强化 ..." [ref=e118] [cursor=pointer]:
+                      - /url: https://www.bing.com/ck/a?!&&p=3abc9c55a300cd0038db05330618b09bc564452c30bb56a1be43d979c8f6e3fdJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cuY2FjLmdvdi5jbi8yMDI2LTA0LzMwL2NfMTc3OTI4OTI5ODcxODc2NS5odG0&ntb=1
+                      - generic [ref=e120]:
+                        - generic [ref=e122]:
+                          - img "国家互联网信息办公室" [ref=e123]
+                          - generic "国家互联网信息办公室" [ref=e124]: 国家互联网信息办公室 · 5 天
+                        - generic [ref=e125]: 中央网信办部署开展“清朗·整治AI应用乱象”专项行动
+                        - generic [ref=e126]: 为规范AI服务和应用，促进行业健康有序发展，保障公民合法权益，近日，中央网信办印发通知，在全国范围内部署开展为期4个月的“清朗·整治AI应用乱象”专项行动。 中央网信办有关负责人表示，本次专项行动分两个阶段开展。第一阶段为“清朗·AI应用服务典型违规问题”专项治理行动，重点整治未按规定履行大模型备案登记义务、安全审核能力不足、大模型训练语料安全、AI数据投毒、生成合成内容标识落实不到位等问题，强化 ...
+                    - link "国家互联网信息办公室":
+                      - /url: /news/search?q=site%3awww.cac.gov.cn&FORM=NWBCLM
+              - generic [ref=e128]:
+                - generic [ref=e129]: 反馈
+                - button "反馈点赞" [ref=e130] [cursor=pointer]
+                - button "反馈不喜欢" [ref=e131] [cursor=pointer]
+            - link "查看更多相关资讯" [ref=e135] [cursor=pointer]:
+              - /url: https://www.bing.com/ck/a?!&&p=32aefcbdeddeb6d2b436fbed54c579cb5d2698eb8e8a26436bf764eb296b135fJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L25ld3Mvc2VhcmNoP3E9QUkrbmV3cyt0b2RheSsyMDI2JkZPUk09RVdSRQ&ntb=1
+              - generic [ref=e136]: 查看更多相关资讯
+              - generic:
+                - img
+        - listitem [ref=e138]:
+          - generic [ref=e139]:
+            - link "浏览此图像" [ref=e142] [cursor=pointer]:
+              - /url: /images/search?view=detailV2&ccid=jlQfmF8/&id=B37813CBE1DEBCCCC33B5B59E3F4DC0131D9145D&thid=OIP.jlQfmF8_r8LuyqlvqCGOKwHaHa&mediaurl=https://aibars-pub.s3.us-east-2.amazonaws.com/pub_news/2026/040201.jpeg&q=AI+news+today+2026&ck=9BFC042AB6DFA6E0A486FB85297787D1&idpp=rc&expw=1024&exph=1024&form=rc2idp
+            - generic [ref=e144]:
+              - link "aibars.net" [ref=e146] [cursor=pointer]:
+                - /url: https://www.bing.com/ck/a?!&&p=1cf7720631cfb51a7f00f85819b0d239202dc5e9e5850afdf16a7883097775d2JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cuYWliYXJzLm5ldC96aC9saWJyYXJ5L2FpLW5ld3MvbGlzdA&ntb=1
+                - generic [ref=e151]:
+                  - generic [ref=e152]: aibars.net
+                  - generic [ref=e155]: https://www.aibars.net › zh › library › ai-news › list
+              - heading "2026年AI行业资讯汇总：最新动态与趋势分析" [level=2] [ref=e156]:
+                - link "2026年AI行业资讯汇总：最新动态与趋势分析" [ref=e157] [cursor=pointer]:
+                  - /url: https://www.bing.com/ck/a?!&&p=1cf7720631cfb51a7f00f85819b0d239202dc5e9e5850afdf16a7883097775d2JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cuYWliYXJzLm5ldC96aC9saWJyYXJ5L2FpLW5ld3MvbGlzdA&ntb=1
+              - paragraph [ref=e158]: 3 天之前 · 美国国防部宣布与八家领先的人工智能公司——亚马逊云科技、谷歌、微软、英伟达、OpenAI、甲骨文、Reflection AI 和 SpaceX——达成协议，旨在 …
+        - listitem [ref=e160]:
+          - link "知乎专栏" [ref=e162] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=3c3f061811559340f13cd68a2cbbcabb9c75d2d0739359a507239c0110506785JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly96aHVhbmxhbi56aGlodS5jb20vcC8yMDI1MzkwMDAyMjMwNTU1NTM4&ntb=1
+            - generic [ref=e167]:
+              - generic [ref=e168]: 知乎专栏
+              - generic [ref=e171]: https://zhuanlan.zhihu.com
+          - heading "2026年4月AI圈5大事件盘点：GPT-6来袭、国产大模型爆发 ..." [level=2] [ref=e172]:
+            - link "2026年4月AI圈5大事件盘点：GPT-6来袭、国产大模型爆发 ..." [ref=e173] [cursor=pointer]:
+              - /url: https://www.bing.com/ck/a?!&&p=3c3f061811559340f13cd68a2cbbcabb9c75d2d0739359a507239c0110506785JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly96aHVhbmxhbi56aGlodS5jb20vcC8yMDI1MzkwMDAyMjMwNTU1NTM4&ntb=1
+          - paragraph [ref=e175]: 2026年第一季度刚刚结束，AI领域就迎来了新一轮爆发式增长：据公开数据统计，仅4月上旬就有12款新大模型发布、3起行业级融资事件落地，平均每天都有重磅消息放出。对于开发者、企业用户和普通 …
+        - listitem [ref=e176]:
+          - generic [ref=e178]:
+            - heading "AI News Today 2026 的视频" [level=2] [ref=e180]:
+              - link "AI News Today 2026 的视频" [ref=e181] [cursor=pointer]:
+                - /url: https://www.bing.com/ck/a?!&&p=29b941618447bc769e75f9c7bdc37355d9385ceae09149a5e513865061fcd7f8JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L3ZpZGVvcy9zZWFyY2g_cT1BSStuZXdzK3RvZGF5KzIwMjYmcXB2dD1BSStuZXdzK3RvZGF5KzIwMjYmRk9STT1WRFJF&ntb=1
+            - 'link "Latest AI News | 4th May 2026 (EDT) | AI News: Meta Robots, Oscar Ban and ER Diagnosis Showdown来源: YouTube · 时长: 3 分钟6 秒 · 上传时间: 1 天前 · 上传人: AI News Today · 单击以播放。 · 🤖 Latest AI News Today | New Updates Happening in the AI World! Stay ahead of the curve with today''s biggest AI & tech updates — explained simply. From OpenAI and Google to startups and research breakthroughs, we cover everything happening in artificial intelligence right now. Welcome to today''s AI news roundup! We cover the biggest ..." [ref=e184] [cursor=pointer]':
+              - /url: https://www.bing.com/ck/a?!&&p=5570a90affcc474cb92ebbe571b022ab3853d946beb1702c9f4cc5d71d96ac3cJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L3ZpZGVvcy9yaXZlcnZpZXcvcmVsYXRlZHZpZGVvP3E9QUkrbmV3cyt0b2RheSsyMDI2Jm1pZD0zRjQ0ODZEREUxRjlCOTNDNTUxMDNGNDQ4NkRERTFGOUI5M0M1NTEwJmNodXJsPSZGT1JNPVZJUkU&ntb=1
+              - generic [ref=e185]:
+                - generic [ref=e194]: 3:06
+                - generic [ref=e197]:
+                  - 'generic "Latest AI News | 4th May 2026 (EDT) | AI News: Meta Robots, Oscar Ban and ER Diagnosis Showdown" [ref=e198]':
+                    - text: Latest
+                    - strong [ref=e199]: AI
+                    - strong [ref=e200]: News
+                    - text: "| 4th May"
+                    - strong [ref=e201]: "2026"
+                    - text: (EDT) |
+                    - strong [ref=e202]: AI
+                    - strong [ref=e203]: News
+                    - text: ": Meta Robots, Oscar Ban and ER Diagnosis Showdown"
+                  - generic [ref=e205]:
+                    - generic [ref=e206]:
+                      - img "视频源网站" [ref=e207]
+                      - text: YouTube · AI News Today
+                    - generic [ref=e208]: 1 天前
+            - generic [ref=e210]:
+              - 'link "Latest AI News | 5th May 2026 (EDT) | Nvidia CEO: AI Creates Jobs, Not Kills Them - May 5 News来源: YouTube · 时长: 4 分钟56 秒 · 上传时间: 18 小时之前 · 上传人: AI News Today · 单击以播放。 · 🤖 Latest AI News Today | New Updates Happening in the AI World! Stay ahead of the curve with today''s biggest AI & tech updates — explained simply. From OpenAI and Google to startups and research breakthroughs, we cover everything happening in artificial intelligence right now. In today''s AI news roundup, we cover Nvidia CEO Jensen Huang''s ..." [ref=e213] [cursor=pointer]':
+                - /url: https://www.bing.com/ck/a?!&&p=6906304837694347318ebb1e736346400fce809513e57356b8289f9f7424c6b7JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L3ZpZGVvcy9yaXZlcnZpZXcvcmVsYXRlZHZpZGVvP3E9QUkrbmV3cyt0b2RheSsyMDI2Jm1pZD1BRkRBN0FDMzQxOUEwNUJEREVFNkFGREE3QUMzNDE5QTA1QkRERUU2JmNodXJsPSZGT1JNPVZJUkU&ntb=1
+                - generic [ref=e214]:
+                  - generic [ref=e223]: 4:56
+                  - generic [ref=e224]:
+                    - 'generic "Latest AI News | 5th May 2026 (EDT) | Nvidia CEO: AI Creates Jobs, Not Kills Them - May 5 News" [ref=e225]':
+                      - text: Latest
+                      - strong [ref=e226]: AI
+                      - strong [ref=e227]: News
+                      - text: "| 5th May"
+                      - strong [ref=e228]: "2026"
+                      - text: "(EDT) | Nvidia CEO:"
+                      - strong [ref=e229]: AI
+                      - text: Creates Jobs, Not Kills Them - May 5
+                      - strong [ref=e230]: News
+                    - generic [ref=e231]:
+                      - generic [ref=e232]:
+                        - img "视频源网站" [ref=e233]
+                        - text: YouTube · AI News Today
+                      - generic [ref=e234]: 18 小时之前
+              - 'link "Latest AI News | 3rd May 2026 (EDT) | AI News: Oscar Ban on AI Actors, Musk vs Altman, Pentagon AI D来源: YouTube · 时长: 4 分钟12 秒 · 上传时间: 2 天之前 · 上传人: AI News Today · 单击以播放。 · 🤖 Latest AI News Today | New Updates Happening in the AI World! Stay ahead of the curve with today''s biggest AI & tech updates — explained simply. From OpenAI and Google to startups and research breakthroughs, we cover everything happening in artificial intelligence right now. Welcome to today''s AI news roundup. We cover the biggest ..." [ref=e237] [cursor=pointer]':
+                - /url: https://www.bing.com/ck/a?!&&p=2af646eae1fb82749c74f54b27ef3f77992fe16da62957b062d2d181380e90e4JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L3ZpZGVvcy9yaXZlcnZpZXcvcmVsYXRlZHZpZGVvP3E9QUkrbmV3cyt0b2RheSsyMDI2Jm1pZD0yOUYyNEE5NUFEQzkyOEEwMTBBMTI5RjI0QTk1QURDOTI4QTAxMEExJmNodXJsPSZGT1JNPVZJUkU&ntb=1
+                - generic [ref=e238]:
+                  - generic [ref=e247]: 4:12
+                  - generic [ref=e248]:
+                    - 'generic "Latest AI News | 3rd May 2026 (EDT) | AI News: Oscar Ban on AI Actors, Musk vs Altman, Pentagon AI D" [ref=e249]':
+                      - text: Latest
+                      - strong [ref=e250]: AI
+                      - strong [ref=e251]: News
+                      - text: "| 3rd May"
+                      - strong [ref=e252]: "2026"
+                      - text: (EDT) |
+                      - strong [ref=e253]: AI
+                      - strong [ref=e254]: News
+                      - text: ": Oscar Ban on"
+                      - strong [ref=e255]: AI
+                      - text: Actors, Musk vs Altman, Pentagon
+                      - strong [ref=e256]: AI
+                      - text: D
+                    - generic [ref=e257]:
+                      - generic [ref=e258]:
+                        - img "视频源网站" [ref=e259]
+                        - text: YouTube · AI News Today
+                      - generic [ref=e260]: 2 天之前
+              - 'link "Latest AI News | 2nd May 2026 (EDT) | AI News: Musk vs Altman, Anthropic $900B, Pentagon AI Deals来源: YouTube · 时长: 4 分钟18 秒 · 上传时间: 3 天之前 · 上传人: AI News Today · 单击以播放。 · 🤖 Latest AI News Today | New Updates Happening in the AI World! Stay ahead of the curve with today''s biggest AI & tech updates — explained simply. From OpenAI and Google to startups and research breakthroughs, we cover everything happening in artificial intelligence right now. Today''s AI news roundup covers the biggest stories from May 1 ..." [ref=e263] [cursor=pointer]':
+                - /url: https://www.bing.com/ck/a?!&&p=c19ca7daec4c8d8589d221779add0b482a7ea55e62dc64395889fc79f2e6548cJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1L3ZpZGVvcy9yaXZlcnZpZXcvcmVsYXRlZHZpZGVvP3E9QUkrbmV3cyt0b2RheSsyMDI2Jm1pZD0yQTQwQUNCMUFEQTU2QjlGNTI5RDJBNDBBQ0IxQURBNTZCOUY1MjlEJmNodXJsPSZGT1JNPVZJUkU&ntb=1
+                - generic [ref=e264]:
+                  - generic [ref=e273]: 4:18
+                  - generic [ref=e274]:
+                    - 'generic "Latest AI News | 2nd May 2026 (EDT) | AI News: Musk vs Altman, Anthropic $900B, Pentagon AI Deals" [ref=e275]':
+                      - text: Latest
+                      - strong [ref=e276]: AI
+                      - strong [ref=e277]: News
+                      - text: "| 2nd May"
+                      - strong [ref=e278]: "2026"
+                      - text: (EDT) |
+                      - strong [ref=e279]: AI
+                      - strong [ref=e280]: News
+                      - text: ": Musk vs Altman, Anthropic $900B, Pentagon"
+                      - strong [ref=e281]: AI
+                      - text: Deals
+                    - generic [ref=e282]:
+                      - generic [ref=e283]:
+                        - img "视频源网站" [ref=e284]
+                        - text: YouTube · AI News Today
+                      - generic [ref=e285]: 3 天之前
+        - listitem [ref=e286]:
+          - link "MIT Technology Review" [ref=e288] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=e809a70d116167df26fb6cc51f81a5ab6a1c56dd3baadfdb8b1abe29617beaa4JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cudGVjaG5vbG9neXJldmlldy5jb20vMjAyNi8wNC8yMS8xMTM1NjQzLzEwLWFpLWFydGlmaWNpYWwtaW50ZWxsaWdlbmNlLXRyZW5kcy10ZWNobm9sb2dpZXMtcmVzZWFyY2gtMjAyNi8&ntb=1
+            - generic [ref=e293]:
+              - generic [ref=e294]: MIT Technology Review
+              - generic [ref=e296]:
+                - generic [ref=e297]: https://www.technologyreview.com
+                - generic [ref=e298]: 翻译此结果
+          - heading "10 Things That Matter in AI Right Now - MIT Technology Review" [level=2] [ref=e299]:
+            - link "10 Things That Matter in AI Right Now - MIT Technology Review" [ref=e300] [cursor=pointer]:
+              - /url: https://www.bing.com/ck/a?!&&p=e809a70d116167df26fb6cc51f81a5ab6a1c56dd3baadfdb8b1abe29617beaa4JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cudGVjaG5vbG9neXJldmlldy5jb20vMjAyNi8wNC8yMS8xMTM1NjQzLzEwLWFpLWFydGlmaWNpYWwtaW50ZWxsaWdlbmNlLXRyZW5kcy10ZWNobm9sb2dpZXMtcmVzZWFyY2gtMjAyNi8&ntb=1
+          - paragraph [ref=e302]: 2026年4月21日 · MIT Technology Review's authoritative overview of the 10 technologies, emerging trends, bold ideas, and powerful movements in AI in 2026.
+        - listitem [ref=e303]:
+          - link "IBM Newsroom" [ref=e305] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=c78e906084cd59c83172864ce48677193453b2dc24681d6f5127c77be41489d2JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9uZXdzcm9vbS5pYm0uY29tLzIwMjYtMDUtMDUtdGhpbmstMjAyNi1pYm0tZGVsaXZlcnMtdGhlLWJsdWVwcmludC1mb3ItdGhlLWFpLW9wZXJhdGluZy1tb2RlbC1hcy10aGUtYWktZGl2aWRlLXdpZGVucw&ntb=1
+            - generic [ref=e310]:
+              - generic [ref=e311]: IBM Newsroom
+              - generic [ref=e313]:
+                - generic [ref=e314]: https://newsroom.ibm.com
+                - generic [ref=e315]: 翻译此结果
+          - 'heading "Think 2026: IBM Delivers the Blueprint for the AI Operating ..." [level=2] [ref=e316]':
+            - 'link "Think 2026: IBM Delivers the Blueprint for the AI Operating ..." [ref=e317] [cursor=pointer]':
+              - /url: https://www.bing.com/ck/a?!&&p=c78e906084cd59c83172864ce48677193453b2dc24681d6f5127c77be41489d2JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9uZXdzcm9vbS5pYm0uY29tLzIwMjYtMDUtMDUtdGhpbmstMjAyNi1pYm0tZGVsaXZlcnMtdGhlLWJsdWVwcmludC1mb3ItdGhlLWFpLW9wZXJhdGluZy1tb2RlbC1hcy10aGUtYWktZGl2aWRlLXdpZGVucw&ntb=1
+          - paragraph [ref=e319]: "1 天前 · BOSTON, May 5, 2026 / PRNewswire / -- Today, at its annual Think conference, IBM (NYSE: IBM) announced its most comprehensive expansion of enterprise AI and hybrid cloud management …"
+        - listitem [ref=e320]:
+          - link "Stanford HAI" [ref=e322] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=3e5b2f49efe2381c0a4bbbd27ac8d717d2556bb2b23c5de16b1c074a2cd60460JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9oYWkuc3RhbmZvcmQuZWR1L2FpLWluZGV4LzIwMjYtYWktaW5kZXgtcmVwb3J0&ntb=1
+            - generic [ref=e327]:
+              - generic [ref=e328]: Stanford HAI
+              - generic [ref=e330]:
+                - generic [ref=e331]: https://hai.stanford.edu › ai-index
+                - generic [ref=e332]: 翻译此结果
+          - heading "The 2026 AI Index Report | Stanford HAI" [level=2] [ref=e333]:
+            - link "The 2026 AI Index Report | Stanford HAI" [ref=e334] [cursor=pointer]:
+              - /url: https://www.bing.com/ck/a?!&&p=3e5b2f49efe2381c0a4bbbd27ac8d717d2556bb2b23c5de16b1c074a2cd60460JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9oYWkuc3RhbmZvcmQuZWR1L2FpLWluZGV4LzIwMjYtYWktaW5kZXgtcmVwb3J0&ntb=1
+          - paragraph [ref=e336]: National AI strategies are expanding, particularly among developing economies, and state-backed investments in AI supercomputing are rising in parallel—a sign of growing ambitions for domestic …
+        - listitem [ref=e337]:
+          - link "AI Weekly" [ref=e339] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=81d130c4411c7abb8c0d05abf02e8b0db68a09ae5e1afbf2f93e5896ceb9e97fJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9haXdlZWtseS5jby9sZWFybmluZy1haS9hcnRpZmljaWFsLWludGVsbGlnZW5jZS9haS1uZXdzLWxhdGVzdC1hcnRpZmljaWFsLWludGVsbGlnZW5jZS11cGRhdGVzLTIwMjY&ntb=1
+            - generic [ref=e344]:
+              - generic [ref=e345]: AI Weekly
+              - generic [ref=e347]:
+                - generic [ref=e348]: https://aiweekly.co › learning-ai › artificial-intelligence › ...
+                - generic [ref=e349]: 翻译此结果
+          - 'heading "AI News: Latest Artificial Intelligence Updates (2026)" [level=2] [ref=e350]':
+            - 'link "AI News: Latest Artificial Intelligence Updates (2026)" [ref=e351] [cursor=pointer]':
+              - /url: https://www.bing.com/ck/a?!&&p=81d130c4411c7abb8c0d05abf02e8b0db68a09ae5e1afbf2f93e5896ceb9e97fJmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9haXdlZWtseS5jby9sZWFybmluZy1haS9hcnRpZmljaWFsLWludGVsbGlnZW5jZS9haS1uZXdzLWxhdGVzdC1hcnRpZmljaWFsLWludGVsbGlnZW5jZS11cGRhdGVzLTIwMjY&ntb=1
+          - paragraph [ref=e353]: 2026年3月28日 · Get the latest artificial intelligence news, breakthroughs, and analysis. AI Weekly covers model releases, startup funding, tools, and trends daily.
+        - listitem [ref=e354]:
+          - link "新华网" [ref=e356] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=4d3da80ea6102576f618cea540a73ce80a61b9dd2302c9e879ed95fc847308a3JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cubmV3cy5jbi9wb2xpdGljcy8yMDI2MDEyOC8yNWY2OTc4ZmU4Y2Y0MWJkYTUzYjc4YmNmNzEwNmZlYy9jLmh0bWw&ntb=1
+            - generic [ref=e361]:
+              - generic [ref=e362]: 新华网
+              - generic [ref=e365]: https://www.news.cn › politics
+          - heading "新华深读丨2026年中国AI发展趋势前瞻-新华网" [level=2] [ref=e366]:
+            - link "新华深读丨2026年中国AI发展趋势前瞻-新华网" [ref=e367] [cursor=pointer]:
+              - /url: https://www.bing.com/ck/a?!&&p=4d3da80ea6102576f618cea540a73ce80a61b9dd2302c9e879ed95fc847308a3JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cubmV3cy5jbi9wb2xpdGljcy8yMDI2MDEyOC8yNWY2OTc4ZmU4Y2Y0MWJkYTUzYjc4YmNmNzEwNmZlYy9jLmh0bWw&ntb=1
+          - paragraph [ref=e369]: 2026年1月28日 · 中金公司2026年展望报告显示，消费电子的“端侧AI时代”已经来临，今年有望成为AI消费终端大规模普及的关键年份。 AI重新定义价值，最深远的是挖掘人的价值。 学日语出身的刘典， …
+        - listitem [ref=e370]:
+          - link "IEEE Spectrum" [ref=e372] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=ad981699d38dfba1c30bc40d4f9cda445a98845310c4e0462351c260bc545060JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9zcGVjdHJ1bS5pZWVlLm9yZy9zdGF0ZS1vZi1haS1pbmRleC0yMDI2&ntb=1
+            - generic [ref=e377]:
+              - generic [ref=e378]: IEEE Spectrum
+              - generic [ref=e380]:
+                - generic [ref=e381]: https://spectrum.ieee.org
+                - generic [ref=e382]: 翻译此结果
+          - heading "Stanford's AI Index for 2026 Shows the State of the Industry" [level=2] [ref=e383]:
+            - link "Stanford's AI Index for 2026 Shows the State of the Industry" [ref=e384] [cursor=pointer]:
+              - /url: https://www.bing.com/ck/a?!&&p=ad981699d38dfba1c30bc40d4f9cda445a98845310c4e0462351c260bc545060JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9zcGVjdHJ1bS5pZWVlLm9yZy9zdGF0ZS1vZi1haS1pbmRleC0yMDI2&ntb=1
+          - paragraph [ref=e386]: 2026年4月13日 · As in prior years (see our coverage from 2021, 2022, 2023, 2024, and 2025), we’ve read the report and identified the trends that encapsulate the state of AI in 2026.
+        - listitem [ref=e387]:
+          - link "kersai.com" [ref=e389] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=c9c3df3957835b1cdc76962e66cb1bf87eb4eaf9dbaf685bb96a163ff280aab8JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9rZXJzYWkuY29tL2FpLWJyZWFrdGhyb3VnaHMtYXByaWwtMjAyNi1tb2RlbHMtZnVuZGluZy1zaGlmdHMv&ntb=1
+            - generic [ref=e394]:
+              - generic [ref=e395]: kersai.com
+              - generic [ref=e397]:
+                - generic [ref=e398]: https://kersai.com
+                - generic [ref=e399]: 翻译此结果
+          - 'heading "AI in April 2026: Biggest Breakthroughs, Models & Industry Shifts" [level=2] [ref=e400]':
+            - 'link "AI in April 2026: Biggest Breakthroughs, Models & Industry Shifts" [ref=e401] [cursor=pointer]':
+              - /url: https://www.bing.com/ck/a?!&&p=c9c3df3957835b1cdc76962e66cb1bf87eb4eaf9dbaf685bb96a163ff280aab8JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly9rZXJzYWkuY29tL2FpLWJyZWFrdGhyb3VnaHMtYXByaWwtMjAyNi1tb2RlbHMtZnVuZGluZy1zaGlmdHMv&ntb=1
+          - paragraph [ref=e403]: 2026年4月16日 · This article provides a comprehensive, data-driven analysis of every major AI development in April 2026 — from model benchmarks to funding flows, from enterprise adoption …
+        - listitem [ref=e404]:
+          - link "36氪" [ref=e406] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=72abd3e1470962fb17be4119d5c2f6de9842e5efdc8304a858dbfabea1ffd5d3JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cuMzZrci5jb20vcC8zNzI4MDU4MDMwMDEzNTcy&ntb=1
+            - generic [ref=e411]:
+              - generic [ref=e412]: 36氪
+              - generic [ref=e415]: https://www.36kr.com
+          - heading "2026 年人工智能与数据科学的五大趋势 - 36氪" [level=2] [ref=e416]:
+            - link "2026 年人工智能与数据科学的五大趋势 - 36氪" [ref=e417] [cursor=pointer]:
+              - /url: https://www.bing.com/ck/a?!&&p=72abd3e1470962fb17be4119d5c2f6de9842e5efdc8304a858dbfabea1ffd5d3JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cHM6Ly93d3cuMzZrci5jb20vcC8zNzI4MDU4MDMwMDEzNTcy&ntb=1
+          - paragraph [ref=e419]: 6 小时之前 · 生成式人工智能在 2023 年和 2024 年引发了巨大的轰动，但到了 2026 年，这种轰动效应预计将逐渐平息。 企业将从“实验和探索”阶段转向“部署和扩展”阶段。 虽然生成式 AI 仍将是创新的重 …
+        - listitem [ref=e420]:
+          - generic [ref=e421]:
+            - generic [ref=e422]:
+              - heading "其他用户还问了以下问题" [level=2] [ref=e423]:
+                - generic [ref=e424]: 其他用户还问了以下问题
+              - list [ref=e427]:
+                - listitem [ref=e428]:
+                  - heading "What happened in AI development in April 2026?" [level=3] [ref=e429]:
+                    - button "What happened in AI development in April 2026?" [ref=e430] [cursor=pointer]:
+                      - generic [ref=e431]: What happened in AI development in April 2026?
+                      - generic:
+                        - img
+                - listitem [ref=e432]:
+                  - heading "What is the 2026 AI Index?" [level=3] [ref=e433]:
+                    - button "What is the 2026 AI Index?" [ref=e434] [cursor=pointer]:
+                      - generic [ref=e435]: What is the 2026 AI Index?
+                      - generic:
+                        - img
+                - listitem [ref=e436]:
+                  - heading "What will AI look like in 2026?" [level=3] [ref=e437]:
+                    - button "What will AI look like in 2026?" [ref=e438] [cursor=pointer]:
+                      - generic [ref=e439]: What will AI look like in 2026?
+                      - generic:
+                        - img
+                - listitem [ref=e440]:
+                  - heading "How much is Ai worth in 2026?" [level=3] [ref=e441]:
+                    - button "How much is Ai worth in 2026?" [ref=e442] [cursor=pointer]:
+                      - generic [ref=e443]: How much is Ai worth in 2026?
+                      - generic:
+                        - img
+            - button "反馈" [ref=e446] [cursor=pointer]
+        - listitem [ref=e447]:
+          - navigation "AI news today 2026 的更多搜索结果":
+            - list:
+              - listitem [ref=e448]:
+                - generic "第 1 页" [ref=e449]: "1"
+              - listitem [ref=e450]:
+                - link "第 2 页" [ref=e451] [cursor=pointer]:
+                  - /url: /search?q=AI+news+today+2026&FPIG=1273DDB6790241AB9D9D9E3AB5AB7F32&first=11&FORM=PERE
+                  - text: "2"
+              - listitem [ref=e452]:
+                - link "第 3 页" [ref=e453] [cursor=pointer]:
+                  - /url: /search?q=AI+news+today+2026&FPIG=1273DDB6790241AB9D9D9E3AB5AB7F32&first=21&FORM=PERE1
+                  - text: "3"
+              - listitem [ref=e454]:
+                - link "下一页" [ref=e455] [cursor=pointer]:
+                  - /url: /search?q=AI+news+today+2026&FPIG=1273DDB6790241AB9D9D9E3AB5AB7F32&first=11&FORM=PORE
+    - complementary "更多结果" [ref=e456]:
+      - list
+  - button "反馈" [ref=e459] [cursor=pointer]:
+    - generic:
+      - img
+    - generic [ref=e460]: 反馈
+  - contentinfo [ref=e461]:
+    - generic [ref=e462]:
+      - list:
+        - listitem [ref=e463]:
+          - link "隐私" [ref=e464] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=395e4cd7075a1eb710b0b58cb4f9b1d33b6e733cb3a3fd54e3125cbe75655d69JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cDovL2dvLm1pY3Jvc29mdC5jb20vZndsaW5rLz9MaW5rSWQ9NTIxODM5&ntb=1
+        - listitem [ref=e465]:
+          - link "条款" [ref=e466] [cursor=pointer]:
+            - /url: https://www.bing.com/ck/a?!&&p=5ef9e1c0ac0358dd34f2a81b5514688a519b105205d70e96e94bd7feedaaead7JmltdHM9MTc3NzkzOTIwMA&ptn=3&ver=2&hsh=4&fclid=04a92952-5f95-644b-260c-3e035e496593&u=a1aHR0cDovL2dvLm1pY3Jvc29mdC5jb20vZndsaW5rLz9MaW5rSUQ9MjQ2MzM4&ntb=1
+    - link "🐞" [ref=e467] [cursor=pointer]:
+      - /url: javascript:void(0)

@@ -250,7 +250,7 @@
           </div>
           <div class="flex items-center gap-1">
             <TagPickerPopover v-if="props.allTags" :all-tags="props.allTags" :message-tags="messageTags"
-              @select="(tag) => emit('add-tag', props.message.id, tag.name)" />
+              @select="(tag) => emit('add-tag', props.message.id, tag.id)" />
             <button @click.stop="handleToggleStar" class="p-1 rounded transition-colors" :class="props.message.starred
               ? 'text-yellow-400 hover:text-yellow-500'
               : 'text-gray-500 hover:text-yellow-400'"
@@ -322,7 +322,7 @@ const emit = defineEmits<{
   'toggle-star': [id: number]
   'toggle-media-star': [mediaId: number, messageId: number]
   'edit': [id: number]
-  'add-tag': [messageId: number, tagName: string]
+  'add-tag': [messageId: number, tagId: number]
 }>()
 
 const maxPreviewItems = 10

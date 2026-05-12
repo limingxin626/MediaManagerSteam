@@ -14,7 +14,7 @@ from app.schemas.message import (
     MessageSyncMediaItem, MessageSyncResponse,
     MEDIA_PREVIEW_LIMIT,
 )
-from app.services.message_service import sync_tags_from_text, reorder_message_media, cleanup_orphan_tags
+from app.services.message_service import reorder_message_media, cleanup_orphan_tags
 from app.services.media_service import process_file
 
 router = APIRouter(prefix="/messages", tags=["messages"])
@@ -397,14 +397,9 @@ def create_message(
     db.add(db_message)
     db.flush()
 
-    if message_data.tag_ids is not None:
-        # 显式 tag_ids（即使为空 []）：跳过文本解析，纯由 tag_ids 决定
-        if message_data.tag_ids:
-            tags = db.query(Tag).filter(Tag.id.in_(message_data.tag_ids)).all()
-            db_message.tags = tags
-    else:
-        # 老客户端兼容路径：从文本解析
-        sync_tags_from_text(db, db_message, message_data.text)
+    if message_data.tag_ids:
+        tags = db.query(Tag).filter(Tag.id.in_(message_data.tag_ids)).all()
+        db_message.tags = tags
 
     position = 0
     for file_path in message_data.files:
@@ -447,8 +442,6 @@ def create_message_from_client(
     db.add(db_message)
     db.flush()
 
-    sync_tags_from_text(db, db_message, message_data.text)
-
     position = 0
     for client_file in message_data.files:
         result = process_file(db, client_file.file_path, db_message.id, position, media_id=client_file.id)
@@ -473,9 +466,6 @@ def update_message(
 
     if update_data.text is not None:
         message.text = update_data.text
-        if update_data.tag_ids is None:
-            # 仅在前端未显式传 tag_ids 时回退到文本解析（兼容老客户端）
-            sync_tags_from_text(db, message, update_data.text, merge=False)
 
     if update_data.tag_ids is not None:
         tags = db.query(Tag).filter(Tag.id.in_(update_data.tag_ids)).all() if update_data.tag_ids else []
@@ -529,7 +519,6 @@ def merge_messages(
     texts = [m.text for m in msgs if m.text]
     if texts:
         target.text = "\n".join(texts)
-        sync_tags_from_text(db, target, target.text)
 
     # 合并媒体：把其他消息的 media 接到 target 后面
     max_pos = (

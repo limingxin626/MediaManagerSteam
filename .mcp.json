@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "work-data": {
+      "command": "python",
+      "args": ["C:/Users/jieli4/Desktop/Git/AgentDataGeneration/mcp/DataService/app/mcp_server.py"]
+    }
+  }
+}

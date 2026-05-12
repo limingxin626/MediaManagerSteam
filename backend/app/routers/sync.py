@@ -18,7 +18,6 @@ from app.schemas.sync import (
     SyncChangesResponse, SyncChangeItem,
     SyncApplyRequest, SyncApplyResponse,
 )
-from app.services.message_service import sync_tags_from_text
 from app.config import config
 
 logger = logging.getLogger(__name__)
@@ -316,7 +315,6 @@ def _upsert_message(db: Session, entity_id: int, payload: dict) -> None:
     if existing:
         if "text" in payload:
             existing.text = payload["text"]
-            sync_tags_from_text(db, existing, existing.text, merge=True)
         if "actorId" in payload or "actor_id" in payload:
             existing.actor_id = payload.get("actorId") or payload.get("actor_id")
         if "starred" in payload:
@@ -334,7 +332,6 @@ def _upsert_message(db: Session, entity_id: int, payload: dict) -> None:
         )
         db.add(msg)
         db.flush()
-        sync_tags_from_text(db, msg, msg.text, merge=True)
 
 
 def _upsert_actor(db: Session, entity_id: int, payload: dict) -> None:

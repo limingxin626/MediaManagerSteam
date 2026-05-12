@@ -10,6 +10,7 @@
 """
 import sys
 import os
+import re
 import shutil
 import traceback
 from datetime import datetime
@@ -17,10 +18,9 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bs4 import BeautifulSoup
-from app.models import SessionLocal, Message
+from app.models import SessionLocal, Message, Tag
 from app.config import config
 from app.services.media_service import process_file
-from app.services.message_service import sync_tags_from_text
 
 # ── 配置 ────────────────────────────────────────────────────────────────────
 FLOMO_DIR = os.path.join(
@@ -104,7 +104,18 @@ def main():
                 db.flush()
 
                 # 同步 #hashtag → Tag
-                sync_tags_from_text(db, db_message, plain_text)
+                tag_names = list(dict.fromkeys(
+                    re.findall(r'#([\w\u4e00-\u9fff\u3400-\u4dbf/\-]+)', plain_text or "")
+                ))
+                tags = []
+                for name in tag_names:
+                    tag = db.query(Tag).filter(Tag.name == name).first()
+                    if not tag:
+                        tag = Tag(name=name)
+                        db.add(tag)
+                        db.flush()
+                    tags.append(tag)
+                db_message.tags = tags
 
                 # 处理图片附件
                 upload_dir = config.get_upload_dir()

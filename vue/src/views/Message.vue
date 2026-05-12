@@ -809,35 +809,19 @@ const onMediaChanged = async (messageId: number) => {
   }
 }
 
-const handleQuickAddTag = async (messageId: number, tagName: string) => {
+const handleQuickAddTag = async (messageId: number, tagId: number) => {
   const msg = messages.value.find(m => m.id === messageId)
   if (!msg) return
 
-  const text = msg.text || ''
-  // Check if tag already exists in text
-  const escaped = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  if (new RegExp(`#${escaped}(?![\\w\\u4e00-\\u9fff])`).test(text)) {
+  if (msg.tags?.some(t => t.id === tagId)) {
     toast.error('该 Tag 已存在')
     return
   }
 
-  // Insert tag: if text starts with hashtags, prepend with space; otherwise prepend with newline
-  const hashtagLineRegex = /^((?:#[\w\u4e00-\u9fff\u3400-\u4dbf/\-]+\s*)+)/
-  let newText: string
-  const match = text.match(hashtagLineRegex)
-  if (match) {
-    // Existing hashtags at start — prepend before them with space
-    newText = `#${tagName} ${text}`
-  } else if (text) {
-    // No hashtags at start — prepend with newline
-    newText = `#${tagName}\n${text}`
-  } else {
-    newText = `#${tagName}`
-  }
+  const tagIds = [...(msg.tags || []).map(t => t.id), tagId]
 
   try {
-    const updated = await api.patch<MessageDetail>(`/messages/${messageId}`, { text: newText })
-    msg.text = updated.text
+    const updated = await api.patch<MessageDetail>(`/messages/${messageId}`, { tag_ids: tagIds })
     msg.updated_at = updated.updated_at
     if (updated.tags) msg.tags = updated.tags
     toast.success('标签已添加')

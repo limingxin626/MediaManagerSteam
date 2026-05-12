@@ -88,7 +88,7 @@ npm run build             # 打包分发
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `ASKTAO_DATA_ROOT` | 数据目录（SQLite 数据库、上传文件、缩略图） | `E:/AskTao` |
+| `DATA_ROOT` | 数据目录（SQLite 数据库、上传文件、缩略图） | 必填，无默认值 |
 | `FFMPEG_PATH` | ffmpeg 可执行文件路径 | 系统 PATH |
 | `FFPROBE_PATH` | ffprobe 可执行文件路径 | 系统 PATH |
 

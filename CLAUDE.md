@@ -20,7 +20,7 @@ Personal media management app with an Instagram-like feed architecture. Self-hos
 Entry point: `backend/api.py` → runs uvicorn on port 8002. App initialized in `backend/app/__init__.py` with CORS (all origins), static mounts (`/uploads`, `/data`), rotating file logger, and router registration.
 
 Key env vars:
-- `ASKTAO_DATA_ROOT` — data directory (default `E:/AskTao`), contains SQLite DB (`db_new.sqlite3`), uploads, thumbnails
+- `DATA_ROOT` — data directory (required, no default), contains SQLite DB (`db.sqlite3`), uploads, thumbnails
 - `FFMPEG_PATH` / `FFPROBE_PATH` — paths to ffmpeg binaries
 
 Routers (registered via `backend/app/routers/__init__.py:all_routers`): `actor`, `message`, `media`, `files`, `tags`, `sync`, `admin`, `dashboard`, `todos`.
