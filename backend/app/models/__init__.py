@@ -39,11 +39,13 @@ class Message(Base):
     id = Column(Integer, primary_key=True, index=True)
     text = Column(Text, nullable=True)
     actor_id = Column(Integer, ForeignKey("actor.id"), nullable=True, index=True)
+    issue_id = Column(Integer, ForeignKey("issue.id", ondelete="SET NULL"), nullable=True, index=True)
     starred = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     actor = relationship("Actor", back_populates="messages")
+    issue = relationship("Issue", back_populates="messages")
     message_media = relationship("MessageMedia", back_populates="message", cascade="all, delete-orphan")
     tags = relationship("Tag", secondary=message_tag, back_populates="messages")
 
@@ -140,7 +142,7 @@ class SyncLog(Base):
     __tablename__ = "sync_log"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    entity_type = Column(String(32), nullable=False)   # MESSAGE | ACTOR | MEDIA | TAG
+    entity_type = Column(String(32), nullable=False)   # MESSAGE | ACTOR | MEDIA | TAG | ISSUE
     entity_id = Column(Integer, nullable=False)
     operation = Column(String(16), nullable=False)      # UPSERT | DELETE
     timestamp = Column(DateTime, default=datetime.now, nullable=False)
@@ -161,3 +163,4 @@ def get_db():
 
 # 导入子模块模型，确保 Base.metadata 包含它们（alembic autogenerate 依赖此处）
 from app.models.todo import Todo  # noqa: E402,F401
+from app.models.issue import Issue  # noqa: E402,F401

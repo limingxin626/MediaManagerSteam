@@ -8,6 +8,7 @@ MEDIA_PREVIEW_LIMIT = 9  # 消息内媒体预览上限（3×3 宫格）
 class MessageCreate(BaseModel):
     text: Optional[str] = None
     actor_id: Optional[int] = None
+    issue_id: Optional[int] = None
     files: List[str] = []
     tag_ids: Optional[List[int]] = None
 
@@ -21,6 +22,7 @@ class MessageCreateFromClient(BaseModel):
     id: int                            # 客户端提供的 Message ID
     text: Optional[str] = None
     actor_id: Optional[int] = None
+    issue_id: Optional[int] = None
     created_at: Optional[str] = None   # ISO 时间戳
     files: List[ClientMediaFile] = []  # 客户端提供 media_id + 服务器文件路径
 
@@ -28,6 +30,7 @@ class MessageCreateFromClient(BaseModel):
 class MessageUpdate(BaseModel):
     text: Optional[str] = None
     actor_id: Optional[int] = None
+    issue_id: Optional[int] = None
     starred: Optional[bool] = None
     created_at: Optional[str] = None  # ISO 时间戳
     media_order: Optional[List[int]] = None  # media_id 数组，定义新的 position 顺序
@@ -54,6 +57,8 @@ class MessageResponse(TimestampMixin):
     text: str | None = None
     actor_id: int | None = None
     actor_name: str | None = None
+    issue_id: int | None = None
+    issue_title: str | None = None
     media_count: int
     starred: bool = False
 

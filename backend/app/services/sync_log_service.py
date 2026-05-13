@@ -10,7 +10,7 @@ from datetime import datetime
 from sqlalchemy import event, insert
 from sqlalchemy.orm import Session
 
-from app.models import Message, Actor, Media, Tag, SyncLog
+from app.models import Message, Actor, Media, Tag, SyncLog, Issue
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ _TRACKED_MODELS = {
     Actor: "ACTOR",
     Media: "MEDIA",
     Tag: "TAG",
+    Issue: "ISSUE",
 }
 
 # thread-local 防止 after_flush 递归

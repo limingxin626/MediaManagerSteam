@@ -5,17 +5,14 @@
 
       <HeatmapCard />
 
-      <TodoBoard />
-
-      <RecentMedia />
+      <IssueBoard />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import HeatmapCard from '../components/dashboard/HeatmapCard.vue'
-import TodoBoard from '../components/dashboard/TodoBoard.vue'
-import RecentMedia from '../components/dashboard/RecentMedia.vue'
+import IssueBoard from '../components/dashboard/IssueBoard.vue'
 
 defineOptions({ name: 'Dashboard' })
 </script>

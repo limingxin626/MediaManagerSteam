@@ -5,7 +5,7 @@
       <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">标签</div>
       <div class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-4">
         <button @click="onSelectTag(null)"
-          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === null && selectedActorId === null
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === null && selectedActorId === null && selectedIssueId === null
             ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
           <span>全部</span>
@@ -31,7 +31,7 @@
       </div>
     </div>
 
-    <!-- Actor List (bottom half) -->
+    <!-- Actor List (middle) -->
     <div class="flex-1 min-h-0 flex flex-col overflow-hidden border-t border-[var(--border-color)]">
       <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">演员</div>
       <div class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-4">
@@ -60,24 +60,71 @@
         </button>
       </div>
     </div>
+
+    <!-- Issues (bottom) -->
+    <div class="flex-1 min-h-0 flex flex-col overflow-hidden border-t border-[var(--border-color)]">
+      <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0 flex items-center justify-between">
+        <span>Issue</span>
+        <button
+          v-if="onCreateIssue"
+          @click="onCreateIssue"
+          class="text-gray-400 hover:text-[var(--color-primary-500)] text-sm leading-none"
+          title="新增 issue"
+        >＋</button>
+      </div>
+      <div class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-4">
+        <button
+          v-if="noIssueCount > 0 || selectedIssueId === 0"
+          @click="onSelectIssue(0)"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
+          :class="selectedIssueId === 0
+            ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
+        >
+          <span class="truncate">无</span>
+          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ noIssueCount }}</span>
+        </button>
+        <button
+          v-for="issue in issues"
+          :key="issue.id"
+          @click="onSelectIssue(issue.id)"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
+          :class="selectedIssueId === issue.id
+            ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
+        >
+          <span class="truncate">{{ issue.title }}</span>
+          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ issue.message_count }}</span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Actor, TagWithCount } from '../types'
+import type { Actor, Issue, TagWithCount } from '../types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   tags: TagWithCount[]
   actors: Actor[]
   noActorCount: number
   selectedTagId: number | null
   selectedActorId: number | null
-}>()
+  issues?: Issue[]
+  noIssueCount?: number
+  selectedIssueId?: number | null
+  onCreateIssue?: () => void
+}>(), {
+  issues: () => [],
+  noIssueCount: 0,
+  selectedIssueId: null,
+})
 
 const emit = defineEmits<{
   (e: 'select-tag', tagId: number | null): void
   (e: 'select-actor', actorId: number | null): void
+  (e: 'select-issue', issueId: number | null): void
 }>()
 
 const onSelectTag = (tagId: number | null) => {
@@ -87,6 +134,10 @@ const onSelectTag = (tagId: number | null) => {
 
 const onSelectActor = (actorId: number | null) => {
   emit('select-actor', actorId)
+}
+
+const onSelectIssue = (issueId: number | null) => {
+  emit('select-issue', issueId)
 }
 
 const tagTree = computed(() => {

@@ -49,6 +49,7 @@ def _build_detail_query(
     media_id: Optional[int],
     tag_id: Optional[int],
     starred: Optional[bool] = None,
+    issue_id: Optional[int] = None,
 ):
     """공통 필터만 적용한 Message 쿼리를 반환 (정렬·커서 없음)."""
     query = db.query(Message)
@@ -57,6 +58,11 @@ def _build_detail_query(
             query = query.filter(Message.actor_id.is_(None))
         else:
             query = query.filter(Message.actor_id == actor_id)
+    if issue_id is not None:
+        if issue_id == 0:
+            query = query.filter(Message.issue_id.is_(None))
+        else:
+            query = query.filter(Message.issue_id == issue_id)
     if query_text:
         query = query.filter(Message.text.ilike(f"%{query_text}%"))
     if media_id:
@@ -84,9 +90,10 @@ def _build_message_query(
     cursor_time: Optional[datetime],
     starred: Optional[bool] = None,
     inclusive: bool = False,
+    issue_id: Optional[int] = None,
 ):
     """공통 필터·정렬을 적용한 Message 쿼리를 반환한다。"""
-    query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred)
+    query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred, issue_id)
     if cursor_time:
         if inclusive:
             query = query.filter(Message.created_at <= cursor_time)
@@ -155,11 +162,14 @@ def _build_detail_response(
         media_items = _media_items_for(db, msg.id, limit=media_limit)
     tags = _aggregate_tags(msg)
     actor_name = msg.actor.name if msg.actor else None
+    issue_title = msg.issue.title if msg.issue else None
     return MessageDetailResponse(
         id=msg.id,
         text=msg.text,
         actor_id=msg.actor_id,
         actor_name=actor_name,
+        issue_id=msg.issue_id,
+        issue_title=issue_title,
         media_count=len(media_items),
         starred=bool(msg.starred),
         media_items=media_items,
@@ -194,6 +204,8 @@ def _build_sync_response(db: Session, db_message: Message) -> MessageSyncRespons
         text=db_message.text,
         actor_id=db_message.actor_id,
         actor_name=db_message.actor.name if db_message.actor else None,
+        issue_id=db_message.issue_id,
+        issue_title=db_message.issue.title if db_message.issue else None,
         starred=bool(db_message.starred),
         created_at=db_message.created_at.isoformat(),
         updated_at=db_message.updated_at.isoformat(),
@@ -212,12 +224,13 @@ def get_messages(
     cursor: Optional[str] = Query(None, description="游标，ISO 格式的 created_at"),
     limit: int = Query(20, ge=1, le=100),
     actor_id: Optional[int] = None,
+    issue_id: Optional[int] = None,
     starred: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
 ):
     """获取消息列表（游标分页）"""
     cursor_time = _parse_cursor(cursor)
-    query = _build_message_query(db, actor_id, None, None, None, cursor_time, starred=starred)
+    query = _build_message_query(db, actor_id, None, None, None, cursor_time, starred=starred, issue_id=issue_id)
     items, has_more, next_cursor = _paginate(query, limit)
 
     # 批量查 media_count，避免 N+1
@@ -235,6 +248,8 @@ def get_messages(
             text=msg.text,
             actor_id=msg.actor_id,
             actor_name=msg.actor.name if msg.actor else None,
+            issue_id=msg.issue_id,
+            issue_title=msg.issue.title if msg.issue else None,
             media_count=counts.get(msg.id, 0),
             starred=bool(msg.starred),
             created_at=msg.created_at.isoformat(),
@@ -250,6 +265,7 @@ def get_message_dates(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
     actor_id: Optional[int] = None,
+    issue_id: Optional[int] = None,
     query_text: Optional[str] = Query(None),
     media_id: Optional[int] = Query(None),
     tag_id: Optional[int] = Query(None),
@@ -264,6 +280,11 @@ def get_message_dates(
             query = query.filter(Message.actor_id.is_(None))
         else:
             query = query.filter(Message.actor_id == actor_id)
+    if issue_id is not None:
+        if issue_id == 0:
+            query = query.filter(Message.issue_id.is_(None))
+        else:
+            query = query.filter(Message.issue_id == issue_id)
     if query_text:
         query = query.filter(Message.text.ilike(f"%{query_text}%"))
     if media_id:
@@ -317,6 +338,8 @@ def sync_messages(db: Session = Depends(get_db)):
             text=msg.text,
             actor_id=msg.actor_id,
             actor_name=msg.actor.name if msg.actor else None,
+            issue_id=msg.issue_id,
+            issue_title=msg.issue.title if msg.issue else None,
             starred=bool(msg.starred),
             created_at=msg.created_at.isoformat(),
             updated_at=msg.updated_at.isoformat(),
@@ -333,6 +356,7 @@ def get_messages_with_detail(
     inclusive: bool = Query(False, description="是否包含 cursor 本身（用 <= / >= 而非 < / >），用于位置恢复"),
     limit: int = Query(20, ge=1, le=100),
     actor_id: Optional[int] = None,
+    issue_id: Optional[int] = None,
     query_text: Optional[str] = Query(None, description="搜索文本，匹配 message.text"),
     media_id: Optional[int] = Query(None, description="媒体 ID，查询包含该媒体的所有消息"),
     tag_id: Optional[int] = Query(None, description="标签 ID，查询包含该标签的所有消息"),
@@ -344,13 +368,13 @@ def get_messages_with_detail(
     if direction == "forward" and cursor:
         pivot = _parse_cursor(cursor)
         op = Message.created_at >= pivot if inclusive else Message.created_at > pivot
-        query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred)
+        query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred, issue_id)
         query = query.filter(op).order_by(Message.created_at.asc())
         rows = query.limit(limit + 1).all()
         has_more = len(rows) > limit
         items = rows[:limit]
 
-        base = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred)
+        base = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred, issue_id)
         has_more_before = base.filter(Message.created_at < pivot).first() is not None
 
         ids = [m.id for m in items]
@@ -366,7 +390,7 @@ def get_messages_with_detail(
 
     # 默认：向后（desc）分页
     cursor_time = _parse_cursor(cursor)
-    query = _build_message_query(db, actor_id, query_text, media_id, tag_id, cursor_time, starred=starred, inclusive=inclusive)
+    query = _build_message_query(db, actor_id, query_text, media_id, tag_id, cursor_time, starred=starred, inclusive=inclusive, issue_id=issue_id)
     items, has_more, next_cursor = _paginate(query, limit)
 
     ids = [m.id for m in items]
@@ -393,7 +417,7 @@ def create_message(
     db: Session = Depends(get_db),
 ):
     """创建新消息"""
-    db_message = Message(text=message_data.text, actor_id=message_data.actor_id)
+    db_message = Message(text=message_data.text, actor_id=message_data.actor_id, issue_id=message_data.issue_id)
     db.add(db_message)
     db.flush()
 
@@ -437,6 +461,7 @@ def create_message_from_client(
         id=message_data.id,
         text=message_data.text,
         actor_id=message_data.actor_id,
+        issue_id=message_data.issue_id,
         created_at=created_at,
     )
     db.add(db_message)
@@ -473,6 +498,9 @@ def update_message(
 
     if update_data.actor_id is not None:
         message.actor_id = update_data.actor_id
+
+    if update_data.issue_id is not None:
+        message.issue_id = update_data.issue_id if update_data.issue_id != 0 else None
 
     if update_data.starred is not None:
         message.starred = 1 if update_data.starred else 0

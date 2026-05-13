@@ -4,8 +4,18 @@ import type { components } from './types/api.generated'
 
 // 消息相关
 export type MessageMediaItem = components['schemas']['MessageMediaItem']
-export type Message = components['schemas']['MessageResponse']
-export type MessageDetail = components['schemas']['MessageDetailResponse']
+type _Message = components['schemas']['MessageResponse']
+type _MessageDetail = components['schemas']['MessageDetailResponse']
+
+// 后端已新增 issue 关联字段，OpenAPI 尚未重新生成，手动扩展
+export type Message = _Message & {
+  issue_id?: number | null
+  issue_title?: string | null
+}
+export type MessageDetail = _MessageDetail & {
+  issue_id?: number | null
+  issue_title?: string | null
+}
 
 // 演员相关
 export type Actor = components['schemas']['ActorResponse']
@@ -95,6 +105,31 @@ export interface TodoBoard {
   pending: Todo[]
   doing: Todo[]
   done: Todo[]
+}
+
+// ---------------------------------------------------------------------------
+// Issue (取代 Todo 看板)
+// ---------------------------------------------------------------------------
+
+export type IssueStatus = 'doing' | 'done' | 'archived' | 'abandoned'
+
+export interface Issue {
+  id: number
+  title: string
+  description: string | null
+  status: IssueStatus
+  position: number
+  message_count: number
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+}
+
+export interface IssueBoard {
+  doing: Issue[]
+  done: Issue[]
+  archived: Issue[]
+  abandoned: Issue[]
 }
 
 export interface DashboardStats {

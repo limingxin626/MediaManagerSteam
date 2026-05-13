@@ -6,8 +6,13 @@
       :no-actor-count="noActorCount"
       :selected-tag-id="selectedTagId"
       :selected-actor-id="selectedActorId"
+      :issues="issues"
+      :no-issue-count="noIssueCount"
+      :selected-issue-id="selectedIssueId"
+      :on-create-issue="promptCreateIssue"
       @select-tag="selectTag"
       @select-actor="selectActor"
+      @select-issue="selectIssue"
     />
 
     <!-- Main Content -->
@@ -173,15 +178,8 @@
 
         <!-- Bottom Input Bar -->
         <div class="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-t border-[var(--border-color)] mb-20 md:mb-0">
-          <div class="max-w-3xl mx-auto pr-10">
-            <button @click="openCreateDialog"
-              class="w-full flex items-center gap-3 px-4 py-3 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full text-sm text-[var(--text-muted)] hover:border-[var(--color-primary-500)] transition-colors cursor-text">
-              <span class="flex-1 text-left">写点什么...</span>
-              <svg class="w-5 h-5 text-[var(--color-primary-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-          </div>
+          <MessageComposeInline :all-tags="tags" :tag-id="selectedTagId ?? null"
+            :actor-id="selectedActorId ?? undefined" :issue-id="selectedIssueId ?? undefined" @created="onDialogCreated" />
         </div>
       </div>
 
@@ -341,11 +339,12 @@ import { useRoute } from 'vue-router'
 import { renderMarkdown } from '../utils/markdown'
 import { Calendar } from 'v-calendar'
 import 'v-calendar/style.css'
-import { type Actor, type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
+import { type Actor, type Issue, type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import SearchInput from '../components/SearchInput.vue'
 import MessageComposeDialog from '../components/MessageComposeDialog.vue'
+import MessageComposeInline from '../components/MessageComposeInline.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
@@ -388,6 +387,7 @@ const loadCalendarMonth = async (year: number, month: number) => {
       month,
       tag_id: selectedTagId.value ?? undefined,
       actor_id: selectedActorId.value ?? undefined,
+      issue_id: selectedIssueId.value ?? undefined,
       query_text: searchQuery.value || undefined,
     })
     const dateSet = new Set(data.dates.map(d => d.date))
@@ -444,6 +444,7 @@ const jumpToDate = async (dateStr: string) => {
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
         actor_id: selectedActorId.value ?? undefined,
+        issue_id: selectedIssueId.value ?? undefined,
       },
     )
 
@@ -486,6 +487,10 @@ const actors = ref<Actor[]>([])
 const noActorCount = ref(0)
 const selectedActorId = ref<number | null>(null)
 
+const issues = ref<Issue[]>([])
+const noIssueCount = ref(0)
+const selectedIssueId = ref<number | null>(null)
+
 interface FilterScrollCache {
   messageId: number
   scrollOffset: number
@@ -501,6 +506,7 @@ const scrollPositionCache = new Map<string, FilterScrollCache>()
 const getFilterKey = (): string => {
   if (selectedTagId.value !== null) return `tag:${selectedTagId.value}`
   if (selectedActorId.value !== null) return `actor:${selectedActorId.value}`
+  if (selectedIssueId.value !== null) return `issue:${selectedIssueId.value}`
   return 'all'
 }
 
@@ -593,6 +599,31 @@ const fetchActors = async () => {
   }
 }
 
+const fetchIssues = async () => {
+  try {
+    const list = await api.get<Issue[]>('/issues/list', { status: 'doing' })
+    issues.value = list
+    // no_issue_count: messages without issue_id — fetch via /messages list with issue_id=0 count is not free,
+    // so we don't show count when 0. Keep at 0 unless user toggles to it.
+    noIssueCount.value = 0
+  } catch {
+    // silent
+  }
+}
+
+const promptCreateIssue = async () => {
+  const title = window.prompt('新建 issue 标题：')
+  if (!title || !title.trim()) return
+  try {
+    const issue = await api.post<Issue>('/issues', { title: title.trim() })
+    issues.value.unshift(issue)
+    selectIssue(issue.id)
+    toast.success('已创建 issue')
+  } catch {
+    toast.error('创建 issue 失败')
+  }
+}
+
 const resetFilters = () => {
   searchQuery.value = ''
   starredFilter.value = false
@@ -603,6 +634,7 @@ const selectTag = (tagId: number | null) => {
   saveScrollPosition()
   selectedTagId.value = tagId
   selectedActorId.value = null
+  selectedIssueId.value = null
   resetFilters()
   if (!restoreFromCache(getFilterKey())) {
     resetAndFetch()
@@ -613,6 +645,18 @@ const selectActor = (actorId: number | null) => {
   saveScrollPosition()
   selectedActorId.value = actorId
   selectedTagId.value = null
+  selectedIssueId.value = null
+  resetFilters()
+  if (!restoreFromCache(getFilterKey())) {
+    resetAndFetch()
+  }
+}
+
+const selectIssue = (issueId: number | null) => {
+  saveScrollPosition()
+  selectedIssueId.value = issueId
+  selectedTagId.value = null
+  selectedActorId.value = null
   resetFilters()
   if (!restoreFromCache(getFilterKey())) {
     resetAndFetch()
@@ -686,6 +730,7 @@ const fetchForwardMessages = async () => {
       starred: starredFilter.value || undefined,
       tag_id: selectedTagId.value ?? undefined,
       actor_id: selectedActorId.value ?? undefined,
+      issue_id: selectedIssueId.value ?? undefined,
     })
 
     const container = scrollContainer.value
@@ -730,15 +775,6 @@ const dialogInitialText = ref('')
 const dialogInitialDate = ref('')
 const dialogInitialMedia = ref<MessageMediaItem[]>([])
 const dialogInitialTags = ref<{ id: number; name: string }[]>([])
-
-const openCreateDialog = () => {
-  dialogMode.value = 'create'
-  dialogMessageId.value = undefined
-  dialogInitialText.value = ''
-  dialogInitialDate.value = ''
-  dialogInitialTags.value = []
-  dialogVisible.value = true
-}
 
 const openEditDialog = (messageId: number) => {
   const msg = messages.value.find(m => m.id === messageId)
@@ -861,6 +897,7 @@ const fetchMessages = async (isLoadingMore = false) => {
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
         actor_id: selectedActorId.value ?? undefined,
+        issue_id: selectedIssueId.value ?? undefined,
       },
     )
 
@@ -1327,6 +1364,7 @@ watch(() => route.path, (path) => {
 onMounted(() => {
   fetchTags()
   fetchActors()
+  fetchIssues()
   const saved = localStorage.getItem(SCROLL_POS_KEY)
   if (saved) {
     try {
@@ -1344,6 +1382,7 @@ onMounted(() => {
             starred: starredFilter.value || undefined,
             tag_id: selectedTagId.value ?? undefined,
             actor_id: selectedActorId.value ?? undefined,
+            issue_id: selectedIssueId.value ?? undefined,
           },
         ),
         api.get<{ items: MessageDetail[]; next_cursor: string | null; has_more: boolean }>(
@@ -1356,6 +1395,7 @@ onMounted(() => {
             starred: starredFilter.value || undefined,
             tag_id: selectedTagId.value ?? undefined,
             actor_id: selectedActorId.value ?? undefined,
+            issue_id: selectedIssueId.value ?? undefined,
             direction: 'forward',
           },
         ),
