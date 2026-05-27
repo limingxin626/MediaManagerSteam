@@ -138,3 +138,20 @@ export interface DashboardStats {
   media_this_month: number
   todo_doing_count: number
 }
+
+// ---------------------------------------------------------------------------
+// Smart / CLIP
+// ---------------------------------------------------------------------------
+
+export interface TagSuggestion {
+  tag_id: number
+  name: string
+  category: string | null
+  score: number
+}
+
+export interface SmartStatus {
+  available: boolean
+  model: string
+  reason: string | null
+}

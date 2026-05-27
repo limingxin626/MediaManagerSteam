@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Table, Index, UniqueConstraint, event
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Table, Index, UniqueConstraint, LargeBinary, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, backref
 from datetime import datetime
@@ -84,7 +84,7 @@ class Media(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     file_path = Column(String(255), nullable=False)
-    file_hash = Column(String(128), nullable=True, index=True)
+    file_hash = Column(String(128), nullable=True, unique=True, index=True)
     file_size = Column(Integer, nullable=True)
     mime_type = Column(String(100), nullable=True)
     width = Column(Integer, nullable=True)
@@ -136,6 +136,15 @@ class MessageMedia(Base):
         UniqueConstraint("message_id", "position", name="uq_mm_message_position"),
         Index("ix_mm_created_at_position", "created_at", "position"),
     )
+
+
+class MediaEmbedding(Base):
+    __tablename__ = "media_embedding"
+
+    media_id = Column(Integer, ForeignKey("media.id", ondelete="CASCADE"), primary_key=True)
+    model = Column(String(64), nullable=False)
+    vector = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
 
 
 class SyncLog(Base):

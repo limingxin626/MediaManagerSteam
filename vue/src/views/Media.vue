@@ -31,6 +31,26 @@
             ]"
           >{{ opt.label }}</button>
         </div>
+        <!-- Smart search -->
+        <div class="relative flex-1 max-w-xs">
+          <input
+            v-model="searchInput"
+            @keydown.enter="commitSearch"
+            type="text"
+            placeholder="智能搜索：sunset / 猫 / actor..."
+            class="w-full px-3 py-1.5 pr-8 rounded-full text-sm bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[var(--color-primary-500)]"
+          />
+          <button
+            v-if="searchQuery || similarMode"
+            @click="clearSmartMode"
+            class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-white"
+            title="退出智能模式"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         <!-- Starred Filter -->
         <button
           @click="toggleStarredFilter"
@@ -51,7 +71,42 @@
 
     <!-- Scrollable Content Area -->
     <div class="flex-1 min-h-0 relative">
-    <div ref="scrollContainer" class="absolute inset-0 overflow-y-auto" @scroll="vg.onScroll">
+
+    <!-- Smart mode grid (search / similar) -->
+    <div v-if="smartActive" class="absolute inset-0 overflow-y-auto">
+      <div class="max-w-4xl mx-auto px-2 sm:px-4 py-4">
+        <div class="flex items-center justify-between mb-3 px-1">
+          <div class="text-sm text-[var(--text-muted)]">
+            <span v-if="similarMode">相似于 #{{ similarMode.media_id }}</span>
+            <span v-else>搜索“{{ searchQuery }}”</span>
+            <span class="ml-2">共 {{ smartItems.length }} 项</span>
+          </div>
+          <button
+            v-if="smartLoading"
+            class="text-xs text-[var(--text-muted)]"
+          >加载中...</button>
+        </div>
+        <div v-if="!smartLoading && !smartItems.length" class="py-20 text-center text-sm text-[var(--text-muted)]">
+          无结果
+        </div>
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5">
+          <div
+            v-for="(item, idx) in smartItems"
+            :key="item.id"
+            class="aspect-square rounded overflow-hidden bg-gray-200 dark:bg-gray-900"
+          >
+            <MediaCell
+              :item="item"
+              :bouncing="mediaBounceId === item.id"
+              @open="openSmartPreview(idx)"
+              @star="starWithBounce(item)"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-show="!smartActive" ref="scrollContainer" class="absolute inset-0 overflow-y-auto" @scroll="vg.onScroll">
       <div ref="measureEl" class="relative max-w-4xl mx-auto px-1 sm:px-2 py-4" :style="{ height: vg.totalHeight.value + 'px' }">
 
         <!-- Month headers -->
@@ -100,7 +155,7 @@
 
       <!-- Date Scrubber -->
       <DateScrubber
-        v-if="vg.timeline.value.length"
+        v-if="!smartActive && vg.timeline.value.length"
         :timeline="vg.timeline.value"
         :min-date="timelineMinDate"
         :max-date="timelineMaxDate"
@@ -133,6 +188,7 @@
       @toggle-star="handlePreviewToggleStar"
       @media-deleted="handleMediaDeleted"
       @media-rotated="handleMediaRotated"
+      @find-similar="enterSimilarMode"
     />
   </div>
 </template>
@@ -143,10 +199,13 @@ import MediaPreview from '../components/MediaPreview.vue'
 import DateScrubber from '../components/DateScrubber.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
 import MediaCell from '../components/MediaCell.vue'
-import type { Media, TagWithCount, Actor } from '../types'
+import type { Media, TagWithCount, Actor, CursorResponse } from '../types'
 import { api } from '../composables/useApi'
 import { useVirtualGrid } from '../composables/useVirtualGrid'
 import { toggleMediaStar } from '../utils/media'
+import { useToast } from '../composables/useToast'
+
+const toast = useToast()
 
 defineOptions({ name: 'Media' })
 
@@ -181,6 +240,81 @@ const previewOpen = ref(false)
 const previewItems = ref<any[]>([])
 const previewStartIndex = ref(0)
 const mediaBounceId = ref<number | null>(null)
+
+// --- Smart mode (search / similar) ---
+const searchInput = ref('')
+const searchQuery = ref('')
+const similarMode = ref<{ media_id: number } | null>(null)
+const smartItems = ref<Media[]>([])
+const smartLoading = ref(false)
+
+const smartActive = computed(() => !!searchQuery.value || !!similarMode.value)
+
+async function commitSearch() {
+  const q = searchInput.value.trim()
+  if (!q) {
+    clearSmartMode()
+    return
+  }
+  similarMode.value = null
+  searchQuery.value = q
+  await fetchSearch(q)
+}
+
+async function fetchSearch(q: string) {
+  smartLoading.value = true
+  smartItems.value = []
+  try {
+    const res = await api.get<CursorResponse<Media>>(
+      `/smart/search?q=${encodeURIComponent(q)}&limit=50`,
+    )
+    smartItems.value = res.items
+  } catch (e: any) {
+    toast.error(e?.message || '搜索失败')
+  } finally {
+    smartLoading.value = false
+  }
+}
+
+async function enterSimilarMode(mediaId: number) {
+  searchQuery.value = ''
+  searchInput.value = ''
+  similarMode.value = { media_id: mediaId }
+  smartLoading.value = true
+  smartItems.value = []
+  try {
+    const res = await api.get<CursorResponse<Media>>(`/smart/similar/${mediaId}?limit=50`)
+    smartItems.value = res.items
+  } catch (e: any) {
+    toast.error(e?.message || '加载相似媒体失败')
+    similarMode.value = null
+  } finally {
+    smartLoading.value = false
+  }
+}
+
+function clearSmartMode() {
+  searchQuery.value = ''
+  searchInput.value = ''
+  similarMode.value = null
+  smartItems.value = []
+}
+
+function openSmartPreview(idx: number) {
+  const slice = smartItems.value.slice(0, smartItems.value.length)
+  previewItems.value = slice.map((m) => ({
+    id: m.id,
+    file_path: m.file_path,
+    mime_type: m.mime_type,
+    duration_ms: m.duration_ms,
+    thumb_url: m.thumb_url,
+    thumb_path: m.thumb_path,
+    starred: m.starred,
+    tags: m.tags,
+  }))
+  previewStartIndex.value = idx
+  previewOpen.value = true
+}
 
 function starWithBounce(item: Media) {
   mediaBounceId.value = item.id

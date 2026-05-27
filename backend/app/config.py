@@ -65,14 +65,30 @@ class AppConfig:
 
     @classmethod
     def check_paths(cls) -> None:
-        """启动时检查关键路径，ffmpeg 不在 PATH 时打印 warning。"""
-        for label, path in [("FFMPEG_PATH", cls.FFMPEG_PATH), ("FFPROBE_PATH", cls.FFPROBE_PATH)]:
-            # 如果是绝对路径则检查文件是否存在；如果是命令名则跳过（交给运行时报错）
-            if os.path.isabs(path) and not os.path.isfile(path):
-                logger.warning(
-                    "%s 指向的文件不存在: %s — 缩略图生成和媒体信息提取将静默失败。",
-                    label, path,
-                )
+        """启动时校验 ffmpeg/ffprobe:解析到绝对路径,并实际执行 -version 探活。
+        任一失败则 fail-fast,避免运行中静默失败导致缩略图/元数据丢失。
+        """
+        import shutil as _shutil
+        import subprocess as _sp
+
+        for label in ("FFMPEG_PATH", "FFPROBE_PATH"):
+            raw = getattr(cls, label)
+            resolved = raw if os.path.isabs(raw) else _shutil.which(raw)
+            if not resolved or not os.path.isfile(resolved):
+                logger.error("%s 无法定位到可执行文件 (raw=%s, resolved=%s)。", label, raw, resolved)
+                sys.exit(1)
+            try:
+                r = _sp.run([resolved, "-version"], capture_output=True,
+                            timeout=5, text=True, encoding="utf-8", errors="ignore")
+            except Exception as e:
+                logger.error("%s 探活失败 (%s): %s", label, resolved, e)
+                sys.exit(1)
+            if r.returncode != 0:
+                logger.error("%s -version 返回非零 (%s, rc=%s): %s",
+                             label, resolved, r.returncode, (r.stderr or "")[:200])
+                sys.exit(1)
+            setattr(cls, label, resolved)
+            logger.info("%s OK: %s", label, resolved)
 
     @classmethod
     def get_static_mounts(cls) -> Dict[str, str]:

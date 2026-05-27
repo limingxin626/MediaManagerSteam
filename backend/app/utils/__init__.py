@@ -116,7 +116,7 @@ class ThumbnailUtils:
             thumb_path
         ]
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30,
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=20,
                                     encoding='utf-8', errors='ignore')
             if result.returncode == 0:
                 logger.info(f"Generated video thumbnail: {thumb_path}")
@@ -134,7 +134,7 @@ class ThumbnailUtils:
                 '-y',
                 thumb_path
             ]
-            result = subprocess.run(cmd_fallback, capture_output=True, text=True, timeout=30,
+            result = subprocess.run(cmd_fallback, capture_output=True, text=True, timeout=15,
                                     encoding='utf-8', errors='ignore')
             if result.returncode == 0:
                 logger.info(f"Generated video thumbnail (fallback): {thumb_path}")
@@ -144,7 +144,7 @@ class ThumbnailUtils:
             return False
 
         except subprocess.TimeoutExpired:
-            logger.error(f"Timeout generating video thumbnail for: {source_path}")
+            logger.error(f"Timeout (20s/15s) generating video thumbnail for: {source_path}")
             return False
         except Exception as e:
             logger.error(f"Failed to generate video thumbnail: {str(e)}")
@@ -192,18 +192,18 @@ class ThumbnailUtils:
                 cmd += ['-vf', ','.join(vf_filters)]
             cmd += ['-y', thumb_path]
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60,
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30,
                                     encoding='utf-8', errors='ignore')
 
             if result.returncode == 0:
                 logger.info(f"Generated gif thumbnail: {thumb_path}")
                 return True
             else:
-                logger.error(f"ffmpeg error: {result.stderr}")
+                logger.error(f"ffmpeg error (gif {source_path}): {result.stderr[:500]}")
                 return False
 
         except subprocess.TimeoutExpired:
-            logger.error(f"Timeout generating gif thumbnail for: {source_path}")
+            logger.error(f"Timeout (30s) generating gif thumbnail for: {source_path}")
             return False
         except Exception as e:
             logger.error(f"Failed to generate gif thumbnail: {str(e)}")

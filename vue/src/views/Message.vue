@@ -47,6 +47,14 @@
           </div>
         </div>
 
+        <!-- Issue pinned banner -->
+        <IssuePinnedBanner
+          v-if="selectedIssue"
+          :issue="selectedIssue"
+          @clear="selectIssue(null)"
+          @updated="onIssueUpdated"
+        />
+
         <!-- Scrollable Content Area -->
         <div ref="scrollContainer" class="flex-1 overflow-y-auto min-h-0 relative">
           <!-- Floating date badge (clickable to open calendar) -->
@@ -346,6 +354,7 @@ import SearchInput from '../components/SearchInput.vue'
 import MessageComposeDialog from '../components/MessageComposeDialog.vue'
 import MessageComposeInline from '../components/MessageComposeInline.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
+import IssuePinnedBanner from '../components/IssuePinnedBanner.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
@@ -609,6 +618,16 @@ const fetchIssues = async () => {
   } catch {
     // silent
   }
+}
+
+const selectedIssue = computed<Issue | null>(() => {
+  if (selectedIssueId.value === null) return null
+  return issues.value.find(i => i.id === selectedIssueId.value) ?? null
+})
+
+const onIssueUpdated = (updated: Issue) => {
+  const idx = issues.value.findIndex(i => i.id === updated.id)
+  if (idx !== -1) issues.value[idx] = updated
 }
 
 const promptCreateIssue = async () => {

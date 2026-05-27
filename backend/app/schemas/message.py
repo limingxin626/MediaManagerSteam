@@ -82,6 +82,25 @@ class MessageDetailCursorResponse(BaseModel):
     has_more_before: bool = False
 
 
+class MessageSearchItem(BaseModel):
+    id: int
+    created_at: str
+    snippet: str
+    actor_id: Optional[int] = None
+    actor_name: Optional[str] = None
+    issue_id: Optional[int] = None
+    issue_title: Optional[str] = None
+    tags: List[str] = []
+    media_count: int = 0
+    starred: bool = False
+
+
+class MessageSearchCursorResponse(BaseModel):
+    items: List[MessageSearchItem]
+    next_cursor: Optional[str] = None
+    has_more: bool
+
+
 class MessageDateCount(BaseModel):
     date: str
     count: int

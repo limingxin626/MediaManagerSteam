@@ -8,6 +8,7 @@ from .admin import router as admin_router
 from .dashboard import router as dashboard_router
 from .issues import router as issues_router
 from .health import router as health_router
+from .smart import router as smart_router
 
 # 所有路由列表
 all_routers = [
@@ -21,4 +22,5 @@ all_routers = [
     dashboard_router,
     issues_router,
     health_router,
+    smart_router,
 ]

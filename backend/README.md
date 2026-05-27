@@ -66,7 +66,37 @@ python api.py
 
 ## API 概览
 
-### 消息（核心 feed）
+## 智能查询（CLIP 本地推理）
+
+`/smart/*` 路由提供基于 CLIP ViT-B/32 的自动打 tag、相似媒体搜索、文本→图片搜索功能，**完全本地推理**（onnxruntime CPU）。
+
+### 模型文件放置
+
+把以下三个文件放到 `{DATA_ROOT}/models/clip/`：
+
+```text
+{DATA_ROOT}/models/clip/
+├── visual.onnx     # 图像编码器：输入 1x3x224x224 float32，输出 1x512
+├── textual.onnx    # 文本编码器：输入 1x77 int64，输出 1x512
+└── tokenizer.json  # HuggingFace tokenizers 格式的 CLIP BPE
+```
+
+推荐从 HuggingFace 导出 OpenAI CLIP ViT-B/32（`openai/clip-vit-base-patch32`）转 onnx。文件缺失时所有 `/smart/*` 端点返回 503。
+
+### 接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/smart/status` | 模型可用性 |
+| POST | `/smart/tags/suggest` | 给单个媒体推荐 Top-K tag（按 cosine 排序） |
+| POST | `/smart/tags/apply` | 把指定 tag 追加到媒体 |
+| GET | `/smart/similar/{media_id}` | 相似媒体列表（图→图） |
+| GET | `/smart/search?q=...` | 文本→媒体语义搜索 |
+| POST | `/smart/embeddings/rebuild` | 批量预计算（不传 ids 则只补缺失） |
+
+Embedding 缓存到 `media_embedding` 表（float16 BLOB，每条约 1KB）。
+
+## 消息（核心 feed）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|

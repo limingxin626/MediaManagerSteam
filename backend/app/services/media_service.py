@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import time
 from typing import Optional, Dict, Any
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.models import Media, MessageMedia, media_tag
 from app.utils import calculate_file_hash, ThumbnailUtils, MediaInfoUtils
@@ -75,13 +76,24 @@ def process_standalone_file(
         media_kwargs["id"] = media_id
     media = Media(**media_kwargs)
     db.add(media)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # 并发上传同一文件时,另一事务已先插入同 file_hash 行 —— 回退使用已存在的那条。
+        db.rollback()
+        if skip_dedup:
+            raise
+        existing_media = db.query(Media).filter(Media.file_hash == file_hash).first()
+        if existing_media:
+            logger.info(f"Race on file_hash {file_hash[:12]}, returning existing media id={existing_media.id}")
+            return {"media": existing_media, "is_new": False}
+        raise
 
     try:
         thumb_path = config.get_thumbnail_path(media.id)
         ThumbnailUtils.generate_thumbnail(file_path, thumb_path, media_type, config.FFMPEG_PATH)
     except Exception as e:
-        logger.error(f"Failed to generate thumbnail: {e}")
+        logger.error(f"Failed to generate thumbnail for media id={media.id} path={file_path}: {e}")
 
     return {"media": media, "is_new": True}
 

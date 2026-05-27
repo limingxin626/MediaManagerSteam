@@ -10,6 +10,7 @@ from app.schemas.message import (
     MessageResponse, MessageDetailResponse,
     MessageMediaItem, MessageTagItem,
     CursorResponse, MessageDetailCursorResponse,
+    MessageSearchItem, MessageSearchCursorResponse,
     MessageDateCount, MessageDatesResponse,
     MessageSyncMediaItem, MessageSyncResponse,
     MEDIA_PREVIEW_LIMIT,
@@ -31,6 +32,15 @@ def _aggregate_tags(msg: Message) -> list:
             for t in mm.media.tags:
                 tag_map.setdefault(t.id, t)
     return [MessageTagItem(id=t.id, name=t.name, category=t.category) for t in tag_map.values()]
+
+
+def _aggregate_tags_raw(msg: Message) -> list:
+    tag_map = {t.id: t for t in msg.tags}
+    for mm in msg.message_media:
+        if mm.media:
+            for t in mm.media.tags:
+                tag_map.setdefault(t.id, t)
+    return list(tag_map.values())
 
 
 def _parse_cursor(cursor: Optional[str]) -> Optional[datetime]:
@@ -397,6 +407,252 @@ def get_messages_with_detail(
     media_by_msg = _batch_media_items(db, ids) if ids else {}
     result = [_build_detail_response(db, msg, media_by_msg=media_by_msg) for msg in items]
     return MessageDetailCursorResponse(items=result, next_cursor=next_cursor, has_more=has_more)
+
+
+def _escape_fts_query(q: str) -> str:
+    """把用户输入转成安全的 FTS5 MATCH 字符串。
+
+    策略：把所有 token 用双引号包成短语，避免 *、(、AND/OR 等被解释为语法。
+    多个 token 之间隐式 AND（FTS5 默认行为）。
+    """
+    tokens = [t for t in q.replace('"', ' ').split() if t]
+    if not tokens:
+        return ""
+    return " ".join(f'"{t}"' for t in tokens)
+
+
+def _execute_like_search(
+    db: Session,
+    like_q: str,
+    actor_id: Optional[int],
+    issue_id: Optional[int],
+    tag_id: Optional[int],
+    starred: Optional[bool],
+    limit: int,
+):
+    """LIKE 子串兜底，用于 FTS unicode61 中文 tokenize 边界。
+    手动构造 snippet（命中处前后各 30 字），rank 用 0 占位（按 created_at 倒序）。
+    """
+    from sqlalchemy import text as sql_text
+
+    params: dict = {"pat": f"%{like_q}%", "limit": limit + 1}
+    where = ["m.text LIKE :pat"]
+
+    if actor_id is not None:
+        if actor_id == 0:
+            where.append("m.actor_id IS NULL")
+        else:
+            where.append("m.actor_id = :actor_id")
+            params["actor_id"] = actor_id
+    if issue_id is not None:
+        if issue_id == 0:
+            where.append("m.issue_id IS NULL")
+        else:
+            where.append("m.issue_id = :issue_id")
+            params["issue_id"] = issue_id
+    if starred is not None:
+        where.append("m.starred = :starred")
+        params["starred"] = 1 if starred else 0
+    if tag_id is not None:
+        where.append("""
+            (m.id IN (SELECT message_id FROM message_tag WHERE tag_id = :tag_id)
+             OR m.id IN (
+                SELECT mm.message_id FROM message_media mm
+                JOIN media_tag mt ON mt.media_id = mm.media_id
+                WHERE mt.tag_id = :tag_id))
+        """)
+        params["tag_id"] = tag_id
+
+    sql = sql_text(f"""
+        SELECT m.id AS id,
+               m.created_at AS created_at,
+               m.actor_id AS actor_id,
+               m.issue_id AS issue_id,
+               m.starred AS starred,
+               0.0 AS rank,
+               m.text AS text
+        FROM message m
+        WHERE {' AND '.join(where)}
+        ORDER BY m.created_at DESC
+        LIMIT :limit
+    """)
+    raw = db.execute(sql, params).fetchall()
+
+    # 在 Python 里生成 snippet（FTS 的 snippet() 函数不可用）
+    def _make_snippet(text: str, q: str, window: int = 30) -> str:
+        if not text:
+            return ""
+        idx = text.lower().find(q.lower())
+        if idx < 0:
+            return text[:120] + ("…" if len(text) > 120 else "")
+        start = max(0, idx - window)
+        end = min(len(text), idx + len(q) + window)
+        return (
+            ("…" if start > 0 else "")
+            + text[start:idx]
+            + "«" + text[idx:idx + len(q)] + "»"
+            + text[idx + len(q):end]
+            + ("…" if end < len(text) else "")
+        )
+
+    class _Row:
+        def __init__(self, r):
+            self.id = r.id
+            self.created_at = r.created_at
+            self.actor_id = r.actor_id
+            self.issue_id = r.issue_id
+            self.starred = r.starred
+            self.rank = r.rank
+            self.snippet = _make_snippet(r.text or "", like_q)
+
+    return [_Row(r) for r in raw]
+
+
+def _execute_fts_search(
+    db: Session,
+    match_q: str,
+    actor_id: Optional[int],
+    issue_id: Optional[int],
+    tag_id: Optional[int],
+    starred: Optional[bool],
+    limit: int,
+    cursor_rank: Optional[float],
+    cursor_id: Optional[int],
+):
+    from sqlalchemy import text as sql_text
+
+    params: dict = {"q": match_q, "limit": limit + 1}
+    where = ["message_fts MATCH :q"]
+
+    if actor_id is not None:
+        if actor_id == 0:
+            where.append("m.actor_id IS NULL")
+        else:
+            where.append("m.actor_id = :actor_id")
+            params["actor_id"] = actor_id
+    if issue_id is not None:
+        if issue_id == 0:
+            where.append("m.issue_id IS NULL")
+        else:
+            where.append("m.issue_id = :issue_id")
+            params["issue_id"] = issue_id
+    if starred is not None:
+        where.append("m.starred = :starred")
+        params["starred"] = 1 if starred else 0
+    if tag_id is not None:
+        where.append("""
+            (m.id IN (SELECT message_id FROM message_tag WHERE tag_id = :tag_id)
+             OR m.id IN (
+                SELECT mm.message_id FROM message_media mm
+                JOIN media_tag mt ON mt.media_id = mm.media_id
+                WHERE mt.tag_id = :tag_id))
+        """)
+        params["tag_id"] = tag_id
+    if cursor_rank is not None and cursor_id is not None:
+        where.append("(bm25(message_fts) > :c_rank OR (bm25(message_fts) = :c_rank AND m.id < :c_id))")
+        params["c_rank"] = cursor_rank
+        params["c_id"] = cursor_id
+
+    sql = sql_text(f"""
+        SELECT m.id AS id,
+               m.created_at AS created_at,
+               m.actor_id AS actor_id,
+               m.issue_id AS issue_id,
+               m.starred AS starred,
+               bm25(message_fts) AS rank,
+               snippet(message_fts, 0, '«', '»', '…', 16) AS snippet
+        FROM message_fts
+        JOIN message m ON m.id = message_fts.rowid
+        WHERE {' AND '.join(where)}
+        ORDER BY bm25(message_fts) ASC, m.id DESC
+        LIMIT :limit
+    """)
+    return db.execute(sql, params).fetchall()
+
+
+@router.get("/search", response_model=MessageSearchCursorResponse)
+def search_messages_fts(
+    q: str = Query(..., min_length=1, description="搜索关键词（FTS5），多词之间隐式 AND"),
+    actor_id: Optional[int] = Query(None),
+    issue_id: Optional[int] = Query(None),
+    tag_id: Optional[int] = Query(None),
+    starred: Optional[bool] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    cursor: Optional[str] = Query(None, description="游标，格式 '{rank}|{id}'"),
+    db: Session = Depends(get_db),
+):
+    """基于 FTS5 的全文检索，返回精简结果（snippet + 元数据）。"""
+    match_q = _escape_fts_query(q)
+    if not match_q:
+        return MessageSearchCursorResponse(items=[], next_cursor=None, has_more=False)
+
+    cursor_rank: Optional[float] = None
+    cursor_id: Optional[int] = None
+    if cursor:
+        try:
+            r, i = cursor.split("|", 1)
+            cursor_rank = float(r)
+            cursor_id = int(i)
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="Invalid cursor format")
+
+    rows = _execute_fts_search(
+        db, match_q, actor_id, issue_id, tag_id, starred, limit, cursor_rank, cursor_id
+    )
+
+    # 中文 fallback：unicode61 把连续中文当一个 token，搜「工作」这种总粘在
+    # 长词里的字搜不到。FTS 0 命中且首页时，降级走 LIKE 子串匹配。
+    used_fallback = False
+    if not rows and cursor is None:
+        like_q = "".join(q.replace('"', ' ').split())
+        if like_q:
+            rows = _execute_like_search(
+                db, like_q, actor_id, issue_id, tag_id, starred, limit
+            )
+            used_fallback = True
+
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    if not rows:
+        return MessageSearchCursorResponse(items=[], next_cursor=None, has_more=False)
+
+    ids = [r.id for r in rows]
+    msgs = {m.id: m for m in db.query(Message).filter(Message.id.in_(ids)).all()}
+    media_counts = dict(
+        db.query(MessageMedia.message_id, func.count(MessageMedia.media_id))
+        .filter(MessageMedia.message_id.in_(ids))
+        .group_by(MessageMedia.message_id)
+        .all()
+    )
+
+    items: List[MessageSearchItem] = []
+    for r in rows:
+        msg = msgs.get(r.id)
+        if not msg:
+            continue
+        tag_names = [t.name for t in _aggregate_tags_raw(msg)]
+        items.append(MessageSearchItem(
+            id=r.id,
+            created_at=msg.created_at.isoformat(),
+            snippet=r.snippet or "",
+            actor_id=r.actor_id,
+            actor_name=msg.actor.name if msg.actor else None,
+            issue_id=r.issue_id,
+            issue_title=msg.issue.title if msg.issue else None,
+            tags=tag_names,
+            media_count=media_counts.get(r.id, 0),
+            starred=bool(r.starred),
+        ))
+
+    next_cursor = None
+    if has_more and not used_fallback:
+        last = rows[-1]
+        next_cursor = f"{last.rank}|{last.id}"
+    return MessageSearchCursorResponse(
+        items=items,
+        next_cursor=next_cursor,
+        has_more=has_more and not used_fallback,
+    )
 
 
 @router.get("/{message_id}", response_model=MessageDetailResponse)

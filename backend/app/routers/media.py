@@ -393,20 +393,22 @@ def replace_media_endpoint(
     while os.path.exists(tmp_path):
         tmp_path = os.path.join(upload_dir, f"replace_{media_id}_{timestamp}_{counter}{ext}")
         counter += 1
-    with open(tmp_path, "wb") as f:
-        f.write(file.file.read())
+
+    import shutil as _shutil
+    try:
+        with open(tmp_path, "wb") as f:
+            _shutil.copyfileobj(file.file, f, length=1024 * 1024)
+    except Exception:
+        if os.path.exists(tmp_path):
+            try: os.remove(tmp_path)
+            except Exception: pass
+        raise
 
     try:
         media = replace_media_file(db, media_id, tmp_path)
     except ValueError as e:
-        if os.path.exists(tmp_path):
-            try: os.remove(tmp_path)
-            except Exception: pass
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
-        if os.path.exists(tmp_path):
-            try: os.remove(tmp_path)
-            except Exception: pass
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if os.path.exists(tmp_path):
@@ -555,7 +557,8 @@ def add_preview_from_screenshot(
         dest_path = os.path.join(upload_dir, f"preview_{media_id}_{timestamp}_{counter}{ext}")
         counter += 1
     with open(dest_path, "wb") as f:
-        f.write(file.file.read())
+        import shutil as _shutil
+        _shutil.copyfileobj(file.file, f, length=1024 * 1024)
 
     try:
         image = create_preview_media(db, dest_path)

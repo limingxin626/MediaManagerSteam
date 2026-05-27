@@ -73,6 +73,27 @@
             />
             <button
               v-if="currentItem"
+              @click="openSuggestDrawer"
+              class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+              title="智能 tag 建议"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a2 2 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </button>
+            <button
+              v-if="currentItem"
+              @click="emitFindSimilar"
+              class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+              title="查找相似媒体"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3l2 3h7a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
+                <circle cx="12" cy="13" r="3" stroke-width="2" />
+              </svg>
+            </button>
+            <button
+              v-if="currentItem"
               @click="openDetailPage"
               class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
               title="打开详情页"
@@ -246,7 +267,13 @@
         </div>
       </div>
     </div>
-  </Transition>
+  <!-- Smart tag suggestion drawer -->
+  <TagSuggestDrawer
+    :is-open="suggestDrawerOpen"
+    :media-id="suggestDrawerMediaId"
+    @close="suggestDrawerOpen = false"
+    @tags-applied="onSmartTagsApplied"
+  />
 </template>
 
 <script setup lang="ts">
@@ -257,6 +284,7 @@ import { isVideo, isImage, resolveUrl, resolveThumb, rotateMedia } from '../util
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import TagPickerPopover from './TagPickerPopover.vue'
+import TagSuggestDrawer from './TagSuggestDrawer.vue'
 
 const toast = useToast()
 const router = useRouter()
@@ -295,6 +323,7 @@ const emit = defineEmits<{
   'media-rotated': [mediaId: number]
   'media-replaced': [mediaId: number]
   'media-tags-changed': [mediaId: number, tags: TagItem[]]
+  'find-similar': [mediaId: number]
 }>()
 
 const currentIndex = ref(props.startIndex)
@@ -308,6 +337,27 @@ const isRotating = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isReplacing = ref(false)
 const mediaCacheBust = ref<Record<number, number>>({})
+const suggestDrawerOpen = ref(false)
+const suggestDrawerMediaId = ref<number | null>(null)
+
+function openSuggestDrawer() {
+  if (!currentItem.value) return
+  suggestDrawerMediaId.value = currentItem.value.id
+  suggestDrawerOpen.value = true
+}
+
+function emitFindSimilar() {
+  if (!currentItem.value) return
+  emit('find-similar', currentItem.value.id)
+  emit('close')
+}
+
+function onSmartTagsApplied(mediaId: number, tags: TagItem[]) {
+  if (currentItem.value && currentItem.value.id === mediaId) {
+    currentItem.value.tags = tags
+  }
+  emit('media-tags-changed', mediaId, tags)
+}
 
 function handleStarClick() {
   if (!currentItem.value) return

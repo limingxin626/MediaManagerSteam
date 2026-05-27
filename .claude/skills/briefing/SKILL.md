@@ -54,7 +54,36 @@ description: >
 分析获取到的数据，生成简报：
 
 1. 写入临时文件 `reports/briefing.md`（固定文件名，每次覆盖）
-2. 调用 `write_message_from_md(file_path="reports/briefing.md", tag_list=["简报"])` 将简报内容写入笔记系统
+2. 调用 `write_message_from_md(file_path="reports/briefing.md", tag_list=["简报"], delete_after=True)` 将简报内容写入笔记系统，写入成功后删除临时 md 文件
+3. 完成简报后，执行下方「Issue 进展联动」步骤
+
+## Issue 进展联动
+
+简报落库后，对进行中的 issue 推送相关进展更新（让 issue 时间线和早间回顾同步）。
+
+1. `list_issues(status="doing")` 拿到所有 doing 状态的 issue（id / title / description）
+2. 对每个 issue，结合昨日的邮件 / Teams / 文件回顾数据，判断**是否有明显相关动态**：
+   - issue 的 title / description 关键词与邮件 Subject、Teams 内容、文件名匹配
+   - 同主题人物在 actor / 发件人中出现
+   - 仅在有明确信号时才更新，**没有相关动态的 issue 不要硬凑内容**
+3. 对命中的 issue：
+   a. `read_issue(issue_id, history_limit=5)` 看最近几条历史，避免重复昨天已记录的结论
+   b. `write_message(issue_id=<id>, text=..., tag_list=["简报", "issue更新"])` 写入一条结构化更新，模板：
+
+      ```markdown
+      ## 昨日相关动态
+      - [邮件] 发件人 — 主题 / 关键信息
+      - [Teams] 频道/人 — 关键信息
+      - [文件] 文件名 — 谁改了什么
+
+      ## 建议下一步
+      - 具体可执行的行动 / 实现方案
+      ```
+
+4. 在简报的「待处理事项」之后追加一个小节「Issue 进展更新」，列出本次更新过的 issue：
+   - `#<id> 标题` — 一句话说明更新要点
+
+如果所有 doing issue 都没有相关动态，省略该小节，不要写"无更新"。
 
 ### 简报模板
 
@@ -95,6 +124,10 @@ description: >
 ## 待处理事项
 从昨天的邮件和消息中提取需要行动的事项，按优先级排列：
 - 【来源：发件人】事项描述
+
+## Issue 进展更新
+（若本次没有更新过任何 issue 则省略整节）
+- `#<id> 标题` — 一句话说明本次更新的要点
 
 ## 今日建议
 基于昨天的未处理事项和今天的日程，给出 2-3 条今天应该优先做什么的建议。
