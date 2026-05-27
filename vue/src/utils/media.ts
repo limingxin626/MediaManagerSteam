@@ -1,4 +1,4 @@
-import { API_BASE_URL, IS_ELECTRON } from './constants'
+import { API_BASE_URL } from './constants'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 
@@ -26,30 +26,10 @@ export function resolveUrl(path: string): string {
   return `${API_BASE_URL}${path.replace(/#/g, '%23')}`
 }
 
-/** 把系统绝对路径转成 file:// URL（处理 Windows 反斜杠 + # 编码） */
-function toFileUrl(absPath: string): string {
-  return 'file:///' + absPath.replace(/\\/g, '/').replace(/#/g, '%23')
-}
-
-/** 缩略图地址：Electron 走 file://，浏览器走 HTTP。
- *  thumb_url 上的 ?t=xxx 缓存戳会自动转移到 file:// URL，保留刷新语义。 */
-export function resolveThumb(item: { thumb_path?: string; thumb_url: string }): string {
-  if (IS_ELECTRON && item.thumb_path) {
-    const qIdx = item.thumb_url.indexOf('?')
-    const query = qIdx >= 0 ? item.thumb_url.slice(qIdx) : ''
-    return toFileUrl(item.thumb_path) + query
-  }
+/** Resolve media thumb_url to full URL */
+export function resolveThumb(item: { thumb_url: string | null } | null): string {
+  if (!item?.thumb_url) return ''
   return resolveUrl(item.thumb_url)
-}
-
-/** 头像地址：Electron 走 file://，浏览器走 HTTP */
-export function resolveAvatar(actor: { avatar_abs_path?: string; avatar_url: string }): string {
-  if (IS_ELECTRON && actor.avatar_abs_path) {
-    const qIdx = actor.avatar_url.indexOf('?')
-    const query = qIdx >= 0 ? actor.avatar_url.slice(qIdx) : ''
-    return toFileUrl(actor.avatar_abs_path) + query
-  }
-  return resolveUrl(actor.avatar_url)
 }
 
 /** Toggle media starred state via API, updates item.starred in-place */

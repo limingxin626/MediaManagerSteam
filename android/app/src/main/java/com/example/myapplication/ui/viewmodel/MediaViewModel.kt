@@ -30,6 +30,9 @@ class MediaViewModel(private val databaseManager: DatabaseManager) : ViewModel()
     private val _selectedGenre = MutableStateFlow<String?>(null)
     val selectedGenre: StateFlow<String?> = _selectedGenre.asStateFlow()
 
+    private val _starredFilter = MutableStateFlow(false)
+    val starredFilter: StateFlow<Boolean> = _starredFilter.asStateFlow()
+
     private val _genres = MutableStateFlow<List<String>>(emptyList())
     val genres: StateFlow<List<String>> = _genres.asStateFlow()
 
@@ -82,6 +85,11 @@ class MediaViewModel(private val databaseManager: DatabaseManager) : ViewModel()
         applyFilters()
     }
 
+    fun toggleStarredFilter() {
+        _starredFilter.value = !_starredFilter.value
+        applyFilters()
+    }
+
     fun setSortOrder(sortOrder: String) {
         _sortOrder.value = sortOrder
         applyFilters()
@@ -91,7 +99,8 @@ class MediaViewModel(private val databaseManager: DatabaseManager) : ViewModel()
         viewModelScope.launch {
             try {
                 val searchQuery = _searchQuery.value
-                val sortOrder = _sortOrder.value
+                val starredFilter = _starredFilter.value
+                // val sortOrder = _sortOrder.value  // Room SQL 已有排序，这里只做搜索过滤
 
                 // 获取所有媒体数据
                 databaseManager.mediaRepository.getAllMedia().collect { allMedia ->
@@ -107,16 +116,13 @@ class MediaViewModel(private val databaseManager: DatabaseManager) : ViewModel()
                         }
                     }
 
-                    // 应用排序
-                    val sortedMedia = when (sortOrder) {
-                        "createdAt" -> filteredMedia.sortedByDescending { it.createdAt }
-                        "rating" -> filteredMedia.sortedByDescending { it.rating }
-                        "duration" -> filteredMedia.sortedByDescending { it.durationMs ?: 0L }
-                        "fileSize" -> filteredMedia.sortedByDescending { it.fileSize ?: 0L }
-                        else -> filteredMedia.sortedByDescending { it.createdAt }
+                    // 应用收藏筛选
+                    if (starredFilter) {
+                        filteredMedia = filteredMedia.filter { it.starred }
                     }
 
-                    _mediaList.value = sortedMedia
+                    // Room SQL 已按 createdAt DESC 排序，直接使用
+                    _mediaList.value = filteredMedia
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = "筛选失败: ${e.message}")

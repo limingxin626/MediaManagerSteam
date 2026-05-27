@@ -37,7 +37,7 @@ class MessageUpdate(BaseModel):
     tag_ids: Optional[List[int]] = None  # 显式 tag 绑定；传入则替换、不调用文本解析
 
 
-class MessageMediaItem(MediaUrlMixin):
+class MessageMediaItem(MediaUrlMixin, TimestampMixin):
     mime_type: str | None
     width: int | None
     height: int | None

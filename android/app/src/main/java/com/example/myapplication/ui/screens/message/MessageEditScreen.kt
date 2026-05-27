@@ -158,9 +158,8 @@ fun MessageEditScreen(
                     position++
                 }
 
-                // 4. Re-parse tags
+                // 4. Tags 更新（暂时清空，TODO: 后续添加 tag 选择 UI）
                 messageRepo.deleteMessageTagsByMessageId(messageId)
-                messageRepo.parseAndAttachTags(text, messageId, databaseManager.tagRepository)
 
                 navController.navigateUp()
             } catch (_: Exception) {

@@ -34,7 +34,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.format.DateTimeParseException
 
 /**
  * 消息仓库
@@ -73,12 +75,13 @@ class MessageRepository(
      * 在单个事务中创建消息 + 所有媒体 + junction + tags，
      * 保证 PagingData 只刷新一次，媒体同时出现。
      *
+     * @param tagIds 显式传入的 tag ID 列表（不再从文本解析）
      * @return Pair(messageId, List<mediaId>) — 用于后续上传 / 推送
      */
     suspend fun createMessageWithMedia(
         message: Message,
         mediaEntities: List<Media>,
-        tagRepository: TagRepository
+        tagIds: List<Long> = emptyList()
     ): Pair<Long, List<Long>> {
         var msgId = 0L
         val mediaIds = mutableListOf<Long>()
@@ -95,15 +98,9 @@ class MessageRepository(
                 mediaIds.add(mediaId)
             }
 
-            if (!message.text.isNullOrBlank()) {
-                val tagNames = TAG_PATTERN.findAll(message.text)
-                    .map { it.groupValues[1] }
-                    .distinct()
-                    .toList()
-                for (name in tagNames) {
-                    val tag = tagRepository.createOrGetTag(name)
-                    messageDao.insertMessageTag(MessageTag(messageId = msgId, tagId = tag.id))
-                }
+            // 显式关联 tags，不再从文本解析
+            for (tagId in tagIds) {
+                messageDao.insertMessageTag(MessageTag(messageId = msgId, tagId = tagId))
             }
         }
 
@@ -502,6 +499,8 @@ class MessageRepository(
                         // 2) Upsert Media (IGNORE + update 避免 REPLACE 级联删除 message_media)
                         for (rm in remote.media_items) {
                             val nowMs = System.currentTimeMillis()
+                            // 调试：打印接收到的原始时间
+                            Log.d(TAG, "全量同步 MEDIA #${rm.id}: created_at=${rm.created_at}, updated_at=${rm.updated_at}")
                             val media = Media(
                                 id = rm.id,
                                 remoteMediaUrl = buildFullUrl(SyncConfig.BASE_URL, rm.file_url),
@@ -691,6 +690,15 @@ class MessageRepository(
                                             val rm = parseRemoteMediaItem(data)
                                             if (rm != null) {
                                                 val nowMs = System.currentTimeMillis()
+                                                // 调试：打印接收到的原始时间
+                                                Log.d(TAG, "同步 MEDIA #${rm.id}: created_at=${rm.created_at}, updated_at=${rm.updated_at}")
+                                                val cAt = rm.created_at?.let {
+                                                    Log.d(TAG, "解析 created_at: $it")
+                                                    parseIsoToMs(it)
+                                                } ?: nowMs
+                                                val uAt = rm.updated_at?.let {
+                                                    parseIsoToMs(it)
+                                                } ?: nowMs
                                                 val media = Media(
                                                     id = rm.id,
                                                     remoteMediaUrl = buildFullUrl(
@@ -713,8 +721,8 @@ class MessageRepository(
                                                     frameMs = rm.frame_ms,
                                                     startMs = rm.start_ms,
                                                     endMs = rm.end_ms,
-                                                    createdAt = rm.created_at?.let(::parseIsoToMs) ?: nowMs,
-                                                    updatedAt = rm.updated_at?.let(::parseIsoToMs) ?: nowMs,
+                                                    createdAt = cAt,
+                                                    updatedAt = uAt,
                                                 )
                                                 val inserted = mediaDao.insertMediaIgnore(media)
                                                 if (inserted == -1L) mediaDao.updateMedia(media)
@@ -875,10 +883,39 @@ class MessageRepository(
     @Suppress("UNCHECKED_CAST")
     private fun parseRemoteTag(data: Map<String, Any?>): RemoteTagItem? = parseRemoteTagItem(data)
 
-    private fun parseIsoToMs(iso: String): Long = try {
-        LocalDateTime.parse(iso).toInstant(ZoneOffset.UTC).toEpochMilli()
-    } catch (_: Exception) {
-        System.currentTimeMillis()
+    private val ISO_FORMATTER_MICROS = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
+    private val ISO_FORMATTER = java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
+    private val DB_DATETIME_FORMATTER = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS")
+    private val DB_DATETIME_T_FORMATTER = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
+
+    private fun parseIsoToMs(iso: String): Long {
+        val input = iso.trim()
+        return try {
+            // 尝试解析空格分隔的数据库格式: 2025-10-17 01:21:33.652396
+            val dt = LocalDateTime.parse(input, DB_DATETIME_FORMATTER)
+            dt.toInstant(ZoneOffset.UTC).toEpochMilli()
+        } catch (_: DateTimeParseException) {
+            try {
+                // 尝试解析 T 分隔的格式: 2025-10-17T01:21:33.652396
+                val dt = LocalDateTime.parse(input, DB_DATETIME_T_FORMATTER)
+                dt.toInstant(ZoneOffset.UTC).toEpochMilli()
+            } catch (_: DateTimeParseException) {
+                try {
+                    // 尝试解析带时区格式: 2026-05-09T08:30:00+08:00
+                    val dt = OffsetDateTime.parse(input, ISO_FORMATTER)
+                    dt.toInstant().toEpochMilli()
+                } catch (_: DateTimeParseException) {
+                    try {
+                        // 尝试标准 ISO 格式
+                        val dt = LocalDateTime.parse(input)
+                        dt.atZone(ZoneOffset.UTC).toInstant().toEpochMilli()
+                    } catch (_: Exception) {
+                        Log.w(TAG, "解析时间失败: $iso，使用当前时间")
+                        System.currentTimeMillis()
+                    }
+                }
+            }
+        }
     }
 
     /** 立即将 outbox 中的待推送变更同步到后端（fire-and-forget） */

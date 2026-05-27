@@ -90,22 +90,33 @@ fun MediaViewerScreen(
         onDispose { bottomBarVisible.value = true }
     }
 
-    if (mediaIdList.isNotEmpty() && messageId > 0) {
-        // 模式1: 列表模式（联动）— 来自 message，可跨 group 滑动
-        FederatedListModeViewer(
-            initialMediaId = initialMediaId,
-            initialMessageId = messageId,
-            initialMediaIdList = mediaIdList,
-            filter = MessageRepository.MediaViewerFilter(
-                tagId = filterTagId,
-                actorId = filterActorId,
-                searchQuery = filterQuery
-            ),
-            databaseManager = databaseManager,
-            navController = navController
-        )
+    if (mediaIdList.isNotEmpty()) {
+        // 有媒体ID列表（来自media页面筛选或message页面联动）
+        if (messageId > 0) {
+            // 模式1: 列表模式（联动）— 来自 message，可跨 group 滑动
+            FederatedListModeViewer(
+                initialMediaId = initialMediaId,
+                initialMessageId = messageId,
+                initialMediaIdList = mediaIdList,
+                filter = MessageRepository.MediaViewerFilter(
+                    tagId = filterTagId,
+                    actorId = filterActorId,
+                    searchQuery = filterQuery
+                ),
+                databaseManager = databaseManager,
+                navController = navController
+            )
+        } else {
+            // 模式2: 浏览模式 — 来自 media 页面，使用传入的筛选后列表
+            BrowseModeViewer(
+                initialMediaId = initialMediaId,
+                initialMediaIdList = mediaIdList,
+                databaseManager = databaseManager,
+                navController = navController
+            )
+        }
     } else {
-        // 模式2: 浏览模式 — 来自 media 页面，窗口化加载
+        // 无媒体ID列表，从头加载（fallback）
         BrowseModeViewer(
             initialMediaId = initialMediaId,
             databaseManager = databaseManager,
@@ -250,8 +261,78 @@ private fun FederatedListModeViewer(
 }
 
 /**
- * 浏览模式：窗口化分页加载（适用于 media 页面的大量媒体）
- * 只加载当前位置附近的媒体窗口，滑动到边界时自动扩展
+ * 浏览模式：使用传入的筛选后列表（适用于 media 页面切换收藏筛选后）
+ * 直接使用筛选后的媒体列表，不需要窗口化分页
+ */
+@Composable
+private fun BrowseModeViewer(
+    initialMediaId: Long,
+    initialMediaIdList: List<Long>,
+    databaseManager: DatabaseManager,
+    navController: NavController
+) {
+    val coroutineScope = rememberCoroutineScope()
+
+    // 使用传入的筛选后列表
+    val mediaList = remember { mutableStateListOf<Media>() }
+    var isInitialized by remember { mutableStateOf(false) }
+    var totalCount by remember { mutableIntStateOf(0) }
+
+    // 初始化：加载传入的媒体列表
+    LaunchedEffect(initialMediaId, initialMediaIdList) {
+        if (initialMediaIdList.isEmpty()) {
+            isInitialized = true
+            return@LaunchedEffect
+        }
+
+        coroutineScope.launch {
+            val loaded = databaseManager.mediaRepository.getMediaByIds(initialMediaIdList)
+            val loadedMap = loaded.associateBy { it.id }
+            // 按照传入顺序排列
+            val ordered = initialMediaIdList.mapNotNull { loadedMap[it] }
+            mediaList.clear()
+            mediaList.addAll(ordered)
+            totalCount = ordered.size
+            isInitialized = true
+        }
+    }
+
+    if (!isInitialized || mediaList.isEmpty()) {
+        LoadingBox()
+        return
+    }
+
+    // 找到初始媒体在列表中的位置
+    val startIndex = mediaList.indexOfFirst { it.id == initialMediaId }.coerceAtLeast(0)
+    val pagerState = rememberPagerState(initialPage = startIndex) { mediaList.size }
+    val stripListState = rememberLazyListState()
+
+    // 居中缩略图
+    LaunchedEffect(pagerState.currentPage) {
+        val viewportWidth = stripListState.layoutInfo.viewportSize.width
+        val itemWidthPx =
+            stripListState.layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: viewportWidth
+        val offset = -(viewportWidth / 2 - itemWidthPx / 2)
+        stripListState.scrollToItem(
+            index = pagerState.currentPage,
+            scrollOffset = offset
+        )
+    }
+
+    MediaViewerContent(
+        mediaList = mediaList,
+        pagerState = pagerState,
+        stripListState = stripListState,
+        totalCount = totalCount,
+        currentGlobalIndex = pagerState.currentPage,
+        databaseManager = databaseManager,
+        navController = navController,
+        coroutineScope = coroutineScope
+    )
+}
+
+/**
+ * 浏览模式：窗口化分页加载（适用于media页面的默认fallback无列表场景）
  */
 @Composable
 private fun BrowseModeViewer(

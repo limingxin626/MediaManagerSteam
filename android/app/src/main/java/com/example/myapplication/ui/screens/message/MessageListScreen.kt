@@ -341,10 +341,11 @@ fun MessageListScreen(
 
             // 输入栏固定在 Box 底部，与消息流叠加
             MessageComposeBar(
-                onSendMessage = { text, mediaList ->
+                onSendMessage = { text, mediaList, tagIds ->
                     viewModel.sendMessage(
                         text = text,
                         mediaList = mediaList,
+                        tagIds = tagIds,
                         databaseManager = databaseManager,
                         context = context,
                         onSuccess = { },

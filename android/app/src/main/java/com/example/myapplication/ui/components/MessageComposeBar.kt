@@ -50,7 +50,7 @@ import com.example.myapplication.utils.rememberMultipleMediaFilePicker
  */
 @Composable
 fun MessageComposeBar(
-    onSendMessage: (text: String, mediaList: List<MediaFileInfo>) -> Unit,
+    onSendMessage: (text: String, mediaList: List<MediaFileInfo>, tagIds: List<Long>) -> Unit,
     isSending: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -147,7 +147,7 @@ fun MessageComposeBar(
                 IconButton(
                     onClick = {
                         if (canSend) {
-                            onSendMessage(text, selectedMedia.toList())
+                            onSendMessage(text, selectedMedia.toList(), emptyList())
                             text = ""
                             selectedMedia.clear()
                         }

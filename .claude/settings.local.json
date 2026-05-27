@@ -25,13 +25,29 @@
       "mcp__work-data__data_profile",
       "mcp__work-data__data_expand",
       "Bash(ls:*)",
-      "Bash(find:*)",
-      "Bash(cp:*)"
+      "Bash(mkdir:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm gen:types:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(pip install:*)",
+      "Bash(npx:*)",
+      "Bash(echo exit: $?:*)",
+      "Bash(.venv/Scripts/alembic revision *)",
+      "Bash(ASKTAO_DATA_ROOT=E:/AskTao .venv/Scripts/alembic revision --autogenerate -m \"add_media_tag\")",
+      "Bash(DATA_ROOT=E:/AskTao .venv/Scripts/alembic revision *)",
+      "Bash(DATA_ROOT=E:/AskTao UPLOAD_DIR=E:/AskTao/uploads .venv/Scripts/alembic revision *)",
+      "WebSearch",
+      "Bash(cmd.exe:*)",
+      "Bash(sqlite3:*)",
+      "Bash(DATA_ROOT=E:/Note/data uv run:*)",
+      "Bash(git add:*)"
     ]
   },
-  "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "work-data",
-    "work-memory"
+  "disabledMcpjsonServers": [
+    "work-data"
   ]
 }

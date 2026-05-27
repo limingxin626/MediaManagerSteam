@@ -348,6 +348,7 @@ def sync_messages(db: Session = Depends(get_db)):
             text=msg.text,
             actor_id=msg.actor_id,
             actor_name=msg.actor.name if msg.actor else None,
+            media_count=len(media_items),
             issue_id=msg.issue_id,
             issue_title=msg.issue.title if msg.issue else None,
             starred=bool(msg.starred),

@@ -146,6 +146,7 @@ class MessageViewModel(
     fun sendMessage(
         text: String,
         mediaList: List<MediaFileInfo>,
+        tagIds: List<Long>,
         databaseManager: DatabaseManager,
         context: Context,
         onSuccess: () -> Unit,
@@ -201,7 +202,7 @@ class MessageViewModel(
             val (localMessageId, mediaIds) = messageRepository.createMessageWithMedia(
                 message = Message(text = text.ifBlank { null }, sendStatus = initialStatus),
                 mediaEntities = preparedList.map { it.entity },
-                tagRepository = databaseManager.tagRepository
+                tagIds = tagIds
             )
             // ↑ 至此消息已在 paging 中完整可见（带全部本地缩略图）
             _isSending.value = false
@@ -244,6 +245,7 @@ class MessageViewModel(
                         id = localMessageId,
                         text = text.ifBlank { null },
                         actor_id = null,
+                        tag_ids = tagIds,
                         created_at = createdAtIso,
                         files = uploadResults.filterNotNull()
                     )
@@ -275,6 +277,7 @@ class MessageViewModel(
             messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PUSHING)
             try {
                 val mediaList = messageRepository.getMediaByMessageId(messageId)
+                val tagIds = messageRepository.getMessageTagIds(messageId)
                 val uploadResults = coroutineScope {
                     mediaList.map { media ->
                         async {
@@ -300,6 +303,7 @@ class MessageViewModel(
                         id = messageId,
                         text = msg?.text,
                         actor_id = msg?.actorId,
+                        tag_ids = tagIds,
                         created_at = createdAtIso,
                         files = uploadResults.filterNotNull()
                     )

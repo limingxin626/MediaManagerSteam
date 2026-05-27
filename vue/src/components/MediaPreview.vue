@@ -267,6 +267,7 @@
         </div>
       </div>
     </div>
+  </Transition>
   <!-- Smart tag suggestion drawer -->
   <TagSuggestDrawer
     :is-open="suggestDrawerOpen"

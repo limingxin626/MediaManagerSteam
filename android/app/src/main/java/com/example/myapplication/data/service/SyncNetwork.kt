@@ -65,6 +65,7 @@ data class MessageSyncRequest(
     val id: Long,
     val text: String?,
     val actor_id: Long?,
+    val tag_ids: List<Long>?,
     val created_at: String?,
     val files: List<ClientMediaFile>
 )

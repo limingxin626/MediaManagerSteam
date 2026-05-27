@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.screens.media
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -57,7 +59,9 @@ import com.example.myapplication.ui.components.InstagramFilterButton
 import com.example.myapplication.ui.components.LoadingIndicator
 import com.example.myapplication.ui.components.MediaCard
 import com.example.myapplication.ui.components.SearchBar
+import com.example.myapplication.ui.theme.InstagramGradientEnd
 import com.example.myapplication.ui.theme.InstagramGradientMiddle
+import com.example.myapplication.ui.theme.InstagramGradientStart
 import com.example.myapplication.ui.viewmodel.MediaViewModel
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
@@ -76,6 +80,17 @@ fun MediaListScreen(
     val uiState by viewModel.uiState.collectAsState()
     val mediaList by viewModel.mediaList.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+
+    // 打印前10个媒体信息调试
+    LaunchedEffect(mediaList) {
+        if (mediaList.isNotEmpty()) {
+            val sb = StringBuilder("MediaListScreen: 前10个媒体\n")
+            mediaList.take(10).forEachIndexed { index, media ->
+                sb.append("[$index] id=${media.id}, createdAt=${media.createdAt}, fileHash=${media.fileHash.take(8)}...\n")
+            }
+            Log.d("MediaListScreen", sb.toString())
+        }
+    }
 
     // 局部搜索输入状态
     var localSearchQuery by remember { mutableStateOf("") }
@@ -232,6 +247,28 @@ fun MediaListScreen(
                         hasActiveFilters = false,
                         onClick = { showFilterSheet = true }
                     )
+
+                    val starredFilter by viewModel.starredFilter.collectAsState()
+                    Surface(
+                        modifier = Modifier.height(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (starredFilter) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        onClick = { viewModel.toggleStarredFilter() }
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = "收藏筛选",
+                                modifier = Modifier.size(20.dp),
+                                tint = if (starredFilter) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
 
 

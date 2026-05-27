@@ -18,9 +18,11 @@ from typing import Dict
 logger = logging.getLogger(__name__)
 
 
-def _require_env(name: str) -> str:
+def _get_env(name: str, default: str = None) -> str:
     val = os.getenv(name, "").strip()
     if not val:
+        if default is not None:
+            return default
         logger.error("环境变量 %s 未设置，无法启动。", name)
         sys.exit(1)
     return val
@@ -34,15 +36,15 @@ def _dir_name(path: str) -> str:
 class AppConfig:
     """应用配置类"""
 
-    DATA_ROOT: str = os.path.abspath(_require_env("DATA_ROOT"))
-    UPLOAD_DIR: str = os.path.abspath(_require_env("UPLOAD_DIR"))
+    DATA_ROOT: str = os.path.abspath(_get_env("DATA_ROOT"))
+    UPLOAD_DIR: str = os.path.abspath(_get_env("UPLOAD_DIR"))
 
     # 额外静态挂载目录，分号分隔
     STATIC_DIRS: list = [
         os.path.abspath(d.strip()) for d in os.getenv("STATIC_DIRS", "").split(";") if d.strip()
     ]
 
-    HOST: str = os.getenv("HOST", "127.0.0.1").strip() or "127.0.0.1"
+    HOST: str = os.getenv("HOST", "0.0.0.0").strip() or "0.0.0.0"
     PORT: int = int(os.getenv("PORT", "8002"))
 
     FFMPEG_PATH: str = os.getenv("FFMPEG_PATH", "ffmpeg")

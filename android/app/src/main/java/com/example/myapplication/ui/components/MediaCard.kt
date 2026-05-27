@@ -121,37 +121,6 @@ fun MediaCard(
                         tint = Color(0xFFFFD700)
                     )
                 }
-
-                // 评分标签 - 左上角（如果有评分）
-                if (media.rating > 0) {
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp),
-                        shape = RoundedCornerShape(4.dp),
-                        color = InstagramGradientStart.copy(alpha = 0.9f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                modifier = Modifier.size(10.dp),
-                                tint = Color.White
-                            )
-                            Text(
-                                text = "${media.rating}",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.sp, fontWeight = FontWeight.SemiBold
-                                ),
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
             }
         }
     }

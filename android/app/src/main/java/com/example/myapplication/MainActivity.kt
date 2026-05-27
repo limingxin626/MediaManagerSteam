@@ -454,8 +454,8 @@ fun AppNavHost(
             MediaListScreen(
                 viewModel = mediaViewModel!!,
                 databaseManager = databaseManager,
-                onMediaClick = { media, _ ->
-                    navController.navigateToMediaFullscreen(media.id)
+                onMediaClick = { media, filteredMediaList ->
+                    navController.navigateToMediaFullscreen(media.id, filteredMediaList)
                 }
             )
         }
