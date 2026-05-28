@@ -1,5 +1,5 @@
 <template>
-  <section class="bg-white/30 dark:bg-black/20 backdrop-blur rounded-2xl p-4 border border-[var(--border-color)]">
+  <section class="bg-white/30 dark:bg-[var(--bg-card)] backdrop-blur rounded-2xl p-4 border border-[var(--border-color)]">
     <div class="flex items-center justify-between mb-3">
       <h2 class="text-base font-bold text-gray-900 dark:text-white">📊 活跃概览</h2>
       <span v-if="!loading" class="text-xs text-gray-500 dark:text-gray-400">
@@ -82,7 +82,7 @@ const Stat = defineComponent({
   props: { label: { type: String, required: true }, value: { type: Number, required: true } },
   setup(props) {
     return () =>
-      h('div', { class: 'rounded-lg border border-[var(--border-color)] bg-white/50 dark:bg-gray-800/50 p-3' }, [
+      h('div', { class: 'rounded-lg border border-[var(--border-color)] bg-white/50 dark:bg-[#3d3d3d] p-3' }, [
         h('div', { class: 'text-2xl font-bold text-gray-900 dark:text-white' }, String(props.value)),
         h('div', { class: 'text-xs text-gray-500 dark:text-gray-400 mt-1' }, props.label),
       ])

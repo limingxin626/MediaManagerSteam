@@ -24,6 +24,15 @@
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div class="flex gap-2 items-center justify-between max-w-3xl mx-auto pr-10">
               <h2 class="text-lg font-bold text-gray-900 dark:text-white">消息流</h2>
+              <!-- Refresh -->
+              <button @click="resetAndFetch()" :disabled="loading"
+                class="p-1 rounded-md transition-colors text-gray-400 hover:text-[var(--color-primary-600)] bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="刷新">
+                <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
               <!-- Merge toggle -->
               <button @click="toggleMergeMode" class="px-2 py-1 text-xs rounded-md transition-colors" :class="mergeMode
                 ? 'bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)]'

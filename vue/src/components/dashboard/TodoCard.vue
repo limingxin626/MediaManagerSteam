@@ -1,6 +1,6 @@
 <template>
   <div
-    class="group bg-white dark:bg-gray-800 border border-[var(--border-color)] rounded-lg px-3 py-2 shadow-sm hover:shadow transition-shadow cursor-grab active:cursor-grabbing"
+    class="group bg-white dark:bg-[#3d3d3d] border border-[var(--border-color)] rounded-lg px-3 py-2 shadow-sm hover:shadow transition-shadow cursor-grab active:cursor-grabbing"
   >
     <div v-if="!editing" class="flex items-start gap-2">
       <span

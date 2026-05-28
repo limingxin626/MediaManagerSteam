@@ -71,6 +71,18 @@ def process_standalone_file(
         width=media_info["width"],
         height=media_info["height"],
         duration_ms=media_info["duration_ms"],
+        taken_at=media_info.get("taken_at"),
+        gps_lat=media_info.get("gps_lat"),
+        gps_lng=media_info.get("gps_lng"),
+        orientation=media_info.get("orientation"),
+        camera_make=media_info.get("camera_make"),
+        camera_model=media_info.get("camera_model"),
+        lens=media_info.get("lens"),
+        video_codec=media_info.get("video_codec"),
+        audio_codec=media_info.get("audio_codec"),
+        has_audio=media_info.get("has_audio"),
+        fps=media_info.get("fps"),
+        bitrate=media_info.get("bitrate"),
     )
     if media_id is not None:
         media_kwargs["id"] = media_id
@@ -246,6 +258,18 @@ def replace_media_file(db: Session, media_id: int, src_path: str) -> Media:
     media.width = media_info["width"]
     media.height = media_info["height"]
     media.duration_ms = media_info["duration_ms"]
+    media.taken_at = media_info.get("taken_at")
+    media.gps_lat = media_info.get("gps_lat")
+    media.gps_lng = media_info.get("gps_lng")
+    media.orientation = media_info.get("orientation")
+    media.camera_make = media_info.get("camera_make")
+    media.camera_model = media_info.get("camera_model")
+    media.lens = media_info.get("lens")
+    media.video_codec = media_info.get("video_codec")
+    media.audio_codec = media_info.get("audio_codec")
+    media.has_audio = media_info.get("has_audio")
+    media.fps = media_info.get("fps")
+    media.bitrate = media_info.get("bitrate")
 
     try:
         thumb_path = config.get_thumbnail_path(media.id)
