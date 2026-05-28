@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Table, Index, UniqueConstraint, LargeBinary, event
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Float, ForeignKey, Table, Index, UniqueConstraint, LargeBinary, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, backref
 from datetime import datetime
@@ -90,6 +90,20 @@ class Media(Base):
     width = Column(Integer, nullable=True)
     height = Column(Integer, nullable=True)
     duration_ms = Column(Integer, nullable=True)
+
+    taken_at = Column(DateTime, nullable=True, index=True)
+    gps_lat = Column(Float, nullable=True)
+    gps_lng = Column(Float, nullable=True)
+    orientation = Column(Integer, nullable=True)
+    camera_make = Column(String(64), nullable=True)
+    camera_model = Column(String(64), nullable=True)
+    lens = Column(String(128), nullable=True)
+    video_codec = Column(String(32), nullable=True)
+    audio_codec = Column(String(32), nullable=True)
+    has_audio = Column(Integer, nullable=True)
+    fps = Column(Float, nullable=True)
+    bitrate = Column(Integer, nullable=True)
+
     rating = Column(Integer, default=0, nullable=False)
     starred = Column(Integer, default=0, nullable=False)
     view_count = Column(Integer, default=0, nullable=False)

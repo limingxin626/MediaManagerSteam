@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
+from datetime import datetime
 from app.schemas.base import TimestampMixin, MediaUrlMixin
 from app.schemas.message import MessageTagItem
 
@@ -18,6 +19,18 @@ class MediaResponse(MediaUrlMixin, TimestampMixin):
     frame_ms: int | None = None
     start_ms: int | None = None
     end_ms: int | None = None
+    taken_at: datetime | None = None
+    gps_lat: float | None = None
+    gps_lng: float | None = None
+    orientation: int | None = None
+    camera_make: str | None = None
+    camera_model: str | None = None
+    lens: str | None = None
+    video_codec: str | None = None
+    audio_codec: str | None = None
+    has_audio: int | None = None
+    fps: float | None = None
+    bitrate: int | None = None
 
 
 class MediaDetailResponse(MediaResponse):

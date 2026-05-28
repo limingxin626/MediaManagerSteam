@@ -269,21 +269,53 @@ class MediaInfoUtils:
         return None
 
     @staticmethod
-    def _extract_exif_date(img) -> str | None:
-        """从 PIL Image 提取 EXIF 拍摄日期，返回 ISO 格式字符串或 None"""
+    def _extract_exif_date(img):
+        """从 PIL Image 提取 EXIF 拍摄日期,返回 datetime 或 None"""
         try:
             exif = img.getexif()
             if not exif:
                 return None
-            # 36867 = DateTimeOriginal, 36868 = DateTimeDigitized, 306 = DateTime
+            from datetime import datetime as _dt
             for tag_id in (36867, 36868, 306):
                 val = exif.get(tag_id)
                 if val:
-                    # EXIF 格式: "2024:01:15 14:30:00" → "2024-01-15T14:30:00"
-                    return val.replace(':', '-', 2).replace(' ', 'T', 1)
+                    try:
+                        return _dt.strptime(val, "%Y:%m:%d %H:%M:%S")
+                    except ValueError:
+                        continue
         except Exception as e:
             logger.debug(f"Failed to extract EXIF date: {e}")
         return None
+
+    @staticmethod
+    def _extract_exif_camera(img) -> dict:
+        """提取相机品牌/型号/镜头。返回 {make, model, lens, orientation}"""
+        out = {"make": None, "model": None, "lens": None, "orientation": None}
+        try:
+            exif = img.getexif()
+            if not exif:
+                return out
+            # 271=Make, 272=Model, 274=Orientation
+            make = exif.get(271)
+            model = exif.get(272)
+            orient = exif.get(274)
+            if make:
+                out["make"] = str(make).strip().strip('\x00') or None
+            if model:
+                out["model"] = str(model).strip().strip('\x00') or None
+            if isinstance(orient, int):
+                out["orientation"] = orient
+            # LensModel 在 ExifIFD (0x8769) 的 0xa434
+            try:
+                exif_ifd = exif.get_ifd(0x8769)
+                lens = exif_ifd.get(0xa434) if exif_ifd else None
+                if lens:
+                    out["lens"] = str(lens).strip().strip('\x00') or None
+            except Exception:
+                pass
+        except Exception as e:
+            logger.debug(f"Failed to extract EXIF camera: {e}")
+        return out
 
     @staticmethod
     def _extract_exif_gps(img) -> dict | None:
@@ -329,11 +361,8 @@ class MediaInfoUtils:
     @staticmethod
     def get_media_info(file_path: str, media_type: str, ffprobe_path: str = None) -> dict:
         """
-        获取媒体的详细信息
-
-        Returns:
-            dict with keys: width, height, duration_ms, bitrate, fps, codec, has_audio, taken_at, gps
-            当前只有 width/height/duration_ms 会写入数据库，其余字段供将来使用。
+        获取媒体详细信息。返回的键与 Media 模型字段对齐(taken_at 为 datetime|None,
+        gps_lat/gps_lng 为 float|None)。
         """
         info = {
             "width": None,
@@ -341,10 +370,16 @@ class MediaInfoUtils:
             "duration_ms": None,
             "bitrate": None,
             "fps": None,
-            "codec": None,
+            "video_codec": None,
+            "audio_codec": None,
             "has_audio": None,
             "taken_at": None,
-            "gps": None,
+            "gps_lat": None,
+            "gps_lng": None,
+            "orientation": None,
+            "camera_make": None,
+            "camera_model": None,
+            "lens": None,
         }
 
         ext = os.path.splitext(file_path)[1].lower()
@@ -354,71 +389,89 @@ class MediaInfoUtils:
             if data:
                 has_audio = False
                 for stream in data.get('streams', []):
-                    if stream.get('codec_type') == 'video' and info["width"] is None:
+                    ctype = stream.get('codec_type')
+                    if ctype == 'video' and info["width"] is None:
                         info["width"] = stream.get('width')
                         info["height"] = stream.get('height')
-                        info["codec"] = stream.get('codec_name')
-                        # fps: r_frame_rate 格式为 "30/1" 或 "30000/1001"
+                        info["video_codec"] = stream.get('codec_name')
                         r_frame_rate = stream.get('r_frame_rate', '')
                         if '/' in r_frame_rate:
                             num, den = r_frame_rate.split('/')
-                            if int(den) > 0:
-                                info["fps"] = round(int(num) / int(den), 2)
-                    elif stream.get('codec_type') == 'audio':
+                            try:
+                                if int(den) > 0:
+                                    info["fps"] = round(int(num) / int(den), 3)
+                            except ValueError:
+                                pass
+                    elif ctype == 'audio':
                         has_audio = True
-                info["has_audio"] = has_audio
+                        if info["audio_codec"] is None:
+                            info["audio_codec"] = stream.get('codec_name')
+                info["has_audio"] = 1 if has_audio else 0
 
                 format_data = data.get('format', {})
                 if format_data.get('duration'):
-                    info["duration_ms"] = round(float(format_data['duration']) * 1000)  # 转换为毫秒
+                    info["duration_ms"] = round(float(format_data['duration']) * 1000)
                 if format_data.get('bit_rate'):
-                    info["bitrate"] = int(format_data['bit_rate'])
+                    try:
+                        info["bitrate"] = int(format_data['bit_rate'])
+                    except ValueError:
+                        pass
 
-                # 拍摄日期: format.tags.creation_time
-                tags = format_data.get('tags', {})
+                tags = format_data.get('tags', {}) or {}
                 creation_time = tags.get('creation_time') or tags.get('Creation_time')
                 if creation_time:
-                    info["taken_at"] = creation_time
+                    from datetime import datetime as _dt
+                    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ",
+                                "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
+                        try:
+                            info["taken_at"] = _dt.strptime(creation_time, fmt)
+                            break
+                        except ValueError:
+                            continue
 
-                # 地理位置: format.tags.location 格式 "+31.2345+121.4567/"
+                info["camera_make"] = (tags.get('make') or tags.get('com.apple.quicktime.make') or None)
+                info["camera_model"] = (tags.get('model') or tags.get('com.apple.quicktime.model') or None)
+
                 location = tags.get('location') or tags.get('com.apple.quicktime.location.ISO6709')
                 if location:
                     import re
                     m = re.match(r'([+-][\d.]+)([+-][\d.]+)', location)
                     if m:
-                        info["gps"] = {
-                            "lat": round(float(m.group(1)), 6),
-                            "lng": round(float(m.group(2)), 6),
-                        }
+                        info["gps_lat"] = round(float(m.group(1)), 6)
+                        info["gps_lng"] = round(float(m.group(2)), 6)
 
         elif media_type == "IMAGE":
             try:
                 from PIL import Image, ImageOps
                 with Image.open(file_path) as img:
-                    # 应用 EXIF orientation，让 width/height 反映拍摄方向
                     transposed = ImageOps.exif_transpose(img)
                     info["width"], info["height"] = transposed.size
 
-                    # EXIF 拍摄日期和 GPS (JPEG/TIFF 等有 EXIF 的格式)
                     info["taken_at"] = MediaInfoUtils._extract_exif_date(img)
-                    info["gps"] = MediaInfoUtils._extract_exif_gps(img)
+                    gps = MediaInfoUtils._extract_exif_gps(img)
+                    if gps:
+                        info["gps_lat"] = gps["lat"]
+                        info["gps_lng"] = gps["lng"]
+                    cam = MediaInfoUtils._extract_exif_camera(img)
+                    info["camera_make"] = cam["make"]
+                    info["camera_model"] = cam["model"]
+                    info["lens"] = cam["lens"]
+                    info["orientation"] = cam["orientation"]
 
-                    # GIF: 用 ffprobe 获取准确 duration，fallback 到 PIL 帧累加
                     if ext == '.gif':
-                        info["codec"] = "gif"
+                        info["video_codec"] = "gif"
                         if ffprobe_path:
                             data = MediaInfoUtils._parse_ffprobe(file_path, ffprobe_path)
                             if data:
                                 fmt_dur = data.get('format', {}).get('duration')
                                 if fmt_dur:
                                     info["duration_ms"] = round(float(fmt_dur))
-                        # fallback: PIL 帧累加
                         if info["duration_ms"] is None and hasattr(img, 'n_frames') and img.n_frames > 1:
                             total_ms = 0
                             for frame_idx in range(img.n_frames):
                                 img.seek(frame_idx)
                                 total_ms += img.info.get('duration', 100)
-                            info["duration_ms"] = total_ms  # 已经是毫秒
+                            info["duration_ms"] = total_ms
             except Exception as e:
                 logger.error(f"Failed to get image properties for {file_path}: {e}")
 
