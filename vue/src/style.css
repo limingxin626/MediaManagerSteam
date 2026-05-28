@@ -7,8 +7,8 @@
 
 :root {
   /* Fonts */
-  --font-display: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
-  --font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-display: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
   /* Primary */
   --color-primary-500: #6366f1;
@@ -33,45 +33,45 @@
 }
 
 .dark {
-  --color-primary-500: #818cf8;
-  --color-primary-600: #6366f1;
-  --color-primary-700: #4f46e5;
+  --color-primary-500: #7c93ff;
+  --color-primary-600: #5b73e8;
+  --color-primary-700: #3b54c4;
 
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
 
-  --bg-primary: rgb(32, 26, 27);
-  --bg-secondary: rgb(32, 32, 32);
-  --bg-card: rgb(32, 26, 27);
-  --border-color: rgba(255, 255, 255, 0.10);
-  --text-primary: #ffffff;
-  --text-secondary: #d1d5db;
-  --text-muted: #9ca3af;
+  --bg-primary: #212121;
+  --bg-secondary: #2a2a2a;
+  --bg-card: #333333;
+  --border-color: rgba(240, 246, 252, 0.12);
+  --text-primary: #f0f6fc;
+  --text-secondary: #c9d1d9;
+  --text-muted: #8b96a3;
   --sidebar-bg: transparent;
-  --divider: rgba(255, 255, 255, 0.10);
+  --divider: rgba(240, 246, 252, 0.08);
 }
 
 @theme inline {
-  --color-dark-bg: rgb(32, 32, 32);
-  --color-card-bg: rgb(32, 26, 27);
+  --color-dark-bg: #0d1117;
+  --color-card-bg: #1c2128;
   --color-button-success-bg: rgb(255, 169, 254);
 
   --color-select-bg: #ffffff;
-  --color-select-bg-dark: rgb(45, 31, 42);
+  --color-select-bg-dark: #1c2128;
   --color-select-border: #d1d5db;
-  --color-select-border-dark: #4b5563;
+  --color-select-border-dark: #30363d;
   --color-select-text: #111827;
-  --color-select-text-dark: #ffffff;
+  --color-select-text-dark: #e6edf3;
   --color-select-icon: #9ca3af;
   --color-select-menu-bg: #ffffff;
-  --color-select-menu-bg-dark: #374151;
+  --color-select-menu-bg-dark: #161b22;
   --color-select-option-active-bg: #e0e7ff;
-  --color-select-option-active-bg-dark: rgba(99, 102, 241, 0.5);
+  --color-select-option-active-bg-dark: rgba(124, 147, 255, 0.18);
   --color-select-option-active-text: #312e81;
-  --color-select-option-active-text-dark: #a5b4fc;
+  --color-select-option-active-text-dark: #c7d0ff;
   --color-select-selected-icon: #4f46e5;
-  --color-select-selected-icon-dark: #818cf8;
+  --color-select-selected-icon-dark: #7c93ff;
   --color-select-focus-ring: #6366f1;
 }
 
@@ -122,22 +122,22 @@ video {
 }
 
 .dark .tag-chip {
-  border-color: rgba(165, 180, 252, 0.22);
-  background: linear-gradient(180deg, rgba(79, 70, 229, 0.32), rgba(67, 56, 202, 0.22));
-  color: rgb(224, 231, 255);
+  border-color: rgba(124, 147, 255, 0.22);
+  background: linear-gradient(180deg, rgba(91, 115, 232, 0.28), rgba(59, 84, 196, 0.18));
+  color: rgb(199, 208, 255);
 }
 
 .dark ::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: #0d1117;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
+  background: #30363d;
   border-radius: 4px;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #4a4a4a;
+  background: #484f58;
 }
 
 /* === Milkdown Crepe dark theme overrides === */
@@ -146,23 +146,23 @@ video {
 }
 
 .dark .milkdown {
-  --crepe-color-background: #1a1a1a;
-  --crepe-color-on-background: #e6e6e6;
-  --crepe-color-surface: #121212;
-  --crepe-color-surface-low: #1c1c1c;
-  --crepe-color-on-surface: #d1d1d1;
-  --crepe-color-on-surface-variant: #a9a9a9;
-  --crepe-color-outline: #757575;
-  --crepe-color-primary: #818cf8;
-  --crepe-color-secondary: #4d4d4d;
-  --crepe-color-on-secondary: #d6d6d6;
-  --crepe-color-inverse: #e5e5e5;
-  --crepe-color-on-inverse: #2a2a2a;
-  --crepe-color-inline-code: #ff8a8a;
-  --crepe-color-error: #ff6666;
-  --crepe-color-hover: #232323;
-  --crepe-color-selected: #2f2f2f;
-  --crepe-color-inline-area: #2b2b2b;
+  --crepe-color-background: #0d1117;
+  --crepe-color-on-background: #e6edf3;
+  --crepe-color-surface: #161b22;
+  --crepe-color-surface-low: #1c2128;
+  --crepe-color-on-surface: #c9d1d9;
+  --crepe-color-on-surface-variant: #9da7b3;
+  --crepe-color-outline: #6e7681;
+  --crepe-color-primary: #7c93ff;
+  --crepe-color-secondary: #30363d;
+  --crepe-color-on-secondary: #c9d1d9;
+  --crepe-color-inverse: #e6edf3;
+  --crepe-color-on-inverse: #161b22;
+  --crepe-color-inline-code: #ff7b72;
+  --crepe-color-error: #f85149;
+  --crepe-color-hover: #1c2128;
+  --crepe-color-selected: #262c36;
+  --crepe-color-inline-area: #21262d;
 }
 
 /* === Global font === */

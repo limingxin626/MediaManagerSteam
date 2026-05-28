@@ -1,5 +1,5 @@
 <template>
-  <section class="bg-white/30 dark:bg-black/20 backdrop-blur rounded-2xl p-4 border border-[var(--border-color)]">
+  <section class="bg-white/30 dark:bg-[var(--bg-card)] backdrop-blur rounded-2xl p-4 border border-[var(--border-color)]">
     <div class="flex items-center justify-between mb-3">
       <h2 class="text-base font-bold text-gray-900 dark:text-white">🎯 Issue 看板</h2>
       <button

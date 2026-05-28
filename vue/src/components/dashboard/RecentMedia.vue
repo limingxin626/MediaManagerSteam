@@ -1,5 +1,5 @@
 <template>
-  <section class="bg-white/30 dark:bg-black/20 backdrop-blur rounded-2xl p-4 border border-[var(--border-color)]">
+  <section class="bg-white/30 dark:bg-[var(--bg-card)] backdrop-blur rounded-2xl p-4 border border-[var(--border-color)]">
     <div class="flex items-center justify-between mb-3">
       <h2 class="text-base font-bold text-gray-900 dark:text-white">🖼️ 最近媒体</h2>
       <router-link to="/media" class="text-xs text-gray-500 hover:text-[var(--color-primary-500)]">查看全部 →</router-link>
