@@ -187,7 +187,7 @@ import { useRouter } from 'vue-router'
 import type { Media, TagWithCount, VideoPreviewItem } from '../types'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import { isVideo, isImage, resolveUrl, formatDuration } from '../utils/media'
+import { isVideo, isImage, resolveMediaUrl, formatDuration } from '../utils/media'
 import TagPickerPopover from '../components/TagPickerPopover.vue'
 import VideoPreviewStrip from '../components/VideoPreviewStrip.vue'
 import VideoScreenshotCapture from '../components/VideoScreenshotCapture.vue'
@@ -214,7 +214,7 @@ const displayName = computed(() => {
 
 const mediaSrc = computed(() => {
   if (!mediaItem.value) return ''
-  return resolveUrl(mediaItem.value.file_url)
+  return resolveMediaUrl(mediaItem.value)
 })
 
 const formatFileSize = (bytes: number | null): string => {

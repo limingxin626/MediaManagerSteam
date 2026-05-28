@@ -44,7 +44,9 @@
       "Bash(cmd.exe:*)",
       "Bash(sqlite3:*)",
       "Bash(DATA_ROOT=E:/Note/data uv run:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   },
   "disabledMcpjsonServers": [

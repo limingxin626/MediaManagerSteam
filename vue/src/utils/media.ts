@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './constants'
+import { IS_ELECTRON } from './constants'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 
@@ -20,16 +20,28 @@ export function isImage(mimeType: string | null): boolean {
   return mimeType?.startsWith('image/') ?? false
 }
 
-/** Resolve a backend-relative URL (e.g. /data/thumbs/1.webp) to a full URL */
+/** Resolve a backend-relative path to a full absolute path */
 export function resolveUrl(path: string): string {
-  // 对 URL 进行编码处理，特别是对 # 字符进行编码
-  return `${API_BASE_URL}${path.replace(/#/g, '%23')}`
+  if (IS_ELECTRON) {
+    return `file://${path.replace(/#/g, '%23')}`
+  }
+  return `${path.replace(/#/g, '%23')}`
 }
 
-/** Resolve media thumb_url to full URL */
-export function resolveThumb(item: { thumb_url: string | null } | null): string {
-  if (!item?.thumb_url) return ''
-  return resolveUrl(item.thumb_url)
+/** Resolve media thumb_url to absolute path */
+export function resolveThumb(item: { thumb_url: string | null; thumb_path?: string | null } | null): string {
+  if (!item) return ''
+  if (item.thumb_path) return resolveUrl(item.thumb_path)
+  if (item.thumb_url) return resolveUrl(item.thumb_url)
+  return ''
+}
+
+/** Resolve media file_url to absolute path, preferring file_path if available */
+export function resolveMediaUrl(item: { file_url: string | null; file_path?: string | null } | null): string {
+  if (!item) return ''
+  if (item.file_path) return resolveUrl(item.file_path)
+  if (item.file_url) return resolveUrl(item.file_url)
+  return ''
 }
 
 /** Toggle media starred state via API, updates item.starred in-place */

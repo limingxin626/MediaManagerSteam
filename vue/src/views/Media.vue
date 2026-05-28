@@ -17,6 +17,17 @@
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div class="flex items-center gap-3 max-w-4xl mx-auto">
         <h2 class="text-lg font-bold text-gray-900 dark:text-white shrink-0">媒体</h2>
+        <!-- Refresh -->
+        <button
+          @click="handleRefresh"
+          :disabled="refreshing"
+          class="p-1.5 rounded-md transition-colors text-gray-400 hover:text-[var(--color-primary-600)] bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="刷新"
+        >
+          <svg class="w-4 h-4" :class="{ 'animate-spin': refreshing }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
         <!-- Type Filter -->
         <div class="flex gap-2">
           <button
@@ -240,6 +251,16 @@ const previewOpen = ref(false)
 const previewItems = ref<any[]>([])
 const previewStartIndex = ref(0)
 const mediaBounceId = ref<number | null>(null)
+const refreshing = ref(false)
+
+async function handleRefresh() {
+  refreshing.value = true
+  try {
+    vg.resetAll()
+  } finally {
+    refreshing.value = false
+  }
+}
 
 // --- Smart mode (search / similar) ---
 const searchInput = ref('')
@@ -419,6 +440,7 @@ function openPreview(bucketKey: string, idx: number) {
     thumb_url: m.thumb_url,
     thumb_path: m.thumb_path,
     starred: m.starred,
+    tags: m.tags,
   }))
   previewStartIndex.value = idx - start
   previewOpen.value = true

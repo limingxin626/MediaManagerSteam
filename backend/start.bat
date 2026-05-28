@@ -12,5 +12,5 @@ if not exist "%DATA_ROOT%\db.sqlite3" (
     echo 数据库不存在，正在初始化...
     uv run alembic upgrade head
 )
-@REM alembic upgrade head
+@REM uv run alembic upgrade head
 uv run api.py

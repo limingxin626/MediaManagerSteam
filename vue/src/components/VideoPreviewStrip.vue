@@ -22,16 +22,16 @@
         class="group relative bg-gray-900 rounded-lg overflow-hidden border border-gray-800 hover:border-indigo-500 transition-colors cursor-pointer"
         @click="seekTo(p)"
       >
-        <div class="flex gap-3 p-2">
+        <div class="relative w-full">
           <img
             :src="resolveThumb(p)"
             :alt="`preview-${p.id}`"
-            class="w-24 h-16 object-cover rounded bg-black flex-shrink-0"
+            class="w-full"
             loading="lazy"
           />
-          <div class="flex-1 min-w-0">
-            <div class="text-xs text-gray-300 font-mono">{{ formatMs(p.frame_ms) }}</div>
-            <div v-if="p.start_ms != null || p.end_ms != null" class="text-[10px] text-gray-500 mt-0.5">
+          <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+            <div class="text-xs text-white font-mono">{{ formatMs(p.frame_ms) }}</div>
+            <div v-if="p.start_ms != null || p.end_ms != null" class="text-[10px] text-gray-300 mt-0.5">
               {{ p.start_ms != null ? formatMs(p.start_ms) : '?' }}
               →
               {{ p.end_ms != null ? formatMs(p.end_ms) : '?' }}
