@@ -224,6 +224,28 @@ async def list_issues(status: str | None = "doing") -> str:
 
 
 @mcp.tool()
+async def create_issue(
+    title: str,
+    description: str | None = None,
+    status: str = "doing",
+) -> str:
+    """新建一个 issue（工作主题/任务卡片）。
+    适用场景：用户提到要跟进一件新的工作、要建一个新的待办主题，
+    或明确说「建一个 issue」「加一个任务」时调用。
+    建好后可把后续相关笔记通过 write_message(issue_id=...) 挂到此 issue 时间线下。
+
+    Args:
+        title: Issue 标题，必填
+        description: 详细描述，支持 Markdown
+        status: 初始状态，"doing" / "done" / "archived" / "abandoned"，默认 "doing"
+    """
+    body: dict[str, Any] = {"title": title, "status": status}
+    if description is not None:
+        body["description"] = description
+    return await _request("POST", "/issues", json_body=body)
+
+
+@mcp.tool()
 async def read_issue(issue_id: int, history_limit: int = 5) -> str:
     """读取单个 issue 的详情，并附带最近若干条关联 message（按时间倒序）。
     在给 issue 发新更新前调用，避免重复昨天已经记录过的结论。
