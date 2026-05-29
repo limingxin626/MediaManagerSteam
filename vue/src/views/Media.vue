@@ -85,7 +85,7 @@
 
     <!-- Smart mode grid (search / similar) -->
     <div v-if="smartActive" class="absolute inset-0 overflow-y-auto">
-      <div class="max-w-4xl mx-auto px-2 sm:px-4 py-4">
+      <div class="w-full px-2 sm:px-4 py-4">
         <div class="flex items-center justify-between mb-3 px-1">
           <div class="text-sm text-[var(--text-muted)]">
             <span v-if="similarMode">相似于 #{{ similarMode.media_id }}</span>
@@ -117,8 +117,8 @@
       </div>
     </div>
 
-    <div v-show="!smartActive" ref="scrollContainer" class="absolute inset-0 overflow-y-auto" @scroll="vg.onScroll">
-      <div ref="measureEl" class="relative max-w-4xl mx-auto px-1 sm:px-2 py-4" :style="{ height: vg.totalHeight.value + 'px' }">
+    <div v-show="!smartActive" ref="scrollContainer" class="absolute inset-0 overflow-y-auto scrollbar-hidden pr-[32px] md:pr-[44px]" @scroll="vg.onScroll">
+      <div ref="measureEl" class="relative w-full px-1 sm:px-2 py-4" :style="{ height: vg.totalHeight.value + 'px' }">
 
         <!-- Month headers -->
         <div
@@ -173,20 +173,9 @@
         :current-date="vg.currentDate.value"
         @jump="handleDateScrubberJump"
         @jump-final="handleDateScrubberJumpFinal"
+        @wheel="(dy) => scrollContainer?.scrollBy({ top: dy })"
       />
     </div>
-
-      <!-- Back to Latest -->
-      <button
-        v-if="showBackToLatest"
-        @click="backToLatest"
-        class="fixed bottom-20 right-4 z-30 flex items-center gap-1.5 px-3 py-2 rounded-full bg-[var(--color-primary-600)] text-white text-sm shadow-lg hover:bg-[var(--color-primary-700)] transition-colors"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
-        </svg>
-        回到最新
-      </button>
 
     </div>
 
@@ -405,14 +394,6 @@ function handleDateScrubberJumpFinal(date: Date) {
   vg.setDispatchPaused(false)
   const target = vg.findBucketByDate(date)
   if (target) vg.loadBucketNow(`${target.year}-${String(target.month).padStart(2, '0')}`)
-}
-
-// --- Back to latest ---
-const showBackToLatest = computed(
-  () => vg.scrollTop.value > vg.viewportH.value * 2,
-)
-function backToLatest() {
-  scrollContainer.value?.scrollTo({ top: 0, behavior: 'auto' })
 }
 
 // --- Preview ---

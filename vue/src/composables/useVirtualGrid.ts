@@ -92,7 +92,7 @@ export function useVirtualGrid(opts: Options) {
 
   const timeline = ref<TimelineEntry[]>([])
   const loadingTimeline = ref(false)
-  const cols = ref(window.innerWidth >= 640 ? 4 : 3)
+  const cols = ref(3)
   const cellSize = ref(0)
   const monthHeaderH = ref(DEFAULT_HEADER_H)
   const scrollTop = ref(0)
@@ -430,11 +430,18 @@ export function useVirtualGrid(opts: Options) {
   let resizeObserver: ResizeObserver | null = null
   let measuredHeader = false
 
+  const TARGET_CELL = 220
+  const MIN_COLS_MOBILE = 3
+  const MIN_COLS_DESKTOP = 4
+
   function recomputeCellSize() {
     const el = measureEl.value
     if (!el) return
     const w = el.clientWidth
     if (w <= 0) return
+    const minCols = window.innerWidth >= 640 ? MIN_COLS_DESKTOP : MIN_COLS_MOBILE
+    const newCols = Math.max(minCols, Math.round(w / TARGET_CELL))
+    if (newCols !== cols.value) cols.value = newCols
     const c = cols.value
     cellSize.value = Math.max(1, Math.floor((w - (c - 1) * GAP) / c))
   }
@@ -455,8 +462,6 @@ export function useVirtualGrid(opts: Options) {
   }
 
   function onWindowResize() {
-    const newCols = window.innerWidth >= 640 ? 4 : 3
-    if (newCols !== cols.value) cols.value = newCols
     recomputeCellSize()
     if (container.value) viewportH.value = container.value.clientHeight
   }

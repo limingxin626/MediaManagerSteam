@@ -1,24 +1,43 @@
 <template>
   <div
     ref="barRef"
-    class="date-scrubber absolute right-0 top-0 bottom-0 z-30 flex items-stretch select-none"
-    :class="dragging ? 'w-8' : 'w-5 hover:w-8'"
+    class="date-scrubber absolute right-0 top-0 bottom-0 z-30 flex select-none"
+    :class="[dragging ? 'is-dragging' : '', 'w-[28px] md:w-[40px]']"
     @mousedown.prevent="onPointerDown"
     @touchstart.prevent="onTouchStart"
     @mouseenter="hovering = true"
     @mouseleave="onMouseLeave"
     @mousemove="onHoverMove"
+    @wheel.passive="onWheel"
   >
-    <!-- Track background -->
+    <!-- Left label column (year labels + floating month capsule) -->
+    <div class="relative hidden md:block" style="width: 26px">
+      <!-- Year labels -->
+      <div
+        v-for="label in yearLabels"
+        :key="`yl-${label.year}`"
+        class="absolute left-0 right-1 text-right text-[10px] font-medium text-gray-500 dark:text-gray-400 pointer-events-none leading-none whitespace-nowrap tabular-nums"
+        :style="{ top: label.top + '%', transform: `translateY(${label.anchor})` }"
+      >{{ label.year }}</div>
+
+      <!-- Floating current month capsule -->
+      <div
+        v-if="showCapsule"
+        class="scrubber-capsule absolute right-3 hidden sm:flex items-center pointer-events-none whitespace-nowrap px-2 py-0.5 rounded-full text-[11px] font-medium backdrop-blur-md bg-black/70 text-white dark:bg-white/15 dark:text-white border border-white/10 shadow"
+        :style="{ top: indicatorTop + '%', transform: 'translateY(-50%)' }"
+      >{{ capsuleLabel }}</div>
+    </div>
+
+    <!-- Right tick track -->
     <div class="relative flex-1">
       <!-- Center axis line -->
-      <div class="absolute right-1.5 top-0 bottom-0 w-px bg-gray-300/40 dark:bg-white/15 pointer-events-none"></div>
+      <div class="absolute right-1.5 top-0 bottom-0 w-px bg-gray-300/50 dark:bg-white/15 pointer-events-none"></div>
 
       <!-- Month ticks (short) -->
       <div
         v-for="tick in monthTicks"
         :key="`m-${tick.year}-${tick.month}`"
-        class="absolute right-1.5 h-px w-1.5 bg-gray-400/50 dark:bg-white/30 pointer-events-none"
+        class="absolute right-1.5 h-px w-1.5 bg-gray-400/60 dark:bg-white/30 pointer-events-none"
         :style="{ top: tick.top + '%' }"
       ></div>
 
@@ -30,25 +49,21 @@
         :style="{ top: tick.top + '%' }"
       ></div>
 
-      <!-- Year labels -->
+      <!-- Indicator: leader line + dot -->
       <div
-        v-for="label in yearLabels"
-        :key="label.year"
-        class="absolute right-5 text-[10px] font-medium text-gray-500 dark:text-gray-400 pointer-events-none leading-none whitespace-nowrap"
-        :style="{ top: label.top + '%', transform: `translateY(${label.anchor})` }"
-      >{{ label.year }}</div>
-
-      <!-- Current position indicator -->
+        class="scrubber-leader absolute right-3 h-px w-3 bg-[var(--color-primary-500)] pointer-events-none"
+        :style="{ top: `calc(${indicatorTop}% - 0.5px)` }"
+      ></div>
       <div
-        class="absolute right-0 w-3 h-0.5 bg-[var(--color-primary-500)] rounded-sm pointer-events-none transition-[top] duration-150 shadow"
-        :style="{ top: indicatorTop + '%' }"
+        class="scrubber-dot absolute right-1 w-1.5 h-1.5 rounded-full bg-[var(--color-primary-500)] pointer-events-none shadow-[0_0_8px_var(--color-primary-500)]"
+        :style="{ top: `calc(${indicatorTop}% - 3px)` }"
       ></div>
     </div>
 
-    <!-- Tooltip -->
+    <!-- Drag/hover tooltip (frosted glass) -->
     <div
       v-if="(hovering || dragging) && tooltipDate"
-      class="absolute right-full mr-2 px-2 py-1 rounded bg-black/80 text-white text-xs whitespace-nowrap pointer-events-none"
+      class="absolute right-full mr-2 px-2 py-1 rounded-md text-xs whitespace-nowrap pointer-events-none backdrop-blur-md bg-black/60 text-white dark:bg-black/50 border border-white/15 shadow-lg"
       :style="{ top: tooltipY + 'px', transform: 'translateY(-50%)' }"
     >{{ tooltipLabel }}</div>
   </div>
@@ -73,6 +88,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   jump: [date: Date]
   'jump-final': [date: Date]
+  wheel: [deltaY: number]
 }>()
 
 const barRef = ref<HTMLElement | null>(null)
@@ -102,13 +118,19 @@ function yToPercent(y: number): number {
 
 const indicatorTop = computed(() => dateToPercent(props.currentDate))
 
+const showCapsule = computed(() => props.timeline.length >= 2)
+
+const capsuleLabel = computed(() => {
+  const d = props.currentDate
+  return `${d.getFullYear()}年${d.getMonth() + 1}月`
+})
+
 const tooltipLabel = computed(() => {
   if (!tooltipDate.value) return ''
   const d = tooltipDate.value
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
 })
 
-// Month ticks — one per month present in timeline
 const monthTicks = computed(() => {
   if (!props.timeline.length || totalRange.value <= 0) return []
   return props.timeline.map(t => ({
@@ -118,7 +140,6 @@ const monthTicks = computed(() => {
   }))
 })
 
-// Year ticks — at Jan 1 of each year spanned by the range
 const yearTicks = computed(() => {
   if (!props.timeline.length || totalRange.value <= 0) return []
   const minY = props.minDate.getFullYear()
@@ -132,12 +153,14 @@ const yearTicks = computed(() => {
   return ticks
 })
 
-// Year labels — positioned at year tick (Jan 1)
+// Year labels — collapse adjacent labels (<8% apart) keeping the newer (smaller top%) one.
+// All year ticks above still render; only the text label is folded.
 const yearLabels = computed(() => {
   if (!props.timeline.length || totalRange.value <= 0) return []
   const minY = props.minDate.getFullYear()
   const maxY = props.maxDate.getFullYear()
-  const labels: { year: number; top: number; anchor: string }[] = []
+  type Lbl = { year: number; top: number; anchor: string }
+  const raw: Lbl[] = []
   for (let y = minY; y <= maxY; y++) {
     const anchor = new Date(y, 0, 1)
     const clamped = anchor < props.minDate ? props.minDate : anchor > props.maxDate ? props.maxDate : anchor
@@ -145,9 +168,17 @@ const yearLabels = computed(() => {
     let translate = '-50%'
     if (top > 92) translate = '-100%'
     else if (top < 8) translate = '0%'
-    labels.push({ year: y, top, anchor: translate })
+    raw.push({ year: y, top, anchor: translate })
   }
-  return labels
+  // Sort by top asc (newer years first since maxDate -> 0%).
+  raw.sort((a, b) => a.top - b.top)
+  const kept: Lbl[] = []
+  for (const l of raw) {
+    const last = kept[kept.length - 1]
+    if (last && l.top - last.top < 8) continue
+    kept.push(l)
+  }
+  return kept
 })
 
 function handleMove(clientY: number) {
@@ -162,14 +193,12 @@ function handleMove(clientY: number) {
 
 function handleJump(clientY: number) {
   const pct = yToPercent(clientY)
-  const date = percentToDate(pct)
-  emit('jump', date)
+  emit('jump', percentToDate(pct))
 }
 
 function handleJumpFinal(clientY: number) {
   const pct = yToPercent(clientY)
-  const date = percentToDate(pct)
-  emit('jump-final', date)
+  emit('jump-final', percentToDate(pct))
 }
 
 let rafPending = false
@@ -243,6 +272,11 @@ function onMouseLeave() {
   }
 }
 
+function onWheel(e: WheelEvent) {
+  if (dragging.value) return
+  emit('wheel', e.deltaY)
+}
+
 onUnmounted(() => {
   document.removeEventListener('mousemove', onDocMouseMove)
   document.removeEventListener('mouseup', onDocMouseUp)
@@ -254,11 +288,27 @@ onUnmounted(() => {
 <style scoped>
 .date-scrubber {
   cursor: pointer;
-  transition: width 0.15s ease;
   background: transparent;
 }
-.date-scrubber:hover,
-.date-scrubber.dragging {
-  background: linear-gradient(to bottom, rgba(0,0,0,0.04), rgba(0,0,0,0.08));
+.date-scrubber.is-dragging {
+  cursor: grabbing;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.05), transparent);
+}
+.dark .date-scrubber.is-dragging {
+  background: linear-gradient(to left, rgba(255, 255, 255, 0.04), transparent);
+}
+
+.scrubber-dot,
+.scrubber-leader,
+.scrubber-capsule {
+  transition: top 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrubber-dot,
+  .scrubber-leader,
+  .scrubber-capsule {
+    transition: none;
+  }
 }
 </style>
