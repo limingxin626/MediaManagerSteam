@@ -14,6 +14,7 @@ import type { Media, CursorResponse } from '../types'
 export interface TimelineEntry {
   year: number
   month: number
+  day: number
   count: number
 }
 
@@ -28,6 +29,7 @@ export interface BucketLayout {
   key: string
   year: number
   month: number
+  day: number
   count: number
   rows: number
   headerOffset: number
@@ -70,21 +72,21 @@ function pad(n: number) {
   return String(n).padStart(2, '0')
 }
 
-function bucketKey(year: number, month: number) {
-  return `${year}-${pad(month)}`
+function bucketKey(year: number, month: number, day: number) {
+  return `${year}-${pad(month)}-${pad(day)}`
 }
 
-function monthStartIso(year: number, month: number) {
-  return `${year}-${pad(month)}-01T00:00:00`
+function dayStartIso(year: number, month: number, day: number) {
+  return `${year}-${pad(month)}-${pad(day)}T00:00:00`
 }
 
-function nextMonthStartIso(year: number, month: number) {
-  if (month === 12) return `${year + 1}-01-01T00:00:00`
-  return `${year}-${pad(month + 1)}-01T00:00:00`
+function nextDayStartIso(year: number, month: number, day: number) {
+  const d = new Date(year, month - 1, day + 1)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T00:00:00`
 }
 
-function bucketStartCursor(year: number, month: number) {
-  return `${nextMonthStartIso(year, month)}|2147483647`
+function bucketStartCursor(year: number, month: number, day: number) {
+  return `${nextDayStartIso(year, month, day)}|2147483647`
 }
 
 export function useVirtualGrid(opts: Options) {
@@ -117,9 +119,10 @@ export function useVirtualGrid(opts: Options) {
       const gridH = rows * cs + (rows - 1) * GAP
       const height = headerH + gridH
       out.push({
-        key: bucketKey(t.year, t.month),
+        key: bucketKey(t.year, t.month, t.day),
         year: t.year,
         month: t.month,
+        day: t.day,
         count: t.count,
         rows,
         headerOffset: cursor,
@@ -182,11 +185,11 @@ export function useVirtualGrid(opts: Options) {
     const top = scrollTop.value
     for (const b of arr) {
       if (b.endOffset > top) {
-        return new Date(b.year, b.month - 1, 1)
+        return new Date(b.year, b.month - 1, b.day)
       }
     }
     const last = arr[arr.length - 1]
-    return new Date(last.year, last.month - 1, 1)
+    return new Date(last.year, last.month - 1, last.day)
   })
 
   function paramsObj() {
@@ -262,23 +265,23 @@ export function useVirtualGrid(opts: Options) {
     bumpCache()
     inFlight++
     try {
-      const cursor = entry.nextCursor ?? bucketStartCursor(b.year, b.month)
+      const cursor = entry.nextCursor ?? bucketStartCursor(b.year, b.month, b.day)
       const data = await api.get<CursorResponse<Media>>('/media', {
         cursor,
         limit: PAGE_LIMIT,
         ...paramsObj(),
       })
-      const monthStart = monthStartIso(b.year, b.month)
-      const inMonth: Media[] = []
+      const dayStart = dayStartIso(b.year, b.month, b.day)
+      const inDay: Media[] = []
       let spilled = false
       for (const m of data.items) {
-        if (m.created_at >= monthStart) inMonth.push(m)
+        if (m.created_at >= dayStart) inDay.push(m)
         else {
           spilled = true
           break
         }
       }
-      entry.items.push(...inMonth)
+      entry.items.push(...inDay)
       entry.loadedCount = entry.items.length
 
       if (entry.loadedCount >= b.count || spilled || !data.has_more) {
@@ -371,8 +374,8 @@ export function useVirtualGrid(opts: Options) {
     }
   }
 
-  function scrollToBucket(year: number, month: number) {
-    const key = bucketKey(year, month)
+  function scrollToBucket(year: number, month: number, day: number) {
+    const key = bucketKey(year, month, day)
     const b = buckets.value.find((x) => x.key === key)
     if (!b || !container.value) return
     container.value.scrollTo({ top: b.headerOffset, behavior: 'auto' })
@@ -383,23 +386,17 @@ export function useVirtualGrid(opts: Options) {
   function scrollToDate(date: Date) {
     const b = findBucketByDate(date)
     if (!b || !container.value) return
-    const daysInMonth = new Date(b.year, b.month, 0).getDate()
-    const day = date.getFullYear() === b.year && date.getMonth() + 1 === b.month
-      ? Math.min(daysInMonth, Math.max(1, date.getDate()))
-      : daysInMonth
-    const frac = (daysInMonth - day) / daysInMonth
-    const top = b.headerOffset + frac * b.height
-    container.value.scrollTo({ top, behavior: 'auto' })
-    scrollTop.value = top
+    container.value.scrollTo({ top: b.headerOffset, behavior: 'auto' })
+    scrollTop.value = b.headerOffset
     loadBucketNow(b.key)
   }
 
   function findBucketByDate(date: Date): BucketLayout | null {
-    const y = date.getFullYear()
-    const m = date.getMonth() + 1
+    const target = date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate()
     const arr = buckets.value
     for (const b of arr) {
-      if (b.year < y || (b.year === y && b.month <= m)) return b
+      const bi = b.year * 10000 + b.month * 100 + b.day
+      if (bi <= target) return b
     }
     return arr[arr.length - 1] ?? null
   }
@@ -444,7 +441,7 @@ export function useVirtualGrid(opts: Options) {
     const entry = cacheRef.value.get(found.key)!
     entry.items.splice(found.idx, 1)
     entry.loadedCount = entry.items.length
-    const tlIdx = timeline.value.findIndex((t) => bucketKey(t.year, t.month) === found.key)
+    const tlIdx = timeline.value.findIndex((t) => bucketKey(t.year, t.month, t.day) === found.key)
     if (tlIdx !== -1) {
       const t = timeline.value[tlIdx]
       if (t.count > 0) {

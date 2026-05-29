@@ -25,7 +25,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 
 export interface TimelineEntry {
   year: number

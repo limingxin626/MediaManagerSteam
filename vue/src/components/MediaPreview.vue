@@ -289,7 +289,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import type { MessageMediaItem, TagWithCount, TagItem, Media } from '../types'
-import { isVideo, isImage, resolveUrl, resolveThumb, rotateMedia } from '../utils/media'
+import { isVideo, isImage, resolveThumb, rotateMedia } from '../utils/media'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import TagPickerPopover from './TagPickerPopover.vue'

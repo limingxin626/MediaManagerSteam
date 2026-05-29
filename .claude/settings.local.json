@@ -46,7 +46,9 @@
       "Bash(DATA_ROOT=E:/Note/data uv run:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(openspec new *)",
+      "Bash(openspec status *)"
     ]
   },
   "disabledMcpjsonServers": [

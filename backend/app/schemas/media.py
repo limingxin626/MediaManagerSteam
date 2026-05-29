@@ -40,6 +40,7 @@ class MediaDetailResponse(MediaResponse):
 class TimelineItem(BaseModel):
     year: int
     month: int
+    day: int
     count: int
 
 

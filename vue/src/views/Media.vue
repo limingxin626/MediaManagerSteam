@@ -127,7 +127,7 @@
           class="absolute left-0 right-0 px-1 sm:px-2 py-2"
           :style="{ top: b.headerOffset + 'px', height: vg.monthHeaderH.value + 'px' }"
         >
-          <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ b.year }}年{{ b.month }}月</span>
+          <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ b.year }}年{{ b.month }}月{{ b.day }}日</span>
         </div>
 
         <!-- Visible cells only (true virtualization) -->
@@ -253,7 +253,10 @@ function mapToPreviewItem(m: Media) {
   return {
     id: m.id,
     file_path: m.file_path,
+    file_url: m.file_url,
     mime_type: m.mime_type,
+    width: m.width,
+    height: m.height,
     duration_ms: m.duration_ms,
     thumb_url: m.thumb_url,
     thumb_path: m.thumb_path,
@@ -441,14 +444,14 @@ const timelineMinDate = computed(() => {
   const tl = vg.timeline.value
   if (!tl.length) return new Date()
   const last = tl[tl.length - 1]
-  return new Date(last.year, last.month - 1, 1)
+  return new Date(last.year, last.month - 1, last.day)
 })
 
 const timelineMaxDate = computed(() => {
   const tl = vg.timeline.value
   if (!tl.length) return new Date()
   const first = tl[0]
-  return new Date(first.year, first.month, 0, 23, 59, 59)
+  return new Date(first.year, first.month - 1, first.day, 23, 59, 59)
 })
 
 function handleDateScrubberJump(date: Date) {
@@ -460,7 +463,7 @@ function handleDateScrubberJumpFinal(date: Date) {
   vg.scrollToDate(date)
   vg.setDispatchPaused(false)
   const target = vg.findBucketByDate(date)
-  if (target) vg.loadBucketNow(`${target.year}-${String(target.month).padStart(2, '0')}`)
+  if (target) vg.loadBucketNow(`${target.year}-${String(target.month).padStart(2, '0')}-${String(target.day).padStart(2, '0')}`)
 }
 
 // --- Preview ---

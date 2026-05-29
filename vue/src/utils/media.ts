@@ -44,6 +44,14 @@ export function resolveMediaUrl(item: { file_url: string | null; file_path?: str
   return ''
 }
 
+/** Resolve actor avatar to absolute path */
+export function resolveAvatar(actor: { avatar_url?: string | null; avatar_abs_path?: string | null } | null): string {
+  if (!actor) return ''
+  if (actor.avatar_abs_path) return resolveUrl(actor.avatar_abs_path)
+  if (actor.avatar_url) return resolveUrl(actor.avatar_url)
+  return ''
+}
+
 /** Toggle media starred state via API, updates item.starred in-place */
 export async function toggleMediaStar(item: { id: number; starred: boolean }): Promise<void> {
   const toast = useToast()

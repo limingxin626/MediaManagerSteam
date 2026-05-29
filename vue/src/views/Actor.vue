@@ -178,7 +178,6 @@ const loading = ref(false)
 const filterName = ref('')
 
 const selectedActorId = ref<number | null>(null)
-const selectedActor = computed(() => actorsData.value.find(a => a.id === selectedActorId.value) ?? null)
 
 const messages = ref<MessageDetail[]>([])
 const hasMoreMessages = ref(true)
@@ -312,13 +311,6 @@ const onMessageSent = async (message: MessageDetail) => {
 
 // --- CRUD ---
 
-const editActor = (item: Actor) => {
-  editMode.value = true
-  currentEditId.value = item.id
-  formData.value = { name: item.name, description: item.description || '' }
-  showModal.value = true
-}
-
 const saveActor = async (data: typeof formData.value) => {
   try {
     if (editMode.value && currentEditId.value) {
@@ -331,22 +323,6 @@ const saveActor = async (data: typeof formData.value) => {
     toast.success('保存成功')
   } catch (error) {
     toast.error('保存演员数据失败')
-  }
-}
-
-const deleteActor = async (id: number) => {
-  const ok = await confirm({ title: '确认删除', message: '确定要删除这条记录吗？', danger: true })
-  if (!ok) return
-  try {
-    await api.del(`/actors/${id}`)
-    actorsData.value = actorsData.value.filter((a: Actor) => a.id !== id)
-    if (selectedActorId.value === id) {
-      selectedActorId.value = null
-      messages.value = []
-    }
-    toast.success('删除成功')
-  } catch (error) {
-    toast.error('删除演员数据失败')
   }
 }
 
