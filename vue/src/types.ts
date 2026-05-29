@@ -17,10 +17,15 @@ export type MessageDetail = _MessageDetail & {
   issue_title?: string | null
 }
 
-// 演员相关
-export type Actor = components['schemas']['ActorResponse']
-// 媒体相关
-export type Media = components['schemas']['MediaResponse']
+// 演员相关 —— 后端额外返回 avatar_abs_path（Electron file:// 用），OpenAPI 未重新生成
+export type Actor = components['schemas']['ActorResponse'] & {
+  avatar_abs_path?: string
+}
+// 媒体相关 —— 后端额外返回 thumb_path（Electron file:// 用），OpenAPI 未重新生成
+export type Media = components['schemas']['MediaResponse'] & {
+  thumb_path?: string
+  messages?: { id: number }[]
+}
 
 // 视频预览（章节）—— 后端尚未重新生成 OpenAPI 类型，先手写
 export interface VideoPreviewItem {

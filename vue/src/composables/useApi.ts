@@ -34,7 +34,14 @@ async function request<T>(
   if (params) {
     const sp = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) {
-      if (v != null && v !== '') sp.set(k, String(v))
+      if (v == null || v === '') continue
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (item != null && item !== '') sp.append(k, String(item))
+        }
+      } else {
+        sp.set(k, String(v))
+      }
     }
     const qs = sp.toString()
     if (qs) url += `?${qs}`

@@ -62,6 +62,7 @@
             :video-media-id="mediaItem.id"
             :previews="previews"
             :video-el="videoPlayer"
+            :message-ids="(mediaItem.messages || []).map(m => m.id)"
             @update:previews="previews = $event"
           />
           <p v-else class="text-sm text-gray-500">仅视频支持预览片段</p>

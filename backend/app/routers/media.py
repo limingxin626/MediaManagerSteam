@@ -9,6 +9,7 @@ from app.models import get_db, Media, MessageMedia, Message, Tag, message_tag, m
 from typing import Optional, List, Literal
 from app.schemas.media import (
     MediaResponse,
+    MediaDetailResponse,
     MediaCursorResponse,
     TimelineItem,
     VideoPreviewItem,
@@ -26,6 +27,7 @@ def get_media(
     direction: Optional[str] = Query(None, description="分页方向: 'forward' 加载更新的媒体"),
     limit: int = Query(20, ge=1, le=100),
     message_id: Optional[int] = None,
+    message_ids: Optional[List[int]] = Query(None, description="按多条 message 取并集过滤"),
     starred: Optional[bool] = Query(None),
     type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
     tag_id: Optional[int] = Query(None, description="标签 ID"),
@@ -62,6 +64,12 @@ def get_media(
             query = query.filter(Media.mime_type.like('video/%'))
         elif type == 'image':
             query = query.filter(Media.mime_type.like('image/%'))
+
+        if message_ids:
+            media_ids_msgs = db.query(MessageMedia.media_id).filter(
+                MessageMedia.message_id.in_(message_ids)
+            )
+            query = query.filter(Media.id.in_(media_ids_msgs))
 
         if tag_id is not None:
             msg_ids = db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
@@ -170,10 +178,12 @@ def get_media_timeline(
 ):
     year_col = func.cast(func.strftime('%Y', Media.created_at), Integer)
     month_col = func.cast(func.strftime('%m', Media.created_at), Integer)
+    day_col = func.cast(func.strftime('%d', Media.created_at), Integer)
 
     query = db.query(
         year_col.label('year'),
         month_col.label('month'),
+        day_col.label('day'),
         func.count().label('count'),
     ).filter(Media.video_media_id.is_(None))
 
@@ -199,11 +209,11 @@ def get_media_timeline(
         )
         query = query.filter(Media.id.in_(media_ids_actor))
 
-    rows = query.group_by('year', 'month').order_by(
-        year_col.desc(), month_col.desc()
+    rows = query.group_by('year', 'month', 'day').order_by(
+        year_col.desc(), month_col.desc(), day_col.desc()
     ).all()
 
-    return [TimelineItem(year=r.year, month=r.month, count=r.count) for r in rows]
+    return [TimelineItem(year=r.year, month=r.month, day=r.day, count=r.count) for r in rows]
 
 
 @router.get("/feed", response_model=MediaCursorResponse)
@@ -315,12 +325,20 @@ def delete_preview(preview_id: int, db: Session = Depends(get_db)):
     return None
 
 
-@router.get("/{media_id}", response_model=MediaResponse)
+@router.get("/{media_id}", response_model=MediaDetailResponse)
 def get_media_by_id(media_id: int, db: Session = Depends(get_db)):
     media = db.query(Media).filter(Media.id == media_id).first()
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
-    return MediaResponse.model_validate(media)
+    message_ids = [
+        mid for (mid,) in db.query(MessageMedia.message_id)
+        .filter(MessageMedia.media_id == media_id)
+        .distinct()
+        .all()
+    ]
+    data = MediaResponse.model_validate(media).model_dump()
+    data["messages"] = [{"id": mid} for mid in message_ids]
+    return MediaDetailResponse(**data)
 
 
 @router.put("/{media_id}/starred")

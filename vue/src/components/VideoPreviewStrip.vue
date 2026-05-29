@@ -67,6 +67,7 @@
     <!-- Picker modal -->
     <MediaPickerModal
       :visible="pickerOpen"
+      :message-ids="messageIds"
       @close="pickerOpen = false"
       @select="onPickImage"
     />
@@ -191,6 +192,7 @@ const props = defineProps<{
   videoMediaId: number
   previews: VideoPreviewItem[]
   videoEl: HTMLVideoElement | null
+  messageIds?: number[]
 }>()
 
 const emit = defineEmits<{

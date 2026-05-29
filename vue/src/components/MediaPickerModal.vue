@@ -77,7 +77,7 @@ import type { Media } from '../types'
 import { api, useInfiniteScroll } from '../composables/useApi'
 import { resolveThumb } from '../utils/media'
 
-const props = defineProps<{ visible: boolean }>()
+const props = defineProps<{ visible: boolean; messageIds?: number[] }>()
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'select', mediaId: number): void
@@ -87,8 +87,17 @@ const sentinel = ref<HTMLElement | null>(null)
 const selectedId = ref<number | null>(null)
 
 const { items, loading, hasMore, reset, setupObserver } = useInfiniteScroll<Media>({
-  fetchFn: ({ cursor, limit }) =>
-    api.get('/media', { cursor: cursor ?? undefined, limit, type: 'image' }),
+  fetchFn: ({ cursor, limit }) => {
+    const params: Record<string, any> = {
+      cursor: cursor ?? undefined,
+      limit,
+      type: 'image',
+    }
+    if (props.messageIds && props.messageIds.length) {
+      params.message_ids = props.messageIds
+    }
+    return api.get('/media', params)
+  },
   sentinel,
   limit: 30,
 })
