@@ -342,7 +342,9 @@
         @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" />
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
-        :starred="previewMessageStarred" :message-id="previewMessageId" :all-tags="tags" @close="closePreview" @navigate-prev="navigateToPrevMessage"
+        :starred="previewMessageStarred" :message-id="previewMessageId" :all-tags="tags"
+        :prev-peek-items="previewPrevPeekItems" :next-peek-items="previewNextPeekItems"
+        @close="closePreview" @navigate-prev="navigateToPrevMessage"
         @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @media-deleted="handleMediaDeleted"
         @media-rotated="handleMediaRotated" @media-tags-changed="handleMediaTagsChanged" />
 
@@ -716,6 +718,30 @@ const selectedMessageLoading = ref(false)
 const previewMessageStarred = computed(() => {
   if (currentMessageIndex.value < 0) return false
   return messages.value[currentMessageIndex.value]?.starred ?? false
+})
+
+// 邻居 message 的 media items 用于 preview 缩略图条边缘的"窥视"
+const PEEK_COUNT = 5
+const previewPrevPeekItems = computed<MessageMediaItem[]>(() => {
+  if (currentMessageIndex.value <= 0) return []
+  for (let i = currentMessageIndex.value - 1; i >= 0; i--) {
+    const items = messages.value[i]?.media_items
+    if (items?.length) {
+      // 上一个 message 的 items 顺序保持原序；末尾 PEEK_COUNT 项与当前 message 首项最相邻
+      return items.slice(-PEEK_COUNT)
+    }
+  }
+  return []
+})
+const previewNextPeekItems = computed<MessageMediaItem[]>(() => {
+  if (currentMessageIndex.value < 0 || currentMessageIndex.value >= messages.value.length - 1) return []
+  for (let i = currentMessageIndex.value + 1; i < messages.value.length; i++) {
+    const items = messages.value[i]?.media_items
+    if (items?.length) {
+      return items.slice(0, PEEK_COUNT)
+    }
+  }
+  return []
 })
 
 

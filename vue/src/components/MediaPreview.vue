@@ -193,7 +193,7 @@
         </div>
 
         <!-- Thumbnail strip -->
-        <div v-if="items.length > 1" class="px-4 pb-4 pt-2 relative z-10 flex justify-center">
+        <div v-if="items.length >= 1" class="px-4 pb-4 pt-2 relative z-10 flex justify-center">
           <TransitionGroup
             tag="div"
             name="thumb"
@@ -203,13 +203,16 @@
             <button
               v-for="entry in visibleThumbs"
               :key="entry.item.id"
-              :ref="(el) => setThumbRef(entry.idx, el as HTMLElement | null)"
-              @click="goToIndex(entry.idx)"
+              :ref="(el) => entry.kind === 'current' && setThumbRef(entry.idx, el as HTMLElement | null)"
+              @click="onThumbClick(entry)"
               class="absolute top-0 w-12 h-12 rounded-md overflow-hidden border-2 transition-all duration-200"
-              :style="{ left: `${(entry.idx - currentIndex + THUMB_WINDOW) * 54}px` }"
-              :class="entry.idx === currentIndex
+              :style="{ left: `${(thumbOffset(entry) + THUMB_WINDOW) * 54}px` }"
+              :class="entry.kind === 'current' && entry.idx === currentIndex
                 ? 'border-white scale-110 shadow-lg shadow-white/20 z-10'
-                : 'border-transparent opacity-50 hover:opacity-80'"
+                : entry.kind === 'current'
+                  ? 'border-transparent opacity-50 hover:opacity-80'
+                  : 'border-transparent opacity-25 hover:opacity-60 scale-90'"
+              :title="entry.kind === 'peek-prev' ? '上一个消息' : entry.kind === 'peek-next' ? '下一个消息' : ''"
             >
               <img
                 v-if="isImage(entry.item.mime_type)"
@@ -312,12 +315,16 @@ interface Props {
   starred?: boolean
   messageId?: number
   allTags?: TagWithCount[]
+  prevPeekItems?: MessageMediaItem[]
+  nextPeekItems?: MessageMediaItem[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   startIndex: 0,
   starred: false,
   allTags: () => [],
+  prevPeekItems: () => [],
+  nextPeekItems: () => [],
 })
 
 const emit = defineEmits<{
@@ -571,12 +578,53 @@ const goToIndex = (idx: number) => {
   currentIndex.value = idx
 }
 
-const visibleThumbs = computed(() => {
-  const start = Math.max(0, currentIndex.value - THUMB_WINDOW)
-  const end = Math.min(props.items.length - 1, currentIndex.value + THUMB_WINDOW)
-  const out: { item: MessageMediaItem; idx: number }[] = []
-  for (let i = start; i <= end; i++) {
-    out.push({ item: props.items[i], idx: i })
+const thumbOffset = (entry: ThumbEntry): number => {
+  if (entry.kind === 'current') return entry.idx - currentIndex.value
+  return entry.offset
+}
+
+const onThumbClick = (entry: ThumbEntry) => {
+  if (entry.kind === 'current') {
+    goToIndex(entry.idx)
+  } else if (entry.kind === 'peek-prev') {
+    emit('navigate-prev')
+  } else {
+    emit('navigate-next')
+  }
+}
+
+type ThumbEntry =
+  | { kind: 'current'; item: MessageMediaItem; idx: number }
+  | { kind: 'peek-prev'; item: MessageMediaItem; offset: number }
+  | { kind: 'peek-next'; item: MessageMediaItem; offset: number }
+
+const PEEK_GAP = 2
+
+const visibleThumbs = computed<ThumbEntry[]>(() => {
+  const out: ThumbEntry[] = []
+  const len = props.items.length
+  for (let off = -THUMB_WINDOW; off <= THUMB_WINDOW; off++) {
+    const idx = currentIndex.value + off
+    if (idx >= 0 && idx < len) {
+      out.push({ kind: 'current', item: props.items[idx], idx })
+    }
+  }
+  // peek-prev: 占用最左侧槽位，与当前 items 至少留 PEEK_GAP 空白
+  const leftCurrentMost = -Math.min(currentIndex.value, THUMB_WINDOW)
+  const peekPrevStart = leftCurrentMost - PEEK_GAP - 1
+  for (let s = 0; peekPrevStart - s >= -THUMB_WINDOW; s++) {
+    const offset = peekPrevStart - s
+    const peekIdx = props.prevPeekItems.length - 1 - s
+    if (peekIdx < 0) break
+    out.push({ kind: 'peek-prev', item: props.prevPeekItems[peekIdx], offset })
+  }
+  const rightCurrentMost = Math.min(len - 1 - currentIndex.value, THUMB_WINDOW)
+  const peekNextStart = rightCurrentMost + PEEK_GAP + 1
+  for (let s = 0; peekNextStart + s <= THUMB_WINDOW; s++) {
+    const offset = peekNextStart + s
+    const peekIdx = s
+    if (peekIdx >= props.nextPeekItems.length) break
+    out.push({ kind: 'peek-next', item: props.nextPeekItems[peekIdx], offset })
   }
   return out
 })
@@ -612,6 +660,13 @@ watch(() => props.items.length, (newLen) => {
     currentIndex.value = newLen - 1
   }
 })
+
+watch(() => props.startIndex, (newIndex) => {
+  if (!props.isOpen) return
+  const clamped = Math.max(0, Math.min(newIndex, props.items.length - 1))
+  transitionName.value = clamped > currentIndex.value ? 'slide-left' : 'slide-right'
+  currentIndex.value = clamped
+}, { flush: 'post' })
 
 watch(() => props.isOpen, async (newValue) => {
   if (newValue) {

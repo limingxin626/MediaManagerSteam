@@ -184,7 +184,11 @@
       :is-open="previewOpen"
       :items="previewItems"
       :start-index="previewStartIndex"
+      :prev-peek-items="previewPrevPeekItems"
+      :next-peek-items="previewNextPeekItems"
       @close="previewOpen = false"
+      @navigate-prev="navigateToPrevBucket"
+      @navigate-next="navigateToNextBucket"
       @toggle-star="handlePreviewToggleStar"
       @media-deleted="handleMediaDeleted"
       @media-rotated="handleMediaRotated"
@@ -239,8 +243,71 @@ const vg = useVirtualGrid({
 const previewOpen = ref(false)
 const previewItems = ref<any[]>([])
 const previewStartIndex = ref(0)
+const previewBucketKey = ref<string | null>(null)
 const mediaBounceId = ref<number | null>(null)
 const refreshing = ref(false)
+
+const PEEK_COUNT = 5
+
+function mapToPreviewItem(m: Media) {
+  return {
+    id: m.id,
+    file_path: m.file_path,
+    mime_type: m.mime_type,
+    duration_ms: m.duration_ms,
+    thumb_url: m.thumb_url,
+    thumb_path: m.thumb_path,
+    starred: m.starred,
+    tags: m.tags,
+  }
+}
+
+function findAdjacentBucket(currentKey: string | null, direction: -1 | 1) {
+  if (!currentKey) return null
+  const all = vg.buckets.value
+  const i = all.findIndex(b => b.key === currentKey)
+  if (i < 0) return null
+  const target = all[i + direction]
+  return target ?? null
+}
+
+const previewPrevPeekItems = computed(() => {
+  const target = findAdjacentBucket(previewBucketKey.value, -1)
+  if (!target) return []
+  const entry = vg.cache.value.get(target.key)
+  if (!entry?.items.length) return []
+  return entry.items.slice(-PEEK_COUNT).map(mapToPreviewItem)
+})
+
+const previewNextPeekItems = computed(() => {
+  const target = findAdjacentBucket(previewBucketKey.value, 1)
+  if (!target) return []
+  const entry = vg.cache.value.get(target.key)
+  if (!entry?.items.length) return []
+  return entry.items.slice(0, PEEK_COUNT).map(mapToPreviewItem)
+})
+
+async function navigateToAdjacentBucket(direction: -1 | 1) {
+  const target = findAdjacentBucket(previewBucketKey.value, direction)
+  if (!target) return
+  let entry = vg.cache.value.get(target.key)
+  if (!entry || entry.status !== 'complete') {
+    vg.loadBucketNow(target.key)
+    // 轮询等待加载完成（最多 ~3s）
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 50))
+      entry = vg.cache.value.get(target.key)
+      if (entry?.status === 'complete' && entry.items.length) break
+    }
+  }
+  if (!entry?.items.length) return
+  previewItems.value = entry.items.map(mapToPreviewItem)
+  previewStartIndex.value = direction === -1 ? entry.items.length - 1 : 0
+  previewBucketKey.value = target.key
+}
+
+function navigateToPrevBucket() { navigateToAdjacentBucket(-1) }
+function navigateToNextBucket() { navigateToAdjacentBucket(1) }
 
 async function handleRefresh() {
   refreshing.value = true
@@ -401,17 +468,9 @@ function openPreview(bucketKey: string, idx: number) {
   const entry = vg.cache.value.get(bucketKey)
   if (!entry || !entry.items[idx]) return
 
-  previewItems.value = entry.items.map((m: Media) => ({
-    id: m.id,
-    file_path: m.file_path,
-    mime_type: m.mime_type,
-    duration_ms: m.duration_ms,
-    thumb_url: m.thumb_url,
-    thumb_path: m.thumb_path,
-    starred: m.starred,
-    tags: m.tags,
-  }))
+  previewItems.value = entry.items.map(mapToPreviewItem)
   previewStartIndex.value = idx
+  previewBucketKey.value = bucketKey
   previewOpen.value = true
 }
 
