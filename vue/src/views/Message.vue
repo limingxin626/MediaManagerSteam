@@ -91,8 +91,6 @@
               </div>
             </div>
           </div>
-          <!-- Scroll sentinel for loading older messages -->
-          <div ref="topSentinel" class="h-1"></div>
 
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <!-- Loading skeleton (initial load) -->
@@ -162,9 +160,6 @@
               <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[var(--color-primary-500)]"></div>
             </div>
           </div>
-
-          <!-- Scroll sentinel for loading newer messages -->
-          <div ref="bottomSentinel" class="h-1"></div>
 
           <!-- Merge action bar -->
           <div v-if="mergeMode && selectedMessageIds.size > 0"
@@ -704,8 +699,6 @@ const activeMediaFilter = ref<number | null>(null)
 const starredFilter = ref(false)
 
 const scrollContainer = ref<HTMLElement | null>(null)
-const topSentinel = ref<HTMLElement | null>(null)
-const bottomSentinel = ref<HTMLElement | null>(null)
 
 const previewOpen = ref(false)
 const previewItems = ref<MessageMediaItem[]>([])
@@ -1349,7 +1342,10 @@ function onSearch() {
   resetAndFetch()
 }
 
-// --- Infinite scroll via IntersectionObserver ---
+// --- Infinite scroll: prefetch when N-th item from edge enters viewport ---
+// 与 Android Paging 3 的 prefetchDistance 对齐：还剩 N 项就预取下一页，
+// 不受滚动速度和卡片高度差异影响。
+const PREFETCH_DISTANCE = 10
 
 let topObserver: IntersectionObserver | null = null
 let bottomObserver: IntersectionObserver | null = null
@@ -1357,6 +1353,7 @@ let bottomObserver: IntersectionObserver | null = null
 const setupObservers = () => {
   teardownObservers()
   const root = scrollContainer.value
+  if (!root) return
 
   topObserver = new IntersectionObserver(
     (entries) => {
@@ -1365,9 +1362,8 @@ const setupObservers = () => {
         fetchMessages(true)
       }
     },
-    { root, rootMargin: '200px' }
+    { root }
   )
-  if (topSentinel.value) topObserver.observe(topSentinel.value)
 
   bottomObserver = new IntersectionObserver(
     (entries) => {
@@ -1375,9 +1371,23 @@ const setupObservers = () => {
         fetchForwardMessages()
       }
     },
-    { root, rootMargin: '200px' }
+    { root }
   )
-  if (bottomSentinel.value) bottomObserver.observe(bottomSentinel.value)
+
+  rebindPrefetchTargets()
+}
+
+const rebindPrefetchTargets = () => {
+  const container = scrollContainer.value
+  if (!container || !topObserver || !bottomObserver) return
+  const els = container.querySelectorAll<HTMLElement>('[data-message-id]')
+  if (els.length === 0) return
+  const topIdx = Math.min(PREFETCH_DISTANCE, els.length - 1)
+  const bottomIdx = Math.max(0, els.length - 1 - PREFETCH_DISTANCE)
+  topObserver.disconnect()
+  bottomObserver.disconnect()
+  topObserver.observe(els[topIdx])
+  bottomObserver.observe(els[bottomIdx])
 }
 
 const teardownObservers = () => {
@@ -1467,10 +1477,11 @@ onMounted(() => {
           const lastMsg = forwardData.items[forwardData.items.length - 1]
           forwardCursor.value = lastMsg.created_at
           hasMoreForward.value = forwardData.has_more
-          isViewingHistory.value = true
+          isViewingHistory.value = forwardData.has_more
         } else {
           forwardCursor.value = null
           hasMoreForward.value = false
+          isViewingHistory.value = false
         }
         nextTick(() => {
           pendingRestore.value = { messageId, scrollOffset: scrollOffset ?? 0 }
@@ -1506,6 +1517,9 @@ onUnmounted(() => {
 })
 
 // Update floating date after messages change
-watch(messages, () => nextTick(updateVisibleDate), { flush: 'post' })
+watch(messages, () => nextTick(() => {
+  updateVisibleDate()
+  rebindPrefetchTargets()
+}), { flush: 'post' })
 </script>
 

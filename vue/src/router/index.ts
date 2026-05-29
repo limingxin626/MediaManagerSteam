@@ -18,11 +18,6 @@ const routes = [
     component: () => import('../views/Media.vue')
   },
   {
-    path: '/media/feed',
-    name: 'MediaFeed',
-    component: () => import('../views/MediaFeed.vue')
-  },
-  {
     path: '/media/:id(\\d+)',
     name: 'MediaDetail',
     component: () => import('../views/MediaDetail.vue'),

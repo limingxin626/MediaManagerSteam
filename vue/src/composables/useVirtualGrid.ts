@@ -49,7 +49,7 @@ const PAGE_LIMIT = 100
 const PREFETCH_PX = 800
 const RENDER_OVERSCAN_PX = 400
 const DWELL_MS = 150
-const MAX_CONCURRENT = 2
+const MAX_CONCURRENT = 6
 const DEFAULT_HEADER_H = 44
 
 export interface VisibleCell {
@@ -221,6 +221,30 @@ export function useVirtualGrid(opts: Options) {
   const dwellTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const queue: string[] = []
 
+  function viewportCenter() {
+    return scrollTop.value + viewportH.value / 2
+  }
+
+  function bucketDistance(key: string) {
+    const b = buckets.value.find((x) => x.key === key)
+    if (!b) return Number.POSITIVE_INFINITY
+    const center = viewportCenter()
+    if (center < b.headerOffset) return b.headerOffset - center
+    if (center > b.endOffset) return center - b.endOffset
+    return 0
+  }
+
+  function enqueue(key: string, priority: 'normal' | 'urgent' = 'normal') {
+    const existing = queue.indexOf(key)
+    if (existing !== -1) queue.splice(existing, 1)
+    if (priority === 'urgent') {
+      queue.unshift(key)
+    } else {
+      queue.push(key)
+    }
+    queue.sort((a, b) => bucketDistance(a) - bucketDistance(b))
+  }
+
   function pumpQueue() {
     while (inFlight < MAX_CONCURRENT && queue.length) {
       const key = queue.shift()!
@@ -283,7 +307,7 @@ export function useVirtualGrid(opts: Options) {
       if (!stillVisible) return
       const e = getOrInit(key)
       if (e.status === 'idle' || e.status === 'partial' || e.status === 'error') {
-        if (!queue.includes(key)) queue.push(key)
+        enqueue(key, 'normal')
         pumpQueue()
       }
     }, DWELL_MS)
@@ -326,7 +350,7 @@ export function useVirtualGrid(opts: Options) {
     cancelLoad(key)
     const e = getOrInit(key)
     if (e.status === 'loading' || e.status === 'complete') return
-    if (!queue.includes(key)) queue.push(key)
+    enqueue(key, 'urgent')
     pumpQueue()
   }
 
@@ -352,12 +376,13 @@ export function useVirtualGrid(opts: Options) {
     const b = buckets.value.find((x) => x.key === key)
     if (!b || !container.value) return
     container.value.scrollTo({ top: b.headerOffset, behavior: 'auto' })
+    scrollTop.value = b.headerOffset
+    loadBucketNow(key)
   }
 
   function scrollToDate(date: Date) {
     const b = findBucketByDate(date)
     if (!b || !container.value) return
-    // Fraction of month elapsed (newer = top, so day 1 → bottom of month)
     const daysInMonth = new Date(b.year, b.month, 0).getDate()
     const day = date.getFullYear() === b.year && date.getMonth() + 1 === b.month
       ? Math.min(daysInMonth, Math.max(1, date.getDate()))
@@ -365,6 +390,8 @@ export function useVirtualGrid(opts: Options) {
     const frac = (daysInMonth - day) / daysInMonth
     const top = b.headerOffset + frac * b.height
     container.value.scrollTo({ top, behavior: 'auto' })
+    scrollTop.value = top
+    loadBucketNow(b.key)
   }
 
   function findBucketByDate(date: Date): BucketLayout | null {
