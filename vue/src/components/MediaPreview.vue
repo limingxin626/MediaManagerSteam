@@ -137,27 +137,29 @@
           </button>
 
           <div class="flex flex-col items-center gap-2 max-w-[90vw] max-h-[80vh]">
-            <div class="relative">
-              <video
-                v-if="currentItem && isVideo(currentItem.mime_type)"
-                ref="videoRef"
-                :src="getMediaUrl(currentItem)"
-                class="max-w-[90vw] max-h-[70vh] rounded-lg shadow-2xl"
-                :style="mediaTransformStyle"
-                controls
-                playsinline
-                loop
-                autoplay
-              ></video>
+            <Transition :name="transitionName" mode="out-in">
+              <div class="relative" :key="currentItem?.id ?? -1">
+                <video
+                  v-if="currentItem && isVideo(currentItem.mime_type)"
+                  ref="videoRef"
+                  :src="getMediaUrl(currentItem)"
+                  class="max-w-[90vw] max-h-[70vh] rounded-lg shadow-2xl"
+                  :style="mediaTransformStyle"
+                  controls
+                  playsinline
+                  loop
+                  autoplay
+                ></video>
 
-              <img
-                v-else-if="currentItem && isImage(currentItem.mime_type)"
-                :src="getMediaUrl(currentItem)"
-                :alt="`Media ${currentIndex + 1}`"
-                class="max-w-[90vw] max-h-[70vh] object-contain rounded-lg shadow-2xl"
-                :style="mediaTransformStyle"
-              />
-            </div>
+                <img
+                  v-else-if="currentItem && isImage(currentItem.mime_type)"
+                  :src="getMediaUrl(currentItem)"
+                  :alt="`Media ${currentIndex + 1}`"
+                  class="max-w-[90vw] max-h-[70vh] object-contain rounded-lg shadow-2xl"
+                  :style="mediaTransformStyle"
+                />
+              </div>
+            </Transition>
 
             <!-- Media tags -->
             <div v-if="currentItem" class="flex items-center gap-1.5 flex-wrap justify-center">
@@ -191,32 +193,35 @@
         </div>
 
         <!-- Thumbnail strip -->
-        <div v-if="items.length > 1" class="px-4 pb-4 pt-2 relative z-10">
-          <div
-            ref="thumbStripRef"
-            class="flex items-center gap-1.5 overflow-x-auto justify-center scrollbar-hide"
+        <div v-if="items.length > 1" class="px-4 pb-4 pt-2 relative z-10 flex justify-center">
+          <TransitionGroup
+            tag="div"
+            name="thumb"
+            class="relative overflow-hidden"
+            :style="{ width: thumbStripWidth, height: '48px' }"
           >
             <button
-              v-for="(item, idx) in items"
-              :key="item.id"
-              :ref="(el) => setThumbRef(idx, el as HTMLElement | null)"
-              @click="currentIndex = idx"
-              class="shrink-0 w-12 h-12 rounded-md overflow-hidden border-2 transition-all duration-200"
-              :class="idx === currentIndex
-                ? 'border-white scale-110 shadow-lg shadow-white/20'
+              v-for="entry in visibleThumbs"
+              :key="entry.item.id"
+              :ref="(el) => setThumbRef(entry.idx, el as HTMLElement | null)"
+              @click="goToIndex(entry.idx)"
+              class="absolute top-0 w-12 h-12 rounded-md overflow-hidden border-2 transition-all duration-200"
+              :style="{ left: `${(entry.idx - currentIndex + THUMB_WINDOW) * 54}px` }"
+              :class="entry.idx === currentIndex
+                ? 'border-white scale-110 shadow-lg shadow-white/20 z-10'
                 : 'border-transparent opacity-50 hover:opacity-80'"
             >
               <img
-                v-if="isImage(item.mime_type)"
-                :src="resolveThumb(item)"
+                v-if="isImage(entry.item.mime_type)"
+                :src="resolveThumb(entry.item)"
                 class="w-full h-full object-cover"
               />
               <div
-                v-else-if="isVideo(item.mime_type)"
+                v-else-if="isVideo(entry.item.mime_type)"
                 class="w-full h-full relative bg-gray-800"
               >
                 <img
-                  :src="resolveThumb(item)"
+                  :src="resolveThumb(entry.item)"
                   class="w-full h-full object-cover"
                 />
                 <svg class="absolute inset-0 m-auto w-4 h-4 text-white/80" fill="currentColor" viewBox="0 0 24 24">
@@ -229,7 +234,7 @@
                 </svg>
               </div>
             </button>
-          </div>
+          </TransitionGroup>
         </div>
       </div>
     </div>
@@ -330,6 +335,8 @@ const emit = defineEmits<{
 const currentIndex = ref(props.startIndex)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const thumbRefs = ref<Map<number, HTMLElement>>(new Map())
+const transitionName = ref<'slide-left' | 'slide-right'>('slide-left')
+const THUMB_WINDOW = 5
 const previewStarBounce = ref(false)
 const showDeleteConfirm = ref(false)
 const deleteSourceFile = ref(false)
@@ -542,6 +549,7 @@ const close = () => {
 
 const prev = () => {
   if (canGoPrev.value) {
+    transitionName.value = 'slide-right'
     currentIndex.value--
   } else {
     emit('navigate-prev')
@@ -550,11 +558,34 @@ const prev = () => {
 
 const next = () => {
   if (canGoNext.value) {
+    transitionName.value = 'slide-left'
     currentIndex.value++
   } else {
     emit('navigate-next')
   }
 }
+
+const goToIndex = (idx: number) => {
+  if (idx === currentIndex.value) return
+  transitionName.value = idx > currentIndex.value ? 'slide-left' : 'slide-right'
+  currentIndex.value = idx
+}
+
+const visibleThumbs = computed(() => {
+  const start = Math.max(0, currentIndex.value - THUMB_WINDOW)
+  const end = Math.min(props.items.length - 1, currentIndex.value + THUMB_WINDOW)
+  const out: { item: MessageMediaItem; idx: number }[] = []
+  for (let i = start; i <= end; i++) {
+    out.push({ item: props.items[i], idx: i })
+  }
+  return out
+})
+
+// 48px thumb + 6px gap; (2*WINDOW+1) slots 固定宽度，当前 thumb 始终居中。
+const thumbStripWidth = computed(() => {
+  const slots = THUMB_WINDOW * 2 + 1
+  return `${slots * 48 + (slots - 1) * 6}px`
+})
 
 const handleKeydown = (e: KeyboardEvent) => {
   if (!props.isOpen) return
@@ -585,6 +616,7 @@ watch(() => props.items.length, (newLen) => {
 watch(() => props.isOpen, async (newValue) => {
   if (newValue) {
     currentIndex.value = props.startIndex
+    transitionName.value = 'slide-left'
     await nextTick()
     if (videoRef.value) {
       videoRef.value.play().catch(() => {})
@@ -597,11 +629,6 @@ watch(currentIndex, async () => {
   await nextTick()
   if (videoRef.value) {
     videoRef.value.play().catch(() => {})
-  }
-  // Scroll active thumbnail into view
-  const thumb = thumbRefs.value.get(currentIndex.value)
-  if (thumb) {
-    thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
   }
 })
 
@@ -631,5 +658,44 @@ onUnmounted(() => {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 180ms ease-out, opacity 180ms ease-out;
+}
+.slide-left-enter-from {
+  transform: translateX(24px);
+  opacity: 0;
+}
+.slide-left-leave-to {
+  transform: translateX(-24px);
+  opacity: 0;
+}
+.slide-right-enter-from {
+  transform: translateX(-24px);
+  opacity: 0;
+}
+.slide-right-leave-to {
+  transform: translateX(24px);
+  opacity: 0;
+}
+
+.thumb-enter-active,
+.thumb-leave-active {
+  transition: opacity 200ms ease-out, transform 200ms ease-out, left 200ms ease-out;
+}
+.thumb-leave-active {
+  pointer-events: none;
+}
+.thumb-enter-from {
+  opacity: 0;
+  transform: translateX(24px) scale(0.7);
+}
+.thumb-leave-to {
+  opacity: 0;
+  transform: translateX(-24px) scale(0.7);
 }
 </style>

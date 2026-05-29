@@ -398,22 +398,10 @@ function handleDateScrubberJumpFinal(date: Date) {
 
 // --- Preview ---
 function openPreview(bucketKey: string, idx: number) {
-  const item = vg.cache.value.get(bucketKey)?.items[idx]
-  if (!item) return
+  const entry = vg.cache.value.get(bucketKey)
+  if (!entry || !entry.items[idx]) return
 
-  // Gather siblings: ±10 from same bucket's loaded items
-  const entry = vg.cache.value.get(bucketKey)!
-  const totalItems = 20
-  const half = Math.floor(totalItems / 2)
-  let start = Math.max(0, idx - half)
-  let end = Math.min(entry.items.length - 1, idx + half)
-  if (end - start < totalItems - 1) {
-    if (start === 0) end = Math.min(entry.items.length - 1, totalItems - 1)
-    else if (end === entry.items.length - 1) start = Math.max(0, end - (totalItems - 1))
-  }
-
-  const slice = entry.items.slice(start, end + 1)
-  previewItems.value = slice.map((m: Media) => ({
+  previewItems.value = entry.items.map((m: Media) => ({
     id: m.id,
     file_path: m.file_path,
     mime_type: m.mime_type,
@@ -423,7 +411,7 @@ function openPreview(bucketKey: string, idx: number) {
     starred: m.starred,
     tags: m.tags,
   }))
-  previewStartIndex.value = idx - start
+  previewStartIndex.value = idx
   previewOpen.value = true
 }
 
