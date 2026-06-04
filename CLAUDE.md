@@ -9,8 +9,9 @@ Personal media management app with an Instagram-like feed architecture. Self-hos
 ## Architecture
 
 - **Backend**: FastAPI + SQLAlchemy + SQLite (`backend/`)
-- **Frontend**: Vue 3 + TypeScript + Tailwind CSS v4 (`vue/`)
-- **Desktop**: Electron wrapper (`electron/`)
+- **Frontend**: Vue 3 + TypeScript + Tailwind CSS v4 (`vue/`) — 旧端,不再演进
+- **Desktop (legacy)**: Electron wrapper (`electron/`) — 旧端,不再演进
+- **Mac (main)**: Native SwiftUI app (`MyNote/`) — GRDB 直读共享 SQLite,**不依赖 backend 运行**
 - **Android**: Native Kotlin/Compose app with Room DB + offline-first sync (`android/`, same git repo as backend/vue)
 - **PWA**: Workbox service worker with offline caching (`vue/vite.config.ts`)
 - **No auth** — designed for LAN use only
@@ -70,6 +71,19 @@ Pydantic schema validators auto-fill URL fields: `thumb_url` → `/data/thumbs/{
 ### Electron
 
 Loads Vue dev server (`http://localhost:5173`) in dev, bundled dist in production. `webSecurity: false` to allow local file video playback. Preload script exposes `window.electronAPI.openFileDialog()` via IPC context bridge. Message.vue detects Electron via `navigator.userAgent`.
+
+### Mac (MyNote/)
+
+SwiftUI app with **direct read-only access** to the shared SQLite database via GRDB.swift — does NOT require backend to be running.
+
+- Entry: `MyNote/MyNote/MyNoteApp.swift` — on launch, calls `LocalDatabase.shared.open(rootURL:)` with the user-chosen `DATA_ROOT`. First launch shows `OnboardingView` with `NSOpenPanel` to pick the directory; path persisted to `UserDefaults.dataRoot`.
+- Data layer: `LocalDatabase` (singleton `DatabaseQueue`, `readonly = true`) → `MediaRepository` (composite cursor `(created_at, id)` paging, batch tag loading) → `MediaSource` protocol with `LocalMediaSource` (default) and `APIMediaSource` (HTTP fallback, kept for debugging).
+- Models: `MediaRecord.swift` maps the `media` table 1:1 with backend SQLAlchemy schema (snake_case via `CodingKeys`). `Media` UI struct in `Models.swift` has `localThumbURL` / `localFileURL` computed props that resolve against `Settings.dataRoot`.
+- UI: only `MediaLibraryView` (4-col grid) is wired in first phase. `FeedView` (message feed) is dropped from target.
+- Thumbnails: `LocalImageLoader` (actor + `NSCache<NSNumber, NSImage>`) decodes webp off the main thread; replaces `AsyncImage` to avoid re-decoding on scroll. Requires macOS 14+ for native webp.
+- Detail view: `NSImage` for images, `AVPlayer` for videos, both reading local file URLs.
+- **Mac is read-only in first phase** — no starred toggle, no upload. Write operations still go through backend HTTP if/when re-enabled.
+- See `MyNote/MAC_TODO.md` for Xcode-side setup (SPM add GRDB, deployment target, target membership).
 
 ### Database Models
 

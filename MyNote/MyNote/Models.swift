@@ -191,3 +191,24 @@ struct MediaCursorResponse: Codable {
 struct ErrorResponse: Codable {
     let detail: String
 }
+
+// MARK: - Media 本地路径扩展
+
+extension Media {
+    /// 缩略图本地 URL: `{DATA_ROOT}/data/thumbs/{id}.webp`。
+    /// DATA_ROOT 未配置时返回 nil。
+    var localThumbURL: URL? {
+        guard let root = Settings.dataRoot else { return nil }
+        return root
+            .appendingPathComponent("data", isDirectory: true)
+            .appendingPathComponent("thumbs", isDirectory: true)
+            .appendingPathComponent("\(id).webp")
+    }
+
+    /// 原始媒体文件本地 URL: `{DATA_ROOT}/{file_path}`。
+    /// file_path 在 backend 里是相对路径(如 `uploads/2026/06/04/xxx.mp4`)。
+    var localFileURL: URL? {
+        guard let root = Settings.dataRoot else { return nil }
+        return root.appendingPathComponent(filePath)
+    }
+}
