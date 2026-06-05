@@ -13,25 +13,30 @@ struct LocalThumbView: View {
     @State private var didTryLoad = false
 
     var body: some View {
-        ZStack {
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else if didTryLoad {
-                // 文件缺失或解码失败
-                ZStack {
-                    Color.gray.opacity(0.15)
-                    Image(systemName: "photo")
-                        .foregroundColor(.gray)
-                        .font(.system(size: 20))
-                }
-            } else {
-                ZStack {
-                    Color.gray.opacity(0.08)
-                    ProgressView().controlSize(.small)
+        GeometryReader { geo in
+            ZStack {
+                if let image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                } else if didTryLoad {
+                    // 文件缺失或解码失败
+                    ZStack {
+                        Color.gray.opacity(0.15)
+                        Image(systemName: "photo")
+                            .foregroundColor(.gray)
+                            .font(.system(size: 20))
+                    }
+                } else {
+                    ZStack {
+                        Color.gray.opacity(0.08)
+                        ProgressView().controlSize(.small)
+                    }
                 }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
         .task(id: media.id) {
             guard let url = media.localThumbURL else {

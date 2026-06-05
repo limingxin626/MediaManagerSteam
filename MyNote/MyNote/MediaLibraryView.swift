@@ -10,7 +10,6 @@ import SwiftUI
 struct MediaLibraryView: View {
     @StateObject private var viewModel = MediaLibraryViewModel()
     @State private var selectedMedia: Media? = nil
-    @State private var showDetail = false
 
     let columns = [
         GridItem(.flexible(), spacing: 8),
@@ -67,10 +66,8 @@ struct MediaLibraryView: View {
                 }
             }
         }
-        .sheet(isPresented: $showDetail) {
-            if let selected = selectedMedia {
-                MediaDetailView(media: selected)
-            }
+        .sheet(item: $selectedMedia) { media in
+            MediaDetailView(media: media)
         }
         .onAppear {
             Task { await viewModel.loadInitial() }
@@ -141,7 +138,6 @@ struct MediaLibraryView: View {
                     MediaGridItem(media: mediaItem)
                         .onTapGesture {
                             selectedMedia = mediaItem
-                            showDetail = true
                         }
                 }
 
@@ -184,9 +180,10 @@ struct MediaGridItem: View {
                         .shadow(radius: 2)
                 }
             }
-            .frame(height: 150)
+            .aspectRatio(1, contentMode: .fit)
             .clipped()
             .cornerRadius(4)
+            .contentShape(Rectangle())
 
             // 第一期只读:星标仅显示状态,不可点击
             if media.starred {
