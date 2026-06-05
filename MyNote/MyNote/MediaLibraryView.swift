@@ -9,7 +9,9 @@ import SwiftUI
 
 struct MediaLibraryView: View {
     @StateObject private var viewModel = MediaLibraryViewModel()
-    @State private var selectedMedia: Media? = nil
+    // 用 index 而非 Media,这样左右切换只改 index,sheet 不重建。
+    @State private var detailIndex: Int = 0
+    @State private var showDetail: Bool = false
 
     let columns = [
         GridItem(.flexible(), spacing: 8),
@@ -66,8 +68,13 @@ struct MediaLibraryView: View {
                 }
             }
         }
-        .sheet(item: $selectedMedia) { media in
-            MediaDetailView(media: media)
+        .sheet(isPresented: $showDetail) {
+            MediaDetailView(
+                mediaList: viewModel.media,
+                currentIndex: $detailIndex,
+                hasMore: viewModel.hasMore,
+                onNeedMore: { await viewModel.loadMore() }
+            )
         }
         .onAppear {
             Task { await viewModel.loadInitial() }
@@ -134,10 +141,11 @@ struct MediaLibraryView: View {
     private var grid: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(viewModel.media) { mediaItem in
+                ForEach(Array(viewModel.media.enumerated()), id: \.element.id) { index, mediaItem in
                     MediaGridItem(media: mediaItem)
                         .onTapGesture {
-                            selectedMedia = mediaItem
+                            detailIndex = index
+                            showDetail = true
                         }
                 }
 
