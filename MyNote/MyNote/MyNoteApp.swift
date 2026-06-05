@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GRDB
 
 @main
 struct MyNoteApp: App {
