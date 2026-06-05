@@ -10,6 +10,11 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+# 给 app.config 设哨兵跳过 repositories.json fail-fast —— 否则新机器跑
+# `alembic upgrade head` 时,seed migration 还没机会种 JSON,模块加载就先死了。
+# 必须在 `from app.models` / `from app.config` 之前 set。
+os.environ.setdefault("ALEMBIC_SKIP_REPO_LOAD", "1")
+
 from app.models import Base
 
 # this is the Alembic Config object, which provides

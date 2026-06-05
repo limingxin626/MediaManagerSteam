@@ -2,14 +2,36 @@
 应用配置模块 - 集中管理所有路径和配置
 
 环境变量：
-  DATA_ROOT     — 数据库 + 缩略图目录（必填，无默认值）
-  UPLOAD_DIR    — 上传文件落地目录（必填，无默认值）
-  STATIC_DIRS   — 额外静态挂载目录，分号分隔，可选（如 F:/AV;G:/Movies）
-    HOST          — 服务监听地址，默认 127.0.0.1（仅本机访问）
-  PORT          — 服务端口，默认 8002
-  FFMPEG_PATH   — ffmpeg 可执行文件路径，默认使用 PATH 中的
-  FFPROBE_PATH  — ffprobe 可执行文件路径，默认使用 PATH 中的
+  DATA_ROOT     — 数据库 + 缩略图 + repositories.json 所在目录(必填,无默认)
+  HOST          — 服务监听地址,默认 0.0.0.0
+  PORT          — 服务端口,默认 8002
+  FFMPEG_PATH   — ffmpeg 可执行文件路径,默认走 PATH
+  FFPROBE_PATH  — ffprobe 可执行文件路径,默认走 PATH
+
+Repository 配置:
+  原 UPLOAD_DIR / STATIC_DIRS 两个 env vars 已废弃。挂载点定义改为
+  `<DATA_ROOT>/repositories.json`,Backend 与 Mac 端共享。schema:
+
+      {
+        "version": 1,
+        "default_repo_id": "uploads",
+        "repositories": {
+          "uploads": {
+            "human_name": "Uploads",
+            "paths": {"windows": "E:/Note/Uploads", "darwin": "/Volumes/Note/Uploads"}
+          },
+          "av": {
+            "human_name": "AV 盘",
+            "paths": {"windows": "F:/AV", "darwin": "/Volumes/AV"}
+          }
+        }
+      }
+
+  - 平台 key: win32→windows / darwin→darwin / 其余→linux
+  - 路径用 forward-slash 写,Windows 也认,避免 JSON 转义反斜杠
+  - default_repo_id 决定新上传文件落地的 repo
 """
+import json
 import logging
 import os
 import sys
@@ -28,21 +50,85 @@ def _get_env(name: str, default: str = None) -> str:
     return val
 
 
-def _dir_name(path: str) -> str:
-    """取目录的最后一级文件夹名（不区分大小写统一小写比较）"""
-    return os.path.basename(os.path.normpath(path))
+def _current_platform_key() -> str:
+    """sys.platform → repositories.json 里 paths 的子 key。"""
+    if sys.platform == "win32":
+        return "windows"
+    if sys.platform == "darwin":
+        return "darwin"
+    return "linux"
+
+
+# repositories.json 文件名(同时被 alembic seed migration 引用,改名要同步)
+REPOSITORIES_FILENAME = "repositories.json"
+
+
+def _load_repositories(data_root: str) -> Tuple[Dict[str, str], str]:
+    """读 `<data_root>/repositories.json`,返回 (repos, default_repo_id)。
+
+    repos: {repo_id: 当前平台的绝对路径}。其他平台的 path 在本进程里不需要。
+    任何解析失败 / schema 不对 / 当前平台缺路径 → fail-fast sys.exit(1)。
+    """
+    path = os.path.join(data_root, REPOSITORIES_FILENAME)
+    if not os.path.isfile(path):
+        logger.error(
+            "%s 不存在。请在 DATA_ROOT 下创建 repositories.json,schema 见 config.py 头部注释。",
+            path,
+        )
+        sys.exit(1)
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error("%s 解析失败: %s", path, e)
+        sys.exit(1)
+
+    version = data.get("version")
+    if version != 1:
+        logger.error("%s 版本号不匹配,期望 1,实际 %r", path, version)
+        sys.exit(1)
+
+    raw_repos = data.get("repositories")
+    if not isinstance(raw_repos, dict) or not raw_repos:
+        logger.error("%s 缺少 repositories 字段或为空", path)
+        sys.exit(1)
+
+    default_repo_id = data.get("default_repo_id")
+    if not default_repo_id or default_repo_id not in raw_repos:
+        logger.error(
+            "%s default_repo_id=%r 无效(必须是 repositories 里的一个 key)",
+            path, default_repo_id,
+        )
+        sys.exit(1)
+
+    plat = _current_platform_key()
+    repos: Dict[str, str] = {}
+    for rid, entry in raw_repos.items():
+        if not isinstance(entry, dict):
+            logger.error("%s repositories.%s 不是 object", path, rid)
+            sys.exit(1)
+        paths = entry.get("paths") or {}
+        abs_path = paths.get(plat)
+        if not abs_path:
+            logger.error(
+                "%s repositories.%s 缺当前平台(%s)的路径", path, rid, plat,
+            )
+            sys.exit(1)
+        # 路径在 JSON 里用 forward-slash 写,这里转成 os.sep 并取绝对
+        repos[rid] = os.path.abspath(abs_path.replace("/", os.sep))
+
+    logger.info(
+        "[config] 加载 %d 个 repository(平台=%s,默认=%s): %s",
+        len(repos), plat, default_repo_id, list(repos.keys()),
+    )
+    return repos, default_repo_id
 
 
 class AppConfig:
     """应用配置类"""
 
     DATA_ROOT: str = os.path.abspath(_get_env("DATA_ROOT"))
-    UPLOAD_DIR: str = os.path.abspath(_get_env("UPLOAD_DIR"))
-
-    # 额外静态挂载目录，分号分隔
-    STATIC_DIRS: list = [
-        os.path.abspath(d.strip()) for d in os.getenv("STATIC_DIRS", "").split(";") if d.strip()
-    ]
 
     HOST: str = os.getenv("HOST", "0.0.0.0").strip() or "0.0.0.0"
     PORT: int = int(os.getenv("PORT", "8002"))
@@ -64,6 +150,13 @@ class AppConfig:
     # 支持的媒体文件扩展名
     VIDEO_EXTENSIONS: set = {".mp4"}
     IMAGE_EXTENSIONS: set = {".jpg", ".jpeg", ".png", ".gif"}
+
+    # repositories.json 加载结果,模块加载时 eager 填充
+    _REPOSITORIES: Dict[str, str] = {}
+    _DEFAULT_REPO_ID: str = ""
+
+    # DATA_ROOT 在 FastAPI 上的固定 URL 前缀(thumbs / actor_cover 都挂在这下面)
+    DATA_URL_PREFIX: str = "/data"
 
     @classmethod
     def check_paths(cls) -> None:
@@ -94,32 +187,32 @@ class AppConfig:
 
     @classmethod
     def get_static_mounts(cls) -> Dict[str, str]:
+        """{url_prefix: system_path}。
+
+        - DATA_ROOT 永远挂在 `/data`(thumbs/actor_cover 子目录由前端拼)
+        - 每个 repository 按 `/{repo_id}` 挂载,直接以 repo_id 小写作为 URL 段
         """
-        返回 {url_prefix: system_path} 的挂载映射。
-        DATA_ROOT、UPLOAD_DIR、STATIC_DIRS 均以文件夹名为 URL 前缀。
-        启动时已通过 check_mount_names() 保证无重名。
-        """
-        mounts: Dict[str, str] = {}
-        for path in [cls.DATA_ROOT, cls.UPLOAD_DIR] + cls.STATIC_DIRS:
-            name = _dir_name(path)
-            mounts[f"/{name}"] = path
+        mounts: Dict[str, str] = {cls.DATA_URL_PREFIX: cls.DATA_ROOT}
+        for rid, abs_path in cls._REPOSITORIES.items():
+            mounts[f"/{rid}"] = abs_path
         return mounts
 
     @classmethod
-    def check_mount_names(cls) -> None:
-        """检查所有挂载目录的文件夹名是否重复，重复则报错退出。"""
-        all_dirs = [cls.DATA_ROOT, cls.UPLOAD_DIR] + cls.STATIC_DIRS
-        seen: Dict[str, str] = {}
-        for path in all_dirs:
-            name = _dir_name(path).lower()
-            if name in seen:
-                logger.error(
-                    "挂载目录名称冲突：'%s' 和 '%s' 的文件夹名相同（%s），无法启动。"
-                    " 请重命名其中一个目录或使用子目录。",
-                    seen[name], path, name,
-                )
-                sys.exit(1)
-            seen[name] = path
+    def validate_repositories(cls) -> None:
+        """启动时检查:repo_id 与 /data 不冲突。
+
+        路径是否实际存在不强制检查 —— 跟 Mac 端 isAvailable 语义对齐,允许
+        外接盘没插时 backend 也能起来,对应 media 走 404。
+        """
+        if os.getenv("ALEMBIC_SKIP_REPO_LOAD") == "1":
+            # alembic 上下文里 _REPOSITORIES 故意是空的,validate 也跳过
+            return
+        if not cls._REPOSITORIES:
+            logger.error("repositories 为空,无法启动")
+            sys.exit(1)
+        if "data" in cls._REPOSITORIES:
+            logger.error("repo_id 'data' 与内置 /data 静态前缀冲突,请改名")
+            sys.exit(1)
 
     @classmethod
     def get_media_type(cls, file_path: str) -> str | None:
@@ -131,11 +224,19 @@ class AppConfig:
         return None
 
     @classmethod
+    def get_upload_root(cls) -> str:
+        """default repo 的根目录(替代旧 UPLOAD_DIR 类属性的语义)。"""
+        return cls._REPOSITORIES[cls._DEFAULT_REPO_ID]
+
+    @classmethod
     def get_upload_dir(cls) -> str:
-        """获取按日期分组的上传落地目录"""
+        """按日期分组的上传落地目录(default repo 之下)。"""
         from datetime import date
         today = date.today()
-        return os.path.join(cls.UPLOAD_DIR, str(today.year), f"{today.month:02d}", f"{today.day:02d}")
+        return os.path.join(
+            cls.get_upload_root(),
+            str(today.year), f"{today.month:02d}", f"{today.day:02d}",
+        )
 
     @classmethod
     def get_thumbs_dir(cls) -> str:
@@ -154,72 +255,25 @@ class AppConfig:
         return os.path.join(cls.get_actor_cover_dir(), f"{actor_id}.webp")
 
     @classmethod
-    def _data_root_prefix(cls) -> str:
-        return f"/{_dir_name(cls.DATA_ROOT)}"
-
-    @classmethod
     def get_thumbnail_url(cls, media_id: int) -> str:
-        return f"{cls._data_root_prefix()}/thumbs/{media_id}.webp"
+        return f"{cls.DATA_URL_PREFIX}/thumbs/{media_id}.webp"
 
     @classmethod
     def get_actor_avatar_url(cls, actor_id: int) -> str:
-        return f"{cls._data_root_prefix()}/actor_cover/{actor_id}.webp"
-
-    @classmethod
-    def is_mounted_path(cls, file_path: str) -> bool:
-        """判断文件路径是否位于任何已挂载的静态目录下。
-
-        DEPRECATED:新代码请用 register_relative()(原地把绝对路径分解成 repo_id + 相对路径)。
-        本方法保留供 alembic downgrade / scripts 使用。
-        """
-        if not file_path:
-            return False
-        normalized = file_path.replace("\\", "/").lower()
-        for system_path in cls.get_static_mounts().values():
-            normalized_mount = system_path.replace("\\", "/").lower()
-            if normalized.startswith(normalized_mount):
-                return True
-        return False
-
-    @classmethod
-    def to_url_path(cls, file_path: str) -> str:
-        """将系统绝对路径转换为服务器 URL 路径。
-
-        DEPRECATED:新代码请用 url_for(repo_id, relative_path)。
-        本方法保留供 MediaUrlMixin 在 `__legacy__` 行 / 未注册 repo 上做兜底,以及 scripts 使用。
-        """
-        if not file_path:
-            return ""
-        normalized_path = file_path.replace("\\", "/")
-        for url_prefix, system_path in cls.get_static_mounts().items():
-            normalized_mount = system_path.replace("\\", "/")
-            if normalized_path.lower().startswith(normalized_mount.lower()):
-                relative_path = normalized_path[len(normalized_mount):]
-                if relative_path and not relative_path.startswith("/"):
-                    relative_path = "/" + relative_path
-                return url_prefix + relative_path
-        return file_path
+        return f"{cls.DATA_URL_PREFIX}/actor_cover/{actor_id}.webp"
 
     # ------------------------------------------------------------------ #
-    # Repository 抽象 —— 把"挂载点"形式化到 DB 里(media.repo_id + 相对路径)
+    # Repository API —— 把"挂载点"形式化到 DB 里(media.repo_id + 相对路径)
     # ------------------------------------------------------------------ #
 
     @classmethod
     def get_repositories(cls) -> Dict[str, str]:
-        """{repo_id: abs_mount_path}。UPLOAD_DIR + STATIC_DIRS 一视同仁,都用 basename.lower() 作 id。
-
-        DATA_ROOT 不是 media repo(只放 thumbs/avatar/db),不参与。
-        启动时 check_mount_names() 已保证 basename 全局唯一,这里直接覆盖也不会冲突。
-        """
-        repos: Dict[str, str] = {}
-        for path in [cls.UPLOAD_DIR] + cls.STATIC_DIRS:
-            repos[_dir_name(path).lower()] = path
-        return repos
+        """{repo_id: 本机绝对路径}。"""
+        return dict(cls._REPOSITORIES)
 
     @classmethod
     def default_repo_id(cls) -> str:
-        """默认 repo(新上传文件落地的 repo)的 id = basename(UPLOAD_DIR).lower()。"""
-        return _dir_name(cls.UPLOAD_DIR).lower()
+        return cls._DEFAULT_REPO_ID
 
     @classmethod
     def resolve_to_absolute(cls, repo_id: str, relative_path: str) -> Optional[str]:
@@ -230,8 +284,7 @@ class AppConfig:
         """
         if not repo_id:
             return None
-        repos = cls.get_repositories()
-        mount = repos.get(repo_id)
+        mount = cls._REPOSITORIES.get(repo_id)
         if mount is None:
             return None
         if not relative_path:
@@ -244,14 +297,14 @@ class AppConfig:
         """inverse of resolve_to_absolute。按 mount path 长度 DESC 匹配,处理嵌套 mount。
 
         命中 → 返回 (repo_id, forward-slash 相对路径)。
-        未命中 → ValueError。调用方对新上传文件应先 copy 进 UPLOAD_DIR 再调用。
+        未命中 → ValueError。调用方对新上传文件应先 copy 进 default repo 再调用。
         """
         if not absolute_path:
             raise ValueError("Empty path")
         norm = absolute_path.replace("\\", "/")
         norm_lc = norm.lower()
         candidates = sorted(
-            cls.get_repositories().items(),
+            cls._REPOSITORIES.items(),
             key=lambda kv: len(kv[1]),
             reverse=True,
         )
@@ -267,27 +320,27 @@ class AppConfig:
 
     @classmethod
     def url_for(cls, repo_id: str, relative_path: str) -> str:
-        """(repo_id, relative_path) → "/{mount_basename}/relative/path" 的 HTTP URL。
+        """(repo_id, relative_path) → "/{repo_id}/relative/path" 的 HTTP URL。
 
-        URL 前缀仍用 mount 的 basename(跟 FastAPI StaticFiles 挂载方式一致),
-        不直接用 repo_id 是为了未来 repo_id 可以脱离 basename 而 URL 不变。
+        URL 段直接用 repo_id —— 跟 get_static_mounts() 一致。
         未知 repo 返回空串,由调用方决定兜底。
         """
-        if not repo_id:
+        if not repo_id or repo_id not in cls._REPOSITORIES:
             return ""
-        repos = cls.get_repositories()
-        mount = repos.get(repo_id)
-        if mount is None:
-            return ""
-        prefix = _dir_name(mount)
         rel = (relative_path or "").lstrip("/")
         if not rel:
-            return f"/{prefix}"
-        return f"/{prefix}/{rel}"
+            return f"/{repo_id}"
+        return f"/{repo_id}/{rel}"
 
     @classmethod
     def get_db_path(cls) -> str:
         return os.path.join(cls.DATA_ROOT, "db.sqlite3")
 
-# 创建全局配置实例
+
+# 创建全局配置实例;模块加载时即把 repositories.json 读进类属性。
+# 例外:alembic 的 env.py 会先 set ALEMBIC_SKIP_REPO_LOAD=1 再 import,
+# 这样新机器从零跑 `alembic upgrade head` 时 seed migration 才能把 JSON 种出来。
+# 真正的 API 进程不会带这个标志,启动后仍 fail-fast。
+if os.getenv("ALEMBIC_SKIP_REPO_LOAD") != "1":
+    AppConfig._REPOSITORIES, AppConfig._DEFAULT_REPO_ID = _load_repositories(AppConfig.DATA_ROOT)
 config = AppConfig()

@@ -24,9 +24,9 @@ class TimestampMixin(OrmBase):
 class MediaUrlMixin(OrmBase):
     """自动填充 file_url / thumb_url 的 mixin。
 
-    file_url 优先用 (repo_id, file_path) 通过 url_for() 拼出;
-    若 repo 未注册(如迁移期 `__legacy__` 行,或老客户端不传 repo_id),
-    再兜底走 to_url_path(把 file_path 当作绝对路径解)。
+    file_url 由 (repo_id, file_path) 经 url_for() 拼出。
+    repo_id 缺失 / 未在 repositories.json 注册(如老的 `__legacy__` 行) → 留空串,
+    由前端按需 fallback(目前各端都把空 file_url 视作不可达,显示占位)。
     """
     id: int
     file_path: str
@@ -42,8 +42,5 @@ class MediaUrlMixin(OrmBase):
         if not self.thumb_path:
             self.thumb_path = config.get_thumbnail_path(self.id)
         if not self.file_url and self.file_path:
-            url = config.url_for(self.repo_id, self.file_path) if self.repo_id else ""
-            if not url:
-                url = config.to_url_path(self.file_path)
-            self.file_url = url
+            self.file_url = config.url_for(self.repo_id, self.file_path)
         return self

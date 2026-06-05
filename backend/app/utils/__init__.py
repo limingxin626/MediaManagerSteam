@@ -7,9 +7,9 @@ from app.config import config
 
 logger = logging.getLogger(__name__)
 
-# 媒体文件上传目录（使用配置中的 UPLOAD_DIR）
-MEDIA_UPLOAD_DIR = config.UPLOAD_DIR
-os.makedirs(MEDIA_UPLOAD_DIR, exist_ok=True)
+# 注:default repo 根目录的 mkdir 已下移到 media_service.process_file() 内 ——
+# 模块 import 时不再触碰 config.get_upload_root(),好让 alembic 上下文能在
+# repositories.json 缺失时仍能加载本模块跑迁移。
 
 
 def calculate_file_hash(file_path: str, size_threshold: int = 100 * 1024 * 1024) -> str | None:

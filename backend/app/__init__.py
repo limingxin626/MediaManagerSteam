@@ -44,8 +44,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 检查挂载目录名称冲突（重复则退出）
-config.check_mount_names()
+# 校验 repositories.json 的 repo_id 与内置 /data 前缀不冲突
+config.validate_repositories()
 
 # 配置静态文件服务（所有目录以文件夹名为 URL 前缀挂载）
 for url_prefix, system_path in config.get_static_mounts().items():

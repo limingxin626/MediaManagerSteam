@@ -6,26 +6,49 @@
 //  Backend 端的 media.file_path 自 2026/06 起改为「相对挂载根」的 forward-slash 路径,
 //  各端用各自的 repository 映射拼回绝对路径。
 //
-//  Mac 端的注册表持久化在 Settings.repositories(UserDefaults JSON)。
-//  外接硬盘换盘符时,用户在「Repositories」设置面板手动改 path —— 不引入
-//  Security-Scoped Bookmark(本 app 未开 sandbox,普通 path string 即可)。
+//  注册表来源:`<DATA_ROOT>/repositories.json` —— 跟 backend 共享同一份文件,
+//  Mac 端只读 paths.darwin 段。外接硬盘换盘符时,直接编辑 JSON 文件即可。
 //
 
 import Foundation
+
+/// 解析自 repositories.json 的单个 repo 条目(Mac 端只关心 darwin 路径)。
+struct RepoEntry: Equatable {
+    let path: String
+    let humanName: String?
+}
+
+typealias RepoMap = [String: RepoEntry]
 
 @MainActor
 final class RepositoryManager: ObservableObject {
     static let shared = RepositoryManager()
 
     @Published private(set) var repositories: RepoMap = [:]
+    /// 最近一次 reload 的错误描述(JSON 缺失 / 解析失败 / 当前平台无路径等)。
+    /// 设置面板可显示;调用方一般忽略,UI 走 isAvailable 兜底。
+    @Published private(set) var lastLoadError: String?
 
-    private init() {
-        reload()
-    }
+    private static let filename = "repositories.json"
 
-    /// 从 UserDefaults 重读。在 onboarding / 设置面板修改后调用。
-    func reload() {
-        repositories = Settings.repositories
+    private init() {}
+
+    /// 从 `<dataRoot>/repositories.json` 重读。app 启动 / 切换 dataRoot 后调用。
+    /// dataRoot 为 nil 或文件缺失 → 把 repositories 置空,UI 走老路径兜底。
+    func reload(dataRoot: URL?) {
+        guard let dataRoot else {
+            repositories = [:]
+            lastLoadError = "DATA_ROOT 未配置"
+            return
+        }
+        let url = dataRoot.appendingPathComponent(Self.filename)
+        do {
+            repositories = try Self.load(from: url)
+            lastLoadError = nil
+        } catch {
+            repositories = [:]
+            lastLoadError = error.localizedDescription
+        }
     }
 
     /// (repo_id, 相对路径) → 本机绝对 URL。
@@ -56,19 +79,78 @@ final class RepositoryManager: ObservableObject {
         return rid
     }
 
-    // MARK: - Mutation API(设置面板用)
+    // MARK: - JSON 解析
 
-    func set(repoId: String, path: String, humanName: String?) {
-        var map = repositories
-        map[repoId] = RepoEntry(path: path, humanName: humanName)
-        Settings.repositories = map
-        repositories = map
+    /// JSON schema 校验失败 / IO 异常 / 当前平台缺路径都抛 RepositoryLoadError。
+    static func load(from fileURL: URL) throws -> RepoMap {
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch {
+            throw RepositoryLoadError.fileMissing(fileURL.path)
+        }
+        let raw: RepositoriesFileV1
+        do {
+            raw = try JSONDecoder().decode(RepositoriesFileV1.self, from: data)
+        } catch {
+            throw RepositoryLoadError.parseFailed(error.localizedDescription)
+        }
+        guard raw.version == 1 else {
+            throw RepositoryLoadError.unsupportedVersion(raw.version)
+        }
+        var out: RepoMap = [:]
+        for (rid, entry) in raw.repositories {
+            guard let darwinPath = entry.paths.darwin, !darwinPath.isEmpty else {
+                // 静默跳过没有 darwin 路径的 repo —— 对应文件落不到本机,
+                // UI 上 resolve 会返 nil 进 fallback。不视作整个文件解析失败。
+                continue
+            }
+            out[rid] = RepoEntry(path: darwinPath, humanName: entry.humanName)
+        }
+        return out
     }
+}
 
-    func remove(repoId: String) {
-        var map = repositories
-        map.removeValue(forKey: repoId)
-        Settings.repositories = map
-        repositories = map
+enum RepositoryLoadError: LocalizedError {
+    case fileMissing(String)
+    case parseFailed(String)
+    case unsupportedVersion(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .fileMissing(let p): return "repositories.json 不存在: \(p)"
+        case .parseFailed(let m): return "repositories.json 解析失败: \(m)"
+        case .unsupportedVersion(let v): return "repositories.json 版本不支持: \(v)"
+        }
     }
+}
+
+// MARK: - JSON 解码模型(只在本文件内部用)
+
+private struct RepositoriesFileV1: Decodable {
+    let version: Int
+    let defaultRepoId: String
+    let repositories: [String: RepoEntryJSON]
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case defaultRepoId = "default_repo_id"
+        case repositories
+    }
+}
+
+private struct RepoEntryJSON: Decodable {
+    let humanName: String?
+    let paths: RepoPathsJSON
+
+    enum CodingKeys: String, CodingKey {
+        case humanName = "human_name"
+        case paths
+    }
+}
+
+private struct RepoPathsJSON: Decodable {
+    let windows: String?
+    let darwin: String?
+    let linux: String?
 }

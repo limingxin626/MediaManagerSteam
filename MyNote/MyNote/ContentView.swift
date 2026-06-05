@@ -27,6 +27,7 @@ struct ContentView: View {
             LocalDatabase.shared.close()
             try LocalDatabase.shared.open(rootURL: url)
             Settings.dataRoot = url
+            RepositoryManager.shared.reload(dataRoot: url)
             // 简单做法:重启 app 让所有 ViewModel 重建
             NSApplication.shared.terminate(nil)
         } catch {

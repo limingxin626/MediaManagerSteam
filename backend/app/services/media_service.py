@@ -45,7 +45,10 @@ def process_standalone_file(
         if existing_media:
             return {"media": existing_media, "is_new": False}
 
-    if not config.is_mounted_path(file_path):
+    # 若 file_path 已落在某个 repo 下,直接登记;否则 copy 进 default repo 的日期目录。
+    try:
+        repo_id, rel_path = config.register_relative(file_path)
+    except ValueError:
         ext = os.path.splitext(file_path)[1]
         upload_dir = config.get_upload_dir()
         os.makedirs(upload_dir, exist_ok=True)
@@ -56,16 +59,13 @@ def process_standalone_file(
             dest_path = os.path.join(upload_dir, f"{timestamp}_{counter}{ext}")
             counter += 1
         shutil.copy2(file_path, dest_path)
-        logger.info(f"Copied non-mounted file to uploads: {file_path} -> {dest_path}")
+        logger.info(f"Copied non-repo file to default repo: {file_path} -> {dest_path}")
         file_path = dest_path
+        repo_id, rel_path = config.register_relative(file_path)
 
     file_size = os.path.getsize(file_path)
     mime_type, _ = mimetypes.guess_type(file_path)
     media_info = MediaInfoUtils.get_media_info(file_path, media_type, config.FFPROBE_PATH)
-
-    # 把绝对路径分解成 (repo_id, 相对路径) 存进 DB —— 自动复制分支已保证落在 UPLOAD_DIR,
-    # 走 STATIC_DIRS 的分支也能 match。
-    repo_id, rel_path = config.register_relative(file_path)
 
     media_kwargs = dict(
         file_path=rel_path,

@@ -2,8 +2,7 @@
 
 # 目录与路径（按你的实际路径修改）
 export DATA_ROOT="$HOME/data/Note/data"
-export UPLOAD_DIR="$HOME/data/Note/Uploads"
-export STATIC_DIRS="$HOME/data/Note"
+# Repository 挂载点已迁移到 $DATA_ROOT/repositories.json,不再用 UPLOAD_DIR / STATIC_DIRS
 export HOST="0.0.0.0"
 export PORT="8002"
 
