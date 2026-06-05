@@ -307,7 +307,7 @@ def delete_preview(preview_id: int, db: Session = Depends(get_db)):
     image = db.query(Media).filter(Media.id == preview_id).first()
     if not image or image.video_media_id is None:
         raise HTTPException(status_code=404, detail="Preview not found")
-    file_path = image.file_path
+    file_path = AppConfig.resolve_to_absolute(image.repo_id, image.file_path)
     db.delete(image)
     db.commit()
 
@@ -477,7 +477,7 @@ def delete_media(
             db.commit()
             return {"message": "Media unlinked from message", "unlinked": True}
 
-    file_path = media.file_path
+    file_path = AppConfig.resolve_to_absolute(media.repo_id, media.file_path)
 
     db.query(MessageMedia).filter(MessageMedia.media_id == media_id).delete()
     db.execute(media_tag.delete().where(media_tag.c.media_id == media_id))

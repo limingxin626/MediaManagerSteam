@@ -102,6 +102,7 @@ struct MessageCursorResponse: Codable {
 struct Media: Identifiable, Codable {
     let id: Int
     let filePath: String
+    let repoId: String?
     let fileUrl: String
     let thumbPath: String
     let thumbUrl: String
@@ -136,6 +137,7 @@ struct Media: Identifiable, Codable {
     enum CodingKeys: String, CodingKey {
         case id
         case filePath = "file_path"
+        case repoId = "repo_id"
         case fileUrl = "file_url"
         case thumbPath = "thumb_path"
         case thumbUrl = "thumb_url"
@@ -207,29 +209,53 @@ extension Media {
 
     /// 原始媒体文件本地 URL。
     ///
-    /// `file_path` 在 backend 里存的是写入时机器上的**绝对路径**(例:`E:/MM/uploads/2026/06/04/xxx.mp4`),
-    /// 在 Mac 上直接当文件路径用不通。这里通过截取 `/uploads/` 之后的子路径,
-    /// 拼回当前 `DATA_ROOT` 之下,跨平台还原文件位置。
+    /// 2026/06 起,backend 把 `file_path` 改成「相对挂载根的 forward-slash 相对路径」,
+    /// `repo_id` 标识它挂在哪个 repo 上。这里通过 `RepositoryManager` 拼回本机绝对 URL。
     ///
-    /// 兼容场景:
-    /// - Windows 绝对路径:`E:/MM/uploads/2026/06/04/x.mp4` → `<DATA_ROOT>/uploads/2026/06/04/x.mp4`
-    /// - POSIX 绝对路径:`/srv/mm/uploads/2026/06/04/x.mp4` → 同上
-    /// - 已经是相对路径:`uploads/2026/06/04/x.mp4` → 同上
-    /// - 反斜杠路径:`E:\MM\uploads\2026\06\04\x.mp4` → 同上(先归一化为 `/`)
+    /// Repo 不可用时(外接盘没插)仍会返回 URL —— 文件不存在交由 `FileManager` 检测,
+    /// UI 走 `isRepoAvailable` 分支显示「请插入 XX 硬盘」。
+    ///
+    /// 老数据兜底:`repoId == nil`(读到迁移前 DB)或 repo 未注册 → 走 `legacyExtractedURL()`
+    /// 的字符串抠子串逻辑,行为退化到迁移前。
+    @MainActor
     var localFileURL: URL? {
+        if let url = RepositoryManager.shared.resolve(repoId: repoId, relativePath: filePath) {
+            return url
+        }
+        return legacyExtractedURL()
+    }
+
+    /// 该 media 所在 repo 是否当前可用。UI 用来决定是否显示「请插入 XX 硬盘」。
+    /// 老数据(repoId == nil)按 dataRoot 是否配好兜底。
+    @MainActor
+    var isRepoAvailable: Bool {
+        if repoId != nil {
+            return RepositoryManager.shared.isAvailable(repoId: repoId)
+        }
+        return Settings.dataRoot != nil
+    }
+
+    /// UI 显示用的 repo 名(humanName ?? repoId ?? "default")。
+    @MainActor
+    var repoDisplayName: String {
+        RepositoryManager.shared.displayName(repoId: repoId)
+    }
+
+    /// 老路径(迁移前数据 / 未知 repo)的兜底逻辑。沿用迁移前的字符串抠子串方案,
+    /// 默认拼到 `Settings.dataRoot` 之下。仅用于历史兼容。
+    private func legacyExtractedURL() -> URL? {
         guard let root = Settings.dataRoot else { return nil }
         let normalized = filePath.replacingOccurrences(of: "\\", with: "/")
 
-        // 找 "/uploads/" 或开头的 "uploads/"。两种都接受。
+        // 找 "/uploads/" 或开头的 "uploads/" 两种形式都接受。
         let marker = "/uploads/"
         let relativePart: String
         if let range = normalized.range(of: marker) {
-            // 截取 "uploads/..." 这一段(含 uploads/ 本身)
-            relativePart = String(normalized[range.lowerBound...]).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            relativePart = String(normalized[range.lowerBound...])
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         } else if normalized.hasPrefix("uploads/") {
             relativePart = normalized
         } else {
-            // 没法识别 —— 兜底:取最后一段拼到 uploads/ 下,通常仍然找不到,留给上层显示占位
             relativePart = normalized
         }
 

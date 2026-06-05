@@ -44,8 +44,9 @@ def _message_snapshot(db: Session, msg: Message) -> Dict[str, Any]:
             m = r.media
             media_items.append({
                 "id": m.id,
-                "file_url": config.to_url_path(m.file_path),
+                "file_url": config.url_for(m.repo_id, m.file_path) or config.to_url_path(m.file_path),
                 "file_path": m.file_path,
+                "repo_id": m.repo_id,
                 "file_hash": m.file_hash or "",
                 "file_size": m.file_size,
                 "mime_type": m.mime_type,
@@ -87,10 +88,12 @@ def _actor_snapshot(actor: Actor) -> Dict[str, Any]:
 
 
 def _media_snapshot(media: Media) -> Dict[str, Any]:
+    # file_path 自本次迁移起改为「相对 repo 根」的 forward-slash 路径,客户端应优先用 file_url。
     return {
         "id": media.id,
-        "file_url": config.to_url_path(media.file_path),
+        "file_url": config.url_for(media.repo_id, media.file_path) or config.to_url_path(media.file_path),
         "file_path": media.file_path,
+        "repo_id": media.repo_id,
         "file_hash": media.file_hash or "",
         "file_size": media.file_size,
         "mime_type": media.mime_type,

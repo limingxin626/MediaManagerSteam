@@ -100,7 +100,7 @@ struct MediaDetailView: View {
     @ViewBuilder
     private var content: some View {
         if let media = current {
-            if let url = media.localFileURL {
+            if let url = media.localFileURL, media.isRepoAvailable {
                 if let mime = media.mimeType, mime.hasPrefix("video/") {
                     if let player {
                         VideoPlayer(player: player)
@@ -112,6 +112,8 @@ struct MediaDetailView: View {
                 } else {
                     placeholder("不支持的媒体类型: \(media.mimeType ?? "未知")")
                 }
+            } else if media.repoId != nil && !media.isRepoAvailable {
+                placeholder("请插入 \(media.repoDisplayName) 硬盘")
             } else {
                 placeholder("数据目录未配置")
             }

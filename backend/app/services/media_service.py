@@ -63,8 +63,13 @@ def process_standalone_file(
     mime_type, _ = mimetypes.guess_type(file_path)
     media_info = MediaInfoUtils.get_media_info(file_path, media_type, config.FFPROBE_PATH)
 
+    # 把绝对路径分解成 (repo_id, 相对路径) 存进 DB —— 自动复制分支已保证落在 UPLOAD_DIR,
+    # 走 STATIC_DIRS 的分支也能 match。
+    repo_id, rel_path = config.register_relative(file_path)
+
     media_kwargs = dict(
-        file_path=file_path,
+        file_path=rel_path,
+        repo_id=repo_id,
         file_hash=file_hash,
         file_size=file_size,
         mime_type=mime_type or 'application/octet-stream',
@@ -169,7 +174,7 @@ def _merge_media_into(db: Session, src: Media, dst: Media) -> None:
                 p.video_media_id = dst.id
         else:
             for p in preview_rows:
-                p_path = p.file_path
+                p_abs = config.resolve_to_absolute(p.repo_id, p.file_path)
                 p_id = p.id
                 db.execute(media_tag.delete().where(media_tag.c.media_id == p_id))
                 db.query(MessageMedia).filter(MessageMedia.media_id == p_id).delete()
@@ -178,14 +183,14 @@ def _merge_media_into(db: Session, src: Media, dst: Media) -> None:
                 if os.path.exists(thumb):
                     try: os.remove(thumb)
                     except Exception: pass
-                if p_path and os.path.exists(p_path):
-                    try: os.remove(p_path)
+                if p_abs and os.path.exists(p_abs):
+                    try: os.remove(p_abs)
                     except Exception: pass
     db.flush()
 
     # 4) 删除 src 的缩略图与文件
     src_id = src.id
-    src_path = src.file_path
+    src_abs = config.resolve_to_absolute(src.repo_id, src.file_path)
     db.delete(src)
     db.flush()
 
@@ -193,9 +198,9 @@ def _merge_media_into(db: Session, src: Media, dst: Media) -> None:
     if os.path.exists(thumb):
         try: os.remove(thumb)
         except Exception as e: logger.warning(f"Failed to remove old thumb {thumb}: {e}")
-    if src_path and os.path.exists(src_path):
-        try: os.remove(src_path)
-        except Exception as e: logger.warning(f"Failed to remove old file {src_path}: {e}")
+    if src_abs and os.path.exists(src_abs):
+        try: os.remove(src_abs)
+        except Exception as e: logger.warning(f"Failed to remove old file {src_abs}: {e}")
 
 
 def replace_media_file(db: Session, media_id: int, src_path: str) -> Media:
@@ -232,29 +237,35 @@ def replace_media_file(db: Session, media_id: int, src_path: str) -> Media:
             db.refresh(dup)
             return dup
 
-    old_path = media.file_path
-    old_ext = os.path.splitext(old_path)[1].lower()
+    old_abs = config.resolve_to_absolute(media.repo_id, media.file_path)
+    if old_abs is None:
+        raise ValueError(f"Unknown repo {media.repo_id} for media id={media.id}")
+    old_ext = os.path.splitext(old_abs)[1].lower()
     new_ext = os.path.splitext(src_path)[1].lower()
 
     if new_ext == old_ext:
-        target_path = old_path
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        shutil.copy2(src_path, target_path)
+        target_abs = old_abs
+        os.makedirs(os.path.dirname(target_abs), exist_ok=True)
+        shutil.copy2(src_path, target_abs)
     else:
-        target_path = os.path.splitext(old_path)[0] + new_ext
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        shutil.copy2(src_path, target_path)
-        if old_path != target_path and os.path.exists(old_path):
+        target_abs = os.path.splitext(old_abs)[0] + new_ext
+        os.makedirs(os.path.dirname(target_abs), exist_ok=True)
+        shutil.copy2(src_path, target_abs)
+        if old_abs != target_abs and os.path.exists(old_abs):
             try:
-                os.remove(old_path)
+                os.remove(old_abs)
             except Exception as e:
-                logger.warning(f"Failed to remove old file {old_path}: {e}")
-        media.file_path = target_path
+                logger.warning(f"Failed to remove old file {old_abs}: {e}")
+        new_repo_id, new_rel = config.register_relative(target_abs)
+        assert new_repo_id == media.repo_id, (
+            f"repo_id changed during replace: {media.repo_id} -> {new_repo_id}"
+        )
+        media.file_path = new_rel
 
-    media_info = MediaInfoUtils.get_media_info(target_path, media_type, config.FFPROBE_PATH)
+    media_info = MediaInfoUtils.get_media_info(target_abs, media_type, config.FFPROBE_PATH)
     media.file_hash = new_hash
-    media.file_size = os.path.getsize(target_path)
-    media.mime_type = mimetypes.guess_type(target_path)[0] or 'application/octet-stream'
+    media.file_size = os.path.getsize(target_abs)
+    media.mime_type = mimetypes.guess_type(target_abs)[0] or 'application/octet-stream'
     media.width = media_info["width"]
     media.height = media_info["height"]
     media.duration_ms = media_info["duration_ms"]
@@ -273,7 +284,7 @@ def replace_media_file(db: Session, media_id: int, src_path: str) -> Media:
 
     try:
         thumb_path = config.get_thumbnail_path(media.id)
-        ThumbnailUtils.generate_thumbnail(target_path, thumb_path, media_type, config.FFMPEG_PATH)
+        ThumbnailUtils.generate_thumbnail(target_abs, thumb_path, media_type, config.FFMPEG_PATH)
     except Exception as e:
         logger.error(f"Failed to regenerate thumbnail after replace: {e}")
 
@@ -287,8 +298,8 @@ def rotate_media(db: Session, media_id: int, degrees: int) -> Media:
     if not media:
         raise ValueError("Media not found")
 
-    file_path = media.file_path
-    if not os.path.exists(file_path):
+    file_path = config.resolve_to_absolute(media.repo_id, media.file_path)
+    if file_path is None or not os.path.exists(file_path):
         raise ValueError("Source file not found")
 
     media_type = config.get_media_type(file_path)

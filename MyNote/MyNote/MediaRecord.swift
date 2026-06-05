@@ -13,6 +13,7 @@ struct MediaRecord: Codable, FetchableRecord, TableRecord {
 
     let id: Int
     let filePath: String
+    let repoId: String?
     let fileHash: String?
     let fileSize: Int?
     let mimeType: String?
@@ -48,6 +49,7 @@ struct MediaRecord: Codable, FetchableRecord, TableRecord {
     enum CodingKeys: String, CodingKey {
         case id
         case filePath = "file_path"
+        case repoId = "repo_id"
         case fileHash = "file_hash"
         case fileSize = "file_size"
         case mimeType = "mime_type"
@@ -102,6 +104,7 @@ extension MediaRecord {
         return Media(
             id: id,
             filePath: filePath,
+            repoId: repoId,
             fileUrl: fileUrl,
             thumbPath: thumbPath,
             thumbUrl: thumbUrl,

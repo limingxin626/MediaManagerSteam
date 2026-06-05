@@ -84,6 +84,8 @@ class Media(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     file_path = Column(String(255), nullable=False)
+    repo_id = Column(String(64), nullable=False, default="uploads",
+                     server_default="uploads", index=True)
     file_hash = Column(String(128), nullable=True, unique=True, index=True)
     file_size = Column(Integer, nullable=True)
     mime_type = Column(String(100), nullable=True)

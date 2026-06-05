@@ -39,6 +39,7 @@ struct MyNoteApp: App {
         }
     }
 
+    @MainActor
     private func tryOpen() {
         guard let root = Settings.dataRoot else {
             dbReady = false
@@ -46,6 +47,10 @@ struct MyNoteApp: App {
         }
         do {
             try LocalDatabase.shared.open(rootURL: root)
+            // 首次升级到 repo_id 版本:若没有 repositories 注册表,自动种 default repo = <DATA_ROOT>/uploads。
+            // 老 dataRoot 路径不变(DB + thumbs 仍要它);新 repositories 只管原始媒体文件的查找。
+            Settings.migrateLegacyDataRootIfNeeded()
+            RepositoryManager.shared.reload()
             // 校验性能轻量,顺带打印库大小用于诊断
             if let queue = LocalDatabase.shared.queue {
                 let count = try queue.read { db in

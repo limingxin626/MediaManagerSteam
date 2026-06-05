@@ -13,7 +13,7 @@
 import logging
 import os
 import sys
-from typing import Dict
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +167,11 @@ class AppConfig:
 
     @classmethod
     def is_mounted_path(cls, file_path: str) -> bool:
-        """判断文件路径是否位于任何已挂载的静态目录下"""
+        """判断文件路径是否位于任何已挂载的静态目录下。
+
+        DEPRECATED:新代码请用 register_relative()(原地把绝对路径分解成 repo_id + 相对路径)。
+        本方法保留供 alembic downgrade / scripts 使用。
+        """
         if not file_path:
             return False
         normalized = file_path.replace("\\", "/").lower()
@@ -179,7 +183,11 @@ class AppConfig:
 
     @classmethod
     def to_url_path(cls, file_path: str) -> str:
-        """将系统绝对路径转换为服务器 URL 路径"""
+        """将系统绝对路径转换为服务器 URL 路径。
+
+        DEPRECATED:新代码请用 url_for(repo_id, relative_path)。
+        本方法保留供 MediaUrlMixin 在 `__legacy__` 行 / 未注册 repo 上做兜底,以及 scripts 使用。
+        """
         if not file_path:
             return ""
         normalized_path = file_path.replace("\\", "/")
@@ -191,6 +199,91 @@ class AppConfig:
                     relative_path = "/" + relative_path
                 return url_prefix + relative_path
         return file_path
+
+    # ------------------------------------------------------------------ #
+    # Repository 抽象 —— 把"挂载点"形式化到 DB 里(media.repo_id + 相对路径)
+    # ------------------------------------------------------------------ #
+
+    @classmethod
+    def get_repositories(cls) -> Dict[str, str]:
+        """{repo_id: abs_mount_path}。UPLOAD_DIR + STATIC_DIRS 一视同仁,都用 basename.lower() 作 id。
+
+        DATA_ROOT 不是 media repo(只放 thumbs/avatar/db),不参与。
+        启动时 check_mount_names() 已保证 basename 全局唯一,这里直接覆盖也不会冲突。
+        """
+        repos: Dict[str, str] = {}
+        for path in [cls.UPLOAD_DIR] + cls.STATIC_DIRS:
+            repos[_dir_name(path).lower()] = path
+        return repos
+
+    @classmethod
+    def default_repo_id(cls) -> str:
+        """默认 repo(新上传文件落地的 repo)的 id = basename(UPLOAD_DIR).lower()。"""
+        return _dir_name(cls.UPLOAD_DIR).lower()
+
+    @classmethod
+    def resolve_to_absolute(cls, repo_id: str, relative_path: str) -> Optional[str]:
+        """(repo_id, relative_path) → 本机绝对路径。未知 repo 返回 None。
+
+        relative_path 在 DB 里永远以 forward-slash 存储;这里转成 os.sep 再 join。
+        单段相对路径(如 "x.mp4")也合法,直接落在 repo 根目录下。
+        """
+        if not repo_id:
+            return None
+        repos = cls.get_repositories()
+        mount = repos.get(repo_id)
+        if mount is None:
+            return None
+        if not relative_path:
+            return mount
+        rel = relative_path.lstrip("/").replace("/", os.sep)
+        return os.path.join(mount, rel)
+
+    @classmethod
+    def register_relative(cls, absolute_path: str) -> Tuple[str, str]:
+        """inverse of resolve_to_absolute。按 mount path 长度 DESC 匹配,处理嵌套 mount。
+
+        命中 → 返回 (repo_id, forward-slash 相对路径)。
+        未命中 → ValueError。调用方对新上传文件应先 copy 进 UPLOAD_DIR 再调用。
+        """
+        if not absolute_path:
+            raise ValueError("Empty path")
+        norm = absolute_path.replace("\\", "/")
+        norm_lc = norm.lower()
+        candidates = sorted(
+            cls.get_repositories().items(),
+            key=lambda kv: len(kv[1]),
+            reverse=True,
+        )
+        for rid, mount in candidates:
+            mount_norm = mount.replace("\\", "/").rstrip("/")
+            mount_lc = mount_norm.lower()
+            if norm_lc == mount_lc:
+                return rid, ""
+            if norm_lc.startswith(mount_lc + "/"):
+                rel = norm[len(mount_norm):].lstrip("/")
+                return rid, rel
+        raise ValueError(f"Path not under any registered repo: {absolute_path}")
+
+    @classmethod
+    def url_for(cls, repo_id: str, relative_path: str) -> str:
+        """(repo_id, relative_path) → "/{mount_basename}/relative/path" 的 HTTP URL。
+
+        URL 前缀仍用 mount 的 basename(跟 FastAPI StaticFiles 挂载方式一致),
+        不直接用 repo_id 是为了未来 repo_id 可以脱离 basename 而 URL 不变。
+        未知 repo 返回空串,由调用方决定兜底。
+        """
+        if not repo_id:
+            return ""
+        repos = cls.get_repositories()
+        mount = repos.get(repo_id)
+        if mount is None:
+            return ""
+        prefix = _dir_name(mount)
+        rel = (relative_path or "").lstrip("/")
+        if not rel:
+            return f"/{prefix}"
+        return f"/{prefix}/{rel}"
 
     @classmethod
     def get_db_path(cls) -> str:

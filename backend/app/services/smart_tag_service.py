@@ -52,9 +52,10 @@ def ensure_embedding(db: Session, media_id: int) -> np.ndarray:
     thumb_path = config.get_thumbnail_path(media_id)
     if not os.path.isfile(thumb_path):
         # 缩略图丢失，回退到原文件（可能是大视频，CLIP 也能处理首帧/单图）
-        if not media.file_path or not os.path.isfile(media.file_path):
+        media_abs = config.resolve_to_absolute(media.repo_id, media.file_path)
+        if not media_abs or not os.path.isfile(media_abs):
             raise ValueError(f"Media {media_id} 无可用图像文件")
-        src_path = media.file_path if (media.mime_type or "").startswith("image/") else thumb_path
+        src_path = media_abs if (media.mime_type or "").startswith("image/") else thumb_path
     else:
         src_path = thumb_path
 
