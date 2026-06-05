@@ -35,4 +35,9 @@ actor LocalImageLoader {
         }
         return image
     }
+
+    /// 只读命中缓存,不发起加载。用于详情视图先垫缩略图、再异步上大图。
+    func cached(mediaId: Int) -> NSImage? {
+        cache.object(forKey: NSNumber(value: mediaId))
+    }
 }

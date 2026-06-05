@@ -57,7 +57,11 @@ struct MediaDetailView: View {
             metadata
                 .padding()
         }
-        .frame(minWidth: 720, minHeight: 540)
+        // 固定一个合理的初始窗口尺寸 —— 否则 sheet 会按 Image.scaledToFit 的 intrinsic
+        // 把窗口撑成图片本身大小,左右切换不同比例的图就会看到 sheet 自己在变大变小。
+        // min/ideal 都给上,用户仍可手动拉边框。
+        .frame(minWidth: 900, idealWidth: 1100, maxWidth: .infinity,
+               minHeight: 600, idealHeight: 760, maxHeight: .infinity)
         // 不可见的快捷键按钮 —— 提供 ←/→/ESC 全局响应。
         .background(keyboardShortcuts)
         .onAppear { rebuildPlayer() }
@@ -104,8 +108,6 @@ struct MediaDetailView: View {
                         placeholder("视频加载中…")
                     }
                 } else if let mime = media.mimeType, mime.hasPrefix("image/") {
-                    // 大图独立加载,不复用 LocalImageLoader 的缩略图缓存
-                    // (key 都是 mediaId,共用会让大图覆盖缩略图缓存,反而拖慢网格)
                     LocalLargeImageView(media: media, fileURL: url)
                 } else {
                     placeholder("不支持的媒体类型: \(media.mimeType ?? "未知")")
@@ -264,21 +266,25 @@ struct MediaDetailView: View {
 
 // MARK: - 大图加载
 
-/// 大图视图:在后台线程解码,避免主线程卡顿。
-/// 不接入 LocalImageLoader 共享缓存 —— 大图体积大,且 mediaId 会和缩略图 key 冲突。
-/// task(id:) 在 media 切换时自动取消上一个,这是关键。
+/// 大图视图:先用网格已经缓存的缩略图秒级占位,大图在后台解码完成后无缝替换。
+/// 这样从网格点开看到的"第一帧"立刻就是这张图(模糊版),不会闪黑底。
 private struct LocalLargeImageView: View {
     let media: Media
     let fileURL: URL
 
+    /// nil 表示还没拿到任何图(连缩略图都没缓存),显示进度条。
     @State private var image: NSImage? = nil
+    /// 当前 image 是不是缩略图占位 —— true 时大图还在后台解,但 UI 已经有东西看了。
+    @State private var isPlaceholder: Bool = false
     @State private var failed = false
 
     var body: some View {
         ZStack {
             if let image {
+                // .interpolation(.medium) 让缩略图被拉大时不至于太糊
                 Image(nsImage: image)
                     .resizable()
+                    .interpolation(.medium)
                     .scaledToFit()
             } else if failed {
                 VStack(spacing: 8) {
@@ -297,16 +303,32 @@ private struct LocalLargeImageView: View {
             }
         }
         .task(id: media.id) {
-            image = nil
             failed = false
+
+            // Step 1: 先同步命中网格缩略图缓存,立刻有画面。
+            // LocalImageLoader 是 actor,await 是必要的,但缓存命中只是字典查询,基本零延迟。
+            if let thumb = await LocalImageLoader.shared.cached(mediaId: media.id) {
+                image = thumb
+                isPlaceholder = true
+            } else {
+                // 网格没显示过这张(直接打开第一张就可能),清空让 ProgressView 顶上。
+                image = nil
+                isPlaceholder = false
+            }
+
+            // Step 2: 后台解大图,完成后替换。
             let url = fileURL
             let loaded: NSImage? = await Task.detached(priority: .userInitiated) {
                 guard FileManager.default.fileExists(atPath: url.path) else { return nil }
                 return NSImage(contentsOf: url)
             }.value
+
             // task 被 id 变化取消时,这里的赋值会被跳过 —— SwiftUI 不会渲染陈旧值。
             if let loaded {
                 image = loaded
+                isPlaceholder = false
+            } else if isPlaceholder {
+                // 大图加载失败但缩略图在,就保留缩略图当兜底,不报错。
             } else {
                 failed = true
             }
