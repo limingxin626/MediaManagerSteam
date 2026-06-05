@@ -55,7 +55,7 @@ struct MediaDetailView: View {
                         .resizable()
                         .scaledToFit()
                 } else {
-                    placeholder("无法加载图片")
+                    placeholder("无法加载图片\n路径: \(url.path)\n原始 file_path: \(media.filePath)")
                 }
             } else {
                 placeholder("不支持的媒体类型: \(media.mimeType ?? "未知")")
@@ -72,6 +72,9 @@ struct MediaDetailView: View {
                 .foregroundColor(.gray)
             Text(text)
                 .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+                .textSelection(.enabled)
         }
     }
 

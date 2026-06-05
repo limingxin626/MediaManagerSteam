@@ -205,10 +205,34 @@ extension Media {
             .appendingPathComponent("\(id).webp")
     }
 
-    /// 原始媒体文件本地 URL: `{DATA_ROOT}/{file_path}`。
-    /// file_path 在 backend 里是相对路径(如 `uploads/2026/06/04/xxx.mp4`)。
+    /// 原始媒体文件本地 URL。
+    ///
+    /// `file_path` 在 backend 里存的是写入时机器上的**绝对路径**(例:`E:/MM/uploads/2026/06/04/xxx.mp4`),
+    /// 在 Mac 上直接当文件路径用不通。这里通过截取 `/uploads/` 之后的子路径,
+    /// 拼回当前 `DATA_ROOT` 之下,跨平台还原文件位置。
+    ///
+    /// 兼容场景:
+    /// - Windows 绝对路径:`E:/MM/uploads/2026/06/04/x.mp4` → `<DATA_ROOT>/uploads/2026/06/04/x.mp4`
+    /// - POSIX 绝对路径:`/srv/mm/uploads/2026/06/04/x.mp4` → 同上
+    /// - 已经是相对路径:`uploads/2026/06/04/x.mp4` → 同上
+    /// - 反斜杠路径:`E:\MM\uploads\2026\06\04\x.mp4` → 同上(先归一化为 `/`)
     var localFileURL: URL? {
         guard let root = Settings.dataRoot else { return nil }
-        return root.appendingPathComponent(filePath)
+        let normalized = filePath.replacingOccurrences(of: "\\", with: "/")
+
+        // 找 "/uploads/" 或开头的 "uploads/"。两种都接受。
+        let marker = "/uploads/"
+        let relativePart: String
+        if let range = normalized.range(of: marker) {
+            // 截取 "uploads/..." 这一段(含 uploads/ 本身)
+            relativePart = String(normalized[range.lowerBound...]).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        } else if normalized.hasPrefix("uploads/") {
+            relativePart = normalized
+        } else {
+            // 没法识别 —— 兜底:取最后一段拼到 uploads/ 下,通常仍然找不到,留给上层显示占位
+            relativePart = normalized
+        }
+
+        return root.appendingPathComponent(relativePart)
     }
 }

@@ -88,12 +88,24 @@ App SHALL 定义 `MediaRecord` 结构体,字段与 backend `backend/app/models/_
 
 ### Requirement: 本地媒体文件路径解析
 
-App SHALL 提供工具函数把 backend 存储的相对路径(`file_path` 列,如 `uploads/2026/06/04/xxx.mp4`)解析为绝对 `URL`,基于当前 `DATA_ROOT`。缩略图路径 MUST 固定按 `DATA_ROOT/data/thumbs/{media.id}.webp` 拼接。
+App SHALL 提供工具函数把 backend 存储的 `file_path` 列解析为绝对 `URL`,基于当前 `DATA_ROOT`。`file_path` 在 backend 端实际存储的是**写入时机器上的绝对路径**(例:`E:/MM/uploads/2026/06/04/xxx.mp4`),Mac 端不能直接当本地路径用,MUST 通过截取 `uploads/` 之后的子路径、拼回 `DATA_ROOT` 的方式跨平台还原。
 
-#### Scenario: 解析媒体原文件 URL
+缩略图路径 MUST 固定按 `DATA_ROOT/data/thumbs/{media.id}.webp` 拼接。
 
-- **WHEN** 调用 `Media.localFileURL` 计算属性,`DATA_ROOT = /Volumes/Data/MM` 且 `file_path = uploads/2026/06/04/abc.mp4`
-- **THEN** 返回 `file:///Volumes/Data/MM/uploads/2026/06/04/abc.mp4`
+#### Scenario: Windows 绝对路径还原
+
+- **WHEN** `DATA_ROOT = /Volumes/Data/MM` 且 `file_path = E:/MM/uploads/2026/06/04/abc.mp4`
+- **THEN** `localFileURL` 返回 `file:///Volumes/Data/MM/uploads/2026/06/04/abc.mp4`
+
+#### Scenario: POSIX 绝对路径还原
+
+- **WHEN** `DATA_ROOT = /Volumes/Data/MM` 且 `file_path = /srv/mm/uploads/2026/06/04/abc.mp4`
+- **THEN** `localFileURL` 返回 `file:///Volumes/Data/MM/uploads/2026/06/04/abc.mp4`
+
+#### Scenario: 反斜杠路径归一化
+
+- **WHEN** `file_path = E:\MM\uploads\2026\06\04\abc.mp4`(Windows 风格反斜杠)
+- **THEN** 内部先把 `\` 替换为 `/`,再走截取逻辑;最终 URL 与正斜杠版本一致
 
 #### Scenario: 解析缩略图 URL
 
