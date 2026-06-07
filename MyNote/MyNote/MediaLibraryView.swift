@@ -206,52 +206,47 @@ struct MediaLibraryView: View {
     // MARK: - Grid 主体
 
     private var grid: some View {
-        GeometryReader { geo in
-            ScrollView(.vertical, showsIndicators: false) {
-                ZStack(alignment: .topLeading) {
-                    // 撑高占位:让 ScrollView 内容总高 = totalContentHeight,
-                    // 滚动条比例反映整个媒体库时间跨度。
-                    Color.clear
-                        .frame(width: 1, height: max(viewModel.totalContentHeight, 1))
-
-                    // 桶头(只渲染可视范围 + PREFETCH 内的)
-                    ForEach(viewModel.visibleBuckets) { b in
-                        bucketHeaderView(b)
-                            .frame(width: geo.size.width, height: 28, alignment: .leading)
-                            .offset(x: 0, y: b.headerOffset)
-                    }
-
-                    // 可见 cell(更窄的 RENDER_OVERSCAN)
-                    ForEach(viewModel.visibleCells) { cell in
-                        cellView(cell)
-                            .frame(width: cell.size, height: cell.size)
-                            .offset(x: cell.x, y: cell.y)
-                    }
+        VirtualScrollView(
+            contentHeight: viewModel.totalContentHeight,
+            scrollTop: Binding(
+                get: { viewModel.scrollTop },
+                set: { viewModel.setScrollTop($0) }
+            ),
+            viewportHeight: Binding(
+                get: { viewModel.viewportHeight },
+                set: { viewModel.setViewportHeight($0) }
+            ),
+            containerWidth: Binding(
+                get: { viewModel.containerWidth },
+                set: { viewModel.setContainerWidth($0) }
+            ),
+            jumpTrigger: viewModel.jumpTrigger,
+            targetY: viewModel.jumpTargetY
+        ) {
+            ZStack(alignment: .topLeading) {
+                // 桶头(只渲染可视范围 + PREFETCH 内的)
+                ForEach(viewModel.visibleBuckets) { b in
+                    bucketHeaderView(b)
+                        .frame(width: viewModel.containerWidth, height: 28, alignment: .leading)
+                        .offset(x: 0, y: b.headerOffset)
                 }
-                .frame(width: geo.size.width, alignment: .topLeading)
+
+                // 可见 cell(更窄的 RENDER_OVERSCAN)
+                ForEach(viewModel.visibleCells) { cell in
+                    cellView(cell)
+                        .frame(width: cell.size, height: cell.size)
+                        .offset(x: cell.x, y: cell.y)
+                }
             }
-            .background(
-                NSScrollViewBridge(
-                    scrollTop: Binding(
-                        get: { viewModel.scrollTop },
-                        set: { viewModel.setScrollTop($0) }
-                    ),
-                    jumpTrigger: viewModel.jumpTrigger,
-                    targetY: viewModel.jumpTargetY
-                )
+            .frame(
+                width: max(viewModel.containerWidth, 1),
+                height: max(viewModel.totalContentHeight, 1),
+                alignment: .topLeading
             )
-            .focusable(true)
-            .focused($gridFocused)
-            .onKeyPress { handleKeyPress($0) }
-            .onAppear {
-                viewModel.setContainerWidth(geo.size.width)
-                viewModel.setViewportHeight(geo.size.height)
-            }
-            .onChange(of: geo.size) { _, newSize in
-                viewModel.setContainerWidth(newSize.width)
-                viewModel.setViewportHeight(newSize.height)
-            }
         }
+        .focusable(true)
+        .focused($gridFocused)
+        .onKeyPress { handleKeyPress($0) }
     }
 
     // MARK: - 桶头 / cell

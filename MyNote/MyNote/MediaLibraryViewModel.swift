@@ -113,6 +113,7 @@ class MediaLibraryViewModel: ObservableObject {
     // 滚动 + 容器测量
     @Published var scrollTop: CGFloat = 0
     @Published var viewportHeight: CGFloat = 0
+    @Published var containerWidth: CGFloat = 0
     @Published private(set) var cellSize: CGFloat = TARGET_CELL
     @Published private(set) var cols: Int = MIN_COLS
 
@@ -273,6 +274,7 @@ class MediaLibraryViewModel: ObservableObject {
     /// 列数与 cellSize 都由它派生,变化时重算 buckets 几何。
     func setContainerWidth(_ width: CGFloat) {
         guard width > 0 else { return }
+        containerWidth = width
         let newCols = max(MIN_COLS, Int((width / TARGET_CELL).rounded()))
         let newCellSize = max(1, floor((width - CGFloat(newCols - 1) * GAP) / CGFloat(newCols)))
         if newCols == cols && abs(newCellSize - cellSize) < 0.5 { return }
