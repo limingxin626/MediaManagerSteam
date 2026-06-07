@@ -98,8 +98,12 @@ struct VirtualScrollView<Content: View>: NSViewRepresentable {
         let coord = context.coordinator
         guard let host = sv.documentView as? FlippedHostingView<AnyView> else { return }
 
-        // 每次 SwiftUI 触发 update 都重设 rootView,让 ForEach 派生数据重算
-        host.rootView = AnyView(content())
+        // 每次 update 都把新 Content 推给 NSHostingView —— NSHostingView.rootView 是可写属性,
+        // 赋值后内部 SwiftUI 走 diff,只更新变化部分(LocalThumbView 的 .task(id:) 不会重启,
+        // NSCache 命中的图片不重解码),滚动期间频繁 update 也不会让缩略图闪烁。
+        // 这里**不能**加 contentHeight 守卫 —— 滚动和 bucketCache 更新都不改 contentHeight,
+        // 守卫会把这些更新都吞掉,导致视图卡在旧快照上,看起来就是空白。
+        host.setRootView(AnyView(content()))
 
         // 同步 documentView 尺寸:宽度跟 clip,高度跟 contentHeight
         let clipW = sv.contentView.bounds.width
@@ -203,8 +207,33 @@ struct VirtualScrollView<Content: View>: NSViewRepresentable {
 
 // MARK: - 翻转坐标系的 NSHostingView
 
-/// 默认 NSView 是底部为 (0,0),flipped 后变成左上为 (0,0),
-/// 与 SwiftUI 的 .offset(x:y:) 语义一致(top-left origin)。
-private final class FlippedHostingView<Content: View>: NSHostingView<Content> {
+/// 用 NSView 包住 NSHostingView,翻转坐标系使 (0,0) 在左上,
+/// 与 SwiftUI 的 .offset(x:y:) 语义一致。避免直接 override NSHostingView.isFlipped。
+private final class FlippedHostingView<Content: View>: NSView {
+    private var hostingView: NSHostingView<Content>
+
+    init(rootView: Content) {
+        hostingView = NSHostingView(rootView: rootView)
+        super.init(frame: .zero)
+        addSubview(hostingView)
+    }
+
+    @MainActor required dynamic init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     override var isFlipped: Bool { true }
+
+    func setRootView(_ rootView: Content) {
+        // 直接更新 rootView 属性 —— NSHostingView 内部会 diff,只重渲染变化的部分,
+        // 缩略图 NSCache 命中时不会重解码,也就不会闪烁。
+        // 千万不要 removeFromSuperview + new NSHostingView,那会让整个 SwiftUI 树销毁重建,
+        // 所有 LocalThumbView 的 .task 重新跑一遍,闪烁就在这。
+        hostingView.rootView = rootView
+    }
+
+    override func layout() {
+        super.layout()
+        hostingView.frame = bounds
+    }
 }
