@@ -13,9 +13,6 @@ struct MyNoteApp: App {
     @State private var dbReady = false
     @State private var startupError: String?
 
-    /// 跨窗口共享的预览会话 —— 主窗口和独立的全屏预览窗口都靠它通信。
-    @StateObject private var previewSession = MediaPreviewSession()
-
     var body: some Scene {
         WindowGroup {
             Group {
@@ -36,21 +33,10 @@ struct MyNoteApp: App {
                     }
                 }
             }
-            .environmentObject(previewSession)
             .onAppear {
                 tryOpen()
             }
         }
-
-        // 独立的预览窗口(Photos.app 风格):双击网格 cell → openWindow(id:) 触发,
-        // 在 view onAppear 时立刻进入 macOS 原生全屏。Window(非 WindowGroup) 天然
-        // 单实例,重复 openWindow 只会把它前置 + 换内容,不会新开。
-        Window("预览", id: "media-preview") {
-            MediaPreviewWindowView()
-                .environmentObject(previewSession)
-        }
-        .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
     }
 
     @MainActor

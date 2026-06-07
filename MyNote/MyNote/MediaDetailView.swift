@@ -19,10 +19,9 @@ struct MediaDetailView: View {
     let hasMore: Bool
     /// 走到列表末尾、还能加载更多时回调外层异步拉下一页。
     let onNeedMore: () async -> Void
+    /// 关闭预览的统一回调 —— 外层(MediaLibraryView)负责清状态 / 同步选中态 / 切焦点。
+    let onClose: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.dismissWindow) private var dismissWindow
-    @EnvironmentObject private var session: MediaPreviewSession
     /// 视频播放器随当前 media 重建,切换时旧 player 自动释放。
     @State private var player: AVPlayer? = nil
 
@@ -282,15 +281,10 @@ struct MediaDetailView: View {
         currentIndex += 1
     }
 
-    /// 关闭预览的统一入口:同步 session 状态 + 关掉独立窗口;若是在
-    /// `#Preview` 等没有 session 的环境(理论上不会触发,但兜底),仍能用
-    /// SwiftUI 的 dismiss() 退出。
+    /// 关闭预览的统一入口 —— 仅回调外层,本 view 不再持有任何跨 scene 状态。
     private func closePreview() {
         bumpActivity()
-        session.close()
-        dismissWindow(id: "media-preview")
-        // sheet 路径已下线,但为了不破坏单测/Preview 的回退,仍保留 dismiss()。
-        dismiss()
+        onClose()
     }
 
     // MARK: - Chrome auto-hide

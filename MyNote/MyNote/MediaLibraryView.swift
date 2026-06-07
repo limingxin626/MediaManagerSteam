@@ -18,11 +18,12 @@ import SwiftUI
 struct MediaLibraryView: View {
     @StateObject private var viewModel = MediaLibraryViewModel()
 
-    // 跨窗口共享的预览会话(由 MyNoteApp.environmentObject 注入)。
-    // 双击/空格触发预览时,先 present(...) 写入数据,再 openWindow(id:) 把
-    // 独立的全屏预览窗口拉起来 —— 不再用 sheet。
-    @EnvironmentObject private var previewSession: MediaPreviewSession
-    @Environment(\.openWindow) private var openWindow
+    // 预览状态 —— 本地持有,不再跨 scene 共享。previewItems != nil 即"预览中",
+    // 关闭时把它置回 nil,选中态同步给 selectedIndex。
+    @State private var previewItems: [Media]? = nil
+    @State private var previewIndex: Int = 0
+
+    private var isPreviewing: Bool { previewItems != nil }
 
     // 选中态 - 与详情解耦,单击只改它
     @State private var selectedIndex: Int? = nil
@@ -30,54 +31,71 @@ struct MediaLibraryView: View {
 
     var body: some View {
         ZStack {
-            VStack(spacing: 0) {
-                header
+            // 底层:网格 + 错误提示(原有内容)
+            ZStack {
+                VStack(spacing: 0) {
+                    header
 
-                if viewModel.isLoading && viewModel.buckets.isEmpty {
-                    VStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
+                    if viewModel.isLoading && viewModel.buckets.isEmpty {
+                        VStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    } else if viewModel.buckets.isEmpty {
+                        VStack {
+                            Spacer()
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 48))
+                                .foregroundColor(.gray)
+                            Text("暂无媒体")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                    } else {
+                        gridWithScrubber
                     }
-                } else if viewModel.buckets.isEmpty {
-                    VStack {
-                        Spacer()
-                        Image(systemName: "photo.on.rectangle")
-                            .font(.system(size: 48))
-                            .foregroundColor(.gray)
-                        Text("暂无媒体")
-                            .foregroundColor(.secondary)
-                        Spacer()
-                    }
-                } else {
-                    gridWithScrubber
+
+                    Spacer(minLength: 0)
                 }
 
-                Spacer(minLength: 0)
+                if let error = viewModel.errorMessage {
+                    VStack {
+                        HStack {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                            Spacer()
+                            Button(action: { viewModel.errorMessage = nil }) {
+                                Image(systemName: "xmark")
+                            }
+                        }
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(8)
+                        .padding()
+
+                        Spacer()
+                    }
+                }
             }
 
-            if let error = viewModel.errorMessage {
-                VStack {
-                    HStack {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                        Spacer()
-                        Button(action: { viewModel.errorMessage = nil }) {
-                            Image(systemName: "xmark")
-                        }
-                    }
-                    .padding()
-                    .background(Color.red.opacity(0.1))
-                    .cornerRadius(8)
-                    .padding()
-
-                    Spacer()
-                }
+            // 顶层:窗口内最大化预览。双击/空格打开,ESC/×/空格关闭。
+            // MediaDetailView 内部用 maxWidth/.infinity + maxHeight/.infinity 铺满可用空间。
+            if let items = previewItems {
+                MediaDetailView(
+                    mediaList: items,
+                    currentIndex: Binding(
+                        get: { previewIndex },
+                        set: { previewIndex = $0 }
+                    ),
+                    hasMore: false,
+                    onNeedMore: { /* 桶按需加载暂未启用,保持与旧预览窗一致 */ },
+                    onClose: { closePreview() }
+                )
+                .transition(.opacity)
             }
         }
-        // 预览已迁到独立的全屏 Window scene(MediaPreviewWindowView)。
-        // 双击 / 空格 → previewSession.present(...) + openWindow(id: "media-preview")
         .onAppear {
             Task { await viewModel.loadInitial() }
             gridFocused = true
@@ -98,14 +116,6 @@ struct MediaLibraryView: View {
         .onChange(of: selectedIndex) { _, newValue in
             guard let i = newValue, i < viewModel.loadedFlatItems.count else { return }
             viewModel.ensureMediaVisible(mediaId: viewModel.loadedFlatItems[i].id)
-        }
-        .onChange(of: previewSession.isOpen) { _, isOpen in
-            // 预览窗关闭(用户翻到某张后按 ESC/Cmd+W/Space,或点了红色信号灯) →
-            // 把主窗口选中态对齐到预览中最后看到的那张。后续 onChange(of: selectedIndex)
-            // 会自动调 ensureMediaVisible 把它滚进可视范围。
-            if !isOpen {
-                selectedIndex = previewSession.currentIndex
-            }
         }
         .refreshable {
             await viewModel.refresh()
@@ -312,7 +322,7 @@ struct MediaLibraryView: View {
             moveSelection { ($0 ?? -viewModel.cols) + viewModel.cols }
             return .handled
         case .space:
-            if previewSession.isOpen { return .ignored }
+            if isPreviewing { return .ignored }
             let target = selectedIndex ?? 0
             selectedIndex = target
             openPreview(at: target)
@@ -329,11 +339,26 @@ struct MediaLibraryView: View {
         selectedIndex = max(0, min(raw, count - 1))
     }
 
-    /// 双击 / 空格触发预览的统一入口 —— session 写入数据后 openWindow(id:),
-    /// 由独立的 MediaPreviewWindowView 接管渲染与进入全屏。
+    /// 双击 / 空格触发预览的统一入口 —— 写入本地状态后由外层 body 的
+    /// `if isPreviewing { MediaDetailView }` 接管渲染。
     private func openPreview(at index: Int) {
-        previewSession.present(items: viewModel.loadedFlatItems, at: index)
-        openWindow(id: "media-preview")
+        let items = viewModel.loadedFlatItems
+        guard !items.isEmpty else { return }
+        previewItems = items
+        previewIndex = max(0, min(index, items.count - 1))
+        // 释放网格键盘焦点,让 MediaDetailView 的 .keyboardShortcut 接管方向键 / ESC / 空格。
+        gridFocused = false
+    }
+
+    /// MediaDetailView 的关闭回调(ESC / 空格 / ×)。同步选中态后清掉本地状态,
+    /// 恢复网格焦点。后续 onChange(of: selectedIndex) 会自动调 ensureMediaVisible
+    /// 把最后看到的那张滚进可视范围。
+    private func closePreview() {
+        if let items = previewItems, items.indices.contains(previewIndex) {
+            selectedIndex = previewIndex
+        }
+        previewItems = nil
+        gridFocused = true
     }
 }
 
@@ -380,5 +405,4 @@ struct MediaGridItem: View {
 
 #Preview {
     MediaLibraryView()
-        .environmentObject(MediaPreviewSession())
 }
