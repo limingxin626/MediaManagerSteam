@@ -62,6 +62,10 @@ struct BucketCacheEntry: Equatable {
     var items: [Media] = []
     var nextCursor: String? = nil
     var loadedCount: Int { items.count }
+
+    static func == (lhs: BucketCacheEntry, rhs: BucketCacheEntry) -> Bool {
+        lhs.status == rhs.status && lhs.nextCursor == rhs.nextCursor
+    }
 }
 
 /// 可视区域内一个具体 cell 的位置 + 内容。
@@ -109,7 +113,7 @@ class MediaLibraryViewModel: ObservableObject {
     // 滚动 + 容器测量
     @Published var scrollTop: CGFloat = 0
     @Published var viewportHeight: CGFloat = 0
-    @Published private(set) var cellSize: CGFloat = 0
+    @Published private(set) var cellSize: CGFloat = TARGET_CELL
     @Published private(set) var cols: Int = MIN_COLS
 
     // 程序化跳转触发计数器:View 层每次值变化就把 scrollTop 推到 NSScrollView
@@ -195,10 +199,12 @@ class MediaLibraryViewModel: ObservableObject {
                 type: selectedMediaType,
                 starredOnly: showOnlyStarred
             )
+            print("📅 timeline loaded: \(tl.count) buckets, type=\(selectedMediaType ?? "nil"), starredOnly=\(showOnlyStarred)")
             timeline = tl
             rebuildBuckets()
         } catch {
             print("Timeline load error: \(error)")
+            errorMessage = error.localizedDescription
         }
     }
 
