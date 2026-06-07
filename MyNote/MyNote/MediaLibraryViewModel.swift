@@ -500,6 +500,12 @@ class MediaLibraryViewModel: ObservableObject {
                 entry.nextCursor = nextCursor
             }
             bucketCache[key] = entry
+            // 翻页后如果还没加载完,触发下一轮 dwell 让这个桶继续翻页。
+            // 否则 .partial 状态会卡住 —— 后续 visibleBuckets 还是它,但 dispatchFetches
+            // 不会被任何更新路径调,用户就会看到桶末尾的灰格子永远不消失。
+            if entry.status == .partial {
+                dispatchFetches()
+            }
         } catch {
             bucketCache[key]?.status = .error
             print("loadBucket \(key) error: \(error)")
