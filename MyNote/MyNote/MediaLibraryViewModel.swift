@@ -233,6 +233,18 @@ class MediaLibraryViewModel: ObservableObject {
         await loadInitial()
     }
 
+    // MARK: - 首次加载守门
+
+    /// View.onAppear 用:首次进入时执行 loadInitial,后续不再触发,避免
+    /// 切到其他 tab 再切回时因为 onAppear 重建把滚动位置 / 桶布局清零。
+    /// 过滤切换 / 下拉刷新走 loadInitial() 走全量重置路径。
+    private var hasLoadedOnce = false
+    func loadInitialIfNeeded() async {
+        guard !hasLoadedOnce else { return }
+        hasLoadedOnce = true
+        await loadInitial()
+    }
+
     // MARK: - 桶布局派生
 
     /// 根据 timeline + cellSize + cols 重算每个桶的几何位置。

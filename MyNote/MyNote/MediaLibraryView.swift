@@ -16,7 +16,7 @@
 import SwiftUI
 
 struct MediaLibraryView: View {
-    @StateObject private var viewModel = MediaLibraryViewModel()
+    @ObservedObject var viewModel: MediaLibraryViewModel
 
     // 预览状态 —— 本地持有,不再跨 scene 共享。previewItems != nil 即"预览中",
     // 关闭时把它置回 nil,选中态同步给 selectedIndex。
@@ -33,9 +33,7 @@ struct MediaLibraryView: View {
         ZStack {
             // 底层:网格 + 错误提示(原有内容)
             ZStack {
-                VStack(spacing: 0) {
-                    header
-
+                Group {
                     if viewModel.isLoading && viewModel.buckets.isEmpty {
                         VStack {
                             Spacer()
@@ -55,8 +53,6 @@ struct MediaLibraryView: View {
                     } else {
                         gridWithScrubber
                     }
-
-                    Spacer(minLength: 0)
                 }
 
                 if let error = viewModel.errorMessage {
@@ -96,8 +92,26 @@ struct MediaLibraryView: View {
                 .transition(.opacity)
             }
         }
+        .navigationTitle("媒体库")
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("媒体类型", selection: mediaTypeBinding) {
+                    Text("全部").tag(MediaTypeFilter.all)
+                    Text("图片").tag(MediaTypeFilter.image)
+                    Text("视频").tag(MediaTypeFilter.video)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button { Task { await viewModel.toggleStarredOnly() } } label: {
+                    Image(systemName: viewModel.showOnlyStarred ? "star.fill" : "star")
+                }
+                .help(viewModel.showOnlyStarred ? "显示全部" : "仅显示星标")
+            }
+        }
         .onAppear {
-            Task { await viewModel.loadInitial() }
+            Task { await viewModel.loadInitialIfNeeded() }
             gridFocused = true
         }
         // 首屏 / 过滤切换后默认选中第 0 项
@@ -122,56 +136,18 @@ struct MediaLibraryView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Toolbar 桥接
 
-    private var header: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("媒体库")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-
-                Spacer()
-
-                Button(action: { Task { await viewModel.toggleStarredOnly() } }) {
-                    Image(systemName: viewModel.showOnlyStarred ? "star.fill" : "star")
-                        .font(.system(size: 16))
-                        .foregroundColor(viewModel.showOnlyStarred ? .orange : .gray)
-                }
+    /// 把 viewModel.selectedMediaType (String?) 桥到 Picker 的 MediaTypeFilter 枚举
+    /// selection 上。setter 同步调 changeMediaType 触发 reload,与原 chip 行为一致。
+    private var mediaTypeBinding: Binding<MediaTypeFilter> {
+        Binding(
+            get: { MediaTypeFilter(rawValue: viewModel.selectedMediaType ?? "") ?? .all },
+            set: { newValue in
+                let mapped: String? = newValue == .all ? nil : newValue.rawValue
+                Task { await viewModel.changeMediaType(mapped) }
             }
-
-            HStack(spacing: 8) {
-                ForEach(["全部", "图片", "视频"], id: \.self) { type in
-                    Button(action: {
-                        Task {
-                            let typeValue: String? = type == "全部" ? nil : (type == "图片" ? "image" : "video")
-                            await viewModel.changeMediaType(typeValue)
-                        }
-                    }) {
-                        Text(type)
-                            .font(.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                (type == "全部" && viewModel.selectedMediaType == nil) ||
-                                (type == "图片" && viewModel.selectedMediaType == "image") ||
-                                (type == "视频" && viewModel.selectedMediaType == "video")
-                                ? Color.blue : Color.gray.opacity(0.2)
-                            )
-                            .foregroundColor(
-                                (type == "全部" && viewModel.selectedMediaType == nil) ||
-                                (type == "图片" && viewModel.selectedMediaType == "image") ||
-                                (type == "视频" && viewModel.selectedMediaType == "video")
-                                ? .white : .secondary
-                            )
-                            .cornerRadius(4)
-                    }
-                }
-                Spacer()
-            }
-        }
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        )
     }
 
     // MARK: - Grid + Scrubber 整体
@@ -262,6 +238,7 @@ struct MediaLibraryView: View {
         }
         .focusable(true)
         .focused($gridFocused)
+        .focusEffectDisabled(true)  // 关掉系统默认的蓝色 NSFocusRing,选中态已有自己的 Color.accentColor 描边
         .onKeyPress { handleKeyPress($0) }
     }
 
@@ -404,5 +381,7 @@ struct MediaGridItem: View {
 }
 
 #Preview {
-    MediaLibraryView()
+    NavigationStack {
+        MediaLibraryView(viewModel: MediaLibraryViewModel())
+    }
 }

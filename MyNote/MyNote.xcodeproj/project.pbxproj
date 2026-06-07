@@ -71,7 +71,6 @@
 			name = MyNote;
 			packageProductDependencies = (
 				1D96BEAF2FD2688D00054D1B /* GRDB */,
-				1D96BEB12FD2688D00054D1B /* GRDB-dynamic */,
 			);
 			productName = MyNote;
 			productReference = 1DEEBF742FD1811D00B192E5 /* MyNote.app */;
@@ -396,11 +395,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1D96BEAE2FD2688D00054D1B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
-		};
-		1D96BEB12FD2688D00054D1B /* GRDB-dynamic */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 1D96BEAE2FD2688D00054D1B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
-			productName = "GRDB-dynamic";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
