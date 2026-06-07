@@ -219,17 +219,43 @@ class APIClient: ObservableObject {
     /// 切换媒体收藏状态
     func toggleMediaStarred(id: Int) async throws -> Media {
         let url = URL(string: "\(baseURL)/media/\(id)/starred")!
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        
+
         let (data, response) = try await session.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw APIError.invalidResponse
         }
-        
+
         return try JSONDecoder().decode(Media.self, from: data)
+    }
+
+    /// 获取媒体时间线(按日期分组统计)。
+    func getMediaTimeline(type: String? = nil, starred: Bool? = nil) async throws -> [TimelineEntry] {
+        var components = URLComponents(string: "\(baseURL)/media/timeline")!
+        var queryItems: [URLQueryItem] = []
+
+        if let type = type {
+            queryItems.append(URLQueryItem(name: "type", value: type))
+        }
+        if let starred = starred {
+            queryItems.append(URLQueryItem(name: "starred", value: starred ? "true" : "false"))
+        }
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
+
+        guard let url = components.url else {
+            throw APIError.invalidURL
+        }
+
+        let (data, response) = try await session.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode([TimelineEntry].self, from: data)
     }
     
     // MARK: - Error Handling

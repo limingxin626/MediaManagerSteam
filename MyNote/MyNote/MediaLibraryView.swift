@@ -8,6 +8,7 @@
 //    - 双击 -> 打开预览
 //    - 方向键 -> 在网格内移动选中(↑/↓ 按列对齐,边界处停住不 wrap)
 //    - 空格  -> 切换预览的打开/关闭
+//  时间轴:右侧 DateScrubber 固定显示,拖动可跳转到任意日期桶.
 //
 
 import SwiftUI
@@ -27,6 +28,14 @@ struct MediaLibraryView: View {
 
     private var columns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: 8), count: columnCount)
+    }
+
+    // Scrubber 用
+    private var timelineMinDate: Date {
+        viewModel.timeline.last?.date ?? Date()
+    }
+    private var timelineMaxDate: Date {
+        viewModel.timeline.first?.date ?? Date()
     }
 
     var body: some View {
@@ -86,7 +95,10 @@ struct MediaLibraryView: View {
             )
         }
         .onAppear {
-            Task { await viewModel.loadInitial() }
+            Task {
+                await viewModel.loadTimeline()
+                await viewModel.loadInitial()
+            }
             // 进入页面就让网格拿到焦点,方向键/空格立刻可用。
             gridFocused = true
         }
@@ -171,61 +183,103 @@ struct MediaLibraryView: View {
     // MARK: - Grid
 
     private var grid: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(Array(viewModel.media.enumerated()), id: \.element.id) { index, mediaItem in
-                        MediaGridItem(media: mediaItem, isSelected: selectedIndex == index)
-                            // 显式 id 让 ScrollViewReader.scrollTo 找得到该 cell。
-                            .id(mediaItem.id)
-                            // 双击放前:SwiftUI 会让双击优先,单击事件被延迟到
-                            // doubleClickInterval 之后才触发(这是系统级行为,与 Finder 一致)。
-                            .onTapGesture(count: 2) {
-                                selectedIndex = index
-                                detailIndex = index
-                                showDetail = true
-                            }
-                            .onTapGesture(count: 1) {
-                                selectedIndex = index
-                            }
-                    }
+        HStack(spacing: 0) {
+            // 主内容区
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 8) {
+                        ForEach(viewModel.buckets) { bucket in
+                            // 日期标题行
+                            bucketHeaderView(bucket)
+                                .id("header-\(bucket.id)")
 
-                    if viewModel.hasMore {
-                        VStack {
-                            if viewModel.isLoadingMore {
-                                ProgressView()
-                            } else {
-                                Text("加载更多")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                            // 该天的媒体网格
+                            ForEach(Array(bucket.items.enumerated()), id: \.element.id) { index, mediaItem in
+                                let globalIndex = mediaIndexInAll(mediaId: mediaItem.id)
+                                MediaGridItem(media: mediaItem, isSelected: selectedIndex == globalIndex)
+                                    .id(mediaItem.id)
+                                    .onTapGesture(count: 2) {
+                                        selectedIndex = globalIndex
+                                        detailIndex = globalIndex
+                                        showDetail = true
+                                    }
+                                    .onTapGesture(count: 1) {
+                                        selectedIndex = globalIndex
+                                    }
                             }
                         }
-                        .frame(height: 100)
-                        .gridCellUnsizedAxes(.horizontal)
-                        .onAppear {
-                            Task { await viewModel.loadMore() }
+
+                        // 加载更多
+                        if viewModel.hasMore {
+                            VStack {
+                                if viewModel.isLoadingMore {
+                                    ProgressView()
+                                } else {
+                                    Text("加载更多")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .frame(height: 80)
+                            .gridCellUnsizedAxes(.horizontal)
+                            .onAppear {
+                                Task { await viewModel.loadMore() }
+                            }
                         }
                     }
+                    .padding(8)
                 }
-                .padding(8)
-            }
-            // 选中变化时,只在项超出可见区域时才滚动(避免每次方向键都移动画面)。
-            .onChange(of: selectedIndex) { _, newValue in
-                guard let i = newValue, viewModel.media.indices.contains(i) else { return }
-                let itemId = viewModel.media[i].id
-                // scrollTo(anchor:) 会把项滚到视口内;使用 nil anchor 只在需要时滚动,
-                // 已在可见区域内时不会主动重新居中。
-                withAnimation(.easeOut(duration: 0.15)) {
-                    proxy.scrollTo(itemId, anchor: nil)
+                // 键盘焦点 + 方向键/空格响应。
+                .focusable(true)
+                .focused($gridFocused)
+                .onKeyPress { press in
+                    handleKeyPress(press)
+                }
+                // Scrubber 跳转:滚动到目标桶
+                .onChange(of: viewModel._scrollToBucketIndex) { _, newIdx in
+                    guard let idx = newIdx, viewModel.buckets.indices.contains(idx) else { return }
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo("header-\(viewModel.buckets[idx].id)", anchor: .top)
+                    }
                 }
             }
-            // 键盘焦点 + 方向键/空格响应。
-            .focusable(true)
-            .focused($gridFocused)
-            .onKeyPress { press in
-                handleKeyPress(press)
+
+            // 右侧时间轴 Scrubber
+            if !viewModel.timeline.isEmpty {
+                DateScrubber(
+                    timeline: viewModel.timeline,
+                    minDate: timelineMinDate,
+                    maxDate: timelineMaxDate,
+                    currentDate: $viewModel.currentDate,
+                    onJump: { date in
+                        viewModel.scrollToDate(date)
+                    },
+                    onJumpFinal: { date in
+                        viewModel.scrollToDate(date)
+                    }
+                )
+                .frame(width: 62)
+                .padding(.trailing, 4)
             }
         }
+    }
+
+    /// 日期标题行。
+    private func bucketHeaderView(_ bucket: MediaDateBucket) -> some View {
+        HStack {
+            Text(bucket.headerText)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+    }
+
+    /// 在 viewModel.media 中查找指定 mediaId 的全局索引。
+    private func mediaIndexInAll(mediaId: Int) -> Int? {
+        viewModel.media.firstIndex { $0.id == mediaId }
     }
 
     // MARK: - Keyboard

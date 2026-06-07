@@ -55,6 +55,60 @@ final class MediaRepository {
         self.database = database
     }
 
+    /// 时间线:按日期分组统计媒体数量(最新日期在前)。
+    /// 返回 [(year, month, day, count)],仅包含有媒体的日期。
+    func timeline(
+        type: String?,
+        starredOnly: Bool
+    ) async throws -> [TimelineEntry] {
+        guard let queue = database.queue else { throw RepositoryError.databaseNotOpen }
+
+        return try await queue.read { db -> [TimelineEntry] in
+            var where_: [String] = []
+            var args: [DatabaseValueConvertible] = []
+
+            // 排除子媒体(章节/帧)
+            where_.append("video_media_id IS NULL")
+
+            if let type = type {
+                switch type {
+                case "image":
+                    where_.append("mime_type LIKE 'image/%'")
+                case "video":
+                    where_.append("mime_type LIKE 'video/%'")
+                default:
+                    break
+                }
+            }
+            if starredOnly {
+                where_.append("starred = 1")
+            }
+
+            let whereClause = where_.isEmpty ? "" : "WHERE \(where_.joined(separator: " AND "))"
+
+            let sql = """
+                SELECT
+                    CAST(strftime('%Y', created_at) AS INTEGER) AS year,
+                    CAST(strftime('%m', created_at) AS INTEGER) AS month,
+                    CAST(strftime('%d', created_at) AS INTEGER) AS day,
+                    COUNT(*) AS count
+                FROM media
+                \(whereClause)
+                GROUP BY year, month, day
+                ORDER BY year DESC, month DESC, day DESC
+                """
+            let rows = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(args))
+            return rows.map { row in
+                TimelineEntry(
+                    year: row["year"],
+                    month: row["month"],
+                    day: row["day"],
+                    count: row["count"]
+                )
+            }
+        }
+    }
+
     /// 取一页 Media + 关联 tags。
     /// 排序按 `created_at DESC, id DESC`,符合"最新优先"。
     func list(

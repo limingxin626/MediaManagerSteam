@@ -170,6 +170,32 @@ struct Media: Identifiable, Codable {
     }
 }
 
+// MARK: - 时间线条目
+
+/// 按日期分组的媒体统计,与 backend /media/timeline 对齐。
+struct TimelineEntry: Identifiable, Codable {
+    let year: Int
+    let month: Int
+    let day: Int
+    let count: Int
+
+    /// 唯一标识(同一天不会重复)。
+    var id: String { "\(year)-\(month)-\(day)" }
+
+    /// 该条目对应的 Date(天级别,时间部分为午夜)。
+    var date: Date {
+        var comp = DateComponents()
+        comp.year = year
+        comp.month = month
+        comp.day = day
+        return Calendar.current.date(from: comp) ?? Date()
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case year, month, day, count
+    }
+}
+
 // MARK: - Media 分页响应
 
 struct MediaCursorResponse: Codable {

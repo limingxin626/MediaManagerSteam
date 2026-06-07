@@ -15,6 +15,12 @@ protocol MediaSource {
         type: String?,
         starredOnly: Bool
     ) async throws -> MediaCursorResponse
+
+    /// 时间线:按日期分组统计媒体数量。
+    func timeline(
+        type: String?,
+        starredOnly: Bool
+    ) async throws -> [TimelineEntry]
 }
 
 // MARK: - Local
@@ -46,6 +52,13 @@ final class LocalMediaSource: MediaSource {
             hasMoreBefore: false
         )
     }
+
+    func timeline(
+        type: String?,
+        starredOnly: Bool
+    ) async throws -> [TimelineEntry] {
+        try await repository.timeline(type: type, starredOnly: starredOnly)
+    }
 }
 
 // MARK: - API (回退/调试)
@@ -66,6 +79,16 @@ final class APIMediaSource: MediaSource {
         try await apiClient.getMedia(
             cursor: cursor,
             limit: limit,
+            type: type,
+            starred: starredOnly ? true : nil
+        )
+    }
+
+    func timeline(
+        type: String?,
+        starredOnly: Bool
+    ) async throws -> [TimelineEntry] {
+        try await apiClient.getMediaTimeline(
             type: type,
             starred: starredOnly ? true : nil
         )
