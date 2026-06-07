@@ -48,9 +48,13 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(openspec new *)",
-      "Bash(openspec status *)"
+      "Bash(openspec status *)",
+      "Bash(xcodebuild -scheme MyNote -configuration debug build)"
     ]
   },
+  "enabledMcpjsonServers": [
+    "workdata"
+  ],
   "disabledMcpjsonServers": [
     "work-data"
   ]

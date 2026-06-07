@@ -40,7 +40,7 @@ struct DateScrubber: View {
                 }
 
                 // 右侧刻度轨道
-                ZStack(alignment: .topRight) {
+                ZStack(alignment: .topTrailing) {
                     // 中心轴线
                     Rectangle()
                         .fill(Color.gray.opacity(0.3))
@@ -130,7 +130,7 @@ struct DateScrubber: View {
     // MARK: - 子视图
 
     private func yearLabelsColumn(height: CGFloat) -> some View {
-        ZStack(alignment: .topRight) {
+        ZStack(alignment: .topTrailing) {
             ForEach(yearLabels, id: \.year) { label in
                 Text("\(label.year)")
                     .font(.system(size: 10, weight: .medium))

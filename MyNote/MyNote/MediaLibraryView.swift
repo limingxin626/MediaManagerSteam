@@ -194,18 +194,8 @@ struct MediaLibraryView: View {
                                 .id("header-\(bucket.id)")
 
                             // 该天的媒体网格
-                            ForEach(Array(bucket.items.enumerated()), id: \.element.id) { index, mediaItem in
-                                let globalIndex = mediaIndexInAll(mediaId: mediaItem.id)
-                                MediaGridItem(media: mediaItem, isSelected: selectedIndex == globalIndex)
-                                    .id(mediaItem.id)
-                                    .onTapGesture(count: 2) {
-                                        selectedIndex = globalIndex
-                                        detailIndex = globalIndex
-                                        showDetail = true
-                                    }
-                                    .onTapGesture(count: 1) {
-                                        selectedIndex = globalIndex
-                                    }
+                            ForEach(bucket.items) { mediaItem in
+                                mediaItemView(mediaItem)
                             }
                         }
 
@@ -262,6 +252,22 @@ struct MediaLibraryView: View {
                 .padding(.trailing, 4)
             }
         }
+    }
+
+    /// 单个媒体项视图(拆分出来避免编译器类型爆炸)。
+    @ViewBuilder
+    private func mediaItemView(_ mediaItem: Media) -> some View {
+        let globalIndex = mediaIndexInAll(mediaId: mediaItem.id) ?? 0
+        MediaGridItem(media: mediaItem, isSelected: selectedIndex == globalIndex)
+            .id(mediaItem.id)
+            .onTapGesture(count: 2) {
+                selectedIndex = globalIndex
+                detailIndex = globalIndex
+                showDetail = true
+            }
+            .onTapGesture(count: 1) {
+                selectedIndex = globalIndex
+            }
     }
 
     /// 日期标题行。
