@@ -27,6 +27,8 @@ struct MediaDetailView: View {
 
     /// header / metadata 自动淡入淡出 —— 鼠标静止 ~1.5s 后置 false。
     @State private var chromeVisible: Bool = true
+    /// 焦点 — 让 .onKeyPress 在打开预览时立即接管键盘,不再受 NavigationSplitView 焦点抢占影响。
+    @FocusState private var isFocused: Bool
     /// 最近一次「活动事件」起的隐藏倒计时;新事件来了 cancel 旧的、起新的。
     @State private var hideTask: Task<Void, Never>? = nil
     /// AppKit 鼠标移动监视器 —— 全屏时 .onHover 永远是 true,只能走 NSEvent。
@@ -44,17 +46,10 @@ struct MediaDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-                .opacity(chromeVisible ? 1 : 0)
-                .animation(.easeInOut(duration: 0.25), value: chromeVisible)
-
-            Divider()
-                .opacity(chromeVisible ? 1 : 0)
-                .animation(.easeInOut(duration: 0.25), value: chromeVisible)
-
-            // 媒体本体 + 左右翻页热区
+            // 媒体本体 + 左右翻页热区。背景随系统主题走:
+            //   浅色 → 接近白,深色 → 接近黑 —— 与 Photos.app 等系统 app 的「舞台」色一致。
             ZStack {
-                Color.black.opacity(0.9)
+                Color(.windowBackgroundColor)
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -73,49 +68,46 @@ struct MediaDetailView: View {
                 .animation(.easeInOut(duration: 0.25), value: chromeVisible)
         }
         // 尺寸由外层 Window scene 控制(全屏时即整个屏幕),不再在 view 内部强约束。
-        // 不可见的快捷键按钮 —— 提供 ←/→/ESC 全局响应。
-        .background(keyboardShortcuts)
         .onAppear {
             rebuildPlayer()
             startMouseTracking()
             scheduleHide()
+            updateWindowTitle()
+            // 把焦点转移到本 view,使 .onKeyPress 生效
+            DispatchQueue.main.async { _ = isFocused = true }
         }
+        .focusable(true)
+        .focused($isFocused)
+        .onKeyPress { press in
+            switch press.key {
+            case .leftArrow:
+                goPrev(); return .handled
+            case .rightArrow:
+                goNext(); return .handled
+            case .escape:
+                closePreview(); return .handled
+            case .space:
+                closePreview(); return .handled
+            default:
+                return .ignored
+            }
+        }
+        .focusEffectDisabled(true)
         .onChange(of: currentIndex) { _, _ in
             rebuildPlayer()
             bumpActivity()
+            updateWindowTitle()
         }
         .onDisappear {
             player?.pause()
             player = nil
             stopMouseTracking()
             hideTask?.cancel()
-        }
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            Text(current?.filePath.components(separatedBy: "/").last ?? "")
-                .font(.headline)
-                .lineLimit(1)
-
-            if !mediaList.isEmpty {
-                Text("\(currentIndex + 1) / \(mediaList.count)\(hasMore ? "+" : "")")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            PreviewTitle.shared.title = ""
+            for window in NSApp.windows {
+                window.title = ""
             }
-
-            Spacer()
-
-            Button(action: { closePreview() }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
         }
-        .padding()
     }
 
     // MARK: - Content
@@ -212,7 +204,7 @@ struct MediaDetailView: View {
                     Spacer()
                 }
             }
-            
+
             // 第二行：绝对路径
             if let media = current, let fileURL = media.localFileURL {
                 HStack(spacing: 8) {
@@ -229,28 +221,27 @@ struct MediaDetailView: View {
                 .textSelection(.enabled)
             }
         }
+        // 同样:覆盖在网格上,缺背景会让浅色 secondary 文字糊在 cell 缩略图上读不清。
+        .background(Color(.windowBackgroundColor))
     }
 
-    // MARK: - Keyboard
+    // MARK: - Keyboard / Title
 
-    /// 用一组隐藏按钮承载快捷键,SwiftUI 上这是最稳的全局快捷方式。
-    private var keyboardShortcuts: some View {
-        ZStack {
-            Button("Prev", action: goPrev)
-                .keyboardShortcut(.leftArrow, modifiers: [])
-                .hidden()
-            Button("Next", action: goNext)
-                .keyboardShortcut(.rightArrow, modifiers: [])
-                .hidden()
-            Button("Close") { closePreview() }
-                .keyboardShortcut(.escape, modifiers: [])
-                .hidden()
-            // 空格也关闭预览,与网格态「空格打开预览」对称。
-            Button("Close on space") { closePreview() }
-                .keyboardShortcut(.space, modifiers: [])
-                .hidden()
+    /// 把当前文件名写到 AppKit 窗口的 title bar 上(不是 SwiftUI navigation bar)。
+    /// 媒体库的"媒体库"标题是 ContentView 用 .navigationTitle("媒体库") 渲染的,
+    /// 在 NavigationSplitView detail 里会被提升到系统窗口标题栏;此处同步覆盖,
+    /// 关闭预览时在 .onDisappear 里恢复空 title 让"媒体库"重新出现。
+    private func updateWindowTitle() {
+        let title: String
+        if mediaList.indices.contains(currentIndex) {
+            title = mediaList[currentIndex].filePath.components(separatedBy: "/").last ?? "媒体预览"
+        } else {
+            title = "媒体预览"
         }
-        .allowsHitTesting(false)
+        PreviewTitle.shared.title = title
+        for window in NSApp.windows {
+            window.title = title
+        }
     }
 
     // MARK: - Navigation

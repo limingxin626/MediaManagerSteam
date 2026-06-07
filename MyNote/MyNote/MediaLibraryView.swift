@@ -18,81 +18,72 @@ import SwiftUI
 struct MediaLibraryView: View {
     @ObservedObject var viewModel: MediaLibraryViewModel
 
-    // 预览状态 —— 本地持有,不再跨 scene 共享。previewItems != nil 即"预览中",
-    // 关闭时把它置回 nil,选中态同步给 selectedIndex。
-    @State private var previewItems: [Media]? = nil
-    @State private var previewIndex: Int = 0
-
-    private var isPreviewing: Bool { previewItems != nil }
+    // NavigationStack path — 推入 MediaPreviewDestination 即打开预览,pop 即关闭。
+    @State private var navigationPath = NavigationPath()
 
     // 选中态 - 与详情解耦,单击只改它
     @State private var selectedIndex: Int? = nil
     @FocusState private var gridFocused: Bool
 
     var body: some View {
-        ZStack {
-            // 底层:网格 + 错误提示(原有内容)
+        NavigationStack(path: $navigationPath) {
             ZStack {
-                Group {
-                    if viewModel.isLoading && viewModel.buckets.isEmpty {
-                        VStack {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
-                        }
-                    } else if viewModel.buckets.isEmpty {
-                        VStack {
-                            Spacer()
-                            Image(systemName: "photo.on.rectangle")
-                                .font(.system(size: 48))
-                                .foregroundColor(.gray)
-                            Text("暂无媒体")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                    } else {
-                        gridWithScrubber
-                    }
-                }
-
-                if let error = viewModel.errorMessage {
-                    VStack {
-                        HStack {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                            Spacer()
-                            Button(action: { viewModel.errorMessage = nil }) {
-                                Image(systemName: "xmark")
+                // 底层:网格 + 错误提示
+                ZStack {
+                    Group {
+                        if viewModel.isLoading && viewModel.buckets.isEmpty {
+                            VStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
                             }
+                        } else if viewModel.buckets.isEmpty {
+                            VStack {
+                                Spacer()
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(.gray)
+                                Text("暂无媒体")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                        } else {
+                            gridWithScrubber
                         }
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                        .padding()
+                    }
 
-                        Spacer()
+                    if let error = viewModel.errorMessage {
+                        VStack {
+                            HStack {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                Spacer()
+                                Button(action: { viewModel.errorMessage = nil }) {
+                                    Image(systemName: "xmark")
+                                }
+                            }
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(8)
+                            .padding()
+
+                            Spacer()
+                        }
                     }
                 }
             }
-
-            // 顶层:窗口内最大化预览。双击/空格打开,ESC/×/空格关闭。
-            // MediaDetailView 内部用 maxWidth/.infinity + maxHeight/.infinity 铺满可用空间。
-            if let items = previewItems {
+            .navigationTitle(PreviewTitle.shared.title.isEmpty ? "媒体库" : PreviewTitle.shared.title)
+            .navigationDestination(for: MediaPreviewDestination.self) { destination in
                 MediaDetailView(
-                    mediaList: items,
-                    currentIndex: Binding(
-                        get: { previewIndex },
-                        set: { previewIndex = $0 }
-                    ),
+                    mediaList: destination.mediaList,
+                    currentIndex: destination.currentIndexBinding ?? .constant(destination.startIndex),
                     hasMore: false,
-                    onNeedMore: { /* 桶按需加载暂未启用,保持与旧预览窗一致 */ },
+                    onNeedMore: { /* 桶按需加载暂未启用 */ },
                     onClose: { closePreview() }
                 )
-                .transition(.opacity)
             }
         }
-        .navigationTitle("媒体库")
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("媒体类型", selection: mediaTypeBinding) {
@@ -299,7 +290,6 @@ struct MediaLibraryView: View {
             moveSelection { ($0 ?? -viewModel.cols) + viewModel.cols }
             return .handled
         case .space:
-            if isPreviewing { return .ignored }
             let target = selectedIndex ?? 0
             selectedIndex = target
             openPreview(at: target)
@@ -316,27 +306,38 @@ struct MediaLibraryView: View {
         selectedIndex = max(0, min(raw, count - 1))
     }
 
-    /// 双击 / 空格触发预览的统一入口 —— 写入本地状态后由外层 body 的
-    /// `if isPreviewing { MediaDetailView }` 接管渲染。
+    /// 双击 / 空格触发预览的统一入口 — 推入 NavigationDestination,窗口标题自动切换。
     private func openPreview(at index: Int) {
         let items = viewModel.loadedFlatItems
         guard !items.isEmpty else { return }
-        previewItems = items
-        previewIndex = max(0, min(index, items.count - 1))
-        // 释放网格键盘焦点,让 MediaDetailView 的 .keyboardShortcut 接管方向键 / ESC / 空格。
+        let safeIndex = max(0, min(index, items.count - 1))
+        // 用一个独立的 Box 包裹可变的 Int 引用,避免 @State 跨多次打开时的旧值串扰。
+        let box = IndexBox(value: safeIndex)
+        let binding = Binding(get: { box.value }, set: { box.value = $0 })
+        let destination = MediaPreviewDestination(
+            mediaList: items,
+            startIndex: safeIndex,
+            currentIndexBinding: binding
+        )
+        previewBox = box
+        navigationPath.append(destination)
         gridFocused = false
     }
 
-    /// MediaDetailView 的关闭回调(ESC / 空格 / ×)。同步选中态后清掉本地状态,
-    /// 恢复网格焦点。后续 onChange(of: selectedIndex) 会自动调 ensureMediaVisible
-    /// 把最后看到的那张滚进可视范围。
+    /// MediaDetailView 的关闭回调(ESC / 空格 / ×)。pop 回媒体库,同步选中态,
+    /// 恢复网格焦点。后续 onChange(of: selectedIndex) 会自动调 ensureMediaVisible。
     private func closePreview() {
-        if let items = previewItems, items.indices.contains(previewIndex) {
-            selectedIndex = previewIndex
+        if let box = previewBox {
+            selectedIndex = box.value
         }
-        previewItems = nil
+        previewBox = nil
+        navigationPath.removeLast()
         gridFocused = true
     }
+
+    /// 用 @State 持有最近一次打开的 IndexBox — 关闭时据其同步 selectedIndex。
+    /// 每次 openPreview 重新创建,确保上一次的值不残留。
+    @State private var previewBox: IndexBox? = nil
 }
 
 // MARK: - Grid Item
