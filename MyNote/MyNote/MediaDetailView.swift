@@ -222,6 +222,10 @@ struct MediaDetailView: View {
             Button("Close") { dismiss() }
                 .keyboardShortcut(.escape, modifiers: [])
                 .hidden()
+            // 空格也关闭预览,与网格态「空格打开预览」对称。
+            Button("Close on space") { dismiss() }
+                .keyboardShortcut(.space, modifiers: [])
+                .hidden()
         }
         .allowsHitTesting(false)
     }
