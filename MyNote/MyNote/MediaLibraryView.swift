@@ -2,54 +2,42 @@
 //  MediaLibraryView.swift
 //  MyNote
 //
-//  媒体库视图 - 网格展示所有媒体(本地 SQLite 数据源)。
-//  交互模型贴近 Finder / macOS 照片:
-//    - 单击 -> 仅选中,不打开预览
-//    - 双击 -> 打开预览
-//    - 方向键 -> 在网格内移动选中(↑/↓ 按列对齐,边界处停住不 wrap)
-//    - 空格  -> 切换预览的打开/关闭
-//  时间轴:右侧 DateScrubber 固定显示,拖动可跳转到任意日期桶.
+//  媒体库视图 - 基于 timeline 派生的虚拟化网格 + 右侧 DateScrubber 日期导航。
+//
+//  架构与 vue/src/views/Media.vue + useVirtualGrid.ts 同构:
+//    1. 网格用 ScrollView + ZStack 绝对定位渲染可视范围内的 cell,
+//       内容总高由 timeline 全量算出,跳转到任意桶不依赖该桶已被实例化。
+//    2. NSScrollViewBridge 把 SwiftUI ScrollView 桥到 AppKit,
+//       支持「程序化跳转任意 y」+「实时回写 scrollTop」。
+//    3. 单击/双击/方向键/空格交互复用旧的 Finder 风格选中逻辑,
+//       基于 ViewModel.loadedFlatItems 提供 globalIndex。
 //
 
 import SwiftUI
 
 struct MediaLibraryView: View {
     @StateObject private var viewModel = MediaLibraryViewModel()
-    // 用 index 而非 Media,这样左右切换只改 index,sheet 不重建。
+
+    // 详情 sheet
     @State private var detailIndex: Int = 0
     @State private var showDetail: Bool = false
-    // 选中态 - 与预览态解耦,单击只动这个。
+
+    // 选中态 - 与详情解耦,单击只改它
     @State private var selectedIndex: Int? = nil
-    // 网格的键盘焦点 - .focusable + .focused + .onKeyPress 三件套需要它。
     @FocusState private var gridFocused: Bool
-
-    // 列数提成常量,方向键的几何换算和 columns 都要用。
-    private let columnCount = 4
-
-    private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 8), count: columnCount)
-    }
-
-    // Scrubber 用
-    private var timelineMinDate: Date {
-        viewModel.timeline.last?.date ?? Date()
-    }
-    private var timelineMaxDate: Date {
-        viewModel.timeline.first?.date ?? Date()
-    }
 
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
                 header
 
-                if viewModel.isLoading {
+                if viewModel.isLoading && viewModel.buckets.isEmpty {
                     VStack {
                         Spacer()
                         ProgressView()
                         Spacer()
                     }
-                } else if viewModel.media.isEmpty {
+                } else if viewModel.buckets.isEmpty {
                     VStack {
                         Spacer()
                         Image(systemName: "photo.on.rectangle")
@@ -60,7 +48,7 @@ struct MediaLibraryView: View {
                         Spacer()
                     }
                 } else {
-                    grid
+                    gridWithScrubber
                 }
 
                 Spacer(minLength: 0)
@@ -88,38 +76,28 @@ struct MediaLibraryView: View {
         }
         .sheet(isPresented: $showDetail) {
             MediaDetailView(
-                mediaList: viewModel.media,
+                mediaList: viewModel.loadedFlatItems,
                 currentIndex: $detailIndex,
-                hasMore: viewModel.hasMore,
-                onNeedMore: { await viewModel.loadMore() }
+                hasMore: false,
+                onNeedMore: { /* 桶按需加载,详情翻页时如果到末尾再考虑 */ }
             )
         }
         .onAppear {
-            Task {
-                await viewModel.loadTimeline()
-                await viewModel.loadInitial()
-            }
-            // 进入页面就让网格拿到焦点,方向键/空格立刻可用。
+            Task { await viewModel.loadInitial() }
             gridFocused = true
         }
-        // 首屏(或过滤切换)拉完数据后,默认选中第 0 项。
-        // 监听 count 而非整个 [Media] - Media 没有 Equatable,且 count 已经能覆盖
-        // 三种触发场景:loadInitial(0→N)、loadMore(N→N+k)、filter 切换(N→M)。
-        .onChange(of: viewModel.media.count) { _, newCount in
+        // 首屏 / 过滤切换后默认选中第 0 项
+        .onChange(of: viewModel.loadedFlatItems.count) { _, newCount in
             if newCount == 0 {
                 selectedIndex = nil
             } else if selectedIndex == nil {
                 selectedIndex = 0
             } else if let i = selectedIndex, i >= newCount {
-                // 过滤切换后老索引越界,夹回末项。
                 selectedIndex = newCount - 1
             }
         }
-        // 过滤变化时主动把选中重置 - data 还没回来就先清掉,
-        // 等 viewModel.media 变化的 onChange 再设回 0。
         .onChange(of: viewModel.selectedMediaType) { _, _ in selectedIndex = nil }
         .onChange(of: viewModel.showOnlyStarred) { _, _ in selectedIndex = nil }
-        // 预览关闭后,把网格选中对到预览里最后看的那张。
         .onChange(of: showDetail) { _, isShown in
             if !isShown { selectedIndex = detailIndex }
         }
@@ -180,72 +158,26 @@ struct MediaLibraryView: View {
         .background(Color(NSColor.controlBackgroundColor))
     }
 
-    // MARK: - Grid
+    // MARK: - Grid + Scrubber 整体
 
-    private var grid: some View {
+    private var gridWithScrubber: some View {
         HStack(spacing: 0) {
-            // 主内容区
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 8) {
-                        ForEach(viewModel.buckets) { bucket in
-                            // 日期标题行
-                            bucketHeaderView(bucket)
-                                .id("header-\(bucket.id)")
+            grid
+                .frame(maxWidth: .infinity)
 
-                            // 该天的媒体网格
-                            ForEach(bucket.items) { mediaItem in
-                                mediaItemView(mediaItem)
-                            }
-                        }
-
-                        // 加载更多
-                        if viewModel.hasMore {
-                            VStack {
-                                if viewModel.isLoadingMore {
-                                    ProgressView()
-                                } else {
-                                    Text("加载更多")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .frame(height: 80)
-                            .gridCellUnsizedAxes(.horizontal)
-                            .onAppear {
-                                Task { await viewModel.loadMore() }
-                            }
-                        }
-                    }
-                    .padding(8)
-                }
-                // 键盘焦点 + 方向键/空格响应。
-                .focusable(true)
-                .focused($gridFocused)
-                .onKeyPress { press in
-                    handleKeyPress(press)
-                }
-                // Scrubber 跳转:滚动到目标桶
-                .onChange(of: viewModel._scrollToBucketIndex) { _, newIdx in
-                    guard let idx = newIdx, viewModel.buckets.indices.contains(idx) else { return }
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo("header-\(viewModel.buckets[idx].id)", anchor: .top)
-                    }
-                }
-            }
-
-            // 右侧时间轴 Scrubber
             if !viewModel.timeline.isEmpty {
                 DateScrubber(
                     timeline: viewModel.timeline,
                     minDate: timelineMinDate,
                     maxDate: timelineMaxDate,
-                    currentDate: $viewModel.currentDate,
+                    currentDate: viewModel.currentDate,
                     onJump: { date in
+                        viewModel.setDispatchPaused(true)
                         viewModel.scrollToDate(date)
                     },
                     onJumpFinal: { date in
                         viewModel.scrollToDate(date)
+                        viewModel.setDispatchPaused(false)
                     }
                 )
                 .frame(width: 62)
@@ -254,45 +186,116 @@ struct MediaLibraryView: View {
         }
     }
 
-    /// 单个媒体项视图(拆分出来避免编译器类型爆炸)。
-    @ViewBuilder
-    private func mediaItemView(_ mediaItem: Media) -> some View {
-        let globalIndex = mediaIndexInAll(mediaId: mediaItem.id) ?? 0
-        MediaGridItem(media: mediaItem, isSelected: selectedIndex == globalIndex)
-            .id(mediaItem.id)
-            .onTapGesture(count: 2) {
-                selectedIndex = globalIndex
-                detailIndex = globalIndex
-                showDetail = true
-            }
-            .onTapGesture(count: 1) {
-                selectedIndex = globalIndex
-            }
+    private var timelineMinDate: Date {
+        // timeline 按 DESC,last 是最早 → 取其 0 点
+        guard let last = viewModel.timeline.last else { return Date() }
+        var comp = DateComponents()
+        comp.year = last.year; comp.month = last.month; comp.day = last.day
+        return Calendar.current.date(from: comp) ?? Date()
     }
 
-    /// 日期标题行。
-    private func bucketHeaderView(_ bucket: MediaDateBucket) -> some View {
+    private var timelineMaxDate: Date {
+        // first 是最新 → 取其 23:59:59,避免最新一天被压在 0% 顶端
+        guard let first = viewModel.timeline.first else { return Date() }
+        var comp = DateComponents()
+        comp.year = first.year; comp.month = first.month; comp.day = first.day
+        comp.hour = 23; comp.minute = 59; comp.second = 59
+        return Calendar.current.date(from: comp) ?? Date()
+    }
+
+    // MARK: - Grid 主体
+
+    private var grid: some View {
+        GeometryReader { geo in
+            ScrollView(.vertical, showsIndicators: false) {
+                ZStack(alignment: .topLeading) {
+                    // 撑高占位:让 ScrollView 内容总高 = totalContentHeight,
+                    // 滚动条比例反映整个媒体库时间跨度。
+                    Color.clear
+                        .frame(width: 1, height: max(viewModel.totalContentHeight, 1))
+
+                    // 桶头(只渲染可视范围 + PREFETCH 内的)
+                    ForEach(viewModel.visibleBuckets) { b in
+                        bucketHeaderView(b)
+                            .frame(width: geo.size.width, height: 28, alignment: .leading)
+                            .offset(x: 0, y: b.headerOffset)
+                    }
+
+                    // 可见 cell(更窄的 RENDER_OVERSCAN)
+                    ForEach(viewModel.visibleCells) { cell in
+                        cellView(cell)
+                            .frame(width: cell.size, height: cell.size)
+                            .offset(x: cell.x, y: cell.y)
+                    }
+                }
+                .frame(width: geo.size.width, alignment: .topLeading)
+            }
+            .background(
+                NSScrollViewBridge(
+                    scrollTop: Binding(
+                        get: { viewModel.scrollTop },
+                        set: { viewModel.setScrollTop($0) }
+                    ),
+                    jumpTrigger: viewModel.jumpTrigger,
+                    targetY: viewModel.jumpTargetY
+                )
+            )
+            .focusable(true)
+            .focused($gridFocused)
+            .onKeyPress { handleKeyPress($0) }
+            .onAppear {
+                viewModel.setContainerWidth(geo.size.width)
+                viewModel.setViewportHeight(geo.size.height)
+            }
+            .onChange(of: geo.size) { _, newSize in
+                viewModel.setContainerWidth(newSize.width)
+                viewModel.setViewportHeight(newSize.height)
+            }
+        }
+    }
+
+    // MARK: - 桶头 / cell
+
+    private func bucketHeaderView(_ b: BucketLayout) -> some View {
         HStack {
-            Text(bucket.headerText)
+            Text(b.headerText)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.secondary)
             Spacer()
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
     }
 
-    /// 在 viewModel.media 中查找指定 mediaId 的全局索引。
-    private func mediaIndexInAll(mediaId: Int) -> Int? {
-        viewModel.media.firstIndex { $0.id == mediaId }
+    @ViewBuilder
+    private func cellView(_ cell: VisibleCell) -> some View {
+        if let item = cell.item {
+            let globalIndex = mediaIndexInLoaded(mediaId: item.id) ?? 0
+            MediaGridItem(media: item, isSelected: selectedIndex == globalIndex)
+                .onTapGesture(count: 2) {
+                    selectedIndex = globalIndex
+                    detailIndex = globalIndex
+                    showDetail = true
+                }
+                .onTapGesture(count: 1) {
+                    selectedIndex = globalIndex
+                }
+        } else {
+            // 占位:item 还没加载到此 idx,撑住格子位置不坍缩
+            Rectangle()
+                .fill(Color.gray.opacity(0.12))
+                .cornerRadius(4)
+        }
+    }
+
+    private func mediaIndexInLoaded(mediaId: Int) -> Int? {
+        viewModel.loadedFlatItems.firstIndex { $0.id == mediaId }
     }
 
     // MARK: - Keyboard
 
-    /// 网格层处理方向键 + 空格。返回 .handled 表示事件已消费,.ignored 让它继续冒泡。
     private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
-        let count = viewModel.media.count
+        let count = viewModel.loadedFlatItems.count
         guard count > 0 else { return .ignored }
 
         switch press.key {
@@ -303,13 +306,12 @@ struct MediaLibraryView: View {
             moveSelection { ($0 ?? -1) + 1 }
             return .handled
         case .upArrow:
-            moveSelection { ($0 ?? columnCount) - columnCount }
+            moveSelection { ($0 ?? viewModel.cols) - viewModel.cols }
             return .handled
         case .downArrow:
-            moveSelection { ($0 ?? -columnCount) + columnCount }
+            moveSelection { ($0 ?? -viewModel.cols) + viewModel.cols }
             return .handled
         case .space:
-            // 预览已开,让事件冒泡给 sheet 自己处理关闭。
             if showDetail { return .ignored }
             let target = selectedIndex ?? 0
             selectedIndex = target
@@ -321,10 +323,8 @@ struct MediaLibraryView: View {
         }
     }
 
-    /// 用 transform 计算新索引,并夹到 [0, count-1]。selectedIndex == nil 时由
-    /// transform 内的 ?? 兜底,效果是任一方向键都把选中拽到 0(再加方向偏移再夹回)。
     private func moveSelection(_ transform: (Int?) -> Int) {
-        let count = viewModel.media.count
+        let count = viewModel.loadedFlatItems.count
         guard count > 0 else { return }
         let raw = transform(selectedIndex)
         selectedIndex = max(0, min(raw, count - 1))
@@ -353,15 +353,12 @@ struct MediaGridItem: View {
             .clipped()
             .cornerRadius(4)
             .contentShape(Rectangle())
-            // 选中描边:用 accent color 贴系统外观,3pt 线宽够显眼又不挡内容。
-            // 放在 ZStack 顶部的 overlay 里,不会推动 layout。
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(Color.accentColor, lineWidth: 3)
                     .opacity(isSelected ? 1 : 0)
             )
 
-            // 第一期只读:星标仅显示状态,不可点击
             if media.starred {
                 Image(systemName: "star.fill")
                     .font(.system(size: 12))

@@ -109,6 +109,110 @@ final class MediaRepository {
         }
     }
 
+    /// 按桶(单日)取一页 Media + 关联 tags。与 vue 端 `useVirtualGrid.runLoad` 对齐:
+    /// 起始 cursor 走「次日 00:00:00 | Int.max」,翻到第一条 `created_at < 当天 00:00:00`
+    /// 的记录立即截断、标记 `isComplete = true`(已越界到上一天)。
+    ///
+    /// - Parameters:
+    ///   - year/month/day: 桶的三元组。
+    ///   - afterCursor: 续翻时上一页返回的 `nextCursor`;首次加载传 nil。
+    ///   - limit: 单次请求条数。
+    /// - Returns: items 全部在 `[当天 00:00:00, 次日 00:00:00)` 范围内;
+    ///   `isComplete = true` 时该桶已加载完(达到 timeline count 或越界或 SQL 返回 < limit);
+    ///   `false` 时调用方应继续用 `nextCursor` 翻下一页。
+    func loadBucket(
+        year: Int,
+        month: Int,
+        day: Int,
+        afterCursor: String?,
+        limit: Int,
+        type: String?,
+        starredOnly: Bool
+    ) async throws -> (items: [Media], nextCursor: String?, isComplete: Bool) {
+        guard let queue = database.queue else { throw RepositoryError.databaseNotOpen }
+
+        // 当天 0 点 — 用来判定「越界到上一天」。
+        var dayStartComp = DateComponents()
+        dayStartComp.year = year; dayStartComp.month = month; dayStartComp.day = day
+        guard let dayStart = Calendar.current.date(from: dayStartComp) else {
+            return ([], nil, true)
+        }
+
+        // 起始游标:用次日 0 点 + Int.max,确保不漏当天最新一条。
+        let cursorTuple: (Date, Int)
+        if let raw = afterCursor {
+            cursorTuple = try MediaCursor.decode(raw)
+        } else {
+            let nextDayStart = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+            cursorTuple = (nextDayStart, Int.max)
+        }
+
+        return try await queue.read { db -> (items: [Media], nextCursor: String?, isComplete: Bool) in
+            var where_: [String] = []
+            var args: [DatabaseValueConvertible] = []
+
+            // 排除子媒体(章节/帧),与 timeline 计数口径一致
+            where_.append("video_media_id IS NULL")
+
+            // 复合 cursor(同 list)
+            where_.append("(created_at < ? OR (created_at = ? AND id < ?))")
+            let (cDate, cId) = cursorTuple
+            args.append(cDate); args.append(cDate); args.append(cId)
+
+            if let type = type {
+                switch type {
+                case "image": where_.append("mime_type LIKE 'image/%'")
+                case "video": where_.append("mime_type LIKE 'video/%'")
+                default: break
+                }
+            }
+            if starredOnly {
+                where_.append("starred = 1")
+            }
+
+            let whereClause = "WHERE \(where_.joined(separator: " AND "))"
+            let sql = """
+                SELECT * FROM media
+                \(whereClause)
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """
+            var allArgs = args
+            allArgs.append(limit + 1)
+
+            let rows = try MediaRecord.fetchAll(db, sql: sql, arguments: StatementArguments(allArgs))
+
+            let hasMoreInSQL = rows.count > limit
+            let page = hasMoreInSQL ? Array(rows.prefix(limit)) : rows
+
+            // 越界判停:遇到第一条 < 当天 00:00:00 立即截断、isComplete = true
+            var inDay: [MediaRecord] = []
+            var spilled = false
+            for r in page {
+                if r.createdAt >= dayStart {
+                    inDay.append(r)
+                } else {
+                    spilled = true
+                    break
+                }
+            }
+
+            let isComplete = spilled || !hasMoreInSQL
+            let nextCursor: String? = {
+                if isComplete { return nil }
+                guard let last = inDay.last else { return nil }
+                return MediaCursor.encode(createdAt: last.createdAt, id: last.id)
+            }()
+
+            // 批量取 tags
+            let ids = inDay.map { $0.id }
+            let tagsByMedia = try Self.fetchTags(db: db, mediaIds: ids)
+            let items = inDay.map { $0.toUIModel(tags: tagsByMedia[$0.id] ?? []) }
+
+            return (items, nextCursor, isComplete)
+        }
+    }
+
     /// 取一页 Media + 关联 tags。
     /// 排序按 `created_at DESC, id DESC`,符合"最新优先"。
     func list(

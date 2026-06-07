@@ -41,6 +41,7 @@
 - `LocalThumbView.swift`
 - `OnboardingView.swift`
 - `MediaDetailView.swift`(替换/新增,看是否已在工程中)
+- `NSScrollViewBridge.swift`(**2026-06-07 新增**,DateScrubber-fix 用)
 
 做法:在 Project Navigator 右键 `MyNote` 文件夹 → **Add Files to "MyNote"...** → 多选上述文件 → 勾 `MyNote` target → Add。
 
