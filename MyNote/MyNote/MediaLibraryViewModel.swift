@@ -326,6 +326,49 @@ class MediaLibraryViewModel: ObservableObject {
         return buckets.last
     }
 
+    /// 选中项变化时(方向键 / 详情关闭同步)调用:让 cell 落在可视范围内。
+    /// 桶未加载时跳过(屏外 cell 看不到,等下次方向键用户会自己滚到)。
+    func ensureMediaVisible(mediaId: Int) {
+        for b in buckets {
+            let items = bucketCache[b.key]?.items ?? []
+            if let idxInBucket = items.firstIndex(where: { $0.id == mediaId }) {
+                scrollBucketCellIntoView(bucket: b, idxInBucket: idxInBucket)
+                return
+            }
+        }
+    }
+
+    private func scrollBucketCellIntoView(bucket: BucketLayout, idxInBucket: Int) {
+        guard cols > 0, cellSize > 0, viewportHeight > 0 else { return }
+        let rowStride = cellSize + GAP
+        let row = idxInBucket / cols
+        let cellY = bucket.gridOffset + CGFloat(row) * rowStride
+        let cellBottom = cellY + cellSize
+        let top = scrollTop
+        let bottom = top + viewportHeight
+        let margin: CGFloat = 60
+
+        // 视口边距内有 cell → 不用滚;否则算目标 scrollTop
+        let newScrollTop: CGFloat?
+        if cellY < top + margin {
+            newScrollTop = max(0, cellY - margin)
+        } else if cellBottom > bottom - margin {
+            newScrollTop = max(0, cellBottom + margin - viewportHeight)
+        } else {
+            newScrollTop = nil
+        }
+        guard let target = newScrollTop else { return }
+
+        let maxY = max(0, totalContentHeight - viewportHeight)
+        let clamped = min(target, maxY)
+        if abs(scrollTop - clamped) < 0.5 { return }
+        // 先把 VM 推到位触发 dispatchFetches 给新可视范围安排 dwell,
+        // 再用 jumpTrigger 把 NSScrollView 实际滚过去
+        setScrollTop(clamped)
+        jumpTargetY = clamped
+        jumpTrigger &+= 1
+    }
+
     // MARK: - 加载调度
 
     /// 拖动 scrubber 时调 true,释放时调 false;暂停时清光 dwell timer。

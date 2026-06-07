@@ -98,6 +98,11 @@ struct MediaLibraryView: View {
         }
         .onChange(of: viewModel.selectedMediaType) { _, _ in selectedIndex = nil }
         .onChange(of: viewModel.showOnlyStarred) { _, _ in selectedIndex = nil }
+        // 选中项变化时(方向键 / 详情关闭同步)自动滚到可视范围
+        .onChange(of: selectedIndex) { _, newValue in
+            guard let i = newValue, i < viewModel.loadedFlatItems.count else { return }
+            viewModel.ensureMediaVisible(mediaId: viewModel.loadedFlatItems[i].id)
+        }
         .onChange(of: showDetail) { _, isShown in
             if !isShown { selectedIndex = detailIndex }
         }
