@@ -209,12 +209,14 @@ struct MediaLibraryView: View {
                 }
                 .padding(8)
             }
-            // 选中变化时,滚到该项让它落在视口中央。
-            // contains(i) 守卫避免 loadInitial 清空数据瞬间访问越界。
+            // 选中变化时,只在项超出可见区域时才滚动(避免每次方向键都移动画面)。
             .onChange(of: selectedIndex) { _, newValue in
                 guard let i = newValue, viewModel.media.indices.contains(i) else { return }
+                let itemId = viewModel.media[i].id
+                // scrollTo(anchor:) 会把项滚到视口内;使用 nil anchor 只在需要时滚动,
+                // 已在可见区域内时不会主动重新居中。
                 withAnimation(.easeOut(duration: 0.15)) {
-                    proxy.scrollTo(viewModel.media[i].id, anchor: .center)
+                    proxy.scrollTo(itemId, anchor: nil)
                 }
             }
             // 键盘焦点 + 方向键/空格响应。
