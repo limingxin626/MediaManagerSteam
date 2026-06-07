@@ -76,6 +76,9 @@ struct VisibleCell: Identifiable {
     let y: CGFloat
     let size: CGFloat
     let item: Media?         // nil 表示该桶 items 还没加载到此 idx
+    /// 在 `loadedFlatItems` 里的位置 — 由 `visibleCells` 跑前缀和算出,
+    /// cell 层直接用,避免每次 render 都对 loadedFlatItems 做线性扫。
+    let globalIndex: Int
 
     var id: String { "\(bucketKey)-\(idx)" }
 }
@@ -158,20 +161,32 @@ class MediaLibraryViewModel: ObservableObject {
     }
 
     /// 渲染范围(更窄):仅 RENDER_OVERSCAN 内,实际 ZStack 里只摆这些 cell。
+    /// 遍历时维护 `prefix`(已扫过的桶累计的 items 数),对每个 cell
+    /// 直接给出 `globalIndex = prefix + idx`,这样 cell 层不用再做线性查找。
     var visibleCells: [VisibleCell] {
         guard cellSize > 0, cols > 0 else { return [] }
         let top = scrollTop - RENDER_OVERSCAN_PX
         let bottom = scrollTop + viewportHeight + RENDER_OVERSCAN_PX
         let rowStride = cellSize + GAP
         var out: [VisibleCell] = []
+        var prefix = 0
         for b in buckets {
-            if b.endOffset < top || b.headerOffset > bottom { continue }
+            let bucketItemCount = bucketCache[b.key]?.items.count ?? 0
+            // 桶在视口外 / 桶内无行可渲:跳过 cell 构造,但 items 数仍要累进 prefix,
+            // 否则下一个可见桶的 globalIndex 会算少一段。
+            if b.endOffset < top || b.headerOffset > bottom {
+                prefix += bucketItemCount
+                continue
+            }
             let firstRow = max(0, Int(floor((top - b.gridOffset) / rowStride)))
             let lastRow = min(
                 b.rows - 1,
                 Int(floor((bottom - b.gridOffset) / rowStride))
             )
-            if lastRow < 0 || firstRow > b.rows - 1 { continue }
+            if lastRow < 0 || firstRow > b.rows - 1 {
+                prefix += bucketItemCount
+                continue
+            }
             let startIdx = firstRow * cols
             let endIdx = min(b.count, (lastRow + 1) * cols)
             let entry = bucketCache[b.key]
@@ -184,9 +199,11 @@ class MediaLibraryViewModel: ObservableObject {
                     x: CGFloat(col) * rowStride,
                     y: b.gridOffset + CGFloat(row) * rowStride,
                     size: cellSize,
-                    item: entry?.items[safe: idx]
+                    item: entry?.items[safe: idx],
+                    globalIndex: prefix + idx
                 ))
             }
+            prefix += bucketItemCount
         }
         return out
     }
@@ -217,6 +234,7 @@ class MediaLibraryViewModel: ObservableObject {
 
         // 清空桶缓存 + 滚动到顶
         bucketCache = [:]
+        loadedFlatItems = []   // 与 bucketCache 同步清空
         cancelAllDwell()
         loadQueue.removeAll()
         inFlight = 0
@@ -512,6 +530,9 @@ class MediaLibraryViewModel: ObservableObject {
                 entry.nextCursor = nextCursor
             }
             bucketCache[key] = entry
+            // 同步刷新平铺列表,避免每次访问都重建。
+            // 翻页后 prefix 没变(桶顺序稳定),全量 flatMap 一次 O(buckets + items) 可接受。
+            loadedFlatItems = buckets.flatMap { bucketCache[$0.key]?.items ?? [] }
             // 翻页后如果还没加载完,触发下一轮 dwell 让这个桶继续翻页。
             // 否则 .partial 状态会卡住 —— 后续 visibleBuckets 还是它,但 dispatchFetches
             // 不会被任何更新路径调,用户就会看到桶末尾的灰格子永远不消失。
@@ -544,11 +565,18 @@ class MediaLibraryViewModel: ObservableObject {
 
     // MARK: - 兼容旧 API(供详情 sheet 等暂用)
 
-    /// 已加载到的全部 items 平铺,按 timeline 顺序。供详情 sheet 翻页用。
+    /// 已加载到的全部 items 平铺,按 timeline 顺序。供详情 sheet 翻页、
+    /// cell 选中态定位、键盘导航等使用。
+    ///
+    /// 之所以做成 `@Published` 存储属性而不是 computed:
+    /// 旧版 `buckets.flatMap {...}` 每次访问都重建数组;网格 render 时
+    /// `cellView` 通过 `mediaIndexInLoaded` 访问它的次数等于
+    /// (可见 cell 数 × render 次数),数据多时叠加可观。改成存储属性后
+    /// 读访问是 O(1) 或 O(1) 下标,代价是在 bucketCache 变更点
+    /// (loadInitial / runLoad) 同步重算一次,均为异步路径不影响交互。
+    ///
     /// 未加载的桶会被跳过(不会有空洞);详情翻到边缘时再触发 loadBucketNow。
-    var loadedFlatItems: [Media] {
-        buckets.flatMap { bucketCache[$0.key]?.items ?? [] }
-    }
+    @Published private(set) var loadedFlatItems: [Media] = []
 }
 
 // MARK: - 小工具

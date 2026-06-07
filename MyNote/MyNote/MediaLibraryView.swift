@@ -10,7 +10,9 @@
 //    2. NSScrollViewBridge 把 SwiftUI ScrollView 桥到 AppKit,
 //       支持「程序化跳转任意 y」+「实时回写 scrollTop」。
 //    3. 单击/双击/方向键/空格交互复用旧的 Finder 风格选中逻辑,
-//       基于 ViewModel.loadedFlatItems 提供 globalIndex。
+//       globalIndex 由 ViewModel.visibleCells 算前缀和直接给到 cell,
+//       cell 层不再做线性查找;单击 / 双击判别用 CellTapModifier
+//       自定义(避免 SwiftUI 等系统双击间隔造成的 1s 延迟)。
 //
 
 import SwiftUI
@@ -249,25 +251,24 @@ struct MediaLibraryView: View {
     @ViewBuilder
     private func cellView(_ cell: VisibleCell) -> some View {
         if let item = cell.item {
-            let globalIndex = mediaIndexInLoaded(mediaId: item.id) ?? 0
+            // globalIndex 已由 ViewModel 在 visibleCells 里算好,直接读,
+            // 避免对 loadedFlatItems 做线性扫(每个 cell 每次 render 都跑)。
+            let globalIndex = cell.globalIndex
             MediaGridItem(media: item, isSelected: selectedIndex == globalIndex)
-                .onTapGesture(count: 2) {
-                    selectedIndex = globalIndex
-                    openPreview(at: globalIndex)
-                }
-                .onTapGesture(count: 1) {
-                    selectedIndex = globalIndex
-                }
+                .cellTap(
+                    globalIndex: globalIndex,
+                    onSingle: { _ in selectedIndex = globalIndex },
+                    onDouble: { _ in
+                        selectedIndex = globalIndex
+                        openPreview(at: globalIndex)
+                    }
+                )
         } else {
             // 占位:item 还没加载到此 idx,撑住格子位置不坍缩
             Rectangle()
                 .fill(Color.gray.opacity(0.12))
                 .cornerRadius(4)
         }
-    }
-
-    private func mediaIndexInLoaded(mediaId: Int) -> Int? {
-        viewModel.loadedFlatItems.firstIndex { $0.id == mediaId }
     }
 
     // MARK: - Keyboard
@@ -384,5 +385,76 @@ struct MediaGridItem: View {
 #Preview {
     NavigationStack {
         MediaLibraryView(viewModel: MediaLibraryViewModel())
+    }
+}
+
+// MARK: - 单 / 双击判别
+
+/// 在 macOS 上,如果同一个 view 上同时挂 `.onTapGesture(count: 1)` 和
+/// `.onTapGesture(count: 2)`,SwiftUI 必须等满系统的双击间隔
+/// (`NSEvent.doubleClickInterval()`,默认 500ms)才能确定是单击还是双击,
+/// 单击高亮因此会拖到接近 1 秒 —— 这就是「点击媒体卡顿」的根因。
+///
+/// 这里只挂 `.onTapGesture(count: 1)`,内部用时间戳 + Task 自己判别:
+///   - 第一次 tap 记时间戳,起一个 250ms 的延迟任务准备触发「单击」;
+///   - 250ms 内再来一次 tap → 取消延迟任务,改派发「双击」;
+///   - 250ms 内没有第二次 → 延迟任务自然唤醒,派发「单击」。
+///
+/// 250ms 略小于系统默认 500ms,既能让单击反馈接近即时,又足够覆盖
+/// 多数人的真实双击节奏。
+private struct CellTapModifier: ViewModifier {
+    let globalIndex: Int
+    let onSingle: (Int) -> Void
+    let onDouble: (Int) -> Void
+
+    /// 250ms 在绝大多数用户的双击节奏之内;系统双击间隔调长的人会偶尔
+    /// 把「想双击」误判为两次单击,这种情况可让他们改系统设置。
+    private static let doubleTapWindow: TimeInterval = 0.25
+
+    @State private var lastTapTime: Date?
+    @State private var pendingSingleTask: Task<Void, Never>?
+
+    func body(content: Content) -> some View {
+        content.onTapGesture {
+            handleTap()
+        }
+    }
+
+    private func handleTap() {
+        let now = Date()
+        if let last = lastTapTime, now.timeIntervalSince(last) < Self.doubleTapWindow {
+            // 第二次 tap 落在窗口内:取消挂起的单击,立刻派发双击。
+            pendingSingleTask?.cancel()
+            pendingSingleTask = nil
+            lastTapTime = nil
+            onDouble(globalIndex)
+        } else {
+            // 第一次 tap(或离上次太远):记时间戳并排一个延迟的单击。
+            // 用 capturedIndex 闭包捕获,避免 task 醒来时 globalIndex 已被新值替换。
+            let capturedIndex = globalIndex
+            lastTapTime = now
+            pendingSingleTask = Task { @MainActor [onSingle] in
+                try? await Task.sleep(nanoseconds: UInt64(Self.doubleTapWindow * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                onSingle(capturedIndex)
+            }
+        }
+    }
+}
+
+private extension View {
+    /// 网格 cell 的单击 / 双击判别入口。挂这个等价于
+    /// `.onTapGesture(count: 1)`,但内部用时间戳自行判别双击,
+    /// 避免 SwiftUI 等待系统双击间隔造成的 1 秒延迟。
+    func cellTap(
+        globalIndex: Int,
+        onSingle: @escaping (Int) -> Void,
+        onDouble: @escaping (Int) -> Void
+    ) -> some View {
+        modifier(CellTapModifier(
+            globalIndex: globalIndex,
+            onSingle: onSingle,
+            onDouble: onDouble
+        ))
     }
 }
