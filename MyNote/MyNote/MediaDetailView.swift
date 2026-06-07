@@ -154,37 +154,56 @@ struct MediaDetailView: View {
     // MARK: - Metadata
 
     private var metadata: some View {
-        HStack(spacing: 24) {
-            if let media = current {
-                if let size = media.fileSize {
-                    Label(formatFileSize(size), systemImage: "doc")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                if let w = media.width, let h = media.height {
-                    Label("\(w) × \(h)", systemImage: "aspectratio")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                if let d = media.durationMs {
-                    Label(formatDuration(d), systemImage: "clock")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-                if !media.tags.isEmpty {
-                    ForEach(media.tags) { tag in
-                        Text("#\(tag.name)")
+        VStack(alignment: .leading, spacing: 12) {
+            // 第一行：文件属性标签
+            HStack(spacing: 24) {
+                if let media = current {
+                    if let size = media.fileSize {
+                        Label(formatFileSize(size), systemImage: "doc")
                             .font(.caption)
-                            .foregroundColor(.blue)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(4)
+                            .foregroundColor(.secondary)
                     }
+                    if let w = media.width, let h = media.height {
+                        Label("\(w) × \(h)", systemImage: "aspectratio")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    if let d = media.durationMs {
+                        Label(formatDuration(d), systemImage: "clock")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    if !media.tags.isEmpty {
+                        ForEach(media.tags) { tag in
+                            Text("#\(tag.name)")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(4)
+                        }
+                    }
+                } else {
+                    Spacer()
                 }
-            } else {
-                Spacer()
+            }
+            
+            // 第二行：绝对路径
+            if let media = current, let fileURL = media.localFileURL {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(fileURL.path)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .truncationMode(.middle)
+                        .lineLimit(1)
+                    Spacer()
+                }
+                .textSelection(.enabled)
             }
         }
     }
@@ -279,6 +298,7 @@ private struct LocalLargeImageView: View {
     /// 当前 image 是不是缩略图占位 —— true 时大图还在后台解,但 UI 已经有东西看了。
     @State private var isPlaceholder: Bool = false
     @State private var failed = false
+    @State private var errorDetails: String = ""
 
     var body: some View {
         ZStack {
@@ -289,16 +309,27 @@ private struct LocalLargeImageView: View {
                     .interpolation(.medium)
                     .scaledToFit()
             } else if failed {
-                VStack(spacing: 8) {
+                VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 36))
                         .foregroundColor(.gray)
                     Text("无法加载图片")
                         .foregroundColor(.gray)
-                    Text(fileURL.path)
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .textSelection(.enabled)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("路径: \(fileURL.path)")
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                            .textSelection(.enabled)
+                        if !errorDetails.isEmpty {
+                            Text(errorDetails)
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .padding(8)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(4)
                 }
             } else {
                 ProgressView()
@@ -306,6 +337,7 @@ private struct LocalLargeImageView: View {
         }
         .task(id: media.id) {
             failed = false
+            errorDetails = ""
 
             // Step 1: 先同步命中网格缩略图缓存,立刻有画面。
             // LocalImageLoader 是 actor,await 是必要的,但缓存命中只是字典查询,基本零延迟。
@@ -321,7 +353,8 @@ private struct LocalLargeImageView: View {
             // Step 2: 后台解大图,完成后替换。
             let url = fileURL
             let loaded: NSImage? = await Task.detached(priority: .userInitiated) {
-                guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+                let fileExists = FileManager.default.fileExists(atPath: url.path)
+                guard fileExists else { return nil }
                 return NSImage(contentsOf: url)
             }.value
 
@@ -330,9 +363,15 @@ private struct LocalLargeImageView: View {
                 image = loaded
                 isPlaceholder = false
             } else if isPlaceholder {
-                // 大图加载失败但缩略图在,就保留缩略图当兜底,不报错。
+                // 大图加载失败但缩略图在,就保留缩略图当兜底,但补充错误信息给开发者。
+                let fileExists = FileManager.default.fileExists(atPath: url.path)
+                errorDetails = "源文件加载失败 (存在: \(fileExists))"
+                print("[LocalLargeImageView] 加载失败: \(url.path), 存在: \(fileExists)")
             } else {
+                let fileExists = FileManager.default.fileExists(atPath: url.path)
+                errorDetails = "文件不存在或无权限读取"
                 failed = true
+                print("[LocalLargeImageView] 加载失败: \(url.path), 存在: \(fileExists)")
             }
         }
     }

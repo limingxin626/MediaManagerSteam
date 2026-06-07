@@ -11,6 +11,7 @@
 //
 
 import Foundation
+import Combine
 
 /// 解析自 repositories.json 的单个 repo 条目(Mac 端只关心 darwin 路径)。
 struct RepoEntry: Equatable {
