@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import AppKit
 import AVKit
 
 struct MediaDetailView: View {
@@ -20,8 +21,17 @@ struct MediaDetailView: View {
     let onNeedMore: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismissWindow) private var dismissWindow
+    @EnvironmentObject private var session: MediaPreviewSession
     /// 视频播放器随当前 media 重建,切换时旧 player 自动释放。
     @State private var player: AVPlayer? = nil
+
+    /// header / metadata 自动淡入淡出 —— 鼠标静止 ~1.5s 后置 false。
+    @State private var chromeVisible: Bool = true
+    /// 最近一次「活动事件」起的隐藏倒计时;新事件来了 cancel 旧的、起新的。
+    @State private var hideTask: Task<Void, Never>? = nil
+    /// AppKit 鼠标移动监视器 —— 全屏时 .onHover 永远是 true,只能走 NSEvent。
+    @State private var mouseMonitor: Any? = nil
 
     private var current: Media? {
         guard mediaList.indices.contains(currentIndex) else { return nil }
@@ -36,8 +46,12 @@ struct MediaDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+                .opacity(chromeVisible ? 1 : 0)
+                .animation(.easeInOut(duration: 0.25), value: chromeVisible)
 
             Divider()
+                .opacity(chromeVisible ? 1 : 0)
+                .animation(.easeInOut(duration: 0.25), value: chromeVisible)
 
             // 媒体本体 + 左右翻页热区
             ZStack {
@@ -56,17 +70,27 @@ struct MediaDetailView: View {
 
             metadata
                 .padding()
+                .opacity(chromeVisible ? 1 : 0)
+                .animation(.easeInOut(duration: 0.25), value: chromeVisible)
         }
-        // 固定一个合理的初始窗口尺寸 —— 否则 sheet 会按 Image.scaledToFit 的 intrinsic
-        // 把窗口撑成图片本身大小,左右切换不同比例的图就会看到 sheet 自己在变大变小。
-        // min/ideal 都给上,用户仍可手动拉边框。
-        .frame(minWidth: 900, idealWidth: 1100, maxWidth: .infinity,
-               minHeight: 600, idealHeight: 760, maxHeight: .infinity)
+        // 尺寸由外层 Window scene 控制(全屏时即整个屏幕),不再在 view 内部强约束。
         // 不可见的快捷键按钮 —— 提供 ←/→/ESC 全局响应。
         .background(keyboardShortcuts)
-        .onAppear { rebuildPlayer() }
-        .onChange(of: currentIndex) { _, _ in rebuildPlayer() }
-        .onDisappear { player?.pause(); player = nil }
+        .onAppear {
+            rebuildPlayer()
+            startMouseTracking()
+            scheduleHide()
+        }
+        .onChange(of: currentIndex) { _, _ in
+            rebuildPlayer()
+            bumpActivity()
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+            stopMouseTracking()
+            hideTask?.cancel()
+        }
     }
 
     // MARK: - Header
@@ -85,7 +109,7 @@ struct MediaDetailView: View {
 
             Spacer()
 
-            Button(action: { dismiss() }) {
+            Button(action: { closePreview() }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 20))
                     .foregroundColor(.secondary)
@@ -219,11 +243,11 @@ struct MediaDetailView: View {
             Button("Next", action: goNext)
                 .keyboardShortcut(.rightArrow, modifiers: [])
                 .hidden()
-            Button("Close") { dismiss() }
+            Button("Close") { closePreview() }
                 .keyboardShortcut(.escape, modifiers: [])
                 .hidden()
             // 空格也关闭预览,与网格态「空格打开预览」对称。
-            Button("Close on space") { dismiss() }
+            Button("Close on space") { closePreview() }
                 .keyboardShortcut(.space, modifiers: [])
                 .hidden()
         }
@@ -233,11 +257,13 @@ struct MediaDetailView: View {
     // MARK: - Navigation
 
     private func goPrev() {
+        bumpActivity()
         guard canGoPrev else { return }
         currentIndex -= 1
     }
 
     private func goNext() {
+        bumpActivity()
         guard canGoNext else { return }
         // 如果已经是最后一张但还有更多,先触发加载再前进。
         if currentIndex >= mediaList.count - 1 {
@@ -254,6 +280,56 @@ struct MediaDetailView: View {
             return
         }
         currentIndex += 1
+    }
+
+    /// 关闭预览的统一入口:同步 session 状态 + 关掉独立窗口;若是在
+    /// `#Preview` 等没有 session 的环境(理论上不会触发,但兜底),仍能用
+    /// SwiftUI 的 dismiss() 退出。
+    private func closePreview() {
+        bumpActivity()
+        session.close()
+        dismissWindow(id: "media-preview")
+        // sheet 路径已下线,但为了不破坏单测/Preview 的回退,仍保留 dismiss()。
+        dismiss()
+    }
+
+    // MARK: - Chrome auto-hide
+
+    /// 标记「有活动」—— 立即把 chrome 显示出来,并重启 1.5s 隐藏倒计时。
+    private func bumpActivity() {
+        chromeVisible = true
+        scheduleHide()
+    }
+
+    /// 起一个 1.5s 后把 chrome 隐藏的 task。重复调用会 cancel 旧的、起新的。
+    private func scheduleHide() {
+        hideTask?.cancel()
+        hideTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            if !Task.isCancelled {
+                chromeVisible = false
+            }
+        }
+    }
+
+    /// 注册 AppKit 鼠标移动监视器 —— 全屏视图覆盖整屏,SwiftUI .onHover 永远 true,
+    /// 抓不到「鼠标停下」的边沿,所以只能走 NSEvent。本地 monitor 仅限本进程。
+    private func startMouseTracking() {
+        guard mouseMonitor == nil else { return }
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { event in
+            // 任何鼠标移动都算活动,即便位移 < 1pt —— Photos.app 也是这个行为。
+            Task { @MainActor in
+                bumpActivity()
+            }
+            return event
+        }
+    }
+
+    private func stopMouseTracking() {
+        if let monitor = mouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMonitor = nil
+        }
     }
 
     // MARK: - Player lifecycle

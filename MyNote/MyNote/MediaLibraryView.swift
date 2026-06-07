@@ -18,9 +18,11 @@ import SwiftUI
 struct MediaLibraryView: View {
     @StateObject private var viewModel = MediaLibraryViewModel()
 
-    // 详情 sheet
-    @State private var detailIndex: Int = 0
-    @State private var showDetail: Bool = false
+    // 跨窗口共享的预览会话(由 MyNoteApp.environmentObject 注入)。
+    // 双击/空格触发预览时,先 present(...) 写入数据,再 openWindow(id:) 把
+    // 独立的全屏预览窗口拉起来 —— 不再用 sheet。
+    @EnvironmentObject private var previewSession: MediaPreviewSession
+    @Environment(\.openWindow) private var openWindow
 
     // 选中态 - 与详情解耦,单击只改它
     @State private var selectedIndex: Int? = nil
@@ -74,14 +76,8 @@ struct MediaLibraryView: View {
                 }
             }
         }
-        .sheet(isPresented: $showDetail) {
-            MediaDetailView(
-                mediaList: viewModel.loadedFlatItems,
-                currentIndex: $detailIndex,
-                hasMore: false,
-                onNeedMore: { /* 桶按需加载,详情翻页时如果到末尾再考虑 */ }
-            )
-        }
+        // 预览已迁到独立的全屏 Window scene(MediaPreviewWindowView)。
+        // 双击 / 空格 → previewSession.present(...) + openWindow(id: "media-preview")
         .onAppear {
             Task { await viewModel.loadInitial() }
             gridFocused = true
@@ -103,8 +99,13 @@ struct MediaLibraryView: View {
             guard let i = newValue, i < viewModel.loadedFlatItems.count else { return }
             viewModel.ensureMediaVisible(mediaId: viewModel.loadedFlatItems[i].id)
         }
-        .onChange(of: showDetail) { _, isShown in
-            if !isShown { selectedIndex = detailIndex }
+        .onChange(of: previewSession.isOpen) { _, isOpen in
+            // 预览窗关闭(用户翻到某张后按 ESC/Cmd+W/Space,或点了红色信号灯) →
+            // 把主窗口选中态对齐到预览中最后看到的那张。后续 onChange(of: selectedIndex)
+            // 会自动调 ensureMediaVisible 把它滚进可视范围。
+            if !isOpen {
+                selectedIndex = previewSession.currentIndex
+            }
         }
         .refreshable {
             await viewModel.refresh()
@@ -274,8 +275,7 @@ struct MediaLibraryView: View {
             MediaGridItem(media: item, isSelected: selectedIndex == globalIndex)
                 .onTapGesture(count: 2) {
                     selectedIndex = globalIndex
-                    detailIndex = globalIndex
-                    showDetail = true
+                    openPreview(at: globalIndex)
                 }
                 .onTapGesture(count: 1) {
                     selectedIndex = globalIndex
@@ -312,11 +312,10 @@ struct MediaLibraryView: View {
             moveSelection { ($0 ?? -viewModel.cols) + viewModel.cols }
             return .handled
         case .space:
-            if showDetail { return .ignored }
+            if previewSession.isOpen { return .ignored }
             let target = selectedIndex ?? 0
             selectedIndex = target
-            detailIndex = target
-            showDetail = true
+            openPreview(at: target)
             return .handled
         default:
             return .ignored
@@ -328,6 +327,13 @@ struct MediaLibraryView: View {
         guard count > 0 else { return }
         let raw = transform(selectedIndex)
         selectedIndex = max(0, min(raw, count - 1))
+    }
+
+    /// 双击 / 空格触发预览的统一入口 —— session 写入数据后 openWindow(id:),
+    /// 由独立的 MediaPreviewWindowView 接管渲染与进入全屏。
+    private func openPreview(at index: Int) {
+        previewSession.present(items: viewModel.loadedFlatItems, at: index)
+        openWindow(id: "media-preview")
     }
 }
 
@@ -374,4 +380,5 @@ struct MediaGridItem: View {
 
 #Preview {
     MediaLibraryView()
+        .environmentObject(MediaPreviewSession())
 }
