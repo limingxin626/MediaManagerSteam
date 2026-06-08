@@ -80,35 +80,17 @@ struct MessageCard: View {
     }
 
     // MARK: - 正文
+    //
+    // inline markdown 渲染(**粗体** / *斜体* / `行内代码` / [链接](url) / ~~删除线~~)
+    // + 裸 URL 自动检测。块级语法(标题/列表/引用/代码块)按字面保留,不展开。
+    // 详见 `MessageTextRenderer`。
 
     private func textBody(_ text: String) -> some View {
-        let detected = detectLinks(text)
-        return Text(detected)
+        Text(MessageTextRenderer.render(text))
             .font(.system(size: 14))
             .foregroundColor(.primary)
             .fixedSize(horizontal: false, vertical: true)
             .textSelection(.enabled)
-    }
-
-    /// 简单 link 检测 —— 把 URL 自动转成 tappable link。
-    /// 不做 markdown 渲染(vue 端的 `renderMarkdown` 在 Mac 端需要单独引入,
-    /// 本期不做)。
-    private func detectLinks(_ text: String) -> AttributedString {
-        var attr = AttributedString(text)
-        // SwiftUI 的 AttributedString 自动识别 URL;我们额外把 https:// 文本包成 link
-        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-        let range = NSRange(location: 0, length: (text as NSString).length)
-        if let matches = detector?.matches(in: text, options: [], range: range) {
-            for m in matches {
-                if let url = m.url, let swiftRange = Range(m.range, in: text) {
-                    if let attrRange = Range(swiftRange, in: attr) {
-                        attr[attrRange].link = url
-                        attr[attrRange].foregroundColor = .accentColor
-                    }
-                }
-            }
-        }
-        return attr
     }
 
     // MARK: - tag chips

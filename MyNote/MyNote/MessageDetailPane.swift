@@ -109,31 +109,17 @@ struct MessageDetailPane: View {
     }
 
     // MARK: - 正文
+    //
+    // inline markdown 渲染(**粗体** / *斜体* / `行内代码` / [链接](url) / ~~删除线~~)
+    // + 裸 URL 自动检测。块级语法按字面保留。与 `MessageCard` 同款,
+    // 详见 `MessageTextRenderer`。
 
     private func textBody(_ text: String) -> some View {
-        let detected = detectLinks(text)
-        return Text(detected)
+        Text(MessageTextRenderer.render(text))
             .font(.system(size: 14))
             .foregroundColor(.primary)
             .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func detectLinks(_ text: String) -> AttributedString {
-        var attr = AttributedString(text)
-        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-        let range = NSRange(location: 0, length: (text as NSString).length)
-        if let matches = detector?.matches(in: text, options: [], range: range) {
-            for m in matches {
-                if let url = m.url, let swiftRange = Range(m.range, in: text) {
-                    if let attrRange = Range(swiftRange, in: attr) {
-                        attr[attrRange].link = url
-                        attr[attrRange].foregroundColor = .accentColor
-                    }
-                }
-            }
-        }
-        return attr
     }
 
     // MARK: - tag chips
