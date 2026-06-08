@@ -41,6 +41,7 @@ struct Message: Identifiable, Codable {
 
 struct MessageMediaItem: Identifiable, Codable {
     let id: Int
+    let repoId: String?
     let filePath: String
     let fileUrl: String
     let thumbPath: String
@@ -52,11 +53,12 @@ struct MessageMediaItem: Identifiable, Codable {
     let starred: Bool
     let createdAt: String
     let updatedAt: String
-    
+
     let tags: [MessageTag]
-    
+
     enum CodingKeys: String, CodingKey {
         case id
+        case repoId = "repo_id"
         case filePath = "file_path"
         case fileUrl = "file_url"
         case thumbPath = "thumb_path"
@@ -68,6 +70,26 @@ struct MessageMediaItem: Identifiable, Codable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case tags
+    }
+
+    /// 从 `Media` UI 模型构造 —— MessageRepository 拿到 `MediaRecord` → `Media`
+    /// 后,转成 `MessageMediaItem` 喂给消息视图。tags / fileUrl / thumbUrl / repoId
+    /// 沿用 `Media.toUIModel` 已经算出来的值。
+    init(from media: Media) {
+        self.id = media.id
+        self.repoId = media.repoId
+        self.filePath = media.filePath
+        self.fileUrl = media.fileUrl
+        self.thumbPath = media.thumbPath
+        self.thumbUrl = media.thumbUrl
+        self.mimeType = media.mimeType
+        self.width = media.width
+        self.height = media.height
+        self.durationMs = media.durationMs
+        self.starred = media.starred
+        self.createdAt = media.createdAt
+        self.updatedAt = media.updatedAt
+        self.tags = media.tags
     }
 }
 
@@ -287,4 +309,90 @@ extension Media {
 
         return root.appendingPathComponent(relativePart)
     }
+}
+
+// MARK: - MessageMediaItem 本地路径
+
+extension MessageMediaItem {
+    /// 缩略图本地 URL: `{DATA_ROOT}/data/thumbs/{id}.webp`。
+    /// 与 `Media.localThumbURL` 走同一条路径约定(GRDB 直读的 message 关联的
+    /// media,缩略图文件 id 与 media.id 1:1 对应)。
+    var localThumbURL: URL? {
+        guard let root = Settings.dataRoot else { return nil }
+        return root
+            .appendingPathComponent("data", isDirectory: true)
+            .appendingPathComponent("thumbs", isDirectory: true)
+            .appendingPathComponent("\(id).webp")
+    }
+
+    /// 原始媒体文件本地 URL —— 经 `RepositoryManager` 解析 repoId + filePath;
+    /// 解析失败走 `Media` 同款的 `legacyExtractedURL` 兜底。
+    @MainActor
+    var localFileURL: URL? {
+        if let url = RepositoryManager.shared.resolve(repoId: repoId, relativePath: filePath) {
+            return url
+        }
+        return legacyExtractedURL()
+    }
+
+    /// 所在 repo 是否当前可用。UI 用以决定显示「请插入 XX 硬盘」占位。
+    @MainActor
+    var isRepoAvailable: Bool {
+        if repoId != nil {
+            return RepositoryManager.shared.isAvailable(repoId: repoId)
+        }
+        return Settings.dataRoot != nil
+    }
+
+    /// 老路径兜底,逻辑对齐 `Media.legacyExtractedURL`。
+    private func legacyExtractedURL() -> URL? {
+        guard let root = Settings.dataRoot else { return nil }
+        let normalized = filePath.replacingOccurrences(of: "\\", with: "/")
+        let marker = "/uploads/"
+        let relativePart: String
+        if let range = normalized.range(of: marker) {
+            relativePart = String(normalized[range.lowerBound...])
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        } else if normalized.hasPrefix("uploads/") {
+            relativePart = normalized
+        } else {
+            relativePart = normalized
+        }
+        return root.appendingPathComponent(relativePart)
+    }
+}
+
+// MARK: - 过滤侧栏 UI 模型
+
+/// 标签侧栏条目 —— 在 `MessageTag` 基础上加消息数字段(FilterSidebar 排序用)。
+struct Tag: Identifiable, Codable, Equatable {
+    let id: Int
+    let name: String
+    let category: String?
+    let messageCount: Int
+}
+
+/// 演员侧栏条目 —— 来自 `Actor` 简化版 GRDB 映射,FilterSidebar 渲染所需。
+struct Actor: Identifiable, Codable, Equatable {
+    let id: Int
+    let name: String
+    let avatarPath: String?
+    let messageCount: Int
+
+    /// 演员头像本地 URL: `{DATA_ROOT}/data/actor_cover/{id}.webp`。
+    /// 缺失时返回 nil(老数据未生成头像 / DATA_ROOT 未配置),UI 走 person.circle 占位。
+    var localAvatarURL: URL? {
+        guard let root = Settings.dataRoot else { return nil }
+        return root
+            .appendingPathComponent("data", isDirectory: true)
+            .appendingPathComponent("actor_cover", isDirectory: true)
+            .appendingPathComponent("\(id).webp")
+    }
+}
+
+/// Issue 侧栏条目 —— 简化为列表与过滤所需字段。
+struct Issue: Identifiable, Codable, Equatable {
+    let id: Int
+    let title: String
+    let createdAt: Date
 }

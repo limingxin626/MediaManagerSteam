@@ -3,8 +3,12 @@
 //  MyNote
 //
 //  主窗口 = NavigationSplitView(sidebar: SidebarView, detail: 当前 tab 内容)。
-//  SidebarView 选中态由 ContentView 持有;媒体页的 ViewModel 也由 ContentView 持有,
-//  保证切到其他 tab 再切回时不会因为 view 重建而丢失滚动位置/筛选条件。
+//  SidebarView 选中态由 ContentView 持有;各 tab 的 ViewModel 也由 ContentView 持有,
+//  保证切到其他 tab 再切回时不会因为 view 重建而丢失滚动位置/筛选条件/选中消息。
+//
+//  实现:detail 区域用 ZStack 同时持三个 tab 的 view,通过 opacity + allowsHitTesting
+//  控制可见性(mac-media-page-state-and-styling 决策)。三个 ViewModel 用 @StateObject
+//  一次性创建,生命周期 = ContentView 生命周期。
 //
 
 import SwiftUI
@@ -12,6 +16,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var selectedTab: AppTab? = .media
     @StateObject private var mediaLibraryViewModel = MediaLibraryViewModel()
+    @StateObject private var messagesViewModel = MessagesViewModel()
 
     var body: some View {
         NavigationSplitView {
@@ -23,18 +28,18 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detailContent: some View {
-        switch selectedTab {
-        case .home:
+        ZStack {
             HomePlaceholderView()
-        case .messages:
-            MessagesPlaceholderView()
-        case .media:
+                .opacity(selectedTab == .home ? 1 : 0)
+                .allowsHitTesting(selectedTab == .home)
+            MessagesView(viewModel: messagesViewModel)
+                .opacity(selectedTab == .messages ? 1 : 0)
+                .allowsHitTesting(selectedTab == .messages)
             MediaLibraryView(viewModel: mediaLibraryViewModel)
-        case .none:
-            Text("请选择侧栏项目")
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(selectedTab == .media ? 1 : 0)
+                .allowsHitTesting(selectedTab == .media)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
