@@ -2,7 +2,17 @@
 //  MessagesView.swift
 //  MyNote
 //
-//  消息流主视图 —— 与 vue 端 Message.vue 同构的只读浏览能力。
+//  消息流主视图 —— Mac 端独立 UX:顺向 feed(最新在顶 / 向下滚加载更早)。
+//
+//  与 vue 端 IM 风格(最新在底 / 向上滚加载更早)**不一致**,理由:
+//    SwiftUI 的 LazyVStack 在反向 feed 场景下存在多个不稳定点 ——
+//    末尾空 view 首屏不渲染、ScrollViewProxy 对未实例化 id 的强制布局
+//    契约对 LazyVStack 不可靠、prepend 时视口恢复抖动等。改成顺向后
+//    就是 SwiftUI 的标准模式(Twitter / Mastodon 风格 feed),无需任何
+//    程序化 scroll 协调:
+//      - 初始位置 = 自然顶部 = messages[0] = 最新消息(默认行为)
+//      - 向下滚到接近底部 → onAppear 触发 loadMore → append → 标准模式
+//      - prepend / restoreAnchor / scrollToBottom 全部不需要
 //
 //  结构:
 //
@@ -11,9 +21,9 @@
 //    │                    DateScrubber / 过滤 dropdown        │
 //    ├──────────┬─────────────────────────────────────────────┤
 //    │          │                                             │
-//    │ Filter   │   MessagesList (LazyVStack)                │
+//    │ Filter   │   MessagesList (LazyVStack,顺向)          │
 //    │ Sidebar  │   ┌─────────────────────────────┐           │
-//    │  (tags/  │   │ MessageCard                 │           │
+//    │  (tags/  │   │ MessageCard(最新)           │           │
 //    │  actors/ │   │   - actor + 时间             │           │
 //    │  issues) │   │   - 正文                     │           │
 //    │          │   │   - tag chips                │           │
@@ -21,6 +31,10 @@
 //    │          │   │   - 底部条(星标/媒体数/id)   │           │
 //    │          │   └─────────────────────────────┘           │
 //    │          │   ...                                       │
+//    │          │   ┌─────────────────────────────┐           │
+//    │          │   │ MessageCard(更早)           │           │
+//    │          │   └─────────────────────────────┘           │
+//    │          │   ↓ "加载更早…" / "已经是最早" sentinel    │
 //    │          │              ┌─────────────────────┐        │
 //    │          │              │ MessageDetailPane   │ (有选中时)
 //    │          │              │  - 完整 actor+正文  │        │
@@ -47,20 +61,6 @@ struct MessagesView: View {
     @State private var previewMediaList: [Media] = []
     @State private var previewIndex: Int = 0
     @State private var previewIndexBox: IndexBox? = nil
-
-    // MARK: - Prefetch 状态
-
-    /// 当前 viewport 内「最顶部」那条 message 的 id —— 触发 loadMore 时把
-    /// 它作为 `restoreAnchor` 传给 VM,prepend 完成后 scrollTo 恢复视口。
-    /// 计算来源:MessageCard 报上来的 frame 字典 + ScrollView 当前 contentOffset.y。
-    @State private var topAnchorMessageId: Int? = nil
-    /// 各 message 的 frame.minY(name coordinate space = "feed")字典。
-    /// 每条 message card 渲染时通过 PreferenceKey 报上来,scroll 时用于找
-    /// 「在视口顶部第一条」的 id。
-    @State private var messageFrames: [Int: CGFloat] = [:]
-    /// ScrollView 当前 contentOffset(同步到 `@State` 供 `onScrollGeometryChange` 使用)。
-    @State private var currentScrollY: CGFloat = 0
-    @State private var currentViewportHeight: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -161,143 +161,67 @@ struct MessagesView: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
+    // MARK: - 消息列表(顺向 feed)
+    //
+    // 标准 SwiftUI 模式:
+    //   - ScrollView 默认从顶部开始渲染 → messages[0] 在视口顶 → 用户看到最新
+    //   - 距离数组末尾第 N 条放一个不可见 marker,onAppear 时 loadMore →
+    //     append 到末尾。新内容加在用户视口"下方之外",不抖动当前位置。
+    //
+    // 不再需要的(顺向模式天然规避了):
+    //   - ScrollViewReader / proxy.scrollTo
+    //   - bottom-anchor 空 view
+    //   - frame 跟踪 + topAnchor 计算 + PreferenceKey
+    //   - prepend 视口恢复 anchor
+    //   - scrollToBottomPending 标志位
+
     private var messagesScrollView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    // 顶部 status:只是视觉占位,「加载更早…spinner / 已经是最早」
-                    // 文本;不再承担触发职责。触发交给下面的 prefetch marker。
-                    loadMoreSentinel
-                        .id("top-sentinel")
-                    ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { idx, msg in
-                        // prefetch marker:在距离顶部第 10 条 message 之前,
-                        // 不可见 Color.clear 触发器。
-                        // `.id("prefetch-marker-\(count)")` —— 每次 prepend 完成
-                        // (count 变化)id 字符串变,SwiftUI 销毁旧 marker、构造
-                        // 新 marker → 新 marker 进入视口时 onAppear 重触发。
-                        // 这是把 vue 端 `rebindPrefetchTargets()` 的语义用 SwiftUI
-                        // identity 系统实现 —— 不依赖"侥幸的 view 回收"。
-                        if idx == prefetchIndex {
-                            Color.clear
-                                .frame(height: 1)
-                                .id("prefetch-marker-\(viewModel.messages.count)")
-                                .onAppear { handlePrefetchTrigger() }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { idx, msg in
+                    MessageCard(
+                        message: msg,
+                        isSelected: viewModel.selectedMessage?.id == msg.id,
+                        onCardClick: {
+                            Task { await viewModel.selectMessage(id: msg.id) }
+                        },
+                        onMediaClick: { _ in
+                            // feed 内点媒体不直接进 preview(对齐 vue 端 Message.vue 的行为)
+                            // 而是先选中消息 → 详情面板里再点媒体才进 preview
+                            Task { await viewModel.selectMessage(id: msg.id) }
                         }
-                        MessageCard(
-                            message: msg,
-                            isSelected: viewModel.selectedMessage?.id == msg.id,
-                            onCardClick: {
-                                Task { await viewModel.selectMessage(id: msg.id) }
-                            },
-                            onMediaClick: { _ in
-                                // feed 内点媒体不直接进 preview(对齐 vue 端 Message.vue 的行为)
-                                // 而是先选中消息 → 详情面板里再点媒体才进 preview
-                                Task { await viewModel.selectMessage(id: msg.id) }
-                            }
-                        )
-                        .id(msg.id)
-                        // 报告自己的 frame.minY(name space: "feed"),让 View 计算 topAnchor
-                        .background(
-                            GeometryReader { cardGeo in
-                                Color.clear
-                                    .preference(
-                                        key: MessageFramePreferenceKey.self,
-                                        value: [msg.id: cardGeo.frame(in: .named("feed")).minY]
-                                    )
-                            }
-                        )
-                    }
-                    // 删除原 `Color.clear.id("bottom-anchor")` —— 不再依赖空锚点。
-                    // scrollToLatest() 直接 `proxy.scrollTo(messages.last.id, anchor: .bottom)`;
-                    // ScrollViewProxy 对 LazyVStack 未实例化 id 的契约是「强制布局到目标可见」,
-                    // 比依赖末尾空 view(首屏根本没渲染)可靠得多。
-                }
-                .padding(16)
-            }
-            .coordinateSpace(name: "feed")
-            .onPreferenceChange(MessageFramePreferenceKey.self) { frames in
-                // 各 message 自己报的 frame 字典
-                self.messageFrames = frames
-            }
-            .onScrollGeometryChange(for: ScrollGeometrySnapshot.self) { geo in
-                ScrollGeometrySnapshot(
-                    contentOffsetY: geo.contentOffset.y,
-                    containerHeight: geo.containerSize.height
-                )
-            } action: { _, snapshot in
-                // 同步 scrollTop + viewportHeight,触发 topAnchor 重算
-                self.currentScrollY = snapshot.contentOffsetY
-                self.currentViewportHeight = snapshot.containerHeight
-                self.topAnchorMessageId = computeTopmostMessageId()
-            }
-            // 初次加载完成 / 切 filter 后 → 滚到最新消息(数组末尾 id),不再依赖
-            // bottom-anchor 空 view。后续 loadMore 完成 → scrollTo anchor 恢复视口。
-            .onChange(of: viewModel.messages.count) { _, _ in
-                if viewModel.consumeScrollToBottomPending() {
-                    scrollToLatest(proxy: proxy)
-                } else if let anchor = viewModel.consumePrependedPendingAnchor(),
-                          viewModel.messages.contains(where: { $0.id == anchor }) {
-                    DispatchQueue.main.async {
-                        proxy.scrollTo(anchor, anchor: .top)
+                    )
+                    // prefetch marker:在距离末尾第 10 条 message 之后挂一个
+                    // 不可见 trigger,LazyVStack 渲染到这里时 onAppear → loadMore。
+                    // 这是 SwiftUI 顺向无限滚动的标准用法,无 reverse 模式那些坑。
+                    if idx == prefetchTriggerIndex {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear { handlePrefetchTrigger() }
                     }
                 }
+                loadMoreSentinel
             }
+            .padding(16)
         }
     }
 
-    /// PREFETCH_DISTANCE = 10 —— 与 vue 端 `Math.min(10, els.length - 1)` 对齐。
-    /// 当 count < 10 时,marker 落在最后一条 message 之前(此时它就是第 N=count 条)。
-    private var prefetchIndex: Int {
-        max(0, min(10, viewModel.messages.count - 1))
+    /// 在「距离末尾倒数第 10 条」**之后**挂 trigger。
+    /// PREFETCH_DISTANCE = 10:还剩 10 条没看到时就预拉下一页,与 vue 一致。
+    /// 当 count <= 10 时:trigger 落到第 0 条之后 = 视口顶,首屏自然就要 prefetch
+    /// (符合预期:消息不够 10 条时,如果还有更多就立即拉下一页)。
+    private var prefetchTriggerIndex: Int {
+        max(0, viewModel.messages.count - 1 - 10)
     }
 
-    /// 计算当前 viewport 顶部那条 message 的 id。
-    /// 算法:`messageFrames` 中,`frame.minY >= scrollTop` 的最小值对应的 id。
-    /// 找不到时返回 nil(用户滚到列表上方空白处)。
-    private func computeTopmostMessageId() -> Int? {
-        guard !messageFrames.isEmpty else { return nil }
-        // 视口顶部容差 1pt,避免 cell 顶部正好卡在 scrollTop 上时算到下一条
-        let threshold = currentScrollY + 1
-        return messageFrames
-            .filter { $0.value >= threshold }
-            .min(by: { $0.value < $1.value })?
-            .key
-    }
-
-    /// prefetch marker onAppear 触发:把当前 topAnchor id 传给 VM,异步 loadMore。
+    /// prefetch marker onAppear 触发:异步 loadMore。
     /// VM 内部 200ms debounce + dateJumpPending + isLoading 守门防抖。
-    ///
-    /// `currentScrollY > 0` 守门:首屏 / scrollToLatest 完成前,marker 可能就在
-    /// 视口里被立即触发(尤其消息数少 prefetchIndex = count-1 落到数组末尾时),
-    /// 这会拉到「比首屏还旧」的页但用户根本没向上滚过。对齐 vue 端
-    /// `container.scrollTop > 0` 守门。
     private func handlePrefetchTrigger() {
         guard viewModel.hasMore, !viewModel.dateJumpPending else { return }
-        guard currentScrollY > 0 else { return }
-        let anchor = topAnchorMessageId
-        Task { await viewModel.loadMore(restoreAnchor: anchor) }
+        Task { await viewModel.loadMore() }
     }
 
-    /// 滚到最新消息(数组末尾)。LazyVStack 未实例化末尾 cell 也不影响 ——
-    /// `ScrollViewProxy.scrollTo` 对未实例化 id 的契约是「强制 LazyVStack 实例化
-    /// 到目标 id 进入视口」,不需要事先放一个 `bottom-anchor` 空 view 占位。
-    ///
-    /// 两次尝试覆盖:
-    ///   (a) 0ms 当前布局 —— 首屏一般就够
-    ///   (b) 120ms 第一波 LocalThumbView 缓存 hit 完成、cell 高度稳定后兜底
-    ///
-    /// 不再加更长(如 360ms)的第三次重压 —— 时间太长容易和用户手动滚动打架。
-    /// 即使第一波图片缓存 miss 高度后续仍在变化,用户已经看到底部最新条;
-    /// 后续高度跳变只影响"向上看历史"方向,用户自然向上滚就能修正。
-    private func scrollToLatest(proxy: ScrollViewProxy) {
-        guard let lastId = viewModel.messages.last?.id else { return }
-        let attempt = { proxy.scrollTo(lastId, anchor: .bottom) }
-        DispatchQueue.main.async(execute: attempt)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: attempt)
-    }
-
-    /// 顶部 status:纯视觉占位条(显示「加载更早…」spinner /「已经是最早」),
-    /// 触发职责已迁到 prefetch marker(onAppear)。
+    /// 底部 sentinel:loading 时显示 spinner,已无更多时显示「已经是最早」。
     @ViewBuilder
     private var loadMoreSentinel: some View {
         HStack(spacing: 6) {
@@ -518,29 +442,5 @@ struct MessagesPreviewDestination: Hashable {
     func hash(into hasher: inout Hasher) {
         for m in mediaList { hasher.combine(m.id) }
         hasher.combine(startIndex)
-    }
-}
-
-// MARK: - Prefetch 支撑类型
-
-/// `onScrollGeometryChange` 拿到的快照(只要 contentOffset.y + containerSize.height,
-/// 不需要 contentSize/contentInsets 等无关字段,避免不必要的 diff 触发)。
-struct ScrollGeometrySnapshot: Equatable {
-    let contentOffsetY: CGFloat
-    let containerHeight: CGFloat
-}
-
-/// 各 MessageCard 报告自己 frame.minY 的 PreferenceKey。
-/// value 是 `[messageId: minY]` 字典,每次有 card 出现 / 消失 / 移动都会触发
-/// `onPreferenceChange`,View 用最新字典算 topmost message。
-struct MessageFramePreferenceKey: PreferenceKey {
-    typealias Value = [Int: CGFloat]
-    static var defaultValue: [Int: CGFloat] = [:]
-
-    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
-        // 每张 card 报自己一个 entry,reduce 时取后面的(nextValue)覆盖 —— 这样
-        // 已经不在视口里的 card 不会"卡住"它的旧 frame(因为它的 .background
-        // GeometryReader 会重渲染并 report 新的 0/offscreen 位置)。
-        value = nextValue()
     }
 }

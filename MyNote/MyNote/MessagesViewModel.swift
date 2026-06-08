@@ -2,15 +2,21 @@
 //  MessagesViewModel.swift
 //  MyNote
 //
-//  消息流数据 / 状态 / 分页 / 过滤 —— 与 vue 端 Message.vue 的 reactive state 同构,
-//  走 GRDB 直读 SQLite(不依赖 backend)。架构对齐 MediaLibraryViewModel:
+//  消息流数据 / 状态 / 分页 / 过滤 —— Mac 端独立 UX:
 //
-//    1. 单一数据源:messages: [Message] 是 feed 的全量数据(已加载的),分页
+//    1. 数组顺序 DESC = 最新在 messages[0],最旧在 messages[count-1]。
+//       与 SQL 的 `ORDER BY created_at DESC, id DESC` 自然对齐,不再 reverse;
+//       UI 侧也由顶到底显示「最新 → 最旧」,与 Twitter/微博 feed 一致。
+//    2. 抛弃 vue 端「IM 风格 (最新在底)+ 反向上拉加载」—— 在 SwiftUI
+//       LazyVStack 上无法稳定实现(末尾空 view 首屏不渲染、ScrollViewProxy
+//       对未实例化 id 的强制布局契约对 LazyVStack 不可靠、prepend 时视口
+//       恢复抖动等)。Mac 端取顺向 = SwiftUI 的标准模式 = 稳定。
+//    3. 单一数据源:messages: [Message] 是 feed 全量(已加载的),分页
 //       loadMore / selectFilter 都基于这个数组 + nextCursor。
-//    2. 状态保留:ContentView 以 @StateObject 持有本 VM,切 tab 来回不丢。
-//    3. 写操作为空:Mac 端 read-only 阶段,所有 mutation 走 backend HTTP,本
+//    4. 状态保留:ContentView 以 @StateObject 持有本 VM,切 tab 来回不丢。
+//    5. 写操作为空:Mac 端 read-only 阶段,所有 mutation 走 backend HTTP,本
 //       VM 不暴露 changeStarred / delete / merge / split 等方法。
-//    4. selectedMessage:full detail(actor / mediaItems / tags)由 fetchMessageDetail
+//    6. selectedMessage:full detail(actor / mediaItems / tags)由 fetchMessageDetail
 //       单独拉,不走 list(避免 detail 拿不到完整 9+ 媒体)。
 //
 
@@ -22,7 +28,7 @@ final class MessagesViewModel: ObservableObject {
 
     // MARK: - Published 状态
 
-    /// feed 当前已加载的消息列表(按 created_at DESC, id DESC)。
+    /// feed 当前已加载的消息列表(DESC:最新在 [0],最旧在 [count-1])。
     @Published private(set) var messages: [Message] = []
     /// 用户当前选中的消息完整 detail(null = 未选中,detail pane 关闭)。
     @Published var selectedMessage: Message? = nil
@@ -45,9 +51,6 @@ final class MessagesViewModel: ObservableObject {
     @Published private(set) var nextCursor: String? = nil
     @Published private(set) var hasMore: Bool = true
 
-    // 滚动
-    @Published var scrollTop: CGFloat = 0
-
     // 月度 timeline(DateScrubber 渲染所需)
     @Published private(set) var monthlyDayCount: [DayCount] = []
 
@@ -55,10 +58,6 @@ final class MessagesViewModel: ObservableObject {
     @Published private(set) var availableTags: [Tag] = []
     @Published private(set) var availableActors: [Actor] = []
     @Published private(set) var availableIssues: [Issue] = []
-
-    /// prepend 完成后,View 应该 scrollTo 的 message id(由 loadMore 的 restoreAnchor
-    /// 参数写入;View 在 messages.count 变化时 consume 一次)。
-    @Published private(set) var prependedPendingAnchor: Int? = nil
 
     /// scrollToDate 之后 ~500ms 内为 true。View 在 prefetch marker 触发时
     /// 检查它,避免跨日期边界拉到不该出现的旧消息。
@@ -123,7 +122,6 @@ final class MessagesViewModel: ObservableObject {
         nextCursor = nil
         hasMore = true
         // 切过滤后,清掉旧 selectedMessage(它的 detail 可能已经不符合新 filter)
-        // 留给 selectMessage 重新拉;但保持 UI 状态不抖
         if let sm = selectedMessage, !messages.contains(where: { $0.id == sm.id }) {
             selectedMessage = nil
         }
@@ -131,18 +129,12 @@ final class MessagesViewModel: ObservableObject {
             let result = try await repository.list(
                 cursor: nil, limit: 20, filter: currentFilter
             )
-            // SQL 是 DESC(最新优先),UI 要的是 ASC(最旧在最上、最新在最下)——
-            // 这是聊天 App 的标准顺序。reverse() 把 array 翻成 [oldest, ..., newest]。
-            messages = result.items.reversed()
-            // nextCursor 取「最后一条」,但 last 现在是「最新的」,所以 cursor
-            // 还是最新的 createdAt。下次 loadMore 会 `WHERE created_at < cursor`
-            // 拿到「比最新还旧」的那页,正确。
-            nextCursor = result.items.last?.createdAt
+            // SQL 已是 DESC(最新优先),直接用;UI 顶到底显示「最新 → 最旧」。
+            messages = result.items
+            nextCursor = result.nextCursor
             hasMore = result.hasMore
             // 同步刷月度 timeline
             await reloadMonthlyTimeline()
-            // 加载完 → 默认滚到底部(让用户落在最新消息)
-            scrollToBottomPending = true
         } catch let e as RepositoryError {
             errorMessage = e.errorDescription
         } catch {
@@ -150,18 +142,15 @@ final class MessagesViewModel: ObservableObject {
         }
     }
 
-    /// 向上滚到接近顶部时触发 —— 拉更早消息,拼到 messages 数组头部。
-    ///
-    /// `restoreAnchor`:View 在触发那一刻记录的「viewport 顶部 message 的 id」,
-    /// 用于 prepend 完成后 scrollTo 该 id 恢复视口(对齐 vue 端 tryRestoreScroll)。
-    func loadMore(restoreAnchor: Int? = nil) async {
+    /// 向下滚到接近底部时触发 —— 拉更早消息,append 到 messages 数组末尾。
+    /// SwiftUI LazyVStack 顺向 append 是标准模式,无需视口恢复 anchor:
+    /// 用户视口位置在数组中间,新内容加在底部之外,SwiftUI 不动 contentOffset。
+    func loadMore() async {
         guard !isLoading, hasMore, !dateJumpPending, let cursor = nextCursor else { return }
         // 200ms debounce:防止 LazyVStack 复用 marker view 重复 onAppear
         if let last = lastLoadMoreAt, Date().timeIntervalSince(last) < 0.2 { return }
         let myGen = requestGeneration
         lastLoadMoreAt = Date()
-        // 把 anchor 写给 View,等 messages.count 变化时消费
-        prependedPendingAnchor = restoreAnchor
         isLoading = true
         defer { isLoading = false }
         do {
@@ -170,11 +159,7 @@ final class MessagesViewModel: ObservableObject {
             )
             // 期间 generation 变了(切过滤 / 日期跳转)→ 丢弃结果
             guard myGen == requestGeneration else { return }
-            // 续翻返回「比 cursor 更早」的消息(DESC),需要 reverse 成 ASC,
-            // 然后 prepend 到现有 messages 头部(消息[0] 是最旧的)。
-            // 注:scroll position preservation(用户看到的那条不跳动)由 View 层
-            // 处理 — VM 只负责正确的数组顺序 + 把 anchor 传出去。
-            messages.insert(contentsOf: result.items.reversed(), at: 0)
+            messages.append(contentsOf: result.items)
             nextCursor = result.nextCursor
             hasMore = result.hasMore
         } catch let e as RepositoryError {
@@ -182,14 +167,6 @@ final class MessagesViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    /// View 在 messages.count 变化时消费一次,取走 prepend anchor 用于 scrollTo。
-    /// consume 语义:返回后清空,避免下次无 prepend 的 messages 变化误触 scrollTo。
-    func consumePrependedPendingAnchor() -> Int? {
-        let v = prependedPendingAnchor
-        prependedPendingAnchor = nil
-        return v
     }
 
     // MARK: - 过滤切换
@@ -252,12 +229,12 @@ final class MessagesViewModel: ObservableObject {
     // MARK: - 日期跳转
 
     /// DateScrubber 拖到某日 → 拉该日的最新消息(取该日 23:59:59.999999 作为 cursor)。
-    /// 之后让 view 滚到该日首条消息在 messages 数组中的位置。
+    /// 拉回来后用户视口在顶部 = 该日最新一条,自然往下滚就是看历史。
     func scrollToDate(year: Int, month: Int, day: Int) async {
         // 入口 +1 generation;在飞的 loadMore 会丢弃自己的结果
         requestGeneration += 1
-        // 日期跳转后 ~500ms 内抑制 prefetch —— 否则 cursor = endOfDay 之下会跨日期
-        // 边界拉到不该出现的更早消息。
+        // 日期跳转后 ~500ms 内抑制 prefetch —— 否则刚 reset 完 marker 进视口
+        // 会立刻拉下一页,污染用户预期。
         dateJumpPending = true
         dateJumpClearTask?.cancel()
         dateJumpClearTask = Task { [weak self] in
@@ -276,34 +253,15 @@ final class MessagesViewModel: ObservableObject {
             let result = try await repository.list(
                 cursor: cursor, limit: 20, filter: currentFilter
             )
-            // 与 loadInitial 同款:reverse DESC → ASC,保持 [oldest, ..., newest] 顺序
-            messages = result.items.reversed()
-            nextCursor = result.items.last?.createdAt
+            // 同 loadInitial:DESC 直接用,最新在 [0]
+            messages = result.items
+            nextCursor = result.nextCursor
             hasMore = result.hasMore
-            // 滚到该日首条 = messages 数组中第一条(date >= 该日 0 点的)
-            var targetComp = DateComponents()
-            targetComp.year = year; targetComp.month = month; targetComp.day = day
-            let dayStart = Calendar.current.date(from: targetComp) ?? Date()
-            pendingScrollToDateAnchor = dayStart
         } catch let e as RepositoryError {
             errorMessage = e.errorDescription
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    /// View 层在 messages 渲染完后,如果有 pendingScrollToDateAnchor 就滚到对应消息位置。
-    func consumePendingScrollToDateAnchor() -> Date? {
-        let v = pendingScrollToDateAnchor
-        pendingScrollToDateAnchor = nil
-        return v
-    }
-
-    /// 类似:loadInitial 完后默认滚到底部。
-    func consumeScrollToBottomPending() -> Bool {
-        let v = scrollToBottomPending
-        scrollToBottomPending = false
-        return v
     }
 
     // MARK: - 搜索 debounce
@@ -319,9 +277,6 @@ final class MessagesViewModel: ObservableObject {
     }
 
     // MARK: - 内部
-
-    @Published private(set) var scrollToBottomPending: Bool = false
-    private var pendingScrollToDateAnchor: Date? = nil
 
     /// 拉侧栏过滤条目(并发跑三个 fetch)。
     private func loadFilters() async {
