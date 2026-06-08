@@ -169,15 +169,18 @@ struct MessagesView: View {
                     // 文本;不再承担触发职责。触发交给下面的 prefetch marker。
                     loadMoreSentinel
                         .id("top-sentinel")
-                    ForEach(viewModel.messages.indices, id: \.self) { idx in
-                        let msg = viewModel.messages[idx]
+                    ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { idx, msg in
                         // prefetch marker:在距离顶部第 10 条 message 之前,
                         // 不可见 Color.clear 触发器。
-                        // 不加 .id(...) —— 让 SwiftUI 用默认 identity,这样 prepend
-                        // 后旧 marker view 被销毁,新 marker view 实例化 → onAppear 重触发。
+                        // `.id("prefetch-marker-\(count)")` —— 每次 prepend 完成
+                        // (count 变化)id 字符串变,SwiftUI 销毁旧 marker、构造
+                        // 新 marker → 新 marker 进入视口时 onAppear 重触发。
+                        // 这是把 vue 端 `rebindPrefetchTargets()` 的语义用 SwiftUI
+                        // identity 系统实现 —— 不依赖"侥幸的 view 回收"。
                         if idx == prefetchIndex {
                             Color.clear
                                 .frame(height: 1)
+                                .id("prefetch-marker-\(viewModel.messages.count)")
                                 .onAppear { handlePrefetchTrigger() }
                         }
                         MessageCard(
@@ -204,10 +207,10 @@ struct MessagesView: View {
                             }
                         )
                     }
-                    // 底部锚点 —— scrollToBottom 时跳到这里,让用户落在最新消息。
-                    Color.clear
-                        .frame(height: 1)
-                        .id("bottom-anchor")
+                    // 删除原 `Color.clear.id("bottom-anchor")` —— 不再依赖空锚点。
+                    // scrollToLatest() 直接 `proxy.scrollTo(messages.last.id, anchor: .bottom)`;
+                    // ScrollViewProxy 对 LazyVStack 未实例化 id 的契约是「强制布局到目标可见」,
+                    // 比依赖末尾空 view(首屏根本没渲染)可靠得多。
                 }
                 .padding(16)
             }
@@ -227,13 +230,11 @@ struct MessagesView: View {
                 self.currentViewportHeight = snapshot.containerHeight
                 self.topAnchorMessageId = computeTopmostMessageId()
             }
-            // 初次加载完成 → 滚到底部(让用户落在最新消息)
-            // 后续 loadMore 完成 → scrollTo anchor 恢复视口
+            // 初次加载完成 / 切 filter 后 → 滚到最新消息(数组末尾 id),不再依赖
+            // bottom-anchor 空 view。后续 loadMore 完成 → scrollTo anchor 恢复视口。
             .onChange(of: viewModel.messages.count) { _, _ in
                 if viewModel.consumeScrollToBottomPending() {
-                    DispatchQueue.main.async {
-                        proxy.scrollTo("bottom-anchor", anchor: .bottom)
-                    }
+                    scrollToLatest(proxy: proxy)
                 } else if let anchor = viewModel.consumePrependedPendingAnchor(),
                           viewModel.messages.contains(where: { $0.id == anchor }) {
                     DispatchQueue.main.async {
@@ -265,10 +266,34 @@ struct MessagesView: View {
 
     /// prefetch marker onAppear 触发:把当前 topAnchor id 传给 VM,异步 loadMore。
     /// VM 内部 200ms debounce + dateJumpPending + isLoading 守门防抖。
+    ///
+    /// `currentScrollY > 0` 守门:首屏 / scrollToLatest 完成前,marker 可能就在
+    /// 视口里被立即触发(尤其消息数少 prefetchIndex = count-1 落到数组末尾时),
+    /// 这会拉到「比首屏还旧」的页但用户根本没向上滚过。对齐 vue 端
+    /// `container.scrollTop > 0` 守门。
     private func handlePrefetchTrigger() {
         guard viewModel.hasMore, !viewModel.dateJumpPending else { return }
+        guard currentScrollY > 0 else { return }
         let anchor = topAnchorMessageId
         Task { await viewModel.loadMore(restoreAnchor: anchor) }
+    }
+
+    /// 滚到最新消息(数组末尾)。LazyVStack 未实例化末尾 cell 也不影响 ——
+    /// `ScrollViewProxy.scrollTo` 对未实例化 id 的契约是「强制 LazyVStack 实例化
+    /// 到目标 id 进入视口」,不需要事先放一个 `bottom-anchor` 空 view 占位。
+    ///
+    /// 两次尝试覆盖:
+    ///   (a) 0ms 当前布局 —— 首屏一般就够
+    ///   (b) 120ms 第一波 LocalThumbView 缓存 hit 完成、cell 高度稳定后兜底
+    ///
+    /// 不再加更长(如 360ms)的第三次重压 —— 时间太长容易和用户手动滚动打架。
+    /// 即使第一波图片缓存 miss 高度后续仍在变化,用户已经看到底部最新条;
+    /// 后续高度跳变只影响"向上看历史"方向,用户自然向上滚就能修正。
+    private func scrollToLatest(proxy: ScrollViewProxy) {
+        guard let lastId = viewModel.messages.last?.id else { return }
+        let attempt = { proxy.scrollTo(lastId, anchor: .bottom) }
+        DispatchQueue.main.async(execute: attempt)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: attempt)
     }
 
     /// 顶部 status:纯视觉占位条(显示「加载更早…」spinner /「已经是最早」),
