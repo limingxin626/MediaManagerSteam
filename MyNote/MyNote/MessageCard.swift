@@ -81,16 +81,14 @@ struct MessageCard: View {
 
     // MARK: - 正文
     //
-    // inline markdown 渲染(**粗体** / *斜体* / `行内代码` / [链接](url) / ~~删除线~~)
-    // + 裸 URL 自动检测。块级语法(标题/列表/引用/代码块)按字面保留,不展开。
-    // 详见 `MessageTextRenderer`。
+    // 全量 markdown 渲染(标题/列表/引用/代码块/表格/inline 标记/链接/图片)
+    // —— 走 swift-markdown-ui,与 vue 端 `marked` 渲染基本对齐。
+    // 视觉调校在 `MarkdownBody` 里统一,卡片和详情面板共用同一份样式。
 
     private func textBody(_ text: String) -> some View {
-        Text(MessageTextRenderer.render(text))
-            .font(.system(size: 14))
+        MarkdownBody(text: text)
             .foregroundColor(.primary)
             .fixedSize(horizontal: false, vertical: true)
-            .textSelection(.enabled)
     }
 
     // MARK: - tag chips

@@ -18,6 +18,21 @@
 
 验证:`File → Packages → Resolve Package Versions` 不报错。
 
+### 1.1.5 添加 swift-markdown-ui SPM 依赖(2026-06-08 新增)
+
+消息正文 markdown 渲染依赖此包。**不加 app 会编不过**(`MarkdownBody.swift` import 失败)。
+
+1. 在 Xcode 菜单 **File → Add Package Dependencies...**
+2. URL 框输入:`https://github.com/gonzalezreal/swift-markdown-ui`
+3. Dependency Rule 选 **Up to Next Major Version**,起始版本 `2.4.1`(2024-10 发布,最后稳定版)
+4. 点 **Add Package**
+5. 在 product 列表勾选 **MarkdownUI**,Target 选 `MyNote`
+6. 点 **Add Package** 完成
+
+说明:swift-markdown-ui 作者已把新开发迁去 [Textual](https://github.com/gonzalezreal/textual),
+此包进入 maintenance mode,但 GFM 全特性已稳定可用,继续作为我们的方案。
+
+
 ### 1.2 设置 macOS Deployment Target ≥ 14.0
 
 1. 在 Project Navigator 点 `MyNote` 蓝色工程图标

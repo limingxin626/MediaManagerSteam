@@ -110,15 +110,12 @@ struct MessageDetailPane: View {
 
     // MARK: - 正文
     //
-    // inline markdown 渲染(**粗体** / *斜体* / `行内代码` / [链接](url) / ~~删除线~~)
-    // + 裸 URL 自动检测。块级语法按字面保留。与 `MessageCard` 同款,
-    // 详见 `MessageTextRenderer`。
+    // 全量 markdown 渲染(标题/列表/引用/代码块/表格/inline 标记/链接/图片)
+    // —— 与 MessageCard 同款,详见 `MarkdownBody`。
 
     private func textBody(_ text: String) -> some View {
-        Text(MessageTextRenderer.render(text))
-            .font(.system(size: 14))
+        MarkdownBody(text: text)
             .foregroundColor(.primary)
-            .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
     }
 
