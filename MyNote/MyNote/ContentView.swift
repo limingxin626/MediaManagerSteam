@@ -14,7 +14,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedTab: AppTab? = .media
+    @State private var selectedTab: AppTab? = .home
     @StateObject private var mediaLibraryViewModel = MediaLibraryViewModel()
     @StateObject private var messagesViewModel = MessagesViewModel()
 

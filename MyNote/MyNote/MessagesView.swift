@@ -35,12 +35,6 @@
 //    │          │   │ MessageCard(更早)           │           │
 //    │          │   └─────────────────────────────┘           │
 //    │          │   ↓ "加载更早…" / "已经是最早" sentinel    │
-//    │          │              ┌─────────────────────┐        │
-//    │          │              │ MessageDetailPane   │ (有选中时)
-//    │          │              │  - 完整 actor+正文  │        │
-//    │          │              │  - 全量 media grid  │        │
-//    │          │              │  - ESC / × 关闭     │        │
-//    │          │              └─────────────────────┘        │
 //    └──────────┴─────────────────────────────────────────────┘
 //
 //  状态保留:ContentView 持 @StateObject(MessagesViewModel),切 tab 来回不丢。
@@ -88,7 +82,6 @@ struct MessagesView: View {
     @ViewBuilder
     private func content(for width: CGFloat) -> some View {
         let showSidebar = width >= 800
-        let showDetail = width >= 800 && viewModel.selectedMessage != nil
 
         ZStack(alignment: .top) {
             HStack(spacing: 0) {
@@ -99,18 +92,6 @@ struct MessagesView: View {
 
                 feedPane
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                if showDetail, let message = viewModel.selectedMessage {
-                    Divider()
-                    MessageDetailPane(
-                        message: message,
-                        isLoading: viewModel.selectedMessageLoading,
-                        onClose: { viewModel.clearSelectedMessage() },
-                        onMediaPreview: { index in openPreview(message: message, startIndex: index) }
-                    )
-                    .frame(idealWidth: 420, maxWidth: 600)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
             }
 
             // 错误浮层
@@ -179,18 +160,7 @@ struct MessagesView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { idx, msg in
-                    MessageCard(
-                        message: msg,
-                        isSelected: viewModel.selectedMessage?.id == msg.id,
-                        onCardClick: {
-                            Task { await viewModel.selectMessage(id: msg.id) }
-                        },
-                        onMediaClick: { _ in
-                            // feed 内点媒体不直接进 preview(对齐 vue 端 Message.vue 的行为)
-                            // 而是先选中消息 → 详情面板里再点媒体才进 preview
-                            Task { await viewModel.selectMessage(id: msg.id) }
-                        }
-                    )
+                    MessageCard(message: msg)
                     // prefetch marker:在距离末尾第 10 条 message 之后挂一个
                     // 不可见 trigger,LazyVStack 渲染到这里时 onAppear → loadMore。
                     // 这是 SwiftUI 顺向无限滚动的标准用法,无 reverse 模式那些坑。

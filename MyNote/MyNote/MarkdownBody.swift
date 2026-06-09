@@ -3,7 +3,7 @@
 //  MyNote
 //
 //  消息正文 markdown 渲染 —— 基于 swift-markdown-ui 的 `Markdown` view
-//  做一层薄封装,统一字体 / 间距 / 主题,便于 MessageCard / MessageDetailPane 共用。
+//  做一层薄封装,统一字体 / 间距 / 主题,便于消息域 (MessageCard) 共用。
 //
 //  支持范围(GitHub Flavored Markdown 全集):
 //    - 标题 H1-H6

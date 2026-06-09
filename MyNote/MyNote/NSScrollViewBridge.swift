@@ -45,7 +45,10 @@ struct VirtualScrollView<Content: View>: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let sv = NSScrollView()
-        sv.hasVerticalScroller = true
+        // 媒体页不显示垂直滚动条 —— 右侧 DateScrubber 已提供位置指示,
+        // 视觉上贴近 Finder / Photos / Music 的「无滚动条」网格风格。
+        // 滚轮/trackpad/键盘 PgUp/PgDn 等手势注册在 clip view 上,不受 scroller 开关影响。
+        sv.hasVerticalScroller = false
         sv.hasHorizontalScroller = false
         sv.autohidesScrollers = true
         sv.scrollerStyle = .overlay

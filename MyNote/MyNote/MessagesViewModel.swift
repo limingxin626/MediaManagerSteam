@@ -16,8 +16,7 @@
 //    4. 状态保留:ContentView 以 @StateObject 持有本 VM,切 tab 来回不丢。
 //    5. 写操作为空:Mac 端 read-only 阶段,所有 mutation 走 backend HTTP,本
 //       VM 不暴露 changeStarred / delete / merge / split 等方法。
-//    6. selectedMessage:full detail(actor / mediaItems / tags)由 fetchMessageDetail
-//       单独拉,不走 list(避免 detail 拿不到完整 9+ 媒体)。
+//    6. 不再持有 selectedMessage —— 详情面板已下线,点击卡是 no-op。
 //
 
 import Foundation
@@ -30,10 +29,6 @@ final class MessagesViewModel: ObservableObject {
 
     /// feed 当前已加载的消息列表(DESC:最新在 [0],最旧在 [count-1])。
     @Published private(set) var messages: [Message] = []
-    /// 用户当前选中的消息完整 detail(null = 未选中,detail pane 关闭)。
-    @Published var selectedMessage: Message? = nil
-    /// 单条 detail 拉取中的 loading 标志(消息卡 hover → 选中期间过渡)。
-    @Published private(set) var selectedMessageLoading = false
 
     @Published private(set) var isLoading = false
     @Published var errorMessage: String? = nil
@@ -121,10 +116,6 @@ final class MessagesViewModel: ObservableObject {
         messages = []
         nextCursor = nil
         hasMore = true
-        // 切过滤后,清掉旧 selectedMessage(它的 detail 可能已经不符合新 filter)
-        if let sm = selectedMessage, !messages.contains(where: { $0.id == sm.id }) {
-            selectedMessage = nil
-        }
         do {
             let result = try await repository.list(
                 cursor: nil, limit: 20, filter: currentFilter
@@ -197,33 +188,6 @@ final class MessagesViewModel: ObservableObject {
             }
         }
         await loadInitial()
-    }
-
-    // MARK: - 选中消息
-
-    /// 点击消息卡:从 messages 数组里取摘要 → 拉 detail(actor / 全量 media_items / tags)。
-    func selectMessage(id: Int) async {
-        // 先在 messages 数组里找到占位 summary(已经有 actor / media_count)
-        guard let summary = messages.first(where: { $0.id == id }) else { return }
-        // 立刻用 summary 占位 detail,避免「点击 - 加载」空白期
-        selectedMessage = summary
-        selectedMessageLoading = true
-        do {
-            if let full = try await repository.fetchMessageDetail(id: id) {
-                // 防止 await 期间用户又点了别的消息
-                if selectedMessage?.id == id {
-                    selectedMessage = full
-                }
-            }
-        } catch {
-            // detail 拉取失败时,保留 summary 占位
-        }
-        selectedMessageLoading = false
-    }
-
-    /// 关闭 detail 面板。
-    func clearSelectedMessage() {
-        selectedMessage = nil
     }
 
     // MARK: - 日期跳转
