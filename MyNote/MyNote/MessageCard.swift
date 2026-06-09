@@ -5,17 +5,14 @@
 //  消息卡(feed 内单条)—— 顶部 actor + 相对时间、正文、tag chips、媒体网格、底部条。
 //
 //  Read-only 行为:星标只展示不可点击;编辑 / 删除 / 合并 / 拆分等写操作按钮一律不显示。
+//  点击行为:整张卡(正文 / tag / 媒体)目前是 no-op —— 详情面板已下线,
+//  媒体预览请走媒体页(Media tab)。
 //
 
 import SwiftUI
 
 struct MessageCard: View {
     let message: Message
-    /// 是否处于选中态(与 viewModel.selectedMessage.id 匹配)
-    let isSelected: Bool
-    /// 媒体点击回调(feed 内点击不应直接进 preview,先开 detail)
-    let onCardClick: () -> Void
-    let onMediaClick: (Int) -> Void
 
     @State private var isHovered = false
 
@@ -29,24 +26,20 @@ struct MessageCard: View {
                 tagChips
             }
             if !message.mediaItems.isEmpty {
-                MessageMediaGrid(items: message.mediaItems, onClick: onMediaClick)
+                MessageMediaGrid5(mediaItems: message.mediaItems) { _ in
+                    // 详情面板已下线,feed 内点媒体暂不直接进 preview
+                }
             }
             footerRow
         }
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isHovered || isSelected
+                .fill(isHovered
                       ? Color.gray.opacity(0.10)
                       : Color.gray.opacity(0.04))
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
-        )
-        .contentShape(Rectangle())
         .onHover { isHovered = $0 }
-        .onTapGesture { onCardClick() }
     }
 
     // MARK: - 顶部行:actor + 时间
