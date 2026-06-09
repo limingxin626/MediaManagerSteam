@@ -79,11 +79,12 @@ SwiftUI app with **direct read-only access** to the shared SQLite database via G
 - Entry: `MyNote/MyNote/MyNoteApp.swift` — on launch, calls `LocalDatabase.shared.open(rootURL:)` with the user-chosen `DATA_ROOT`. First launch shows `OnboardingView` with `NSOpenPanel` to pick the directory; path persisted to `UserDefaults.dataRoot`.
 - Data layer: `LocalDatabase` (singleton `DatabaseQueue`, `readonly = true`) → `MediaRepository` (composite cursor `(created_at, id)` paging, batch tag loading) → `MediaSource` protocol with `LocalMediaSource` (default) and `APIMediaSource` (HTTP fallback, kept for debugging).
 - Models: `MediaRecord.swift` maps the `media` table 1:1 with backend SQLAlchemy schema (snake_case via `CodingKeys`). `Media` UI struct in `Models.swift` has `localThumbURL` / `localFileURL` computed props that resolve against `Settings.dataRoot`.
-- UI: only `MediaLibraryView` (4-col grid) is wired in first phase. `FeedView` (message feed) is dropped from target.
+- UI: main window = `SidebarView` (left 200pt, fixed) + content area (right, fills). `SidebarView` is a `List(selection:)` with three `AppTab` entries (home / messages / media); default selection is `.media`. `AppTab` enum (title + SF Symbol) is the single source of truth. Content area renders `HomePlaceholderView` / `MessagesPlaceholderView` / `MediaLibraryView` based on selection. `MediaLibraryView` (4-col grid) is fully implemented; home / messages are blank placeholders to be filled by future changes. `FeedView` (message feed) is dropped from target.
 - Thumbnails: `LocalImageLoader` (actor + `NSCache<NSNumber, NSImage>`) decodes webp off the main thread; replaces `AsyncImage` to avoid re-decoding on scroll. Requires macOS 14+ for native webp.
 - Detail view: `NSImage` for images, `AVPlayer` for videos, both reading local file URLs.
 - **Mac is read-only in first phase** — no starred toggle, no upload. Write operations still go through backend HTTP if/when re-enabled.
 - See `MyNote/MAC_TODO.md` for Xcode-side setup (SPM add GRDB, deployment target, target membership).
+- **Xcode project uses `PBXFileSystemSynchronizedRootGroup` (Xcode 16+)** — files added to `MyNote/MyNote/` are auto-included in the target. No `.pbxproj` editing needed for new Swift files.
 
 ### Database Models
 

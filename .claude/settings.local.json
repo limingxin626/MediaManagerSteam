@@ -49,7 +49,24 @@
       "Bash(git push:*)",
       "Bash(openspec new *)",
       "Bash(openspec status *)",
-      "Bash(xcodebuild -scheme MyNote -configuration debug build)"
+      "Bash(xcodebuild -scheme MyNote -configuration debug build)",
+      "Bash(xcodebuild -project MyNote.xcodeproj -scheme MyNote -configuration Debug -destination 'platform=macOS' build)",
+      "Bash(xcodebuild -list -project MyNote.xcodeproj)",
+      "Bash(xcodebuild -list -project MyNote/MyNote.xcodeproj)",
+      "Bash(xcodebuild -resolvePackageDependencies -project MyNote/MyNote.xcodeproj)",
+      "Bash(xcodebuild -project MyNote/MyNote.xcodeproj -scheme MyNote -configuration Debug -destination 'platform=macOS' build)",
+      "Bash(xcrun -sdk macosx swiftc -parse MyNote/MyNote/NSScrollViewBridge.swift)",
+      "Bash(xcrun -sdk macosx swiftc -parse MyNote/MyNote/MediaLibraryViewModel.swift)",
+      "Bash(xcrun -sdk macosx swiftc -parse MyNote/MyNote/MediaLibraryView.swift)",
+      "Bash(openspec instructions *)",
+      "Bash(xcodebuild -scheme MyNote -configuration Debug -destination 'platform=macOS' build)",
+      "Bash(xcodebuild -scheme MyNote -configuration Debug build)",
+      "Bash(xcodebuild -project MyNote.xcodeproj -scheme MyNote -destination 'platform=macOS' -configuration Debug build)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git branch *)",
+      "Bash(awk ' *)",
+      "Read(//tmp/**)"
     ]
   },
   "enabledMcpjsonServers": [
