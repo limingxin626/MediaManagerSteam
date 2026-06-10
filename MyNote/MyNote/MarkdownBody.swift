@@ -25,7 +25,7 @@ struct MarkdownBody: View {
     let text: String
 
     var body: some View {
-        Markdown(text)
+        Markdown(Self.softBreakToHardBreak(text))
             // 基础正文字号对齐原 inline 渲染(14pt),与 MessageCard 其他文本一致
             .markdownTextStyle(\.text) {
                 FontSize(14)
@@ -93,5 +93,45 @@ struct MarkdownBody: View {
                     }
             }
             .textSelection(.enabled)
+    }
+
+    // 把段落内的单个换行(soft break)转成 CommonMark 硬换行(行尾两空格 + \n),
+    // 对齐 vue 端 `marked` 的 `breaks: true` 行为。否则 swift-markdown-ui
+    // 按 CommonMark 严格语义把单换行当作空格,导致用户视觉上分两行的内容被拼到一起。
+    //
+    // 围栏代码块(``` 或 ~~~)与缩进代码块原样保留,避免破坏代码格式。
+    static func softBreakToHardBreak(_ raw: String) -> String {
+        let normalized = raw.replacingOccurrences(of: "\r\n", with: "\n")
+                            .replacingOccurrences(of: "\r", with: "\n")
+        var out: [String] = []
+        var inFence = false
+        var fenceMarker: Character = "`"
+        let lines = normalized.split(separator: "\n", omittingEmptySubsequences: false)
+        for (idx, sub) in lines.enumerated() {
+            let line = String(sub)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if !inFence, trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                inFence = true
+                fenceMarker = trimmed.first!
+                out.append(line)
+                continue
+            }
+            if inFence {
+                out.append(line)
+                if trimmed.hasPrefix(String(repeating: fenceMarker, count: 3)) {
+                    inFence = false
+                }
+                continue
+            }
+            let isLast = idx == lines.count - 1
+            let nextIsBlank = !isLast && lines[idx + 1].trimmingCharacters(in: .whitespaces).isEmpty
+            let alreadyHardBreak = line.hasSuffix("  ") || line.hasSuffix("\\")
+            if isLast || nextIsBlank || trimmed.isEmpty || alreadyHardBreak {
+                out.append(line)
+            } else {
+                out.append(line + "  ")
+            }
+        }
+        return out.joined(separator: "\n")
     }
 }
