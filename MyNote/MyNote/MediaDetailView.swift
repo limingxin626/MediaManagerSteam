@@ -33,6 +33,12 @@ struct MediaDetailView: View {
     @State private var hideTask: Task<Void, Never>? = nil
     /// AppKit 鼠标移动监视器 —— 全屏时 .onHover 永远是 true,只能走 NSEvent。
     @State private var mouseMonitor: Any? = nil
+    /// AppKit 键盘监视器 —— SwiftUI .onKeyPress 在 overlay 模式下焦点链不稳:
+    /// 切换媒体重建 content 子树时 @FocusState 偶发被吞,后续左右键收不到 →
+    /// "翻不动";另一些时候同一次按键既被 .onKeyPress 又被系统其它响应者
+    /// 处理 → "会跳"(连跳两项)。改走 local monitor 在 SwiftUI 之前抢
+    /// 拦截,返回 nil 吞掉事件,行为稳定不受焦点影响。
+    @State private var keyMonitor: Any? = nil
 
     private var current: Media? {
         guard mediaList.indices.contains(currentIndex) else { return nil }
@@ -71,6 +77,7 @@ struct MediaDetailView: View {
         .onAppear {
             rebuildPlayer()
             startMouseTracking()
+            startKeyTracking()
             scheduleHide()
             updateWindowTitle()
             // 把焦点转移到本 view,使 .onKeyPress 生效
@@ -78,20 +85,8 @@ struct MediaDetailView: View {
         }
         .focusable(true)
         .focused($isFocused)
-        .onKeyPress { press in
-            switch press.key {
-            case .leftArrow:
-                goPrev(); return .handled
-            case .rightArrow:
-                goNext(); return .handled
-            case .escape:
-                closePreview(); return .handled
-            case .space:
-                closePreview(); return .handled
-            default:
-                return .ignored
-            }
-        }
+        // 键盘处理统一走 AppKit local monitor(startKeyTracking),不挂 .onKeyPress —
+        // SwiftUI 焦点链在 overlay 模式下不稳,monitor 抢在事件分发前拦截更可靠。
         .focusEffectDisabled(true)
         .onChange(of: currentIndex) { _, _ in
             rebuildPlayer()
@@ -102,6 +97,7 @@ struct MediaDetailView: View {
             player?.pause()
             player = nil
             stopMouseTracking()
+            stopKeyTracking()
             hideTask?.cancel()
             PreviewTitle.shared.title = ""
             for window in NSApp.windows {
@@ -314,6 +310,37 @@ struct MediaDetailView: View {
         if let monitor = mouseMonitor {
             NSEvent.removeMonitor(monitor)
             mouseMonitor = nil
+        }
+    }
+
+    /// 注册键盘 local monitor —— 抢在 SwiftUI 焦点链之前处理翻页 / 关闭键,
+    /// 返回 nil 吞掉事件防止 .onKeyPress 再次消费导致双触发("跳两项")。
+    /// 仅响应单次 keyDown,不响应 keyRepeat —— 长按不会一秒翻 N 张,与
+    /// Photos.app / 浏览器图片预览行为一致。
+    private func startKeyTracking() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // keyCode: 123=Left, 124=Right, 53=Escape, 49=Space
+            switch event.keyCode {
+            case 123:
+                if !event.isARepeat { Task { @MainActor in goPrev() } }
+                return nil
+            case 124:
+                if !event.isARepeat { Task { @MainActor in goNext() } }
+                return nil
+            case 53, 49:
+                if !event.isARepeat { Task { @MainActor in closePreview() } }
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+
+    private func stopKeyTracking() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
         }
     }
 
