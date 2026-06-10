@@ -52,26 +52,59 @@ struct MessagesView: View {
     /// 再嵌一层 GeometryReader 让 toolbar 与 ZStack 兄弟节点的 toolbar 重叠。
     let containerWidth: CGFloat
 
-    /// 媒体预览 destination —— 推入 NavigationPath 打开 MediaDetailView。
+    /// NavigationStack 保留空跑 —— 维持 ContentView 上提 toolbar 的路由契约
+    /// (每个 tab 自带 NavigationStack 以承接 navigationTitle / window title)。
+    /// 预览不再走 navigationPath.append,改为 ZStack overlay(见 previewState)。
     @State private var navigationPath = NavigationPath()
-    /// 当前正在预览的媒体数组(从某条 message 拿到的 mediaItems) + 起始 index。
-    @State private var previewMediaList: [Media] = []
+
+    /// 媒体预览状态 —— 单一来源,nil 表示无预览,有值时 overlay 渲染 MediaDetailView。
+    ///
+    /// 之所以 overlay 而非 NavigationStack push:
+    ///   1) push 后 SwiftUI 会重 layout 消息流的 LazyVStack,pop 回来时
+    ///      标准 ScrollView 的滚动位置在 macOS 14 上恢复不稳定(已知 Apple
+    ///      bug,FB13322236 / FB13455901)—— 用户感受为「关掉预览后列表回顶」。
+    ///   2) push 同时让焦点链跨容器游走,关闭后下一次空格易误触发 toolbar /
+    ///      sidebar 上的可聚焦元素 —— 用户感受为「再按空格打开了别的媒体」。
+    /// overlay 模式下消息流 view 永不卸载 → 滚动位置由 SwiftUI 自然保留;
+    /// 配合下面的 @FocusState feedFocused,焦点也显式收敛。
+    @State private var previewState: PreviewState? = nil
+
+    /// 消息流容器焦点 —— openPreview 时置 false 让 MediaDetailView 抢焦点,
+    /// closePreview 时置 true 把焦点收回消息流,防止下一次按键被旁边的
+    /// focusable 元素(toolbar 按钮 / sidebar chip)截胡。
+    @FocusState private var feedFocused: Bool
+
+    /// 记录最近一次预览关闭时的最终索引,供未来「同步选中态」等扩展使用。
+    /// 当前消息流没有「选中某条消息」的概念,该值暂未消费,保留以便后续扩展。
     @State private var previewIndex: Int = 0
-    @State private var previewIndexBox: IndexBox? = nil
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            content(for: containerWidth)
-                .navigationTitle(AppTab.messages.title)
-                .navigationDestination(for: MessagesPreviewDestination.self) { dest in
+            ZStack {
+                content(for: containerWidth)
+                    .navigationTitle(AppTab.messages.title)
+
+                if let state = previewState {
+                    // .id(state.id) 强制每次打开都是全新 view —— 否则连续打开两条
+                    // 不同消息的同一索引位置时,SwiftUI 会 reuse,内部 @State
+                    // (AVPlayer / isFocused / chromeVisible / mouseMonitor)不会重置。
                     MediaDetailView(
-                        mediaList: dest.mediaList,
-                        currentIndex: dest.currentIndexBinding ?? .constant(dest.startIndex),
+                        mediaList: state.mediaList,
+                        currentIndex: Binding(
+                            get: { state.indexBox.value },
+                            set: { state.indexBox.value = $0 }
+                        ),
                         hasMore: false,
                         onNeedMore: { /* 单消息内已加载全部媒体,无需翻页 */ },
                         onClose: { closePreview() }
                     )
+                    .id(state.id)
+                    .background(Color(.windowBackgroundColor))
+                    .transition(.opacity)
+                    .zIndex(1)
                 }
+            }
+            .animation(.easeInOut(duration: 0.18), value: previewState?.id)
         }
     }
 
@@ -174,6 +207,12 @@ struct MessagesView: View {
             }
             .padding(16)
         }
+        // 容器级焦点 —— 让关闭预览时焦点有明确归宿,不再游走到 toolbar / sidebar
+        // 上随便一个 focusable 元素。focusEffectDisabled 关掉系统蓝色 ring,
+        // 因为消息流没有「选中某条」的可视态,ring 会显得突兀(参 MediaLibraryView)。
+        .focusable(true)
+        .focused($feedFocused)
+        .focusEffectDisabled(true)
     }
 
     /// 在「距离末尾倒数第 10 条」**之后**挂 trigger。
@@ -386,29 +425,34 @@ struct MessagesView: View {
         let mediaList = message.mediaItems.map { $0.asMedia() }
         guard !mediaList.isEmpty else { return }
         let safe = max(0, min(startIndex, mediaList.count - 1))
-        let box = IndexBox(value: safe)
-        let binding = Binding<Int>(get: { box.value }, set: { box.value = $0 })
-        let dest = MessagesPreviewDestination(
-            mediaList: mediaList,
-            startIndex: safe,
-            currentIndexBinding: binding
-        )
-        previewIndexBox = box
-        // 设置导航栏标题
+        // 设置导航栏标题(MediaDetailView 的 .onAppear 还会再 updateWindowTitle 一次,
+        // 但先在这里给个有意义的占位,避免 overlay 进入动画期间窗口标题闪一下)。
         if let text = message.text, !text.isEmpty {
             PreviewTitle.shared.title = String(text.prefix(30))
         } else {
             PreviewTitle.shared.title = "消息 #\(message.id)"
         }
-        navigationPath.append(dest)
+        // 先释放消息流容器焦点,再插入预览 —— MediaDetailView 的 .onAppear 会异步
+        // 把自己置为 firstResponder,届时键盘事件由它接管。
+        feedFocused = false
+        previewState = PreviewState(
+            id: UUID(),
+            mediaList: mediaList,
+            indexBox: IndexBox(value: safe)
+        )
     }
 
     private func closePreview() {
-        if let box = previewIndexBox {
-            previewIndex = box.value
+        if let state = previewState {
+            previewIndex = state.indexBox.value
         }
-        previewIndexBox = nil
-        navigationPath.removeLast()
+        previewState = nil
+        // async 一拍 —— @FocusState 在 view 拆除过程中同步设置偶发被吞,
+        // 等 overlay 完全 dismiss 后再恢复焦点是 SwiftUI 社区验证过的稳妥写法。
+        // 焦点收回消息流容器后,下一次按空格不会被旁边的 focusable 元素截胡。
+        DispatchQueue.main.async {
+            feedFocused = true
+        }
     }
 }
 
@@ -421,21 +465,17 @@ private func yearOf(_ d: Date) -> Int { Calendar.current.component(.year, from: 
 private func monthOf(_ d: Date) -> Int { Calendar.current.component(.month, from: d) }
 private func dayOf(_ d: Date) -> Int { Calendar.current.component(.day, from: d) }
 
-// MARK: - 预览 destination
+// MARK: - 预览状态
 
-struct MessagesPreviewDestination: Hashable {
+/// 媒体预览的单一状态载体。每次打开都创建新实例(新 UUID),配合
+/// `.id(state.id)` 强制 MediaDetailView 重建,避免上一次 session 的
+/// AVPlayer / @FocusState / chromeVisible 等内部状态串到新一次。
+///
+/// 注意:`indexBox` 用引用语义而非值语义 —— MediaDetailView 翻页通过
+/// `currentIndex` Binding 写回时,需要修改的是 box 内的值,而不是触发
+/// SwiftUI 重建整个 `previewState`。复用 `IndexBox`(MediaPreviewDestination.swift)。
+private struct PreviewState {
+    let id: UUID
     let mediaList: [Media]
-    let startIndex: Int
-    let currentIndexBinding: Binding<Int>?
-
-    static func == (lhs: MessagesPreviewDestination, rhs: MessagesPreviewDestination) -> Bool {
-        // 比较时不考虑 binding(它本身是引用),只看 list 指针 + startIndex
-        lhs.mediaList.map { $0.id } == rhs.mediaList.map { $0.id }
-            && lhs.startIndex == rhs.startIndex
-    }
-
-    func hash(into hasher: inout Hasher) {
-        for m in mediaList { hasher.combine(m.id) }
-        hasher.combine(startIndex)
-    }
+    let indexBox: IndexBox
 }
