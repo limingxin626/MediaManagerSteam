@@ -62,15 +62,24 @@ struct MessageMediaGrid5: View {
         let item = visibleItems[mediaIndex]
         let isLastVisible = mediaIndex == visibleItems.count - 1 && overflowCount > 0
 
-        Button(action: { onClick(mediaIndex) }) {
-            ZStack {
-                MessageThumbCell(media: item)
-                if isLastVisible {
-                    overflowBadge
-                }
+        // 用 onTapGesture 而不是 Button —— 与媒体页 cell 一致,不参与键盘焦点链。
+        // 用 Button(.plain) 的副作用:
+        //   1) Button 默认 focusable,在 MediaDetailView 用空格关闭后,焦点会回到
+        //      view tree 里下一个 focusable Button → 再按一次空格会激活那个 Button,
+        //      意外打开"别的"媒体的详情。
+        //   2) SwiftUI 的 auto-scroll to focused view 会在焦点跳回 Button 时
+        //      重新滚动 ScrollView 让 Button 可见,覆盖用户离开消息页时的 scroll 位置。
+        // onTapGesture 不进入焦点链,两个问题同时规避。
+        ZStack {
+            MessageThumbCell(media: item)
+            if isLastVisible {
+                overflowBadge
             }
         }
-        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onClick(mediaIndex)
+        }
     }
 
     private var overflowBadge: some View {

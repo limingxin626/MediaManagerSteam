@@ -86,23 +86,6 @@ struct MediaLibraryView: View {
                 )
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("媒体类型", selection: mediaTypeBinding) {
-                    Text("全部").tag(MediaTypeFilter.all)
-                    Text("图片").tag(MediaTypeFilter.image)
-                    Text("视频").tag(MediaTypeFilter.video)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button { Task { await viewModel.toggleStarredOnly() } } label: {
-                    Image(systemName: viewModel.showOnlyStarred ? "star.fill" : "star")
-                }
-                .help(viewModel.showOnlyStarred ? "显示全部" : "仅显示星标")
-            }
-        }
         .onAppear {
             Task { await viewModel.loadInitialIfNeeded() }
             gridFocused = true
@@ -129,11 +112,36 @@ struct MediaLibraryView: View {
         }
     }
 
-    // MARK: - Toolbar 桥接
+    // MARK: - 顶栏(toolbar)
+    //
+    // toolbar 已上提到 ContentView,这里只提供工厂方法供其调用。改成 static
+    // 同 MessagesView.messagesToolbar —— ZStack 同时持多个 page 时,各自 page 内
+    // 挂 .toolbar 会被 AppKit 合并到窗口顶栏导致重叠(opacity=0 不影响 toolbar 合并)。
+    // 上提后 ContentView switch selectedTab 单一来源,每个 tab 一套 toolbar 互不打架。
+
+    @ToolbarContentBuilder
+    static func mediaToolbar(viewModel: MediaLibraryViewModel) -> some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Picker("媒体类型", selection: mediaTypeBinding(viewModel: viewModel)) {
+                Text("全部").tag(MediaTypeFilter.all)
+                Text("图片").tag(MediaTypeFilter.image)
+                Text("视频").tag(MediaTypeFilter.video)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button { Task { await viewModel.toggleStarredOnly() } } label: {
+                Image(systemName: viewModel.showOnlyStarred ? "star.fill" : "star")
+            }
+            .help(viewModel.showOnlyStarred ? "显示全部" : "仅显示星标")
+        }
+    }
 
     /// 把 viewModel.selectedMediaType (String?) 桥到 Picker 的 MediaTypeFilter 枚举
     /// selection 上。setter 同步调 changeMediaType 触发 reload,与原 chip 行为一致。
-    private var mediaTypeBinding: Binding<MediaTypeFilter> {
+    /// 改成 static 是为了 mediaToolbar 在 ContentView 调用上下文里无 self 可用。
+    private static func mediaTypeBinding(viewModel: MediaLibraryViewModel) -> Binding<MediaTypeFilter> {
         Binding(
             get: { MediaTypeFilter(rawValue: viewModel.selectedMediaType ?? "") ?? .all },
             set: { newValue in

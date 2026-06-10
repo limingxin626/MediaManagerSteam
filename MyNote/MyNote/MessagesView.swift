@@ -46,8 +46,11 @@ import SwiftUI
 struct MessagesView: View {
     @ObservedObject var viewModel: MessagesViewModel
 
-    /// 主窗口可用宽度(用于窄屏检测:决定 detail pane 是否显示 / sidebar 折叠)
-    @State private var containerWidth: CGFloat = 1200
+    /// 主窗口可用宽度,由 ContentView 顶层 GeometryReader 算出后传入。
+    /// 只用于内容布局判断(决定 FilterSidebar 是否折叠);toolbar 已上提到
+    /// ContentView,窄屏 fallback 在那一侧用同一个值判断,避免本 view 内
+    /// 再嵌一层 GeometryReader 让 toolbar 与 ZStack 兄弟节点的 toolbar 重叠。
+    let containerWidth: CGFloat
 
     /// 媒体预览 destination —— 推入 NavigationPath 打开 MediaDetailView。
     @State private var navigationPath = NavigationPath()
@@ -57,23 +60,18 @@ struct MessagesView: View {
     @State private var previewIndexBox: IndexBox? = nil
 
     var body: some View {
-        GeometryReader { geo in
-            NavigationStack(path: $navigationPath) {
-                content(for: geo.size.width)
-                    .navigationTitle(AppTab.messages.title)
-                    .navigationDestination(for: MessagesPreviewDestination.self) { dest in
-                        MediaDetailView(
-                            mediaList: dest.mediaList,
-                            currentIndex: dest.currentIndexBinding ?? .constant(dest.startIndex),
-                            hasMore: false,
-                            onNeedMore: { /* 单消息内已加载全部媒体,无需翻页 */ },
-                            onClose: { closePreview() }
-                        )
-                    }
-                    .toolbar { toolbarContent }
-            }
-            .onAppear { containerWidth = geo.size.width }
-            .onChange(of: geo.size.width) { _, new in containerWidth = new }
+        NavigationStack(path: $navigationPath) {
+            content(for: containerWidth)
+                .navigationTitle(AppTab.messages.title)
+                .navigationDestination(for: MessagesPreviewDestination.self) { dest in
+                    MediaDetailView(
+                        mediaList: dest.mediaList,
+                        currentIndex: dest.currentIndexBinding ?? .constant(dest.startIndex),
+                        hasMore: false,
+                        onNeedMore: { /* 单消息内已加载全部媒体,无需翻页 */ },
+                        onClose: { closePreview() }
+                    )
+                }
         }
     }
 
@@ -160,7 +158,9 @@ struct MessagesView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { idx, msg in
-                    MessageCard(message: msg)
+                    MessageCard(message: msg) { mediaIndex in
+                        openPreview(message: msg, startIndex: mediaIndex)
+                    }
                     // prefetch marker:在距离末尾第 10 条 message 之后挂一个
                     // 不可见 trigger,LazyVStack 渲染到这里时 onAppear → loadMore。
                     // 这是 SwiftUI 顺向无限滚动的标准用法,无 reverse 模式那些坑。
@@ -238,18 +238,30 @@ struct MessagesView: View {
     }
 
     // MARK: - 顶栏(toolbar)
+    //
+    // toolbar 已上提到 ContentView,这里只提供工厂方法供其调用。改成 static
+    // 是为了让 ContentView 不必持有 MessagesView 实例就能拼出 ToolbarContent;
+    // 同时所有依赖都显式经 viewModel / containerWidth 入参,语义不会被隐式
+    // 状态污染(原 toolbarContent 计算属性偷偷读 self.containerWidth 的写法
+    // 已废)。`@ToolbarContentBuilder` 在 static func 上一样支持。
 
     @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
+    static func messagesToolbar(viewModel: MessagesViewModel, containerWidth: CGFloat) -> some ToolbarContent {
         ToolbarItem(placement: .principal) {
             HStack(spacing: 8) {
                 // 搜索框
                 HStack(spacing: 4) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
-                    TextField("搜索消息...", text: $viewModel.searchText)
-                        .textFieldStyle(.plain)
-                        .frame(width: 200)
+                    // viewModel 是 class,$searchText 投影在 static 上下文里
+                    // 不可用;手工构造 Binding 等价 —— ContentView 持有 @StateObject,
+                    // 重渲染时 viewModel 引用稳定,Binding 闭包内的取值/赋值始终落在同一实例上。
+                    TextField("搜索消息...", text: Binding(
+                        get: { viewModel.searchText },
+                        set: { viewModel.searchText = $0 }
+                    ))
+                    .textFieldStyle(.plain)
+                    .frame(width: 200)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -283,7 +295,7 @@ struct MessagesView: View {
                     || viewModel.selectedActorId != nil
                     || viewModel.selectedIssueId != nil {
                     HStack(spacing: 4) {
-                        Text(currentFilterLabel)
+                        Text(currentFilterLabel(viewModel: viewModel))
                             .font(.system(size: 11))
                             .foregroundColor(.accentColor)
                         Button {
@@ -310,12 +322,18 @@ struct MessagesView: View {
                 if !viewModel.monthlyDayCount.isEmpty {
                     DateScrubber(
                         timeline: viewModel.monthlyDayCount as! [TimelineEntry],
-                        minDate: timelineMinDate,
-                        maxDate: timelineMaxDate,
-                        currentDate: timelineMinDate,
+                        minDate: timelineMinDate(viewModel: viewModel),
+                        maxDate: timelineMaxDate(viewModel: viewModel),
+                        currentDate: timelineMinDate(viewModel: viewModel),
                         onJump: { _ in },
                         onJumpFinal: { date in
-                            Task { await viewModel.scrollToDate(year: yearOf(date), month: monthOf(date), day: dayOf(date)) }
+                            Task {
+                                await viewModel.scrollToDate(
+                                    year: yearOf(date),
+                                    month: monthOf(date),
+                                    day: dayOf(date)
+                                )
+                            }
                         }
                     )
                     .frame(width: 60)
@@ -324,7 +342,9 @@ struct MessagesView: View {
         }
     }
 
-    private var currentFilterLabel: String {
+    // MARK: - Toolbar helpers(static,只给 messagesToolbar 内部用)
+
+    private static func currentFilterLabel(viewModel: MessagesViewModel) -> String {
         if let id = viewModel.selectedTagId,
            let tag = viewModel.availableTags.first(where: { $0.id == id }) {
             return "#\(tag.name)"
@@ -344,7 +364,7 @@ struct MessagesView: View {
         return ""
     }
 
-    private var timelineMinDate: Date {
+    private static func timelineMinDate(viewModel: MessagesViewModel) -> Date {
         // 取该月最早一天
         guard let first = viewModel.monthlyDayCount.last else { return Date() }
         var comp = DateComponents()
@@ -352,17 +372,13 @@ struct MessagesView: View {
         return Calendar.current.date(from: comp) ?? Date()
     }
 
-    private var timelineMaxDate: Date {
+    private static func timelineMaxDate(viewModel: MessagesViewModel) -> Date {
         guard let first = viewModel.monthlyDayCount.first else { return Date() }
         var comp = DateComponents()
         comp.year = first.year; comp.month = first.month; comp.day = first.day
         comp.hour = 23; comp.minute = 59; comp.second = 59
         return Calendar.current.date(from: comp) ?? Date()
     }
-
-    private func yearOf(_ d: Date) -> Int { Calendar.current.component(.year, from: d) }
-    private func monthOf(_ d: Date) -> Int { Calendar.current.component(.month, from: d) }
-    private func dayOf(_ d: Date) -> Int { Calendar.current.component(.day, from: d) }
 
     // MARK: - 媒体预览
 
@@ -395,6 +411,15 @@ struct MessagesView: View {
         navigationPath.removeLast()
     }
 }
+
+// MARK: - 文件级日期组件提取(static toolbar 工厂内使用)
+//
+// 原来是 MessagesView 的实例方法;现在 toolbar 拆成 static func,这些 helper
+// 无 self 可用,改成 file-private 自由函数,语义不变。
+
+private func yearOf(_ d: Date) -> Int { Calendar.current.component(.year, from: d) }
+private func monthOf(_ d: Date) -> Int { Calendar.current.component(.month, from: d) }
+private func dayOf(_ d: Date) -> Int { Calendar.current.component(.day, from: d) }
 
 // MARK: - 预览 destination
 
