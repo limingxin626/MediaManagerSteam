@@ -190,7 +190,7 @@ struct MessagesView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { idx, msg in
-                    MessageCard(message: msg) { mediaIndex in
+                    MessageCard(message: msg, viewModel: viewModel) { mediaIndex in
                         openPreview(message: msg, startIndex: mediaIndex)
                     }
                     // prefetch marker:在距离末尾第 10 条 message 之后挂一个

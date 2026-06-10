@@ -106,14 +106,27 @@ class APIClient: ObservableObject {
         return try JSONDecoder().decode(Message.self, from: data)
     }
     
-    /// 更新消息
-    func updateMessage(id: Int, text: String? = nil, tagIds: [Int]? = nil) async throws -> Message {
+    /// 更新消息 —— 走 backend `PATCH /messages/{id}`,返回 MessageDetailResponse
+    /// (与 `Message` 结构一一对应,可直接 decode)。
+    ///
+    /// 参数全部可选:只传需要改的字段,nil 表示不动。
+    /// - `text`: 正文,会触发后端 #hashtag 解析(但仅在不传 `tagIds` 时生效;
+    ///   传了 `tagIds` 后端按显式 tag 替换、不再解析文本)。
+    /// - `tagIds`: 显式 tag 绑定,传入则替换原有 tag。Mac 端编辑态需要单独管
+    ///   tag chips 时走这条。
+    /// - `starred`: 收藏开关。Mac 端星标点击直接调本方法,不引入单独 endpoint。
+    func updateMessage(
+        id: Int,
+        text: String? = nil,
+        tagIds: [Int]? = nil,
+        starred: Bool? = nil
+    ) async throws -> Message {
         let url = URL(string: "\(baseURL)/messages/\(id)")!
-        
+
         var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        request.httpMethod = "PATCH"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         var payload: [String: Any] = [:]
         if let text = text {
             payload["text"] = text
@@ -121,15 +134,19 @@ class APIClient: ObservableObject {
         if let tagIds = tagIds {
             payload["tag_ids"] = tagIds
         }
-        
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw APIError.invalidResponse
+        if let starred = starred {
+            payload["starred"] = starred
         }
-        
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data)
+            throw APIError.serverError(errorResponse?.detail ?? "更新失败 (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0))")
+        }
+
         return try JSONDecoder().decode(Message.self, from: data)
     }
     

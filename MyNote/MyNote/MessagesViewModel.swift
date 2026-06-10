@@ -14,8 +14,8 @@
 //    3. 单一数据源:messages: [Message] 是 feed 全量(已加载的),分页
 //       loadMore / selectFilter 都基于这个数组 + nextCursor。
 //    4. 状态保留:ContentView 以 @StateObject 持有本 VM,切 tab 来回不丢。
-//    5. 写操作为空:Mac 端 read-only 阶段,所有 mutation 走 backend HTTP,本
-//       VM 不暴露 changeStarred / delete / merge / split 等方法。
+//    5. 写操作:文字 / tag / 星标三个字段已开放,走 APIClient → backend PATCH。
+//       媒体增删 / 合并 / 拆分 / 删除消息仍未开放。
 //    6. 不再持有 selectedMessage —— 详情面板已下线,点击卡是 no-op。
 //
 
@@ -61,6 +61,7 @@ final class MessagesViewModel: ObservableObject {
     // MARK: - 依赖
 
     private let repository: MessageRepository
+    private let apiClient: APIClient
 
     /// 首次 onAppear 守门 —— 切 tab 来回不重置状态(同 MediaLibraryViewModel)。
     private var hasLoadedOnce = false
@@ -80,8 +81,10 @@ final class MessagesViewModel: ObservableObject {
 
     // MARK: - 初始化
 
-    init(repository: MessageRepository = MessageRepository()) {
+    init(repository: MessageRepository = MessageRepository(),
+         apiClient: APIClient = APIClient()) {
         self.repository = repository
+        self.apiClient = apiClient
     }
 
     // MARK: - 过滤拼装
@@ -267,6 +270,90 @@ final class MessagesViewModel: ObservableObject {
         } catch {
             monthlyDayCount = []
         }
+    }
+
+    // MARK: - 编辑 / 写操作
+    //
+    // 走 backend HTTP(PATCH /messages/{id})—— Mac 端 GRDB 是 read-only,写
+    // 必须经过后端,以复用 message_service 里的 #hashtag 解析、SyncLog 落表
+    // 等服务层逻辑。
+    //
+    // 拿到 backend 返回的最新 Message 后,在 messages 数组里就地替换 ——
+    // Message 是 struct 全 `let`,部分字段改不动,只能整条换。
+
+    /// 提交「编辑态」保存:可同时改 text 和 tag。
+    /// - tagIds 传 nil 表示不动 tag(后端按 text 里 #hashtag 重抽);传 [] 清空。
+    /// - 成功后用返回值替换 messages[i],UI 自动重渲。
+    /// - 失败设置 errorMessage,messages 不变(调用方仍处于编辑态,可重试)。
+    /// - Returns: 是否成功(供 View 决定是否退出编辑态)。
+    @discardableResult
+    func commitEdit(messageId: Int, text: String?, tagIds: [Int]?) async -> Bool {
+        do {
+            let updated = try await apiClient.updateMessage(
+                id: messageId, text: text, tagIds: tagIds, starred: nil
+            )
+            applyUpdated(updated)
+            return true
+        } catch let e as APIClient.APIError {
+            errorMessage = e.errorDescription
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// 星标 toggle —— 乐观更新:先就地翻转 UI,失败再回滚 + errorMessage。
+    /// 编辑态 / 只读态都可用,不进 commitEdit 缓冲区。
+    func toggleStar(messageId: Int) async {
+        guard let idx = messages.firstIndex(where: { $0.id == messageId }) else { return }
+        let original = messages[idx]
+        let newStar = !original.starred
+        messages[idx] = replacing(original, starred: newStar)
+
+        do {
+            let updated = try await apiClient.updateMessage(
+                id: messageId, text: nil, tagIds: nil, starred: newStar
+            )
+            applyUpdated(updated)
+        } catch let e as APIClient.APIError {
+            // 失败回滚
+            if let i = messages.firstIndex(where: { $0.id == messageId }) {
+                messages[i] = original
+            }
+            errorMessage = e.errorDescription
+        } catch {
+            if let i = messages.firstIndex(where: { $0.id == messageId }) {
+                messages[i] = original
+            }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// 在 messages 数组里用 id 找到对应项,整体替换。找不到不做事
+    /// (例如用户在等待响应期间切了过滤,旧消息已不在 feed 中)。
+    private func applyUpdated(_ msg: Message) {
+        guard let idx = messages.firstIndex(where: { $0.id == msg.id }) else { return }
+        messages[idx] = msg
+    }
+
+    /// 仅供 toggleStar 乐观更新用:克隆一条 Message,把 starred 换成新值,
+    /// 其他字段照搬。Message 全 `let`,只能这样重建。
+    private func replacing(_ msg: Message, starred: Bool) -> Message {
+        Message(
+            id: msg.id,
+            text: msg.text,
+            createdAt: msg.createdAt,
+            updatedAt: msg.updatedAt,
+            actorId: msg.actorId,
+            actorName: msg.actorName,
+            issueId: msg.issueId,
+            issueTitle: msg.issueTitle,
+            mediaCount: msg.mediaCount,
+            starred: starred,
+            mediaItems: msg.mediaItems,
+            tags: msg.tags
+        )
     }
 }
 

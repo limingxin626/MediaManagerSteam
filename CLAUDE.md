@@ -60,7 +60,7 @@ Key composables:
 - `useToast.ts` — singleton reactive toast (success/error/info)
 - `useTheme.ts` — dark/light mode toggle, persisted to localStorage, applies `.dark` class
 
-API base URL hardcoded in `vue/src/utils/constants.ts` pointing to `http://192.168.31.146:8002`.
+API base URL hardcoded in `vue/src/utils/constants.ts` pointing to `http://127.0.0.1:8002`.
 
 Routes: `/` (Message feed), `/media` (grid), `/actor` (list), `404` catch-all. All views use `<keep-alive>` caching.
 
