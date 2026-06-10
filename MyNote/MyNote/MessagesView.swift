@@ -74,8 +74,10 @@ struct MessagesView: View {
     /// focusable 元素(toolbar 按钮 / sidebar chip)截胡。
     @FocusState private var feedFocused: Bool
 
-    /// 记录最近一次预览关闭时的最终索引,供未来「同步选中态」等扩展使用。
-    /// 当前消息流没有「选中某条消息」的概念,该值暂未消费,保留以便后续扩展。
+    /// 预览当前索引 —— 用 @State 而非 PreviewState 内的引用包装,
+    /// 这样 MediaDetailView 翻页改写时 SwiftUI 能正确追踪依赖、
+    /// 持续触发 MessagesView 重算并把新值通过 $previewIndex 传回去。
+    /// 打开预览时在 openPreview 内重置到 startIndex。
     @State private var previewIndex: Int = 0
 
     var body: some View {
@@ -90,10 +92,7 @@ struct MessagesView: View {
                     // (AVPlayer / isFocused / chromeVisible / mouseMonitor)不会重置。
                     MediaDetailView(
                         mediaList: state.mediaList,
-                        currentIndex: Binding(
-                            get: { state.indexBox.value },
-                            set: { state.indexBox.value = $0 }
-                        ),
+                        currentIndex: $previewIndex,
                         hasMore: false,
                         onNeedMore: { /* 单消息内已加载全部媒体,无需翻页 */ },
                         onClose: { closePreview() }
@@ -435,17 +434,14 @@ struct MessagesView: View {
         // 先释放消息流容器焦点,再插入预览 —— MediaDetailView 的 .onAppear 会异步
         // 把自己置为 firstResponder,届时键盘事件由它接管。
         feedFocused = false
+        previewIndex = safe
         previewState = PreviewState(
             id: UUID(),
-            mediaList: mediaList,
-            indexBox: IndexBox(value: safe)
+            mediaList: mediaList
         )
     }
 
     private func closePreview() {
-        if let state = previewState {
-            previewIndex = state.indexBox.value
-        }
         previewState = nil
         // async 一拍 —— @FocusState 在 view 拆除过程中同步设置偶发被吞,
         // 等 overlay 完全 dismiss 后再恢复焦点是 SwiftUI 社区验证过的稳妥写法。
@@ -471,11 +467,10 @@ private func dayOf(_ d: Date) -> Int { Calendar.current.component(.day, from: d)
 /// `.id(state.id)` 强制 MediaDetailView 重建,避免上一次 session 的
 /// AVPlayer / @FocusState / chromeVisible 等内部状态串到新一次。
 ///
-/// 注意:`indexBox` 用引用语义而非值语义 —— MediaDetailView 翻页通过
-/// `currentIndex` Binding 写回时,需要修改的是 box 内的值,而不是触发
-/// SwiftUI 重建整个 `previewState`。复用 `IndexBox`(MediaPreviewDestination.swift)。
+/// 当前索引另存在 MessagesView 的 `@State previewIndex`,不挂在这里 ——
+/// 否则翻页改写引用包装的 .value 时 SwiftUI 无法追踪到 PreviewState 的依赖,
+/// 父 view 不会重算 body,导致从第二次起翻页失效(只在第一对相邻项间来回)。
 private struct PreviewState {
     let id: UUID
     let mediaList: [Media]
-    let indexBox: IndexBox
 }
