@@ -14,13 +14,12 @@
 //        .frame(width: 200, height: 200)
 //
 //  性能关键 —— `VideoPlayerPool` 按 URL 跨 cell 共享 AVPlayer / AVPlayerItem
-//  / AVPlayerLooper(不共享 layer!),避免反复 create / destroy VideoToolbox
-//  session —— vmc2BuildDecompressionSession 单次要 30-50ms,几十 cell 排队
-//  = 明显卡顿。
+//  / AVPlayerLooper(不共享 layer!)。VideoToolbox session 创建绑在
+//  AVPlayer 上,30-50ms/cell,几十 cell 排队会卡;cache 命中时 <1ms。
 //
-//  layer 每个 view 自己创建并 addSublayer 到 view 的 backing layer 上 ——
-//  view 销毁 layer 自动清理,detail ↔ grid 切来切去不会污染状态(老方案把
-//  layer 也共享,导致 detail 关闭后 grid cell layer 状态混乱 → 空白)。
+//  layer 策略:每个 view 自己 create AVPlayerLayer,通过 `makeBackingLayer`
+//  直接当 view 的 backing layer —— frame 自动跟 view bounds 走(view 销毁
+//  layer 自动释放),不污染其它 view。
 //
 
 import SwiftUI
@@ -29,7 +28,6 @@ import AVKit
 
 /// 按 URL 共享的 AVPlayer 池。跨 cell 复用避免反复 create / destroy
 /// VideoToolbox session(view 出现/消失不释放,只 play/pause)。
-/// `NSCache` 自动 LRU + 内存压力清理,`countLimit` 控制峰值。
 @MainActor
 final class VideoPlayerPool {
     static let shared = VideoPlayerPool()
@@ -103,43 +101,56 @@ struct AnimatedVideoView: View {
         }
         .onDisappear {
             // 只暂停 player —— pool 还持有 player,view 回来时 acquire 直接 play。
-            // 注意:不暂停 layer 也没有(每个 view 自己 layer,随 view 销毁自动清理)
             VideoPlayerPool.shared.release(url)
         }
     }
 }
 
-/// 把 pool 来的 player 装到一个**新建**的 AVPlayerLayer 上,addSublayer 到
-/// view 的 backing layer。每个 view 拥有自己的 layer,layer 生命周期 = view
-/// 生命周期,关闭 detail 不会污染 grid 状态。
+/// AVPlayerLayer 作为 backing layer 的 NSView 子类。
+/// 关键:`makeBackingLayer` 决定 backing layer 类型,frame 自动跟 view bounds。
+/// 旧方案(addSublayer)sublayer frame 不会自动同步,初次 layout 时序不稳会
+/// 短暂 0×0 → 空白。makeBackingLayer 方案 frame 始终正确。
+private final class PlayerLayerHostView: NSView {
+    let player: AVPlayer
+    var contentMode: ContentMode
+
+    init(player: AVPlayer, contentMode: ContentMode) {
+        self.player = player
+        self.contentMode = contentMode
+        super.init(frame: .zero)
+        wantsLayer = true
+        // wantsLayer = true 触发 makeBackingLayer(),无需再设 layer
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func makeBackingLayer() -> CALayer {
+        let layer = AVPlayerLayer(player: player)
+        layer.videoGravity = contentMode == .fill ? .resizeAspectFill : .resizeAspect
+        layer.backgroundColor = NSColor.clear.cgColor
+        return layer
+    }
+
+    /// contentMode 变化时由 NSViewRepresentable.updateNSView 调,直接换
+    /// backing layer 的 videoGravity。不重建 layer,player 引用不动。
+    func updateContentMode(_ mode: ContentMode) {
+        contentMode = mode
+        if let playerLayer = layer as? AVPlayerLayer {
+            playerLayer.videoGravity = mode == .fill ? .resizeAspectFill : .resizeAspect
+        }
+    }
+}
+
 private struct PlayerLayerContainer: NSViewRepresentable {
     let player: AVPlayer
     let contentMode: ContentMode
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
     func makeNSView(context: Context) -> NSView {
-        let v = NSView(frame: .zero)
-        v.wantsLayer = true
-        // 关键:每个 view 自己创建 layer —— 而不是 v.layer = sharedLayer。
-        // 后者会跨 view 共享 backing layer,detail 关闭后 grid 拿到半死状态的
-        // layer 渲染失败 → 空白。
-        let layer = AVPlayerLayer(player: player)
-        layer.videoGravity = contentMode == .fill ? .resizeAspectFill : .resizeAspect
-        context.coordinator.playerLayer = layer
-        v.layer?.addSublayer(layer)
-        return v
+        PlayerLayerHostView(player: player, contentMode: contentMode)
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        // bounds 还没就绪时跳过(避免 0×0 闪烁)
-        guard let layer = context.coordinator.playerLayer,
-              nsView.bounds.size != .zero else { return }
-        layer.videoGravity = contentMode == .fill ? .resizeAspectFill : .resizeAspect
-        layer.frame = nsView.bounds
-    }
-
-    final class Coordinator {
-        var playerLayer: AVPlayerLayer?
+        guard let host = nsView as? PlayerLayerHostView else { return }
+        host.updateContentMode(contentMode)
     }
 }
