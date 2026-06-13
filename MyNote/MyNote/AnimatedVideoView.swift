@@ -21,6 +21,10 @@
 //  直接当 view 的 backing layer —— frame 自动跟 view bounds 走(view 销毁
 //  layer 自动释放),不污染其它 view。
 //
+//  翻页 / 父级换 url:SwiftUI 会**复用**本 view(同位置同类型),@State 保留;
+//  用 onChange(of: url, initial: true) 重新 acquire 新 player,并通过
+//  updateNSView 把新 player 喂给 backing AVPlayerLayer。
+//
 
 import SwiftUI
 import AVFoundation
@@ -82,8 +86,7 @@ struct AnimatedVideoView: View {
     let url: URL
     var contentMode: ContentMode = .fill
 
-    /// pool 拿到的 player。view 首次出现时 acquire 拿,view 重建时 @State 保留,
-    /// 无需重新 acquire。
+    /// pool 拿到的 player。view 首次出现时 acquire 拿,view 重建时 @State 保留。
     @State private var player: AVPlayer?
 
     var body: some View {
@@ -95,12 +98,18 @@ struct AnimatedVideoView: View {
                 Color.gray.opacity(0.08)
             }
         }
-        .onAppear {
-            // acquire 内部已 play();即便 view 之前消失时 release 过,这里也会重新 play
-            player = VideoPlayerPool.shared.acquire(url)
+        // 关键:监听 url 变化 —— 父级用新 url 复用本 view(详情翻页)时,@State
+        // player 是老的,不重新 acquire 就会卡死。onChange 把老 player 释放、
+        // 新 player 拿进来,@State 更新触发 body 重算,PlayerLayerContainer
+        // 收到新 player。initial: true 让首次出现也走同一路径,逻辑统一。
+        .onChange(of: url, initial: true) { oldUrl, newUrl in
+            if oldUrl != newUrl {
+                VideoPlayerPool.shared.release(oldUrl)
+            }
+            player = VideoPlayerPool.shared.acquire(newUrl)
         }
+        // view 真正从 view tree 移除时,释放 pool(等下次 onChange/出现再 acquire)
         .onDisappear {
-            // 只暂停 player —— pool 还持有 player,view 回来时 acquire 直接 play。
             VideoPlayerPool.shared.release(url)
         }
     }
@@ -108,10 +117,12 @@ struct AnimatedVideoView: View {
 
 /// AVPlayerLayer 作为 backing layer 的 NSView 子类。
 /// 关键:`makeBackingLayer` 决定 backing layer 类型,frame 自动跟 view bounds。
-/// 旧方案(addSublayer)sublayer frame 不会自动同步,初次 layout 时序不稳会
-/// 短暂 0×0 → 空白。makeBackingLayer 方案 frame 始终正确。
+///
+/// `player` 是 `var` 而非 `let`:父级 re-render 换 player 时,`updateNSView`
+/// 调 `host.update(player:contentMode:)`,把 backing `AVPlayerLayer.player`
+/// 换成新的 —— 否则 view 复用后一直播老 player。
 private final class PlayerLayerHostView: NSView {
-    let player: AVPlayer
+    var player: AVPlayer
     var contentMode: ContentMode
 
     init(player: AVPlayer, contentMode: ContentMode) {
@@ -131,13 +142,18 @@ private final class PlayerLayerHostView: NSView {
         return layer
     }
 
-    /// contentMode 变化时由 NSViewRepresentable.updateNSView 调,直接换
-    /// backing layer 的 videoGravity。不重建 layer,player 引用不动。
-    func updateContentMode(_ mode: ContentMode) {
-        contentMode = mode
-        if let playerLayer = layer as? AVPlayerLayer {
-            playerLayer.videoGravity = mode == .fill ? .resizeAspectFill : .resizeAspect
+    /// 父级 re-render 换 player / contentMode 时调。只在 player 真的变了时
+    /// 才赋给 AVPlayerLayer(player 引用没变时跳过,避免无谓重置导致画面闪)。
+    /// videoGravity 每次都设(便宜,允许 contentMode 变化实时生效)。
+    func update(player: AVPlayer, contentMode: ContentMode) {
+        let playerChanged = self.player !== player
+        self.player = player
+        self.contentMode = contentMode
+        guard let playerLayer = layer as? AVPlayerLayer else { return }
+        if playerChanged {
+            playerLayer.player = player
         }
+        playerLayer.videoGravity = contentMode == .fill ? .resizeAspectFill : .resizeAspect
     }
 }
 
@@ -150,7 +166,9 @@ private struct PlayerLayerContainer: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        // SwiftUI 复用 NSView 时调(父级 re-render 换 player),把新 player
+        // 喂给 backing AVPlayerLayer,否则老 player 一直播 → 翻页卡死
         guard let host = nsView as? PlayerLayerHostView else { return }
-        host.updateContentMode(contentMode)
+        host.update(player: player, contentMode: contentMode)
     }
 }
