@@ -255,6 +255,18 @@ extension Media {
             .appendingPathComponent("\(id).webp")
     }
 
+    /// MP4 预览本地 URL: `{DATA_ROOT}/data/preview/{id}.mp4`。
+    /// Backend `transcode_gif_previews.py` 把 image/gif 转成 H.264 10fps 小尺寸 MP4
+    /// 放在这里,给 AnimatedVideoView 走 AVPlayer 硬件解码播。
+    /// 缺失时返回 URL(不存在的文件由调用方 FileManager 检测后回退到 AnimatedImageView)。
+    var localPreviewURL: URL? {
+        guard let root = Settings.dataRoot else { return nil }
+        return root
+            .appendingPathComponent("data", isDirectory: true)
+            .appendingPathComponent("preview", isDirectory: true)
+            .appendingPathComponent("\(id).mp4")
+    }
+
     /// 原始媒体文件本地 URL。
     ///
     /// 2026/06 起,backend 把 `file_path` 改成「相对挂载根的 forward-slash 相对路径」,
