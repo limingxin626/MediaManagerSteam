@@ -119,19 +119,14 @@ struct MediaDetailView: View {
                         placeholder("视频加载中…")
                     }
                 } else if let mime = media.mimeType, mime.hasPrefix("image/") {
-                    // GIF 优先用 MP4 preview(AVPlayer 硬件解码)
-                    if mime == "image/gif",
-                       let preview = media.localPreviewURL,
-                       FileManager.default.fileExists(atPath: preview.path) {
-                        AnimatedVideoView(url: preview, contentMode: .fit)
-                    } else {
-                        // 其余 GIF/animated webp 走 AnimatedImageView(NSImage 不放动画)
-                        switch AnimatedImageFormatDetector.detect(url: url) {
-                        case .animated:
-                            AnimatedImageView(url: url, contentMode: .fit)
-                        case .staticImage, .unsupported:
-                            LocalLargeImageView(media: media, fileURL: url)
-                        }
+                    // 详情页读**原图** —— GIF / animated webp 走 AnimatedImageView
+                    // 播原图(CGImageSource 解码,慢但保证全分辨率全帧)。
+                    // 不走 MP4 preview:MP4 只给 grid 缩略图用,详情要看原图全貌。
+                    switch AnimatedImageFormatDetector.detect(url: url) {
+                    case .animated:
+                        AnimatedImageView(url: url, contentMode: .fit)
+                    case .staticImage, .unsupported:
+                        LocalLargeImageView(media: media, fileURL: url)
                     }
                 } else {
                     placeholder("不支持的媒体类型: \(media.mimeType ?? "未知")")
