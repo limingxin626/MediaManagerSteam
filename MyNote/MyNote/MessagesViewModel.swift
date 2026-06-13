@@ -47,7 +47,7 @@ final class MessagesViewModel: ObservableObject {
     @Published private(set) var hasMore: Bool = true
 
     // 月度 timeline(DateScrubber 渲染所需)
-    @Published private(set) var monthlyDayCount: [DayCount] = []
+    @Published private(set) var monthlyDayCount: [TimelineEntry] = []
 
     // 过滤侧栏条目
     @Published private(set) var availableTags: [Tag] = []

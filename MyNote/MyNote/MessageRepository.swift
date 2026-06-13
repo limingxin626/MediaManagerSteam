@@ -175,7 +175,7 @@ final class MessageRepository {
         year: Int,
         month: Int,
         filter: MessageFilter
-    ) async throws -> [DayCount] {
+    ) async throws -> [TimelineEntry] {
         guard let queue = database.queue else { throw RepositoryError.databaseNotOpen }
 
         // 月初/下月初
@@ -185,7 +185,7 @@ final class MessageRepository {
               let monthEnd = Calendar.current.date(byAdding: .month, value: 1, to: monthStart)
         else { return [] }
 
-        return try await queue.read { db -> [DayCount] in
+        return try await queue.read { db -> [TimelineEntry] in
             var where_: [String] = []
             var args: [DatabaseValueConvertible] = []
 
@@ -210,7 +210,7 @@ final class MessageRepository {
                 """
             let rows = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(args))
             return rows.map { row in
-                DayCount(
+                TimelineEntry(
                     year: row["year"],
                     month: row["month"],
                     day: row["day"],
@@ -549,21 +549,4 @@ enum MessageCursor {
 }
 
 // MARK: - 辅助类型
-
-/// 月度时间线条目,结构与 MediaRepository 的 TimelineEntry 一致 —— 可直接喂给
-/// `DateScrubber` 组件,复用现有渲染。
-struct DayCount: Identifiable, Codable, Equatable {
-    let year: Int
-    let month: Int
-    let day: Int
-    let count: Int
-
-    var id: String { String(format: "%04d-%02d-%02d", year, month, day) }
-
-    /// 与 `TimelineEntry.date` 对齐,DateScrubber 直接消费。
-    var date: Date {
-        var comp = DateComponents()
-        comp.year = year; comp.month = month; comp.day = day
-        return Calendar.current.date(from: comp) ?? Date()
-    }
-}
+// (旧的 DayCount struct 已删除 —— 直接复用 Models.swift 的 TimelineEntry)

@@ -359,7 +359,7 @@ struct MessagesView: View {
                 // DateScrubber(仅 timeline 非空时)
                 if !viewModel.monthlyDayCount.isEmpty {
                     DateScrubber(
-                        timeline: viewModel.monthlyDayCount as! [TimelineEntry],
+                        timeline: viewModel.monthlyDayCount,
                         minDate: timelineMinDate(viewModel: viewModel),
                         maxDate: timelineMaxDate(viewModel: viewModel),
                         currentDate: timelineMinDate(viewModel: viewModel),

@@ -84,31 +84,32 @@ struct MessageCard: View {
     }
 
     // MARK: - 顶部行:actor + 时间
+    //
+    // 无演员(actorId == nil)时,头像 + 名字整块隐藏 —— 不再显示占位头像和
+    // 「无演员」文字,只保留相对时间。时间始终展示。
 
+    @ViewBuilder
     private var headerRow: some View {
-        HStack(spacing: 8) {
-            actorAvatar
-            VStack(alignment: .leading, spacing: 2) {
-                Text(message.actorName ?? "无演员")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.primary)
+        if let actorId = message.actorId {
+            HStack(spacing: 8) {
+                ActorAvatarMiniView(actorId: actorId, size: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(message.actorName ?? "")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text(RelativeTimeFormatter.format(message.createdAt))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+        } else {
+            HStack {
                 Text(RelativeTimeFormatter.format(message.createdAt))
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
+                Spacer()
             }
-            Spacer()
-        }
-    }
-
-    @ViewBuilder
-    private var actorAvatar: some View {
-        if let actorId = message.actorId {
-            ActorAvatarMiniView(actorId: actorId, size: 32)
-        } else {
-            Image(systemName: "person.crop.circle")
-                .resizable()
-                .frame(width: 32, height: 32)
-                .foregroundColor(.secondary)
         }
     }
 
