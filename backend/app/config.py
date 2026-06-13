@@ -240,15 +240,28 @@ class AppConfig:
 
     @classmethod
     def get_thumbs_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "thumbs")
+        # 与 Swift 端 (Models.swift localThumbURL) 和 CLAUDE.md 一致,
+        # thumbs 在 {DATA_ROOT}/data/thumbs/,不在 thumbs/。
+        return os.path.join(cls.DATA_ROOT, "data", "thumbs")
 
     @classmethod
     def get_thumbnail_path(cls, media_id: int) -> str:
         return os.path.join(cls.get_thumbs_dir(), f"{media_id}.webp")
 
+    # ── MP4 preview(为 GIF 等动画格式生成的小尺寸 H.264 视频)────
+    # iOS MyNote 在 grid cell / 详情里优先用 AVPlayer 播这个文件
+    # (VideoToolbox 硬件解码,<5ms 冷启),比 animated webp 快一个数量级。
+    @classmethod
+    def get_preview_dir(cls) -> str:
+        return os.path.join(cls.DATA_ROOT, "data", "preview")
+
+    @classmethod
+    def get_preview_path(cls, media_id: int) -> str:
+        return os.path.join(cls.get_preview_dir(), f"{media_id}.mp4")
+
     @classmethod
     def get_actor_cover_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "actor_cover")
+        return os.path.join(cls.DATA_ROOT, "data", "actor_cover")
 
     @classmethod
     def get_actor_avatar_path(cls, actor_id: int) -> str:

@@ -152,61 +152,74 @@ class ThumbnailUtils:
     
     @staticmethod
     def generate_gif_thumbnail(source_path: str, thumb_path: str, ffmpeg_path: str, min_size: int = 300) -> bool:
-        """使用 ffmpeg 为 GIF 生成动态 webp 缩略图
+        """为 GIF 生成动画 webp 缩略图。
+
+        早期实现调 ffmpeg + libwebp_anim,但 ffmpeg 8.x 已删除该 codec,
+        而 homebrew 装的 ffmpeg 又未编入 libwebp 支持。改用 Pillow(PIL)
+        原生支持 GIF 抽帧 + animated webp 输出,完全摆脱 ffmpeg 依赖。
+
+        抽帧策略:GIF 总帧数可能上百,全编进 webp 文件会过大。最多保留
+        MAX_FRAMES 帧,均匀采样;每帧 delay 用原 GIF 的 duration(毫秒)。
+        短边 > min_size 的图等比缩到 min_size,小图不放大。
 
         Args:
-            source_path: 源GIF文件路径
-            thumb_path: 缩略图输出路径（.webp）
-            ffmpeg_path: ffmpeg 可执行文件路径
-            min_size: 缩略图最短边大小
+            source_path: 源 GIF 文件路径
+            thumb_path: 缩略图输出路径(.webp)
+            ffmpeg_path: 保留入参(同 generate_image_thumbnail 签名),未使用
+            min_size: 缩略图最短边像素
         """
+        MAX_FRAMES = 30
         try:
-            from PIL import Image
+            from PIL import Image, ImageSequence
 
-            # 检查 GIF 尺寸
             with Image.open(source_path) as img:
+                n_frames = getattr(img, "n_frames", 1)
                 width, height = img.size
 
-            vf_filters = []
-            # 缩放：最短边至少为 min_size，保持宽高比（小图不放大）
-            short_edge = min(width, height)
-            if short_edge > min_size:
-                # 只有原图短边大于 min_size 才需要缩小
-                if width < height:
-                    # 竖图：宽是短边
-                    new_width = min_size
-                    new_height = int(height * min_size / width)
+                # 等比缩放(小图不放大)
+                short = min(width, height)
+                if short > min_size:
+                    if width < height:
+                        nw, nh = min_size, int(height * min_size / width)
+                    else:
+                        nh, nw = min_size, int(width * min_size / height)
                 else:
-                    # 横图或正方形：高是短边
-                    new_height = min_size
-                    new_width = int(width * min_size / height)
-                vf_filters.append(f'scale={new_width}:{new_height}')
+                    nw, nh = width, height
 
-            cmd = [
-                ffmpeg_path,
-                '-i', source_path,
-                '-c:v', 'libwebp_anim',
-                '-loop', '0',
-            ]
-            if vf_filters:
-                cmd += ['-vf', ','.join(vf_filters)]
-            cmd += ['-y', thumb_path]
+                # 均匀采样(至少 1 步)
+                step = max(1, n_frames // MAX_FRAMES)
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30,
-                                    encoding='utf-8', errors='ignore')
+                frames = []
+                durations = []
+                for i, frame in enumerate(ImageSequence.Iterator(img)):
+                    if i % step != 0:
+                        continue
+                    rgb = frame.convert("RGB").resize((nw, nh), Image.LANCZOS)
+                    frames.append(rgb)
+                    # 每帧 delay(ms);缺省 100ms
+                    durations.append(frame.info.get("duration", 100) or 100)
+                    if len(frames) >= MAX_FRAMES:
+                        break
 
-            if result.returncode == 0:
-                logger.info(f"Generated gif thumbnail: {thumb_path}")
-                return True
-            else:
-                logger.error(f"ffmpeg error (gif {source_path}): {result.stderr[:500]}")
+            if not frames:
+                logger.error(f"GIF no frames extracted: {source_path}")
                 return False
 
-        except subprocess.TimeoutExpired:
-            logger.error(f"Timeout (30s) generating gif thumbnail for: {source_path}")
-            return False
+            # 多帧 webp
+            frames[0].save(
+                thumb_path, "WEBP",
+                save_all=True,
+                append_images=frames[1:],
+                duration=durations,
+                loop=0,
+                lossless=False,
+                quality=70,
+            )
+            logger.info(f"Generated gif thumbnail (animated webp, {len(frames)} frames): {thumb_path}")
+            return True
+
         except Exception as e:
-            logger.error(f"Failed to generate gif thumbnail: {str(e)}")
+            logger.error(f"Failed to generate gif thumbnail: {type(e).__name__}: {e}")
             return False
 
     @staticmethod
