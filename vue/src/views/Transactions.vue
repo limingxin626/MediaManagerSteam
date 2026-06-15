@@ -132,47 +132,120 @@
         <div v-else-if="!items.length" class="text-center py-10 text-gray-500 text-sm">无符合条件的流水</div>
 
         <template v-else>
-          <div
-            v-for="(t, idx) in items"
-            :key="t.id"
-            class="px-4 py-3 flex items-center gap-3 hover:bg-gray-100/40 dark:hover:bg-white/5 transition-colors"
-            :class="idx > 0 ? 'border-t border-[var(--border-color)]' : ''"
-          >
-            <!-- 来源徽章 -->
-            <span
-              :class="t.source === 'alipay'
-                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'"
-              class="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+          <template v-for="(t, idx) in items" :key="t.id">
+            <div
+              class="px-4 py-3 flex items-center gap-3 hover:bg-gray-100/40 dark:hover:bg-white/5 transition-colors"
+              :class="idx > 0 ? 'border-t border-[var(--border-color)]' : ''"
             >
-              {{ t.source === 'alipay' ? '支付宝' : '微信' }}
-            </span>
+              <!-- 来源徽章 -->
+              <span
+                :class="t.source === 'alipay'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                  : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'"
+                class="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+              >
+                {{ t.source === 'alipay' ? '支付宝' : '微信' }}
+              </span>
 
-            <!-- 主体 -->
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {{ t.counterparty || '(无对方)' }}
-                </span>
-                <span v-if="t.category" class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-primary-500)]/15 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] shrink-0">
-                  {{ t.category }}
-                </span>
+              <!-- 主体 -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {{ t.counterparty || '(无对方)' }}
+                  </span>
+                  <span v-if="t.category" class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-primary-500)]/15 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] shrink-0">
+                    {{ t.category }}
+                  </span>
+                </div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {{ t.product || t.raw_type || '—' }}
+                  <span class="ml-1.5">· {{ formatDateTime(t.txn_time) }}</span>
+                  <span v-if="t.excluded" class="ml-1.5 text-orange-500">· 不计统计</span>
+                </div>
               </div>
-              <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {{ t.product || t.raw_type || '—' }}
-                <span class="ml-1.5">· {{ formatDateTime(t.txn_time) }}</span>
-                <span v-if="t.excluded" class="ml-1.5 text-orange-500">· 不计统计</span>
-              </div>
+
+              <!-- 金额 -->
+              <span
+                class="text-sm font-semibold tabular-nums shrink-0"
+                :class="amountColor(t)"
+              >
+                {{ directionSign(t) }}{{ formatAmount(t.amount) }}
+              </span>
+
+              <!-- 编辑按钮 -->
+              <button
+                @click="toggleEdit(t)"
+                :title="editingId === t.id ? '收起' : '编辑'"
+                class="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded text-gray-400 hover:text-[var(--color-primary-600)] hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+              >
+                <svg v-if="editingId !== t.id" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                </svg>
+              </button>
             </div>
 
-            <!-- 金额 -->
-            <span
-              class="text-sm font-semibold tabular-nums shrink-0"
-              :class="amountColor(t)"
+            <!-- 行内编辑面板 -->
+            <div
+              v-if="editingId === t.id && editDraft"
+              class="px-4 py-3 bg-gray-50/60 dark:bg-white/[0.03] border-t border-[var(--border-color)] space-y-3"
             >
-              {{ directionSign(t) }}{{ formatAmount(t.amount) }}
-            </span>
-          </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="space-y-1">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">交易对方</span>
+                  <input
+                    v-model="editDraft.counterparty"
+                    type="text"
+                    class="w-full text-sm rounded-lg border border-[var(--border-color)] bg-white dark:bg-[#3d3d3d] text-gray-900 dark:text-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
+                  />
+                </label>
+                <label class="space-y-1">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">商品</span>
+                  <input
+                    v-model="editDraft.product"
+                    type="text"
+                    class="w-full text-sm rounded-lg border border-[var(--border-color)] bg-white dark:bg-[#3d3d3d] text-gray-900 dark:text-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
+                  />
+                </label>
+                <label class="space-y-1">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">分类</span>
+                  <select
+                    v-model="editDraft.category"
+                    class="w-full text-sm rounded-lg border border-[var(--border-color)] bg-white dark:bg-[#3d3d3d] text-gray-900 dark:text-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
+                  >
+                    <option value="">(无)</option>
+                    <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
+                  </select>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer pt-5">
+                  <input
+                    type="checkbox"
+                    :checked="editDraft.excluded === 1"
+                    @change="(e) => editDraft && (editDraft.excluded = (e.target as HTMLInputElement).checked ? 1 : 0)"
+                    class="rounded"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-200">不计入统计(退款/0元)</span>
+                </label>
+              </div>
+              <div class="flex items-center justify-end gap-2">
+                <button
+                  @click="cancelEdit"
+                  class="px-3 py-1.5 text-xs rounded-full border border-[var(--border-color)] text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10"
+                >
+                  取消
+                </button>
+                <button
+                  @click="saveEdit(t)"
+                  :disabled="saving"
+                  class="px-3 py-1.5 text-xs rounded-full bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-500)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {{ saving ? '保存中…' : '保存' }}
+                </button>
+              </div>
+            </div>
+          </template>
 
           <!-- 加载更多 sentinel -->
           <div ref="sentinel" class="h-1"></div>
@@ -358,6 +431,73 @@ const toggleSort = (field: SortField) => {
 
 const resetList = () => {
   reset()
+}
+
+interface EditDraft {
+  counterparty: string
+  product: string
+  category: string
+  excluded: number
+}
+
+const editingId = ref<number | null>(null)
+const editDraft = ref<EditDraft | null>(null)
+const saving = ref(false)
+
+const toggleEdit = (t: Txn) => {
+  if (editingId.value === t.id) {
+    cancelEdit()
+    return
+  }
+  editingId.value = t.id
+  editDraft.value = {
+    counterparty: t.counterparty ?? '',
+    product: t.product ?? '',
+    category: t.category ?? '',
+    excluded: t.excluded,
+  }
+}
+
+const cancelEdit = () => {
+  editingId.value = null
+  editDraft.value = null
+}
+
+const saveEdit = async (t: Txn) => {
+  if (!editDraft.value) return
+  const draft = editDraft.value
+  const payload: Record<string, unknown> = {}
+  // 文本字段:空串落库成 null;只在跟原值不同时才提交
+  const normalize = (v: string) => (v.trim() === '' ? null : v)
+  const draftCounterparty = normalize(draft.counterparty)
+  if (draftCounterparty !== t.counterparty) payload.counterparty = draftCounterparty
+  const draftProduct = normalize(draft.product)
+  if (draftProduct !== t.product) payload.product = draftProduct
+  const draftCategory = draft.category === '' ? null : draft.category
+  if (draftCategory !== t.category) payload.category = draftCategory
+  if (draft.excluded !== t.excluded) payload.excluded = draft.excluded
+
+  if (Object.keys(payload).length === 0) {
+    cancelEdit()
+    return
+  }
+
+  saving.value = true
+  try {
+    const updated = await api.patch<Txn>(`/transactions/${t.id}`, payload)
+    const idx = items.value.findIndex((x) => x.id === t.id)
+    if (idx !== -1) items.value[idx] = updated
+    cancelEdit()
+    toast.success('已保存')
+    // 改了 category/excluded 会影响汇总卡口径,顺手刷一下
+    if ('category' in payload || 'excluded' in payload) {
+      fetchSummary()
+    }
+  } catch (e) {
+    toast.error(`保存失败:${(e as Error).message}`)
+  } finally {
+    saving.value = false
+  }
 }
 
 const fetchSummary = async () => {

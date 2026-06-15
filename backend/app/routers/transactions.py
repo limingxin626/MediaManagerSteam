@@ -17,6 +17,7 @@ from app.schemas.transaction import (
     RangeSummary,
     TransactionListResponse,
     TransactionOut,
+    TransactionUpdate,
 )
 from app.services import transaction_service as txn_svc
 
@@ -205,3 +206,23 @@ def list_categories(db: Session = Depends(get_db)):
         .all()
     )
     return [c for c, _ in rows if c]
+
+
+@router.patch("/{txn_id}", response_model=TransactionOut)
+def update_transaction(
+    txn_id: int,
+    payload: TransactionUpdate,
+    db: Session = Depends(get_db),
+):
+    """部分更新单条流水。只允许改 category / excluded / counterparty / product 四个字段。"""
+    txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
+    if txn is None:
+        raise HTTPException(status_code=404, detail=f"transaction {txn_id} not found")
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=400, detail="no fields to update")
+    for key, value in data.items():
+        setattr(txn, key, value)
+    db.commit()
+    db.refresh(txn)
+    return TransactionOut.model_validate(txn)

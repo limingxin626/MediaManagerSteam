@@ -26,6 +26,17 @@ class TransactionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TransactionUpdate(BaseModel):
+    """部分更新:只有显式提供的字段才会写。所有字段都是用户可改的「展示/分类」语义,
+    不允许通过 PATCH 改 amount / txn_time / source / biz_no 这些原始记录字段。"""
+    category: Optional[str] = None
+    excluded: Optional[int] = None
+    counterparty: Optional[str] = None
+    product: Optional[str] = None
+
+    model_config = {"extra": "forbid"}
+
+
 class TransactionListResponse(BaseModel):
     items: List[TransactionOut]
     next_cursor: Optional[str] = None
