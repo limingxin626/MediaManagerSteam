@@ -189,3 +189,4 @@ def get_db():
 # 导入子模块模型，确保 Base.metadata 包含它们（alembic autogenerate 依赖此处）
 from app.models.todo import Todo  # noqa: E402,F401
 from app.models.issue import Issue  # noqa: E402,F401
+from app.models.transaction import Transaction, TxnCategoryRule  # noqa: E402,F401
