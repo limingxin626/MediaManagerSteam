@@ -44,6 +44,16 @@ class MonthlySummary(BaseModel):
     by_category: Dict[str, CategorySlot]
 
 
+class RangeSummary(BaseModel):
+    """月份范围 [from, to] 闭区间的支出汇总。"""
+    from_year: int
+    from_month: int
+    to_year: int
+    to_month: int
+    total: float
+    by_category: Dict[str, CategorySlot]
+
+
 class MonthBucket(BaseModel):
     """有数据的月份(用于前端月份选择器)。"""
     year: int

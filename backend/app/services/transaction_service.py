@@ -203,6 +203,36 @@ def monthly_summary(db: Session, year: int, month: int, direction: str = "expens
     }
 
 
+def range_summary(
+    db: Session,
+    from_year: int, from_month: int,
+    to_year: int, to_month: int,
+    direction: str = "expense",
+) -> dict:
+    """月份范围 [from, to] 闭区间按分类汇总。起止反了自动交换。"""
+    from datetime import datetime
+    a_start = datetime(from_year, from_month, 1)
+    b_start = datetime(to_year, to_month, 1)
+    if a_start > b_start:
+        from_year, from_month, to_year, to_month = to_year, to_month, from_year, from_month
+        a_start = datetime(from_year, from_month, 1)
+    end = datetime(to_year + 1, 1, 1) if to_month == 12 else datetime(to_year, to_month + 1, 1)
+    rows = (
+        _summary_query(db, direction)
+        .filter(Transaction.txn_time >= a_start, Transaction.txn_time < end)
+        .with_entities(Transaction.category, func.count(Transaction.id), func.sum(Transaction.amount))
+        .group_by(Transaction.category)
+        .all()
+    )
+    total = sum(float(amt or 0) for _, _, amt in rows)
+    return {
+        "from_year": from_year, "from_month": from_month,
+        "to_year": to_year, "to_month": to_month,
+        "total": total,
+        "by_category": {cat or UNCLASSIFIED: {"count": cnt, "amount": float(amt or 0)} for cat, cnt, amt in rows},
+    }
+
+
 def category_summary(db: Session, direction: str = "expense") -> dict:
     """全量按分类的支出汇总。"""
     rows = (

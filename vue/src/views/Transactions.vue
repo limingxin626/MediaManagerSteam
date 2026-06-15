@@ -4,14 +4,27 @@
       <div class="flex items-center justify-between flex-wrap gap-3">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">记账</h1>
 
-        <!-- 月份选择 -->
-        <div class="flex items-center gap-2">
-          <label class="text-xs text-gray-500 dark:text-gray-400">月份</label>
+        <!-- 月份范围选择 -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-xs text-gray-500 dark:text-gray-400">起</label>
           <select
-            v-model="selectedYM"
+            v-model="fromYM"
             class="text-sm rounded-lg border border-[var(--border-color)] bg-white/60 dark:bg-[#3d3d3d] text-gray-900 dark:text-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
           >
-            <option v-for="m in months" :key="`${m.year}-${m.month}`" :value="`${m.year}-${m.month}`">
+            <option v-for="m in months" :key="`from-${m.year}-${m.month}`" :value="`${m.year}-${m.month}`">
+              {{ m.year }}-{{ String(m.month).padStart(2, '0') }} ({{ m.count }} 笔)
+            </option>
+            <option v-if="!months.length" value="">(暂无数据)</option>
+          </select>
+
+          <span class="text-xs text-gray-400">~</span>
+
+          <label class="text-xs text-gray-500 dark:text-gray-400">止</label>
+          <select
+            v-model="toYM"
+            class="text-sm rounded-lg border border-[var(--border-color)] bg-white/60 dark:bg-[#3d3d3d] text-gray-900 dark:text-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
+          >
+            <option v-for="m in months" :key="`to-${m.year}-${m.month}`" :value="`${m.year}-${m.month}`">
               {{ m.year }}-{{ String(m.month).padStart(2, '0') }} ({{ m.count }} 笔)
             </option>
             <option v-if="!months.length" value="">(暂无数据)</option>
@@ -24,9 +37,10 @@
         <div v-if="summaryLoading" class="text-center py-6 text-gray-500 text-sm">加载中…</div>
         <template v-else-if="summary">
           <div class="flex items-baseline gap-3 mb-4 flex-wrap">
-            <span class="text-xs text-gray-500 dark:text-gray-400">{{ summary.year }}年{{ summary.month }}月 计入支出</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{{ summaryTitle }} 计入支出</span>
             <span class="text-3xl font-bold text-gray-900 dark:text-white">¥ {{ formatAmount(summary.total) }}</span>
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ categorySorted.length }} 个分类</span>
+            <span v-if="rangeMonthCount > 1" class="text-xs text-gray-500 dark:text-gray-400">· {{ rangeMonthCount }} 个月</span>
           </div>
 
           <!-- 堆叠条 -->
@@ -54,7 +68,7 @@
               <span class="text-xs text-gray-500 dark:text-gray-400 tabular-nums w-12 text-right">{{ ((c.amount / summary.total) * 100).toFixed(1) }}%</span>
             </div>
           </div>
-          <div v-else class="text-center py-6 text-gray-500 text-sm">本月无计入支出</div>
+          <div v-else class="text-center py-6 text-gray-500 text-sm">所选范围无计入支出</div>
         </template>
         <div v-else class="text-center py-6 text-gray-500 text-sm">暂无数据</div>
       </section>
@@ -204,8 +218,10 @@ interface MonthBucket {
 interface CategorySlot { count: number; amount: number }
 
 interface Summary {
-  year: number
-  month: number
+  from_year: number
+  from_month: number
+  to_year: number
+  to_month: number
   total: number
   by_category: Record<string, CategorySlot>
 }
@@ -213,7 +229,8 @@ interface Summary {
 const toast = useToast()
 
 const months = ref<MonthBucket[]>([])
-const selectedYM = ref<string>('')
+const fromYM = ref<string>('')
+const toYM = ref<string>('')
 const summary = ref<Summary | null>(null)
 const summaryLoading = ref(false)
 const categories = ref<string[]>([])
@@ -240,16 +257,43 @@ const directionOpts = [
 
 const sentinel = ref<HTMLElement | null>(null)
 
-const parsedYM = computed(() => {
-  if (!selectedYM.value) return { year: null as number | null, month: null as number | null }
-  const [y, m] = selectedYM.value.split('-')
-  return { year: Number(y), month: Number(m) }
+const parseYM = (raw: string): { year: number; month: number } | null => {
+  if (!raw) return null
+  const [y, m] = raw.split('-')
+  const year = Number(y), month = Number(m)
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return null
+  return { year, month }
+}
+
+// 规范化:把 from/to 排成 [小, 大],一端缺失就退化到另一端的单月。
+const normalizedRange = computed(() => {
+  const a = parseYM(fromYM.value)
+  const b = parseYM(toYM.value)
+  const lo = a ?? b
+  const hi = b ?? a
+  if (!lo || !hi) return null
+  const aKey = lo.year * 12 + lo.month
+  const bKey = hi.year * 12 + hi.month
+  return aKey <= bKey ? { from: lo, to: hi } : { from: hi, to: lo }
+})
+
+const rangeMonthCount = computed(() => {
+  const r = normalizedRange.value
+  if (!r) return 0
+  return (r.to.year - r.from.year) * 12 + (r.to.month - r.from.month) + 1
+})
+
+const summaryTitle = computed(() => {
+  if (!summary.value) return ''
+  const f = `${summary.value.from_year}-${String(summary.value.from_month).padStart(2, '0')}`
+  const t = `${summary.value.to_year}-${String(summary.value.to_month).padStart(2, '0')}`
+  return f === t ? f : `${f} ~ ${t}`
 })
 
 const { items, loading: listLoading, hasMore, reset, setupObserver } = useInfiniteScroll<Txn>({
   fetchFn: async ({ cursor, limit }) => {
-    const { year, month } = parsedYM.value
-    if (year == null || month == null) {
+    const r = normalizedRange.value
+    if (!r) {
       return { items: [], next_cursor: null, has_more: false }
     }
     return await api.get<{ items: Txn[]; next_cursor: string | null; has_more: boolean }>(
@@ -257,8 +301,10 @@ const { items, loading: listLoading, hasMore, reset, setupObserver } = useInfini
       {
         cursor: cursor || undefined,
         limit,
-        year,
-        month,
+        from_year: r.from.year,
+        from_month: r.from.month,
+        to_year: r.to.year,
+        to_month: r.to.month,
         direction: filterDirection.value || undefined,
         category: filterCategory.value || undefined,
         excluded: includeExcluded.value ? undefined : 0,
@@ -315,23 +361,28 @@ const resetList = () => {
 }
 
 const fetchSummary = async () => {
-  const { year, month } = parsedYM.value
-  if (year == null || month == null) {
+  const r = normalizedRange.value
+  if (!r) {
     summary.value = null
     return
   }
   summaryLoading.value = true
   try {
-    summary.value = await api.get<Summary>('/transactions/summary/monthly', { year, month })
+    summary.value = await api.get<Summary>('/transactions/summary/range', {
+      from_year: r.from.year,
+      from_month: r.from.month,
+      to_year: r.to.year,
+      to_month: r.to.month,
+    })
   } catch (e) {
-    toast.error(`加载月度汇总失败：${(e as Error).message}`)
+    toast.error(`加载月度汇总失败:${(e as Error).message}`)
     summary.value = null
   } finally {
     summaryLoading.value = false
   }
 }
 
-watch(selectedYM, () => {
+watch([fromYM, toYM], () => {
   fetchSummary()
   resetList()
 })
@@ -345,12 +396,14 @@ onMounted(async () => {
     ])
     months.value = ms
     categories.value = cats
-    if (ms.length && !selectedYM.value) {
-      selectedYM.value = `${ms[0]!.year}-${ms[0]!.month}`
+    if (ms.length && !fromYM.value && !toYM.value) {
+      const latest = `${ms[0]!.year}-${ms[0]!.month}`
+      fromYM.value = latest
+      toYM.value = latest
       // 触发 watch → fetchSummary + resetList
     }
   } catch (e) {
-    toast.error(`加载记账数据失败：${(e as Error).message}`)
+    toast.error(`加载记账数据失败:${(e as Error).message}`)
   }
 })
 </script>
