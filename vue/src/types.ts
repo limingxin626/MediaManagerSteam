@@ -3,7 +3,13 @@ import type { components } from './types/api.generated'
 // --- 从 OpenAPI 生成的类型中派生 ---
 
 // 消息相关
-export type MessageMediaItem = components['schemas']['MessageMediaItem']
+// MessageMediaItem 通过 MediaUrlMixin 获得 local_file_path / local_thumb_path,
+// OpenAPI 尚未重新生成,手动扩展。
+export type MessageMediaItem = components['schemas']['MessageMediaItem'] & {
+  repo_id?: string
+  local_file_path?: string
+  local_thumb_path?: string
+}
 type _Message = components['schemas']['MessageResponse']
 type _MessageDetail = components['schemas']['MessageDetailResponse']
 
@@ -21,19 +27,25 @@ export type MessageDetail = _MessageDetail & {
 export type Actor = components['schemas']['ActorResponse'] & {
   avatar_abs_path?: string
 }
-// 媒体相关 —— 后端额外返回 thumb_path（Electron file:// 用），OpenAPI 未重新生成
+// 媒体相关 —— 后端新增 local_file_path / local_thumb_path 两个绝对本地路径字段
+// (Electron 走 file:// 直读),OpenAPI 尚未重新生成,手动扩展。
+// `*_url` 字段是相对 URL,客户端拼自己的 backend baseUrl 后走 HTTP fallback。
 export type Media = components['schemas']['MediaResponse'] & {
-  thumb_path?: string
+  repo_id?: string
+  local_file_path?: string
+  local_thumb_path?: string
   messages?: { id: number }[]
 }
 
 // 视频预览（章节）—— 后端尚未重新生成 OpenAPI 类型，先手写
 export interface VideoPreviewItem {
   id: number
+  repo_id?: string
   file_path: string
+  local_file_path?: string
+  local_thumb_path?: string
   file_url: string
   thumb_url: string
-  thumb_path?: string
   mime_type: string | null
   frame_ms: number
   start_ms: number | null

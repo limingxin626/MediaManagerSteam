@@ -3,7 +3,7 @@
 AVPlayer 硬件解码播。
 
 源:GIF 还在 uploads 目录(file_path + repo_id resolve)
-输出:{DATA_ROOT}/data/preview/{media_id}.mp4
+输出:{DATA_ROOT}/preview/{media_id}.mp4
 
 不动 media.file_path、不改 mime_type —— 原 GIF 仍是大图源,MP4 只是
 缩略图预览的旁路文件。已有 thumb 静态 webp 也保留(无冲突)。

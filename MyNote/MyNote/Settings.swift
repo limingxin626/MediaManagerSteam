@@ -16,7 +16,7 @@ enum Settings {
 
     /// 数据根目录。指向一份兼容 backend schema 的目录,包含:
     /// - `db.sqlite3`            共享 SQLite 数据库
-    /// - `data/thumbs/{id}.webp` 缩略图
+    /// - `thumbs/{id}.webp`      缩略图
     /// - `repositories.json`     repo 注册表(Backend + Mac 共享)
     ///
     /// 未配置时返回 nil,UI 层应引导用户走 onboarding。

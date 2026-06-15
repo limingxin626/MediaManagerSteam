@@ -20,10 +20,6 @@ Repository 配置:
             "human_name": "Uploads",
             "paths": {"windows": "E:/Note/Uploads", "darwin": "/Volumes/Note/Uploads"}
           },
-          "av": {
-            "human_name": "AV 盘",
-            "paths": {"windows": "F:/AV", "darwin": "/Volumes/AV"}
-          }
         }
       }
 
@@ -240,9 +236,10 @@ class AppConfig:
 
     @classmethod
     def get_thumbs_dir(cls) -> str:
-        # 与 Swift 端 (Models.swift localThumbURL) 和 CLAUDE.md 一致,
-        # thumbs 在 {DATA_ROOT}/data/thumbs/,不在 thumbs/。
-        return os.path.join(cls.DATA_ROOT, "data", "thumbs")
+        # 与 Mac 端 (Models.swift localThumbURL) 一致:thumbs/preview/actor_cover
+        # 都直接在 DATA_ROOT 根下,跟 `/data` URL mount 的根对齐
+        # (`/data` → DATA_ROOT,所以 URL `/data/thumbs/x.webp` 物理就是 `DATA_ROOT/thumbs/x.webp`)。
+        return os.path.join(cls.DATA_ROOT, "thumbs")
 
     @classmethod
     def get_thumbnail_path(cls, media_id: int) -> str:
@@ -253,7 +250,7 @@ class AppConfig:
     # (VideoToolbox 硬件解码,<5ms 冷启),比 animated webp 快一个数量级。
     @classmethod
     def get_preview_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "data", "preview")
+        return os.path.join(cls.DATA_ROOT, "preview")
 
     @classmethod
     def get_preview_path(cls, media_id: int) -> str:
@@ -261,7 +258,7 @@ class AppConfig:
 
     @classmethod
     def get_actor_cover_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "data", "actor_cover")
+        return os.path.join(cls.DATA_ROOT, "actor_cover")
 
     @classmethod
     def get_actor_avatar_path(cls, actor_id: int) -> str:

@@ -53,7 +53,7 @@ class MediaCursorResponse(BaseModel):
 
 
 class VideoPreviewItem(MediaUrlMixin):
-    """视频预览（章节）条目。继承 MediaUrlMixin 自动获得 id/file_url/thumb_url。"""
+    """视频预览（章节）条目。继承 MediaUrlMixin 自动获得 6 个 path/URL 字段。"""
     mime_type: str | None = None
     frame_ms: int
     start_ms: int | None = None

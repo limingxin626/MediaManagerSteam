@@ -84,6 +84,11 @@ struct MediaRecord: Codable, FetchableRecord, TableRecord {
 extension MediaRecord {
     /// 转成 UI 层用的 `Media`(`Models.swift` 已定义)。
     /// tags 由 repository 批量取出后注入,避免 N+1。
+    ///
+    /// 文件/缩略图路径不在这里拼 —— Mac 端统一走 `Media.localFileURL`
+    /// (RepositoryManager 解析 repoId + filePath)和 `Media.localThumbURL`
+    /// (Settings.dataRoot 拼)的计算属性。GRDB 直读路径下没有 HTTP base,
+    /// 也不需要 `file_url` / `thumb_url`。
     func toUIModel(tags: [MessageTag]) -> Media {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -95,19 +100,10 @@ extension MediaRecord {
             date.map { isoFormatter.string(from: $0) }
         }
 
-        // file_url / thumb_url 仍保留(沿用 backend 的 path 约定),
-        // 但 UI 优先用 localFileURL / localThumbURL 计算属性(见 Models.swift 扩展)。
-        let fileUrl = "/data/\(filePath)"
-        let thumbPath = "data/thumbs/\(id).webp"
-        let thumbUrl = "/data/thumbs/\(id).webp"
-
         return Media(
             id: id,
             filePath: filePath,
             repoId: repoId,
-            fileUrl: fileUrl,
-            thumbPath: thumbPath,
-            thumbUrl: thumbUrl,
             fileSize: fileSize,
             mimeType: mimeType,
             width: width,

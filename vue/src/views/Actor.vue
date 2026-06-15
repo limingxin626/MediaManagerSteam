@@ -411,20 +411,20 @@ const handlePreviewToggleStar = async () => {
 
 const handleMediaRotated = (mediaId: number) => {
   const t = Date.now()
+  const bust = (item: any) => {
+    item.thumb_url = (item.thumb_url || '').split('?')[0] + `?t=${t}`
+    if (item.local_file_path) {
+      item.local_file_path = item.local_file_path.split('?')[0] + `?t=${t}`
+    }
+  }
   for (const msg of messages.value) {
     if (!msg.media_items) continue
     for (const item of msg.media_items) {
-      if (item.id === mediaId) {
-        item.thumb_url = item.thumb_url.split('?')[0] + `?t=${t}`
-        item.file_path = item.file_path.split('?')[0] + `?t=${t}`
-      }
+      if (item.id === mediaId) bust(item)
     }
   }
   for (const item of previewItems.value) {
-    if (item.id === mediaId) {
-      item.thumb_url = item.thumb_url.split('?')[0] + `?t=${t}`
-      item.file_path = item.file_path.split('?')[0] + `?t=${t}`
-    }
+    if (item.id === mediaId) bust(item)
   }
 }
 

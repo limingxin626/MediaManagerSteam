@@ -275,7 +275,12 @@ const closeDetail = () => {
 const openMediaFolder = () => {
   if (!mediaItem.value) return
   if (window.electronAPI?.showItemInFolder) {
-    window.electronAPI.showItemInFolder(mediaItem.value.file_path)
+    const path = mediaItem.value.local_file_path
+    if (!path) {
+      toast.info('文件未在已知 repository 中,无法打开文件夹')
+      return
+    }
+    window.electronAPI.showItemInFolder(path)
   } else {
     toast.info('Electron 环境下才能打开文件夹')
   }

@@ -66,7 +66,18 @@ Routes: `/` (Message feed), `/media` (grid), `/actor` (list), `404` catch-all. A
 
 UI: Tailwind v4 (Vite plugin), HeadlessUI, Vidstack (video player), v-calendar. Mobile-first responsive (sidebar hidden on mobile, bottom nav shown). Dark purple gradient background.
 
-Pydantic schema validators auto-fill URL fields: `thumb_url` → `/data/thumbs/{id}.webp`, `avatar_url` → `/data/actor_cover/{id}.webp`.
+Media path/URL fields (filled by `MediaUrlMixin._fill_urls` in `app/schemas/base.py`):
+
+| 字段              | 语义                                         | 谁消费              |
+|-------------------|----------------------------------------------|---------------------|
+| `repo_id`         | repository id                                 | 全员                |
+| `file_path`       | 相对 repo 根的 forward-slash 路径(DB 权威)  | Mac 自己拼          |
+| `local_file_path` | 绝对本地路径(`repo_root + file_path`)        | Vue / Electron      |
+| `local_thumb_path`| 绝对本地路径 `{DATA_ROOT}/thumbs/{id}.webp` | Vue / Electron  |
+| `file_url`        | 相对 URL `/{repo_id}/{file_path}`            | Android(拼 baseUrl) |
+| `thumb_url`       | 相对 URL `/data/thumbs/{id}.webp`            | Android(拼 baseUrl) |
+
+URL 都是**相对**的 —— 客户端用自己 sync 时配的 backend baseUrl 拼绝对 URL,这样换网段/host 不会有缓存污染。`/data` URL 前缀通过 StaticFiles 直接挂到 `DATA_ROOT` 根(所以 `/data/thumbs/x.webp` 物理对应 `DATA_ROOT/thumbs/x.webp`)。Actor 头像同步:`avatar_url` → `/data/actor_cover/{id}.webp`。
 
 ### Electron
 
@@ -123,7 +134,7 @@ npm run build             # electron-builder, packages backend + vue dist
 - Cursor pagination everywhere (not offset-based). Response shape: `{ items, next_cursor, has_more }`
 - Frontend types in `vue/src/types.ts` — `CursorResponse<T>` generic wraps all paginated responses
 - Media files are deduplicated by Blake2b hash; files >100MB use file size as hash
-- Thumbnails stored as WebP in `{DATA_ROOT}/data/thumbs/{media_id}.webp`
+- Thumbnails stored as WebP in `{DATA_ROOT}/thumbs/{media_id}.webp`
 - Uploads auto-organized by date: `{DATA_ROOT}/uploads/YYYY/MM/DD/`
 - `#hashtag` text in messages is auto-parsed into Tag records on create/update (full replacement, orphan tags not auto-deleted)
 - Services call `db.flush()` for intermediate IDs; routers call `db.commit()` once at the end

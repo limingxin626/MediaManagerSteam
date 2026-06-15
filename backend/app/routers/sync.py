@@ -44,9 +44,12 @@ def _message_snapshot(db: Session, msg: Message) -> Dict[str, Any]:
             m = r.media
             media_items.append({
                 "id": m.id,
-                "file_url": config.url_for(m.repo_id, m.file_path),
-                "file_path": m.file_path,
                 "repo_id": m.repo_id,
+                "file_path": m.file_path,
+                "local_file_path": config.resolve_to_absolute(m.repo_id, m.file_path) or "",
+                "local_thumb_path": config.get_thumbnail_path(m.id),
+                "file_url": config.url_for(m.repo_id, m.file_path),
+                "thumb_url": config.get_thumbnail_url(m.id),
                 "file_hash": m.file_hash or "",
                 "file_size": m.file_size,
                 "mime_type": m.mime_type,
@@ -55,7 +58,6 @@ def _message_snapshot(db: Session, msg: Message) -> Dict[str, Any]:
                 "duration_ms": m.duration_ms,
                 "rating": m.rating,
                 "starred": bool(m.starred),
-                "thumb_url": config.get_thumbnail_url(m.id),
                 "position": r.position,
                 "video_media_id": m.video_media_id,
                 "frame_ms": m.frame_ms,
@@ -88,12 +90,18 @@ def _actor_snapshot(actor: Actor) -> Dict[str, Any]:
 
 
 def _media_snapshot(media: Media) -> Dict[str, Any]:
-    # file_path 自本次迁移起改为「相对 repo 根」的 forward-slash 路径,客户端应优先用 file_url。
+    # 6 字段标准见 CLAUDE.md「Pydantic schema validators」段:
+    #   - file_path     相对 repo 根
+    #   - local_*_path  本机绝对路径(Vue/Electron 直读)
+    #   - *_url         相对 URL(Android 拼 baseUrl)
     return {
         "id": media.id,
-        "file_url": config.url_for(media.repo_id, media.file_path),
-        "file_path": media.file_path,
         "repo_id": media.repo_id,
+        "file_path": media.file_path,
+        "local_file_path": config.resolve_to_absolute(media.repo_id, media.file_path) or "",
+        "local_thumb_path": config.get_thumbnail_path(media.id),
+        "file_url": config.url_for(media.repo_id, media.file_path),
+        "thumb_url": config.get_thumbnail_url(media.id),
         "file_hash": media.file_hash or "",
         "file_size": media.file_size,
         "mime_type": media.mime_type,
@@ -102,7 +110,6 @@ def _media_snapshot(media: Media) -> Dict[str, Any]:
         "duration_ms": media.duration_ms,
         "rating": media.rating,
         "starred": bool(media.starred),
-        "thumb_url": config.get_thumbnail_url(media.id),
         "video_media_id": media.video_media_id,
         "frame_ms": media.frame_ms,
         "start_ms": media.start_ms,

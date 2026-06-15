@@ -87,7 +87,7 @@
 
 1. 出现 OnboardingView,显示"欢迎使用 MyNote" + "选择数据目录"按钮
 2. 点击按钮,弹出 NSOpenPanel
-3. 选择 backend 的 DATA_ROOT 目录(里面有 `db.sqlite3` + `data/thumbs/` + `uploads/`)
+3. 选择 backend 的 DATA_ROOT 目录(里面有 `db.sqlite3` + `thumbs/` + `uploads/`)
 4. 点确定后,主界面切换到媒体网格
 5. Xcode console 应有打印:`✅ LocalDatabase opened. media count = NNN at /path/...`
 

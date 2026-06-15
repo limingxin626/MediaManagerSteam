@@ -28,18 +28,18 @@ export function resolveUrl(path: string): string {
   return `${path.replace(/#/g, '%23')}`
 }
 
-/** Resolve media thumb_url to absolute path */
-export function resolveThumb(item: { thumb_url: string | null; thumb_path?: string | null } | null): string {
+/** Resolve media thumb to absolute path. 优先用本机绝对路径(Electron file://),HTTP URL 兜底。 */
+export function resolveThumb(item: { thumb_url?: string | null; local_thumb_path?: string | null } | null): string {
   if (!item) return ''
-  if (item.thumb_path) return resolveUrl(item.thumb_path)
+  if (item.local_thumb_path) return resolveUrl(item.local_thumb_path)
   if (item.thumb_url) return resolveUrl(item.thumb_url)
   return ''
 }
 
-/** Resolve media file_url to absolute path, preferring file_path if available */
-export function resolveMediaUrl(item: { file_url: string | null; file_path?: string | null } | null): string {
+/** Resolve media file to absolute path. 同 resolveThumb 优先级。 */
+export function resolveMediaUrl(item: { file_url?: string | null; local_file_path?: string | null } | null): string {
   if (!item) return ''
-  if (item.file_path) return resolveUrl(item.file_path)
+  if (item.local_file_path) return resolveUrl(item.local_file_path)
   if (item.file_url) return resolveUrl(item.file_url)
   return ''
 }

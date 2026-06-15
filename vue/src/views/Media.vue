@@ -252,14 +252,16 @@ const PEEK_COUNT = 5
 function mapToPreviewItem(m: Media) {
   return {
     id: m.id,
+    repo_id: m.repo_id,
     file_path: m.file_path,
+    local_file_path: m.local_file_path,
+    local_thumb_path: m.local_thumb_path,
     file_url: m.file_url,
+    thumb_url: m.thumb_url,
     mime_type: m.mime_type,
     width: m.width,
     height: m.height,
     duration_ms: m.duration_ms,
-    thumb_url: m.thumb_url,
-    thumb_path: m.thumb_path,
     starred: m.starred,
     tags: m.tags,
   }
@@ -384,11 +386,14 @@ function openSmartPreview(idx: number) {
   const slice = smartItems.value.slice(0, smartItems.value.length)
   previewItems.value = slice.map((m) => ({
     id: m.id,
+    repo_id: m.repo_id,
     file_path: m.file_path,
+    local_file_path: m.local_file_path,
+    local_thumb_path: m.local_thumb_path,
+    file_url: m.file_url,
+    thumb_url: m.thumb_url,
     mime_type: m.mime_type,
     duration_ms: m.duration_ms,
-    thumb_url: m.thumb_url,
-    thumb_path: m.thumb_path,
     starred: m.starred,
     tags: m.tags,
   }))
@@ -496,7 +501,9 @@ function handleMediaRotated(mediaId: number) {
   const pItem = previewItems.value.find((m) => m.id === mediaId)
   if (pItem) {
     pItem.thumb_url = pItem.thumb_url.split('?')[0] + `?t=${t}`
-    pItem.file_path = pItem.file_path.split('?')[0] + `?t=${t}`
+    if ((pItem as any).local_file_path) {
+      ;(pItem as any).local_file_path = (pItem as any).local_file_path.split('?')[0] + `?t=${t}`
+    }
   }
 }
 

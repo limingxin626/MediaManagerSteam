@@ -408,10 +408,15 @@ function openDetailPage() {
 
 function openFileLocation() {
   if (!currentItem.value) return
-  
+
   // 使用 Electron 的 shell API 打开文件位置
   if (window.electronAPI && window.electronAPI.showItemInFolder) {
-    window.electronAPI.showItemInFolder(currentItem.value.file_path)
+    const path = (currentItem.value as any).local_file_path
+    if (!path) {
+      alert('文件未在已知 repository 中,无法打开文件夹')
+      return
+    }
+    window.electronAPI.showItemInFolder(path)
   } else {
     // 提供更友好的用户提示
     alert('无法打开文件位置：Electron shell API 不可用')
@@ -444,6 +449,9 @@ async function onFileSelected(e: Event) {
       const ts = Date.now()
       target.id = updated.id
       target.file_path = updated.file_path
+      ;(target as any).repo_id = (updated as any).repo_id
+      ;(target as any).local_file_path = (updated as any).local_file_path
+      ;(target as any).local_thumb_path = (updated as any).local_thumb_path
       target.file_url = updated.file_url
       target.thumb_url = (updated.thumb_url || '').split('?')[0] + `?t=${ts}`
       target.mime_type = updated.mime_type
@@ -541,7 +549,10 @@ const canGoNext = computed(() => {
 })
 
 const getMediaUrl = (item: MessageMediaItem) => {
-  const url = item.file_path.replace(/#/g, '%23')
+  // 优先用本机绝对路径(Electron file://),HTTP URL 兜底
+  const raw = (item as any).local_file_path || item.file_url || ''
+  if (!raw) return ''
+  const url = raw.replace(/#/g, '%23')
   const bust = mediaCacheBust.value[item.id]
   return bust ? `${url}${url.includes('?') ? '&' : '?'}t=${bust}` : url
 }

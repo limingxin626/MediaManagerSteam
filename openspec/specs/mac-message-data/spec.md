@@ -18,7 +18,7 @@ Mac app SHALL 通过 `LocalDatabase` 的只读 GRDB 连接直接查询 `message`
 - **AND** 不会出现「网络错误」「连接失败」类错误提示
 
 ### Requirement: 消息 UI 模型字段对齐 backend schema
-`Message` UI 模型 MUST 至少包含 `id: Int`、`text: String?`、`createdAt: String` (ISO)、`updatedAt: String?`、`starred: Bool`、`actorId: Int?`、`actorName: String?`、`issueId: Int?`、`issueTitle: String?`、`mediaCount: Int`、`mediaItems: [MessageMediaItem]`、`tags: [MessageTag]`;字段命名、类型、nullability MUST 与 backend `MessageDetailResponse` Pydantic schema 一一对应。`MessageMediaItem` 至少包含 `id`、`filePath`、`fileUrl`、`thumbPath`、`thumbUrl`、`mimeType`、`width`、`height`、`durationMs`、`starred`、`createdAt`、`updatedAt`、`tags`。`MessageTag` 至少包含 `id`、`name`、`category`。
+`Message` UI 模型 MUST 至少包含 `id: Int`、`text: String?`、`createdAt: String` (ISO)、`updatedAt: String?`、`starred: Bool`、`actorId: Int?`、`actorName: String?`、`issueId: Int?`、`issueTitle: String?`、`mediaCount: Int`、`mediaItems: [MessageMediaItem]`、`tags: [MessageTag]`;字段命名、类型、nullability MUST 与 backend `MessageDetailResponse` Pydantic schema 一一对应。`MessageMediaItem` 至少包含 `id`、`repoId`、`filePath`、`mimeType`、`width`、`height`、`durationMs`、`starred`、`createdAt`、`updatedAt`、`tags`;Mac 端不持有 `local_*_path` / `*_url` 派生字段,本地 URL 通过 `RepositoryManager.resolve(repoId:, relativePath:)` 在 `localFileURL` 计算属性中现算,缩略图通过 `Settings.dataRoot` 拼。`MessageTag` 至少包含 `id`、`name`、`category`。
 
 #### Scenario: 模型解码匹配 backend 响应
 - **WHEN** DB 记录中某条 message 的 `text = "hello #world"`,`actor_id = 1`,`starred = 1`,`created_at = 2026-05-29T18:00:00`
@@ -96,14 +96,14 @@ Mac app SHALL 通过 `LocalDatabase` 的只读 GRDB 连接直接查询 `message`
 - **THEN** timeline 中 `2026-05-29` 的 `count` MUST 等于 3(只算该 actor 的消息,不算别的 actor 在同一天的消息)
 
 ### Requirement: 演员头像本地 URL
-`Actor` UI 模型 MUST 暴露 `localAvatarURL: URL?`,指向 `{DATA_ROOT}/data/actor_cover/{id}.webp`(`Settings.dataRoot == nil` 时返回 nil)。`DATA_ROOT` 不可用时 UI MUST 走兜底 `Image(systemName: "person.circle")` 而不是显示破损图片。
+`Actor` UI 模型 MUST 暴露 `localAvatarURL: URL?`,指向 `{DATA_ROOT}/actor_cover/{id}.webp`(`Settings.dataRoot == nil` 时返回 nil)。`DATA_ROOT` 不可用时 UI MUST 走兜底 `Image(systemName: "person.circle")` 而不是显示破损图片。
 
 #### Scenario: 演员头像命中
-- **WHEN** `Settings.dataRoot` 已配置,且 `{DATA_ROOT}/data/actor_cover/1.webp` 存在
+- **WHEN** `Settings.dataRoot` 已配置,且 `{DATA_ROOT}/actor_cover/1.webp` 存在
 - **THEN** `actor.localAvatarURL != nil`,UI 加载该 URL 的 webp 显示
 
 #### Scenario: 演员头像缺失
-- **WHEN** `{DATA_ROOT}/data/actor_cover/1.webp` 不存在(老数据未生成头像)
+- **WHEN** `{DATA_ROOT}/actor_cover/1.webp` 不存在(老数据未生成头像)
 - **THEN** `LocalImageLoader.loadActorAvatar(actorId: 1)` 返回 nil
 - **AND** UI 渲染 `Image(systemName: "person.circle")` 占位
 

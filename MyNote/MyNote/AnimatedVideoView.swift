@@ -6,7 +6,7 @@
 //  硬件解码,<5ms 冷启),AnimatedImageView 的性能替代。
 //
 //  来源约定:MyNote 把 GIF 转成 H.264 MP4 后放在
-//  `{DATA_ROOT}/data/preview/{id}.mp4`,本 view 读这个路径播。
+//  `{DATA_ROOT}/preview/{id}.mp4`,本 view 读这个路径播。
 //  若文件不存在,调用方应回退到 AnimatedImageView(本 view 不做兜底)。
 //
 //  用法:

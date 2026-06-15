@@ -424,10 +424,9 @@ struct ActorAvatarMiniView: View {
 
     @MainActor
     private func loadAvatar() async {
-        // 拼出本地 URL(actorId → {DATA_ROOT}/data/actor_cover/{id}.webp)
+        // 拼出本地 URL(actorId → {DATA_ROOT}/actor_cover/{id}.webp)
         guard let root = Settings.dataRoot else { return }
         let url = root
-            .appendingPathComponent("data", isDirectory: true)
             .appendingPathComponent("actor_cover", isDirectory: true)
             .appendingPathComponent("\(actorId).webp")
         let loaded = await LocalImageLoader.shared.loadActorAvatar(actorId: actorId, url: url)

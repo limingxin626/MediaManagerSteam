@@ -64,11 +64,14 @@ onMounted(async () => {
 function openPreview(idx: number) {
   previewItems.value = items.value.map(m => ({
     id: m.id,
+    repo_id: m.repo_id,
     file_path: m.file_path,
+    local_file_path: m.local_file_path,
+    local_thumb_path: m.local_thumb_path,
+    file_url: m.file_url,
+    thumb_url: m.thumb_url,
     mime_type: m.mime_type,
     duration_ms: m.duration_ms,
-    thumb_url: m.thumb_url,
-    thumb_path: m.thumb_path,
     starred: m.starred,
   }))
   previewStartIndex.value = idx
