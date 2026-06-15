@@ -9,6 +9,7 @@ from .dashboard import router as dashboard_router
 from .issues import router as issues_router
 from .health import router as health_router
 from .smart import router as smart_router
+from .transactions import router as transactions_router
 
 # 所有路由列表
 all_routers = [
@@ -23,4 +24,5 @@ all_routers = [
     issues_router,
     health_router,
     smart_router,
+    transactions_router,
 ]

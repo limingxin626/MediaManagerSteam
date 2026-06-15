@@ -29,6 +29,11 @@ const routes = [
     component: () => import('../views/Admin.vue')
   },
   {
+    path: '/transactions',
+    name: 'Transactions',
+    component: () => import('../views/Transactions.vue')
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('../views/NotFound.vue')
