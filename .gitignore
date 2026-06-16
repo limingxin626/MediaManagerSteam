@@ -15,6 +15,7 @@ pip-delete-this-directory.txt
 backend/Data/
 backend/Uploads/
 backend/Static/
+tmp/
 
 # Node.js
 node_modules/

@@ -80,6 +80,58 @@
           </div>
         </template>
 
+        <!-- Grid: uniform square cells -->
+        <template v-else-if="props.layout === 'grid'">
+          <div class="grid gap-0.5" :class="gridColsClass">
+            <div v-for="(media, index) in mediaPreviewItems" :key="media.id"
+              class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media aspect-square"
+              @click.stop="handleMediaClick(index)">
+              <img :src="resolveThumb(media)" :alt="`Media ${index + 1}`"
+                class="w-full h-full object-cover transition-transform duration-200 group-hover/media:scale-105" />
+              <div class="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
+              <template v-if="isVideo(media.mime_type)">
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div class="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+                    <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  </div>
+                </div>
+              </template>
+              <div v-if="media.duration_ms"
+                class="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
+                {{ formatDuration(media.duration_ms) }}
+              </div>
+              <div class="absolute top-1.5 right-1.5 flex gap-1.5">
+                <button @click.stop="handleMediaToggleStar(media)"
+                  class="w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors" :class="media.starred
+                    ? 'text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/50'
+                    : 'text-white/70 hover:text-yellow-400 hover:bg-white/10'">
+                  <svg class="w-3.5 h-3.5" :class="{ 'star-bounce': mediaStarBouncing === media.id }" :fill="media.starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </button>
+                <button @click.stop="toggleMenu(index)"
+                  class="w-6 h-6 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center backdrop-blur-sm transition-colors opacity-0 hover:opacity-100"
+                  :class="{ 'opacity-100!': activeMenuIndex === index }">
+                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                  </svg>
+                </button>
+                <div v-if="activeMenuIndex === index"
+                  class="absolute top-8 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-white/10 py-1 min-w-[140px] z-10">
+                  <button @click.stop="findMessagesByMedia(media.id)"
+                    class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+                    查找所有message
+                  </button>
+                </div>
+              </div>
+              <div v-if="index === mediaPreviewItems.length - 1 && remainingCount > 0"
+                class="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
+                <span class="text-white text-2xl font-semibold">+{{ remainingCount }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+
         <!-- Mosaic: ROWS layout -->
         <template v-else-if="mosaicLayout.type === 'rows'">
           <div class="flex flex-col gap-0.5" :style="{ aspectRatio: mosaicRowsAspectRatio }">
@@ -309,9 +361,12 @@ interface Props {
   allTags?: TagWithCount[]
   selectable?: boolean
   selected?: boolean
+  layout?: 'mosaic' | 'grid'
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  layout: 'grid',
+})
 
 const emit = defineEmits<{
   click: [id: number]
@@ -325,7 +380,7 @@ const emit = defineEmits<{
   'add-tag': [messageId: number, tagId: number]
 }>()
 
-const maxPreviewItems = 10
+const maxPreviewItems = 30
 const activeMenuIndex = ref<number | null>(null)
 const cardRef = ref<HTMLElement | null>(null)
 const isVisible = ref(false)
@@ -415,6 +470,20 @@ const mediaRatios = computed(() => {
 const mosaicLayout = computed(() => {
   if (mediaPreviewItems.value.length <= 1) return null!
   return calculateMosaicLayout(mediaRatios.value, MOSAIC_CONTAINER_WIDTH)
+})
+
+// Grid 布局：按数量映射列数。2张-2列, 3-3, 4-4, 5-5, 6-3, 7+ -5。
+// 返回完整类名字符串，便于 Tailwind JIT 静态扫描。
+const gridColsClass = computed(() => {
+  const n = mediaPreviewItems.value.length
+  switch (n) {
+    case 2: return 'grid-cols-2'
+    case 3: return 'grid-cols-3'
+    case 4: return 'grid-cols-4'
+    case 5: return 'grid-cols-5'
+    case 6: return 'grid-cols-3'
+    default: return 'grid-cols-5' // 7+ 张
+  }
 })
 
 // ROWS 布局：整个容器的宽高比 = containerWidth / totalHeight

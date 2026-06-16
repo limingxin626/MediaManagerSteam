@@ -129,6 +129,20 @@ npm run dev               # loads http://localhost:5173
 npm run build             # electron-builder, packages backend + vue dist
 ```
 
+## 账单分类(Transactions)
+
+**自动关键词分类已废弃** —— `txn_category_rule` 表 + `transaction_service.DEFAULT_RULES` 准确率太低。现在走**每月人工(LLM)打标**流程。
+
+- 分类体系(14 类)+ 判断原则 + 月度运行步骤:见 [`docs/bills-categories.md`](docs/bills-categories.md)。改类目/改规则**先改这个文件**,代码层无配置。
+- 真相之源:`backend/scratch/bills_by_month/*.json`(已标好的逐月账单,必须保留)。DB 只是它的物化产物。
+- 月度脚本(`backend/scripts/`):
+  - `bills_split_by_month.py` — 扫 `slip/` 下 CSV/xlsx,按 `txn_time` 切分到 `scratch/bills_by_month/YYYY-MM.json`。⚠️ 会**重新生成**已有月份,标过的需先备份;只想跑新月可改脚本只读新文件。
+  - `bills_print_month.py YYYY-MM` — 紧凑打印一个月待标记录(给 Claude 读)。
+  - `bills_apply_categories.py` — 接受 `{biz_no: category}` JSON,写回到对应月份文件。未命中的 biz_no 会报错。
+  - `bills_inject_labeled.py [--apply]` — 清空 `transaction` + `txn_category_rule`,按所有月份 JSON 重新注入。**先 dry-run,再加 `--apply`,apply 前手动备份 `Data/db.sqlite3`。**
+- 月度 mapping 文件(`backend/scratch/mappings/YYYY-MM.py`)是 Claude 的产出物,保留下来便于回溯/重跑。
+- 老的 `import_bills.py` CLI 不要再用 —— 它会走废弃的自动分类。
+
 ## Key Patterns
 
 - Cursor pagination everywhere (not offset-based). Response shape: `{ items, next_cursor, has_more }`
