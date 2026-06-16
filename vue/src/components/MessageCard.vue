@@ -1,6 +1,5 @@
 <template>
-  <div ref="cardRef" class="flex items-end gap-2" :class="{ 'animate-in': isVisible, 'opacity-0': !isVisible }"
-    :style="singleMediaCardStyle">
+  <div ref="cardRef" class="flex items-end gap-2" :class="{ 'animate-in': isVisible, 'opacity-0': !isVisible }">
   <div
     class="group flex-1 min-w-0 bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-color)] overflow-hidden hover:shadow-lg transition-all duration-200"
     :class="{ 'ring-2 ring-[var(--color-primary-500)] border-[var(--color-primary-500)]': props.selected }">
@@ -31,7 +30,7 @@
       <div v-if="mediaPreviewItems.length > 0" class="relative overflow-hidden mb-2 -mx-4">
         <!-- Single image -->
         <template v-if="mediaPreviewItems.length === 1">
-          <div class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media"
+          <div class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer group/media w-1/3"
             :style="{ aspectRatio: getAspectRatio(mediaPreviewItems[0]) }"
             @click.stop="handleMediaClick(0)">
             <img :src="resolveThumb(mediaPreviewItems[0])" alt="Media 1"
@@ -440,20 +439,9 @@ const renderedText = computed(() => {
 // Mosaic layout — 使用容器虚拟宽度 400px 计算
 const MOSAIC_CONTAINER_WIDTH = 400
 
-// 单图时限制卡片宽度，防止竖图过高
-// 最大图片高度 500px 等效，通过 max-width = maxHeight * ratio 限制
-const MAX_SINGLE_IMAGE_HEIGHT = 600
-const singleMediaCardStyle = computed(() => {
-  if (mediaPreviewItems.value.length !== 1) return {}
-  const rawRatio = mediaRatios.value[0]
-  const ratio = Math.min(1.7, Math.max(0.667, rawRatio))
-  if (ratio >= 1) return {} // 横图不限制
-  const maxWidth = MAX_SINGLE_IMAGE_HEIGHT * ratio
-  return { maxWidth: maxWidth + 'px' }
-})
-
+// 单图 clamp 到 0.667-1.7 防止极端比例，配 w-1/3 控制宽度
 const getAspectRatio = (item: MessageMediaItem): string => {
-  if (item.width && item.height) {
+  if (item.width && item.height && item.height > 0) {
     const ratio = Math.min(1.7, Math.max(0.667, item.width / item.height))
     return `${ratio}`
   }
