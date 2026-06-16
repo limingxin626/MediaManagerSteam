@@ -140,7 +140,7 @@
             <Transition :name="transitionName" mode="out-in">
               <div class="relative" :key="currentItem?.id ?? -1">
                 <video
-                  v-if="currentItem && isVideo(currentItem.mime_type)"
+                  v-if="currentItem && isVideo(currentItem.mime_type) && !showFallback"
                   ref="videoRef"
                   :src="getMediaUrl(currentItem)"
                   class="max-w-[90vw] max-h-[70vh] rounded-lg shadow-2xl"
@@ -149,15 +149,30 @@
                   playsinline
                   loop
                   autoplay
+                  @error="handleMediaError"
                 ></video>
 
                 <img
-                  v-else-if="currentItem && isImage(currentItem.mime_type)"
+                  v-else-if="currentItem && isImage(currentItem.mime_type) && !showFallback"
                   :src="getMediaUrl(currentItem)"
                   :alt="`Media ${currentIndex + 1}`"
                   class="max-w-[90vw] max-h-[70vh] object-contain rounded-lg shadow-2xl"
                   :style="mediaTransformStyle"
+                  @error="handleMediaError"
                 />
+
+                <!-- 文件无法访问时,展示缩略图 -->
+                <div v-else-if="currentItem && showFallback" class="relative">
+                  <img
+                    :src="resolveThumb(currentItem)"
+                    :alt="`Media ${currentIndex + 1} (缩略图)`"
+                    class="max-w-[90vw] max-h-[70vh] object-contain rounded-lg shadow-2xl"
+                    :style="mediaTransformStyle"
+                  />
+                  <div class="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 text-white/90 text-xs rounded-full backdrop-blur-sm">
+                    文件无法访问,显示缩略图
+                  </div>
+                </div>
               </div>
             </Transition>
 
@@ -354,6 +369,21 @@ const isReplacing = ref(false)
 const mediaCacheBust = ref<Record<number, number>>({})
 const suggestDrawerOpen = ref(false)
 const suggestDrawerMediaId = ref<number | null>(null)
+// per-item 跟踪加载失败:用于 file:// / HTTP 媒体文件无法访问时回退到缩略图
+const loadFailedIds = ref<Set<number>>(new Set())
+
+function handleMediaError(e: Event) {
+  if (!currentItem.value) return
+  console.warn('[MediaPreview] 媒体加载失败,回退到缩略图:', currentItem.value.id, e)
+  const next = new Set(loadFailedIds.value)
+  next.add(currentItem.value.id)
+  loadFailedIds.value = next
+}
+
+const showFallback = computed(() => {
+  if (!currentItem.value) return false
+  return loadFailedIds.value.has(currentItem.value.id)
+})
 
 function openSuggestDrawer() {
   if (!currentItem.value) return
