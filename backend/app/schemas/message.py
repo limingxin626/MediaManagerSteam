@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from app.schemas.base import OrmBase, TimestampMixin, MediaUrlMixin
 
-MEDIA_PREVIEW_LIMIT = 9  # 消息内媒体预览上限（3×3 宫格）
+MEDIA_PREVIEW_LIMIT = 30  # 消息内媒体预览上限
 
 
 class MessageCreate(BaseModel):

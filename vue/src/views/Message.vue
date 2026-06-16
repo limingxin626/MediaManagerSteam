@@ -22,7 +22,7 @@
         <!-- Search Header -->
         <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div class="flex gap-2 items-center justify-between max-w-3xl mx-auto pr-10">
+            <div class="flex gap-2 items-center justify-between max-w-6xl mx-auto pr-10">
               <h2 class="text-lg font-bold text-gray-900 dark:text-white">消息流</h2>
               <!-- Refresh -->
               <button @click="resetAndFetch()" :disabled="loading"
@@ -38,6 +38,18 @@
                 ? 'bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)]'
                 : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'">
                 {{ mergeMode ? '取消合并' : '合并' }}
+              </button>
+              <!-- Layout toggle (mosaic / grid) -->
+              <button @click="toggleLayout"
+                class="p-1 rounded-md transition-colors text-gray-400 hover:text-[var(--color-primary-600)] bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20"
+                :title="messageLayout === 'grid' ? '切换到拼图布局' : '切换到网格布局'">
+                <!-- grid 态显示「拼图」图标，mosaic 态显示「网格」图标：均提示点击后会切到的目标布局 -->
+                <svg v-if="messageLayout === 'grid'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h6a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
               </button>
               <!-- Starred filter -->
               <button @click="starredFilter = !starredFilter; resetAndFetch()"
@@ -119,7 +131,7 @@
             </div>
 
             <!-- Messages Feed -->
-            <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-3xl mx-auto">
+            <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-6xl mx-auto">
               <template v-for="(message, idx) in messages" :key="message.id">
                 <!-- Date separator -->
                 <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1]?.created_at ?? '')"
@@ -128,7 +140,7 @@
                 </div>
                 <div :data-message-id="message.id" :data-message-date="message.created_at.substring(0, 10)">
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
-                    :all-tags="tags"
+                    :all-tags="tags" :layout="messageLayout"
                     :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
                     @click="handleMessageClick(message)" @media-click="(index) => handleMediaClick(message.id, index)"
                     @delete="handleDeleteMessage" @find-messages-by-media="handleFindMessagesByMedia"
@@ -367,6 +379,7 @@ import { useConfirm } from '../composables/useConfirm'
 import { resolveUrl, resolveThumb, formatDuration, toggleMediaStar } from '../utils/media'
 import { formatDateLabel } from '../utils/date'
 import { useTheme } from '../composables/useTheme'
+import { useMessageLayout } from '../composables/useMessageLayout'
 
 
 defineOptions({ name: 'Message' })
@@ -378,6 +391,7 @@ const toast = useToast()
 const { confirm } = useConfirm()
 const { theme } = useTheme()
 const isDark = computed(() => theme.value === 'dark')
+const { layout: messageLayout, toggleLayout, initLayout } = useMessageLayout()
 
 // --- Calendar date jump ---
 const calendarOpen = ref(false)
@@ -1423,6 +1437,7 @@ watch(() => route.path, (path) => {
 }, { immediate: true })
 
 onMounted(() => {
+  initLayout()
   fetchTags()
   fetchActors()
   fetchIssues()
