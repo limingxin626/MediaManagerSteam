@@ -65,10 +65,16 @@ def _load_repositories(data_root: str) -> Tuple[Dict[str, str], str]:
     repos: {repo_id: 当前平台的绝对路径}。其他平台的 path 在本进程里不需要。
     任何解析失败 / schema 不对 / 当前平台缺路径 → fail-fast sys.exit(1)。
     """
+    if not os.path.isdir(data_root):
+        logger.error(
+            "DATA_ROOT=%s 不存在。请运行 `uv run scripts/init_data_root.py` 初始化。",
+            data_root,
+        )
+        sys.exit(1)
     path = os.path.join(data_root, REPOSITORIES_FILENAME)
     if not os.path.isfile(path):
         logger.error(
-            "%s 不存在。请在 DATA_ROOT 下创建 repositories.json,schema 见 config.py 头部注释。",
+            "%s 不存在。请运行 `uv run scripts/init_data_root.py` 初始化。",
             path,
         )
         sys.exit(1)
@@ -197,8 +203,9 @@ class AppConfig:
     def validate_repositories(cls) -> None:
         """启动时检查:repo_id 与 /data 不冲突。
 
-        路径是否实际存在不强制检查 —— 跟 Mac 端 isAvailable 语义对齐,允许
-        外接盘没插时 backend 也能起来,对应 media 走 404。
+        **不**强制检查 repo 路径是否实际存在 —— 缺失的路径在
+        `app/__init__.py` 的 mount 循环里跳过(允许外接盘未挂时 backend 也能起来,
+        对应 media URL 返回 404)。DATA_ROOT 本身的缺失在 mount 循环里 fail-fast。
         """
         if os.getenv("ALEMBIC_SKIP_REPO_LOAD") == "1":
             # alembic 上下文里 _REPOSITORIES 故意是空的,validate 也跳过

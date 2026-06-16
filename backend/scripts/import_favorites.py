@@ -34,16 +34,6 @@ from typing import Optional
 # 让 scripts/ 能 import app/
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 补丁:app/__init__.py 启动时 makedirs 所有 repository 挂载点,失败会让 import 崩。
-# 把 os.makedirs 包成"权限错就跳过",让 import 走完。
-_orig_makedirs = os.makedirs
-def _safe_makedirs(p, *a, **kw):
-    try:
-        return _orig_makedirs(p, *a, **kw)
-    except (PermissionError, OSError):
-        return None
-os.makedirs = _safe_makedirs
-
 from app.models import Message, SessionLocal, Tag
 from app.services.message_service import create_message_with_files
 

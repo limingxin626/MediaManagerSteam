@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+import sys
 import logging
 from logging.handlers import RotatingFileHandler
 from app.routers import all_routers
@@ -27,6 +28,7 @@ logging.basicConfig(
         logging.StreamHandler()  # 同时输出到控制台
     ]
 )
+logger = logging.getLogger(__name__)
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -47,11 +49,30 @@ app.add_middleware(
 # 校验 repositories.json 的 repo_id 与内置 /data 前缀不冲突
 config.validate_repositories()
 
-# 配置静态文件服务（所有目录以文件夹名为 URL 前缀挂载）
+# 校验 DATA_ROOT 必须存在(不自动创建,运行 init 脚本来建)
+data_root = config.DATA_ROOT
+if not os.path.isdir(data_root):
+    logger.critical(
+        "DATA_ROOT=%s 不存在。请运行 `uv run scripts/init_data_root.py` 初始化。",
+        data_root,
+    )
+    sys.exit(1)
+
+# 配置静态文件服务:每个挂载点单独检查,缺失就跳过(允许外接盘未挂)
+mounted = 0
+skipped = 0
 for url_prefix, system_path in config.get_static_mounts().items():
-    os.makedirs(system_path, exist_ok=True)
+    if not os.path.isdir(system_path):
+        logger.warning(
+            "[static] %s → %s 不存在,跳过挂载(对应 media URL 将返回 404)",
+            url_prefix, system_path,
+        )
+        skipped += 1
+        continue
     mount_name = url_prefix.lstrip("/")
     app.mount(url_prefix, StaticFiles(directory=system_path), name=mount_name)
+    mounted += 1
+logger.info("[static] 已挂载 %d 个,跳过 %d 个", mounted, skipped)
 
 # 注册所有路由
 for router in all_routers:

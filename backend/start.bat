@@ -12,4 +12,9 @@ if not exist "%DATA_ROOT%\db.sqlite3" (
     uv run alembic upgrade head
 )
 @REM uv run alembic upgrade head
+if not exist "%DATA_ROOT%\repositories.json" (
+    echo ❌ DATA_ROOT 未初始化 (%DATA_ROOT%\repositories.json 不存在)
+    echo    请先运行: uv run scripts/init_data_root.py
+    exit /b 1
+)
 uv run api.py

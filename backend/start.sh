@@ -3,7 +3,7 @@
 set -e
 
 # 目录与路径（按你的实际路径修改）
-export DATA_ROOT="$HOME/data/Note/"
+export DATA_ROOT="$HOME/data/Media/"
 export HOST="0.0.0.0"
 export PORT="8002"
 
@@ -21,4 +21,11 @@ export FFPROBE_PATH="/opt/homebrew/bin/ffprobe"
 #     uv run alembic upgrade head
 # fi
 
-uv run scripts/migrate_to_repository_format.py
+
+# uv run alembic upgrade head
+if [ ! -f "$DATA_ROOT/repositories.json" ]; then
+    echo "❌ DATA_ROOT 未初始化 ($DATA_ROOT/repositories.json 不存在)"
+    echo "   请先运行: uv run scripts/init_data_root.py"
+    exit 1
+fi
+uv run api.py
