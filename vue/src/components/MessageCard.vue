@@ -476,6 +476,7 @@ const mosaicLayout = computed(() => {
 // 返回完整类名字符串，便于 Tailwind JIT 静态扫描。
 const gridColsClass = computed(() => {
   const n = mediaPreviewItems.value.length
+  return 'grid-cols-5'
   switch (n) {
     case 2: return 'grid-cols-2'
     case 3: return 'grid-cols-3'

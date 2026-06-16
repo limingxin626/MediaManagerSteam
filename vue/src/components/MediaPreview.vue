@@ -289,7 +289,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import type { MessageMediaItem, TagWithCount, TagItem, Media } from '../types'
-import { isVideo, isImage, resolveThumb, rotateMedia } from '../utils/media'
+import { isVideo, isImage, resolveThumb, resolveMediaUrl, rotateMedia } from '../utils/media'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import TagPickerPopover from './TagPickerPopover.vue'
@@ -550,9 +550,8 @@ const canGoNext = computed(() => {
 
 const getMediaUrl = (item: MessageMediaItem) => {
   // 优先用本机绝对路径(Electron file://),HTTP URL 兜底
-  const raw = (item as any).local_file_path || item.file_url || ''
-  if (!raw) return ''
-  const url = raw.replace(/#/g, '%23')
+  const url = resolveMediaUrl(item)
+  if (!url) return ''
   const bust = mediaCacheBust.value[item.id]
   return bust ? `${url}${url.includes('?') ? '&' : '?'}t=${bust}` : url
 }
