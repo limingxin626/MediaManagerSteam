@@ -14,6 +14,32 @@ from app.config import config
 
 logger = logging.getLogger(__name__)
 
+# 视频 cover sidecar 通用约定:视频文件旁边的同名 `<stem>.cover.{ext}` 文件
+# 会被识别为缩略图来源,优先于 ffmpeg 抽帧。匹配 case-insensitive,所以
+# 任何下载器(BBDown/yt-dlp/...)生成的 `.cover.jpg` / `.Cover.JPG` 等都命中。
+# 这是后端的通用接口,任何批量导入场景只需把 cover 放在视频旁边即可。
+_COVER_SIDECAR_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+
+
+def _find_video_cover_sidecar(video_path: str) -> Optional[str]:
+    """查同目录是否有同名 .cover.{ext} sidecar(case-insensitive)。
+
+    例:`/x/foo.mp4` → `/x/foo.cover.jpg`、`/x/foo.Cover.PNG` 均命中。
+    返回找到的绝对路径或 None;目录无法列出时返回 None。
+    """
+    folder, name = os.path.split(video_path)
+    stem = os.path.splitext(name)[0]
+    needle = (stem + ".cover").lower()
+    try:
+        entries = os.listdir(folder)
+    except OSError:
+        return None
+    for entry in entries:
+        entry_stem, entry_ext = os.path.splitext(entry)
+        if entry_stem.lower() == needle and entry_ext.lower() in _COVER_SIDECAR_EXTS:
+            return os.path.join(folder, entry)
+    return None
+
 
 def process_standalone_file(
     db: Session,
@@ -24,6 +50,8 @@ def process_standalone_file(
     """
     处理单个文件落地为 Media 行（不创建 MessageMedia 链接）。
     - 计算 hash、提取媒体信息、生成缩略图、`db.flush()`。
+    - 视频 sidecar 约定:同目录的 `<stem>.cover.{jpg,jpeg,png,webp}`
+      (case-insensitive)会被用作缩略图来源,优先于 ffmpeg 抽帧。
     - skip_dedup=True 时强制创建新行（用于预览图独占语义）。
     返回 {"media": Media, "is_new": bool} 或 None（文件不存在或不支持的类型）。
     """
@@ -44,6 +72,9 @@ def process_standalone_file(
         existing_media = db.query(Media).filter(Media.file_hash == file_hash).first()
         if existing_media:
             return {"media": existing_media, "is_new": False}
+
+    # 在拷贝前记下原始路径 —— cover sidecar 只能在原始目录找(uploads/ 里没拷贝)。
+    original_file_path = file_path
 
     # 若 file_path 已落在某个 repo 下,直接登记;否则 copy 进 default repo 的日期目录。
     try:
@@ -108,7 +139,16 @@ def process_standalone_file(
 
     try:
         thumb_path = config.get_thumbnail_path(media.id)
-        ThumbnailUtils.generate_thumbnail(file_path, thumb_path, media_type, config.FFMPEG_PATH)
+        sidecar = _find_video_cover_sidecar(original_file_path) if media_type == "VIDEO" else None
+        if sidecar:
+            ok = ThumbnailUtils.generate_image_thumbnail(sidecar, thumb_path)
+            if ok:
+                logger.info(f"Used cover sidecar for media id={media.id}: {sidecar}")
+            else:
+                logger.warning(f"Cover sidecar failed, falling back to ffmpeg: {sidecar}")
+                ThumbnailUtils.generate_thumbnail(file_path, thumb_path, media_type, config.FFMPEG_PATH)
+        else:
+            ThumbnailUtils.generate_thumbnail(file_path, thumb_path, media_type, config.FFMPEG_PATH)
     except Exception as e:
         logger.error(f"Failed to generate thumbnail for media id={media.id} path={file_path}: {e}")
 

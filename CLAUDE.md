@@ -27,7 +27,7 @@ Key env vars:
 Routers (registered via `backend/app/routers/__init__.py:all_routers`): `actor`, `message`, `media`, `files`, `tags`, `sync`, `admin`, `dashboard`, `todos`.
 
 Services:
-- `media_service.py` — file hashing (Blake2b), deduplication, ffprobe info extraction, thumbnail generation. `process_file()` returns `{"media": Media, "is_new": bool}` — calls `db.flush()` (not commit) to get IDs; router commits.
+- `media_service.py` — file hashing (Blake2b), deduplication, ffprobe info extraction, thumbnail generation. `process_file()` returns `{"media": Media, "is_new": bool}` — calls `db.flush()` (not commit) to get IDs; router commits. **Video cover sidecar 通用约定**:视频 `foo.mp4` 同目录如果有 `foo.cover.{jpg,jpeg,png,webp}`(case-insensitive),会被自动用作 thumb,优先于 ffmpeg 抽帧;失败时 fallback 抽帧。这是后端的通用接口 —— 任何批量导入(bilibili / youtube / 本地相册 / …)只要把 cover 放在视频旁边即可,无需写脚本覆盖缩略图。见 `_find_video_cover_sidecar`。
 - `message_service.py` — `#hashtag` auto-extraction (regex `#[\w\u4e00-\u9fff]+`) from message text. Web/HTTP path uses full replacement (`merge=False`); sync-apply path from Android uses `merge=True` to preserve manually-added tags. Also handles media position reordering.
 - `base.py` — static CRUD methods (`get_all`, `get_by_id`, `create`, `update`, `delete`) accepting SQLAlchemy model type.
 

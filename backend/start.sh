@@ -28,4 +28,7 @@ if [ ! -f "$DATA_ROOT/repositories.json" ]; then
     echo "   请先运行: uv run scripts/init_data_root.py"
     exit 1
 fi
+
+# uv run scripts/import_bilibili.py
+
 uv run api.py
