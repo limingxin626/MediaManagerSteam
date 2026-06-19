@@ -17,7 +17,11 @@ from app.schemas.media import (
     VideoPreviewUpdate,
 )
 from app.config import AppConfig, config as app_config
-from app.services.media_service import rotate_media, create_preview_media, replace_media_file
+from app.services.media_service import (
+    rotate_media, create_preview_media, replace_media_file,
+    attach_existing_preview, attach_screenshot_preview, delete_media as delete_media_service,
+)
+from app.services.message_service import link_media_to_message
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -384,7 +388,9 @@ def rotate_media_endpoint(
     db: Session = Depends(get_db)
 ):
     try:
-        media = rotate_media(db, media_id, body.degrees)
+        media = rotate_media(db, media_id, body.degrees, commit=False)
+        db.commit()
+        db.refresh(media)
         return MediaResponse.model_validate(media)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -423,7 +429,7 @@ def replace_media_endpoint(
         raise
 
     try:
-        media = replace_media_file(db, media_id, tmp_path)
+        media = replace_media_file(db, media_id, tmp_path, commit=False)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
@@ -433,6 +439,8 @@ def replace_media_endpoint(
             try: os.remove(tmp_path)
             except Exception: pass
 
+    db.commit()
+    db.refresh(media)
     return MediaResponse.model_validate(media)
 
 
@@ -463,43 +471,20 @@ def delete_media(
     db: Session = Depends(get_db)
 ):
     """删除媒体。若指定 message_id 且该媒体被多条消息引用，则仅解除当前关联。"""
-    media = db.query(Media).filter(Media.id == media_id).first()
-    if not media:
-        raise HTTPException(status_code=404, detail="Media not found")
+    try:
+        result = delete_media_service(
+            db,
+            media_id=media_id,
+            unlink_from_message_id=message_id,
+            delete_source_file=delete_source,
+            commit=True,  # service 内部管事务 + 文件清理
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
-    if message_id is not None:
-        ref_count = db.query(MessageMedia).filter(MessageMedia.media_id == media_id).count()
-        if ref_count > 1:
-            db.query(MessageMedia).filter(
-                MessageMedia.media_id == media_id,
-                MessageMedia.message_id == message_id
-            ).delete()
-            db.commit()
-            return {"message": "Media unlinked from message", "unlinked": True}
-
-    file_path = AppConfig.resolve_to_absolute(media.repo_id, media.file_path)
-
-    db.query(MessageMedia).filter(MessageMedia.media_id == media_id).delete()
-    db.execute(media_tag.delete().where(media_tag.c.media_id == media_id))
-    db.delete(media)
-    db.commit()
-
-    thumb_path = AppConfig.get_thumbnail_path(media_id)
-    if os.path.exists(thumb_path):
-        try:
-            os.remove(thumb_path)
-        except Exception as e:
-            print(f"删除缩略图失败: {e}")
-
-    if delete_source and file_path:
-        try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                print(f"成功删除源文件: {file_path}")
-        except Exception as e:
-            print(f"删除源文件失败: {e}")
-
-    return {"message": "Media deleted successfully", "unlinked": False}
+    if result["action"] == "unlinked":
+        return {"message": "Media unlinked from message", "unlinked": True}
+    return {"message": "Media deleted", "media_id": result["media_id"]}
 
 
 # ===== 视频预览（章节）相关端点 =====
@@ -527,22 +512,24 @@ def list_previews(media_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{media_id}/previews", response_model=VideoPreviewItem)
 def add_preview(media_id: int, body: VideoPreviewCreate, db: Session = Depends(get_db)):
-    _require_video(db, media_id)
-    if body.preview_media_id == media_id:
-        raise HTTPException(status_code=400, detail="preview_media_id cannot equal video media id")
-    image = db.query(Media).filter(Media.id == body.preview_media_id).first()
-    if not image:
-        raise HTTPException(status_code=404, detail="Preview media not found")
-    if not (image.mime_type or "").startswith("image/"):
-        raise HTTPException(status_code=400, detail="Preview media must be an image")
-    if image.video_media_id is not None:
-        raise HTTPException(status_code=409, detail="Preview media is already used by another video")
-    _validate_range(body.frame_ms, body.start_ms, body.end_ms)
+    try:
+        image = attach_existing_preview(
+            db,
+            video_media_id=media_id,
+            preview_media_id=body.preview_media_id,
+            frame_ms=body.frame_ms,
+            start_ms=body.start_ms,
+            end_ms=body.end_ms,
+            commit=False,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "not found" in msg.lower() or "找不到" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        if "already used" in msg.lower() or "已被" in msg:
+            raise HTTPException(status_code=409, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
 
-    image.video_media_id = media_id
-    image.frame_ms = body.frame_ms
-    image.start_ms = body.start_ms
-    image.end_ms = body.end_ms
     db.commit()
     db.refresh(image)
     return VideoPreviewItem.model_validate(image)
@@ -557,59 +544,21 @@ def add_preview_from_screenshot(
     end_ms: Optional[int] = Form(None),
     db: Session = Depends(get_db),
 ):
-    _require_video(db, media_id)
-    if not (file.content_type or "").startswith("image/"):
-        raise HTTPException(status_code=400, detail="Uploaded file must be an image")
-    _validate_range(frame_ms, start_ms, end_ms)
-
-    upload_dir = app_config.get_upload_dir()
-    os.makedirs(upload_dir, exist_ok=True)
-    ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
-    if ext not in (".jpg", ".jpeg", ".png", ".webp"):
-        ext = ".jpg"
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    base = f"preview_{media_id}_{timestamp}{ext}"
-    dest_path = os.path.join(upload_dir, base)
-    counter = 1
-    while os.path.exists(dest_path):
-        dest_path = os.path.join(upload_dir, f"preview_{media_id}_{timestamp}_{counter}{ext}")
-        counter += 1
-    with open(dest_path, "wb") as f:
-        import shutil as _shutil
-        _shutil.copyfileobj(file.file, f, length=1024 * 1024)
-
     try:
-        image = create_preview_media(db, dest_path)
+        image = attach_screenshot_preview(
+            db,
+            video_media_id=media_id,
+            file_obj=file.file,
+            filename=file.filename or "",
+            content_type=file.content_type or "",
+            frame_ms=frame_ms,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            commit=True,  # service 内部管事务 + rename
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    image.video_media_id = media_id
-    image.frame_ms = frame_ms
-    image.start_ms = start_ms
-    image.end_ms = end_ms
-    db.flush()
-
-    earliest_mm = (
-        db.query(MessageMedia)
-        .filter(MessageMedia.media_id == media_id)
-        .order_by(MessageMedia.created_at.asc(), MessageMedia.id.asc())
-        .first()
-    )
-    if earliest_mm is not None:
-        target_message_id = earliest_mm.message_id
-        max_position = (
-            db.query(func.coalesce(func.max(MessageMedia.position), -1))
-            .filter(MessageMedia.message_id == target_message_id)
-            .scalar()
-        )
-        db.add(MessageMedia(
-            message_id=target_message_id,
-            media_id=image.id,
-            position=int(max_position) + 1,
-        ))
-
-    db.commit()
-    db.refresh(image)
     return VideoPreviewItem.model_validate(image)
 
 

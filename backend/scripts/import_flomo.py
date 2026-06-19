@@ -21,6 +21,7 @@ from bs4 import BeautifulSoup
 from app.models import SessionLocal, Message, Tag
 from app.config import config
 from app.services.media_service import process_file
+from app.services.message_service import link_media_to_message
 
 # ── 配置 ────────────────────────────────────────────────────────────────────
 FLOMO_DIR = os.path.join(
@@ -134,9 +135,12 @@ def main():
                     if not os.path.exists(dest):
                         shutil.copy2(abs_src, dest)
 
-                    result = process_file(db, dest, db_message.id, position)
+                    result = process_file(db, dest, commit=False)
                     if result is None:
                         print(f"  警告：process_file 返回 None，跳过 {dest}")
+                        continue
+                    link_media_to_message(db, db_message.id, result["media"].id, position)
+                    position += 1
 
                 db.commit()
                 imported += 1

@@ -15,7 +15,12 @@ from app.schemas.message import (
     MessageSyncMediaItem, MessageSyncResponse,
     MEDIA_PREVIEW_LIMIT,
 )
-from app.services.message_service import reorder_message_media, cleanup_orphan_tags
+from app.services.message_service import (
+    reorder_message_media, cleanup_orphan_tags, link_media_to_message,
+    create_message_service, update_message_service, delete_message_service,
+    merge_messages_service, split_message_service,
+    add_media_to_message_service, remove_media_from_message_service,
+)
 from app.services.media_service import process_file
 
 router = APIRouter(prefix="/messages", tags=["messages"])
@@ -674,20 +679,15 @@ def create_message(
     db: Session = Depends(get_db),
 ):
     """创建新消息"""
-    db_message = Message(text=message_data.text, actor_id=message_data.actor_id, issue_id=message_data.issue_id)
-    db.add(db_message)
-    db.flush()
-
-    if message_data.tag_ids:
-        tags = db.query(Tag).filter(Tag.id.in_(message_data.tag_ids)).all()
-        db_message.tags = tags
-
-    position = 0
-    for file_path in message_data.files:
-        result = process_file(db, file_path, db_message.id, position)
-        if result is not None:
-            position += 1
-
+    db_message = create_message_service(
+        db,
+        text=message_data.text,
+        actor_id=message_data.actor_id,
+        files=message_data.files,
+        tag_ids=message_data.tag_ids,
+        issue_id=message_data.issue_id,
+        commit=False,
+    )
     db.commit()
     db.refresh(db_message)
     return _build_sync_response(db, db_message)
@@ -699,11 +699,6 @@ def create_message_from_client(
     db: Session = Depends(get_db),
 ):
     """客户端主导创建消息：接受客户端提供的 ID，幂等"""
-    # 幂等：ID 已存在直接返回
-    existing = db.query(Message).filter(Message.id == message_data.id).first()
-    if existing:
-        return _build_sync_response(db, existing)
-
     # 解析 created_at
     created_at = None
     if message_data.created_at:
@@ -711,25 +706,19 @@ def create_message_from_client(
             created_at = datetime.fromisoformat(message_data.created_at)
         except ValueError:
             pass
-    if created_at is None:
-        created_at = datetime.now()
 
-    db_message = Message(
-        id=message_data.id,
+    db_message = create_message_service(
+        db,
         text=message_data.text,
         actor_id=message_data.actor_id,
-        issue_id=message_data.issue_id,
+        files=[cf.file_path for cf in message_data.files],
+        tag_ids=None,
         created_at=created_at,
+        issue_id=message_data.issue_id,
+        client_id=message_data.id,
+        media_id_resolver=lambda i: message_data.files[i].id,
+        commit=False,
     )
-    db.add(db_message)
-    db.flush()
-
-    position = 0
-    for client_file in message_data.files:
-        result = process_file(db, client_file.file_path, db_message.id, position, media_id=client_file.id)
-        if result is not None:
-            position += 1
-
     db.commit()
     db.refresh(db_message)
     return _build_sync_response(db, db_message)
@@ -742,35 +731,31 @@ def update_message(
     db: Session = Depends(get_db),
 ):
     """更新消息：文字、actor、媒体顺序"""
-    message = db.query(Message).filter(Message.id == message_id).first()
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    if update_data.text is not None:
-        message.text = update_data.text
-
-    if update_data.tag_ids is not None:
-        tags = db.query(Tag).filter(Tag.id.in_(update_data.tag_ids)).all() if update_data.tag_ids else []
-        message.tags = tags
-
-    if update_data.actor_id is not None:
-        message.actor_id = update_data.actor_id
-
-    if update_data.issue_id is not None:
-        message.issue_id = update_data.issue_id if update_data.issue_id != 0 else None
-
-    if update_data.starred is not None:
-        message.starred = 1 if update_data.starred else 0
-
+    created_at = None
     if update_data.created_at is not None:
         try:
-            message.created_at = datetime.fromisoformat(update_data.created_at)
+            created_at = datetime.fromisoformat(update_data.created_at)
         except ValueError:
             pass
 
-    if update_data.media_order is not None:
-        if not reorder_message_media(db, message_id, update_data.media_order):
-            raise HTTPException(status_code=422, detail="media_order 包含不属于该消息的 media_id")
+    try:
+        message = update_message_service(
+            db,
+            message_id=message_id,
+            text=update_data.text,
+            actor_id=update_data.actor_id,
+            issue_id=update_data.issue_id,
+            starred=update_data.starred,
+            created_at=created_at,
+            tag_ids=update_data.tag_ids,
+            media_order=update_data.media_order,
+            commit=False,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    if message is None:
+        raise HTTPException(status_code=404, detail="Message not found")
 
     db.commit()
     db.refresh(message)
@@ -783,58 +768,16 @@ def merge_messages(
     db: Session = Depends(get_db),
 ):
     """合并多条消息：文本拼接、媒体合并到第一条消息，删除其余消息。"""
-    ids = merge_data.message_ids
-    if len(ids) < 2:
-        raise HTTPException(status_code=422, detail="至少需要两条消息才能合并")
+    try:
+        target = merge_messages_service(db, merge_data.message_ids, commit=False)
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=422, detail=msg)
 
-    # 按 created_at 排序获取所有消息
-    msgs = (
-        db.query(Message)
-        .filter(Message.id.in_(ids))
-        .order_by(Message.created_at.asc())
-        .all()
-    )
-    if len(msgs) != len(ids):
+    if target is None:
         raise HTTPException(status_code=404, detail="部分消息不存在")
-
-    target = msgs[0]
-    others = msgs[1:]
-
-    # 合并文本
-    texts = [m.text for m in msgs if m.text]
-    if texts:
-        target.text = "\n".join(texts)
-
-    # 合并媒体：把其他消息的 media 接到 target 后面
-    max_pos = (
-        db.query(func.coalesce(func.max(MessageMedia.position), -1))
-        .filter(MessageMedia.message_id == target.id)
-        .scalar()
-    )
-    next_pos = max_pos + 1
-
-    for other in others:
-        relations = sorted(list(other.message_media), key=lambda r: r.position)
-        for rel in relations:
-            other.message_media.remove(rel)
-            rel.message_id = target.id
-            rel.position = next_pos
-            target.message_media.append(rel)
-            next_pos += 1
-
-    # 合并 tags（去重）
-    all_tags = {t.id: t for t in target.tags}
-    for other in others:
-        for t in other.tags:
-            all_tags[t.id] = t
-        other.tags = []
-    target.tags = list(all_tags.values())
-
-    db.flush()
-
-    # 删除其余消息
-    for other in others:
-        db.delete(other)
 
     db.commit()
     db.refresh(target)
@@ -848,56 +791,23 @@ def split_message(
     db: Session = Depends(get_db),
 ):
     """拆分消息：将选中的媒体移动到新消息中，复制 text/actor/starred/tags。"""
-    source = db.query(Message).filter(Message.id == message_id).first()
-    if not source:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    media_ids_set = set(split_data.media_ids)
-    relations = (
-        db.query(MessageMedia)
-        .filter(MessageMedia.message_id == message_id)
-        .order_by(MessageMedia.position)
-        .all()
-    )
-    source_media_ids = {r.media_id for r in relations}
-    if not media_ids_set.issubset(source_media_ids):
-        raise HTTPException(status_code=422, detail="部分 media_id 不属于该消息")
-    if len(media_ids_set) == len(relations):
-        raise HTTPException(status_code=422, detail="不能拆分全部媒体，至少保留一个")
-
-    nearby_count = (
-        db.query(func.count(Message.id))
-        .filter(
-            Message.created_at > source.created_at,
-            Message.created_at <= source.created_at + timedelta(seconds=30),
+    try:
+        new_msg = split_message_service(
+            db,
+            source_message_id=message_id,
+            new_message_id=split_data.new_message_id,
+            new_text=split_data.text,
+            media_ids=split_data.media_ids,
+            commit=False,
         )
-        .scalar()
-    )
+    except ValueError as e:
+        msg = str(e)
+        if "not found" in msg.lower() or "找不到" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=422, detail=msg)
 
-    new_msg = Message(
-        text=source.text,
-        actor_id=source.actor_id,
-        starred=source.starred,
-        created_at=source.created_at + timedelta(seconds=nearby_count + 1),
-    )
-    db.add(new_msg)
-    db.flush()
-
-    # 复制 tags
-    for tag in source.tags:
-        new_msg.tags.append(tag)
-
-    # 移动选中的 media 到新 message，重新编号 position
-    new_pos = 0
-    src_pos = 0
-    for rel in relations:
-        if rel.media_id in media_ids_set:
-            rel.message_id = new_msg.id
-            rel.position = new_pos
-            new_pos += 1
-        else:
-            rel.position = src_pos
-            src_pos += 1
+    if new_msg is None:
+        raise HTTPException(status_code=404, detail="Message not found")
 
     db.commit()
     db.refresh(new_msg)
@@ -911,22 +821,12 @@ def add_media_to_message(
     db: Session = Depends(get_db),
 ):
     """向已有消息添加媒体文件"""
+    try:
+        add_media_to_message_service(db, message_id, file_paths, commit=False)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
     message = db.query(Message).filter(Message.id == message_id).first()
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    max_pos = (
-        db.query(func.coalesce(func.max(MessageMedia.position), -1))
-        .filter(MessageMedia.message_id == message_id)
-        .scalar()
-    )
-    position = max_pos + 1
-
-    for file_path in file_paths:
-        result = process_file(db, file_path, message_id, position)
-        if result is not None:
-            position += 1
-
     db.commit()
     db.refresh(message)
     return _build_detail_response(db, message, media_limit=None)
@@ -939,29 +839,15 @@ def remove_media_from_message(
     db: Session = Depends(get_db),
 ):
     """从消息中移除媒体（仅解除关联，不删除文件）"""
-    message = db.query(Message).filter(Message.id == message_id).first()
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
+    try:
+        removed = remove_media_from_message_service(db, message_id, media_id, commit=False)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
-    relation = (
-        db.query(MessageMedia)
-        .filter(MessageMedia.message_id == message_id, MessageMedia.media_id == media_id)
-        .first()
-    )
-    if not relation:
+    if not removed:
         raise HTTPException(status_code=404, detail="Media not found in this message")
 
-    db.delete(relation)
-
-    remaining = (
-        db.query(MessageMedia)
-        .filter(MessageMedia.message_id == message_id)
-        .order_by(MessageMedia.position)
-        .all()
-    )
-    for i, rel in enumerate(remaining):
-        rel.position = i
-
+    message = db.query(Message).filter(Message.id == message_id).first()
     db.commit()
     db.refresh(message)
     return _build_detail_response(db, message, media_limit=None)
@@ -973,10 +859,6 @@ def delete_message(
     db: Session = Depends(get_db),
 ):
     """删除消息"""
-    message = db.query(Message).filter(Message.id == message_id).first()
-    if not message:
+    if not delete_message_service(db, message_id, commit=False):
         raise HTTPException(status_code=404, detail="Message not found")
-
-    db.delete(message)
-    cleanup_orphan_tags(db)
     db.commit()
