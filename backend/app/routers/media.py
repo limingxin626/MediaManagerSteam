@@ -1,12 +1,16 @@
 import os
+import shutil
 import time
 from datetime import datetime
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, Integer
 from app.models import get_db, Media, MessageMedia, Message, Tag, message_tag, media_tag
 from typing import Optional, List, Literal
+
+logger = logging.getLogger(__name__)
 from app.schemas.media import (
     MediaResponse,
     MediaDetailResponse,
@@ -22,6 +26,7 @@ from app.services.media_service import (
     attach_existing_preview, attach_screenshot_preview, delete_media as delete_media_service,
 )
 from app.services.message_service import link_media_to_message
+from app.utils import ThumbnailUtils
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -421,7 +426,7 @@ def replace_media_endpoint(
     import shutil as _shutil
     try:
         with open(tmp_path, "wb") as f:
-            _shutil.copyfileobj(file.file, f, length=1024 * 1024)
+            shutil.copyfileobj(file.file, f, length=1024 * 1024)
     except Exception:
         if os.path.exists(tmp_path):
             try: os.remove(tmp_path)
@@ -560,5 +565,42 @@ def add_preview_from_screenshot(
         raise HTTPException(status_code=400, detail=str(e))
 
     return VideoPreviewItem.model_validate(image)
+
+
+@router.post("/{media_id}/cover")
+def set_video_cover(
+    media_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """把上传的图片设为视频封面。
+
+    落地策略遵循既有 sidecar 约定:`<stem>.cover.jpg` 写在视频同目录,
+    并立刻基于这张 sidecar 重生成 `DATA_ROOT/thumbs/{id}.webp`。
+    下次 re-import / replace 同一路径时,sidecar 仍会被自动识别,封面不会丢。
+    """
+    media = _require_video(db, media_id)
+
+    abs_path = AppConfig.resolve_to_absolute(media.repo_id, media.file_path)
+    if not abs_path or not os.path.exists(abs_path):
+        raise HTTPException(status_code=404, detail="Video file not found on disk")
+
+    folder, name = os.path.split(abs_path)
+    stem = os.path.splitext(name)[0]
+    sidecar_path = os.path.join(folder, f"{stem}.cover.jpg")
+
+    try:
+        with open(sidecar_path, "wb") as f:
+            shutil.copyfileobj(file.file, f, length=1024 * 1024)
+    except Exception as e:
+        logger.error(f"Failed to write cover sidecar for media id={media_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to write cover: {e}")
+
+    thumb_path = AppConfig.get_thumbnail_path(media.id)
+    ok = ThumbnailUtils.generate_image_thumbnail(sidecar_path, thumb_path)
+    if not ok:
+        logger.warning(f"Sidecar written but thumbnail regen failed for media id={media_id}")
+
+    return {"message": "Cover updated", "sidecar": sidecar_path, "ok": ok}
 
 
