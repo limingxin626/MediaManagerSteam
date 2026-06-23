@@ -1,6 +1,14 @@
 """
 应用配置模块 - 集中管理所有路径和配置
 
+配置来源(优先级 高→低):
+  1. 真实环境变量(含 `api.py --data-root` 注入的、shell 里 export 的)
+  2. 项目本地 `backend/.env`(gitignored;复制 `.env.example` 而来)
+  本模块在 import 时即 `load_dotenv(backend/.env, override=False)` —— 真实环境变量
+  永远优先,.env 只补缺。因为 `app.models` → `app.config`,**所有**走 `from app.*`
+  的入口(api.py / alembic / scripts/*)import 时自动加载,无需各自调,切 instance
+  只改 `backend/.env` 里的 DATA_ROOT 即可。详见 README / CLAUDE.md。
+
 环境变量：
   DATA_ROOT     — 数据库 + 缩略图 + repositories.json 所在目录(必填,无默认)
   HOST          — 服务监听地址,默认 0.0.0.0
@@ -33,7 +41,15 @@ import os
 import sys
 from typing import Dict, Optional, Tuple
 
+from dotenv import load_dotenv
+
 logger = logging.getLogger(__name__)
+
+# 项目本地 .env(backend/.env)。本文件在 app/ 下,parent 的 parent 即 backend/。
+# override=False → os.environ 里已有的值(真实 env、api.py --data-root 注入的、
+# alembic 的 ALEMBIC_SKIP_REPO_LOAD 哨兵)都不被 .env 覆盖,.env 只填缺。
+# 必须在下面读 DATA_ROOT 之前执行;.env 不存在则静默(允许纯靠真实 env 跑)。
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"), override=False)
 
 
 def _get_env(name: str, default: str = None) -> str:
@@ -41,7 +57,12 @@ def _get_env(name: str, default: str = None) -> str:
     if not val:
         if default is not None:
             return default
-        logger.error("环境变量 %s 未设置，无法启动。", name)
+        logger.error(
+            "环境变量 %s 未设置,无法启动。"
+            "请在 backend/.env 里设置(复制 .env.example),或传 --data-root,"
+            "或 %s=... 临时注入。",
+            name, name,
+        )
         sys.exit(1)
     return val
 
@@ -312,6 +333,23 @@ class AppConfig:
     @classmethod
     def get_actor_avatar_url(cls, actor_id: int) -> str:
         return f"{cls.DATA_URL_PREFIX}/actor_cover/{actor_id}.webp"
+
+    # ── 磁盘扫描缩略图(scan_thumbs/{fs_entry_id}.webp)────────────
+    # 与 Media 的 thumbs/ 平级,直接在 DATA_ROOT 根下,所以同样由
+    # `/data` 静态挂载自动 serve(`/data/scan_thumbs/x.webp` 物理对应
+    # `DATA_ROOT/scan_thumbs/x.webp`),无需新挂载。
+    # 目录由 scan_worker 首次写入前 os.makedirs 懒建,保持 config import 无副作用。
+    @classmethod
+    def get_scan_thumbs_dir(cls) -> str:
+        return os.path.join(cls.DATA_ROOT, "scan_thumbs")
+
+    @classmethod
+    def get_scan_thumbnail_path(cls, fs_entry_id: int) -> str:
+        return os.path.join(cls.get_scan_thumbs_dir(), f"{fs_entry_id}.webp")
+
+    @classmethod
+    def get_scan_thumbnail_url(cls, fs_entry_id: int) -> str:
+        return f"{cls.DATA_URL_PREFIX}/scan_thumbs/{fs_entry_id}.webp"
 
     # ------------------------------------------------------------------ #
     # Repository API —— 把"挂载点"形式化到 DB 里(media.repo_id + 相对路径)

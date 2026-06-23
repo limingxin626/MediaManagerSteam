@@ -83,3 +83,7 @@ register_sync_listeners()
 
 # 检查 ffmpeg/ffprobe 路径
 config.check_paths()
+
+# 启动磁盘扫描后台 worker(逐个补 fs_entry 的 metadata + 缩略图)
+from app.services.scan_worker import start_worker
+start_worker()

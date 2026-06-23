@@ -13,6 +13,8 @@ engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 def _enable_sqlite_fk(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
+    # WAL:允许 scan_worker 后台线程与请求线程并发写,避免 "database is locked"
+    cursor.execute("PRAGMA journal_mode=WAL")
     cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -191,3 +193,4 @@ from app.models.todo import Todo  # noqa: E402,F401
 from app.models.issue import Issue  # noqa: E402,F401
 from app.models.transaction import Transaction, TxnCategoryRule  # noqa: E402,F401
 from app.models.telegram import TelegramSyncState, RemoteMediaReference  # noqa: E402,F401
+from app.models.fs_entry import FsEntry  # noqa: E402,F401

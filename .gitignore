@@ -88,3 +88,7 @@ htmlcov/
 
 .connect-writer/
 .claude/worktrees/
+
+# Playwright MCP / debug artifacts
+.playwright-mcp/
+media-console.txt

@@ -81,6 +81,57 @@ export interface CursorResponse<T> {
   has_more_before?: boolean
 }
 
+// ---------------------------------------------------------------------------
+// Scan(磁盘扫描视图 / fs_entry)—— 后端无 OpenAPI 生成,手写
+// 反映磁盘物理真相,与 Media(去重资产库)正交。详见后端 app/models/fs_entry.py。
+// ---------------------------------------------------------------------------
+
+export type ScanProcStatus = 'pending' | 'reused' | 'done' | 'failed'
+
+export interface FsEntry {
+  id: number
+  repo_id: string
+  rel_path: string
+  file_path: string
+  file_url: string
+  thumb_url: string
+  local_file_path?: string
+  local_thumb_path?: string
+  mime_type: string | null
+  media_type: 'VIDEO' | 'IMAGE'
+  file_size: number | null
+  mtime: number               // epoch 秒
+  scanned_at: string
+  media_id: number | null
+  meta_status: ScanProcStatus
+  thumb_status: ScanProcStatus
+  width: number | null
+  height: number | null
+  duration_ms: number | null
+  fps: number | null
+  bitrate: number | null
+  video_codec: string | null
+  audio_codec: string | null
+  has_audio: number | null
+  taken_at: string | null
+  gps_lat: number | null
+  gps_lng: number | null
+  orientation: number | null
+  camera_make: string | null
+  camera_model: string | null
+  lens: string | null
+  is_hdr: number | null
+  color_transfer: string | null
+}
+
+export interface ScanStatus {
+  total: number
+  pending: number
+  done: number
+  failed: number
+  running: boolean
+}
+
 // --- 纯前端类型（后端无对应 schema） ---
 
 export interface ViewMode {
