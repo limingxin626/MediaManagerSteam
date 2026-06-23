@@ -313,6 +313,23 @@ class AppConfig:
     def get_actor_avatar_url(cls, actor_id: int) -> str:
         return f"{cls.DATA_URL_PREFIX}/actor_cover/{actor_id}.webp"
 
+    # ── 磁盘扫描缩略图(scan_thumbs/{fs_entry_id}.webp)────────────
+    # 与 Media 的 thumbs/ 平级,直接在 DATA_ROOT 根下,所以同样由
+    # `/data` 静态挂载自动 serve(`/data/scan_thumbs/x.webp` 物理对应
+    # `DATA_ROOT/scan_thumbs/x.webp`),无需新挂载。
+    # 目录由 scan_worker 首次写入前 os.makedirs 懒建,保持 config import 无副作用。
+    @classmethod
+    def get_scan_thumbs_dir(cls) -> str:
+        return os.path.join(cls.DATA_ROOT, "scan_thumbs")
+
+    @classmethod
+    def get_scan_thumbnail_path(cls, fs_entry_id: int) -> str:
+        return os.path.join(cls.get_scan_thumbs_dir(), f"{fs_entry_id}.webp")
+
+    @classmethod
+    def get_scan_thumbnail_url(cls, fs_entry_id: int) -> str:
+        return f"{cls.DATA_URL_PREFIX}/scan_thumbs/{fs_entry_id}.webp"
+
     # ------------------------------------------------------------------ #
     # Repository API —— 把"挂载点"形式化到 DB 里(media.repo_id + 相对路径)
     # ------------------------------------------------------------------ #

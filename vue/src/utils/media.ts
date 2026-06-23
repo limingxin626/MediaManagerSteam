@@ -20,6 +20,28 @@ export function isImage(mimeType: string | null): boolean {
   return mimeType?.startsWith('image/') ?? false
 }
 
+/** 字节数 → 人类可读(KB/MB/GB) */
+export function formatSize(bytes: number | null | undefined): string {
+  if (!bytes && bytes !== 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  const kb = bytes / 1024
+  if (kb < 1024) return `${kb.toFixed(1)} KB`
+  const mb = kb / 1024
+  if (mb < 1024) return `${mb.toFixed(1)} MB`
+  return `${(mb / 1024).toFixed(2)} GB`
+}
+
+/** epoch 秒 → 本地时间字符串 */
+export function formatMtime(epoch: number | null | undefined): string {
+  if (!epoch) return ''
+  return new Date(epoch * 1000).toLocaleString()
+}
+
+/** forward-slash 路径取文件名 */
+export function basename(p: string): string {
+  return p.split('/').pop() ?? p
+}
+
 /** Resolve a backend-relative path to a full absolute path */
 export function resolveUrl(path: string): string {
   if (IS_ELECTRON) {

@@ -8,6 +8,7 @@
             {{ currentIndex + 1 }} / {{ totalItems }}
           </div>
           <div class="flex items-center gap-2">
+            <template v-if="!minimal">
             <button
               v-if="currentItem"
               @click="handleStarClick()"
@@ -102,6 +103,19 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
               </svg>
             </button>
+            </template>
+
+            <!-- 精简模式:详情(metadata) -->
+            <button
+              v-if="minimal && currentItem"
+              @click="emit('info', currentItem)"
+              class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+              title="详情"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
             <button
               v-if="currentItem"
               @click="openFileLocation"
@@ -177,7 +191,7 @@
             </Transition>
 
             <!-- Media tags -->
-            <div v-if="currentItem" class="flex items-center gap-1.5 flex-wrap justify-center">
+            <div v-if="currentItem && !minimal" class="flex items-center gap-1.5 flex-wrap justify-center">
               <span
                 v-for="tag in (currentItem.tags || [])"
                 :key="tag.id"
@@ -332,11 +346,18 @@ interface Props {
   allTags?: TagWithCount[]
   prevPeekItems?: MessageMediaItem[]
   nextPeekItems?: MessageMediaItem[]
+  /**
+   * 精简模式:隐藏所有针对 Media 资产的操作(收藏/删除/旋转/替换/智能 tag/找相似/详情页/标签编辑),
+   * 只保留 导航 + 预览 + 打开文件位置 + 关闭。用于 Scan 这类基于 fs_entry 的只读浏览
+   * —— 此时 item.id 是 fs_entry id 而非 media id,打 /media 接口是错的。
+   */
+  minimal?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   startIndex: 0,
   starred: false,
+  minimal: false,
   allTags: () => [],
   prevPeekItems: () => [],
   nextPeekItems: () => [],
@@ -352,6 +373,8 @@ const emit = defineEmits<{
   'media-replaced': [mediaId: number]
   'media-tags-changed': [mediaId: number, tags: TagItem[]]
   'find-similar': [mediaId: number]
+  /** 精简模式下点「详情」按钮 —— 宿主自行决定展示什么(如 ScanDetailModal) */
+  info: [item: MessageMediaItem]
 }>()
 
 const currentIndex = ref(props.startIndex)
