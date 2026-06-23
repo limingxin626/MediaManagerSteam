@@ -54,6 +54,7 @@
       @close="previewOpen = false"
       @navigate-next="loadMoreForPreview"
       @info="(it) => (detailItem = it as unknown as FsEntry)"
+      @delete="(it) => deleteEntry(it as unknown as FsEntry)"
     />
 
     <ScanDetailModal :item="detailItem" @close="detailItem = null" />
@@ -68,11 +69,14 @@ import ScanDetailModal from '../components/ScanDetailModal.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api, useInfiniteScroll } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
+import { useConfirm } from '../composables/useConfirm'
+import { basename } from '../utils/media'
 import type { FsEntry, ScanStatus, CursorResponse, MessageMediaItem } from '../types'
 
 defineOptions({ name: 'Scan' })
 
 const toast = useToast()
+const { confirm } = useConfirm()
 
 const sort = ref('mtime')
 const order = ref('desc')
@@ -128,6 +132,26 @@ function openPreview(idx: number) {
 async function loadMoreForPreview() {
   if (loading.value || !hasMore.value) return
   await load()
+}
+
+// 删除一条扫描条目(连同磁盘源文件)。MediaPreview 监听 items 变化自动 clamp/关闭。
+async function deleteEntry(it: FsEntry) {
+  const ok = await confirm({
+    title: '删除文件',
+    message: `确定删除「${basename(it.rel_path)}」吗？\n会同时删除磁盘上的源文件,不可恢复。`,
+    confirmText: '删除',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await api.del(`/scan/${it.id}`)
+    const idx = items.value.findIndex((x) => x.id === it.id)
+    if (idx !== -1) items.value.splice(idx, 1)
+    if (items.value.length === 0) previewOpen.value = false
+    toast.success('已删除')
+  } catch (e: any) {
+    toast.error(e?.message || '删除失败')
+  }
 }
 
 watch([sort, order, type, repoId], () => reset())

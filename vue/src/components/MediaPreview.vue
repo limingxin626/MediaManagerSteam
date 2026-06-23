@@ -116,6 +116,17 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
+            <!-- 精简模式:删除(含源文件,宿主确认) -->
+            <button
+              v-if="minimal && currentItem"
+              @click="emit('delete', currentItem)"
+              class="p-2 text-white/70 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors"
+              title="删除(含源文件)"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
             <button
               v-if="currentItem"
               @click="openFileLocation"
@@ -375,6 +386,8 @@ const emit = defineEmits<{
   'find-similar': [mediaId: number]
   /** 精简模式下点「详情」按钮 —— 宿主自行决定展示什么(如 ScanDetailModal) */
   info: [item: MessageMediaItem]
+  /** 精简模式下点「删除」按钮 —— 宿主自行确认 + 调用对应删除接口(如 /scan/{id}) */
+  delete: [item: MessageMediaItem]
 }>()
 
 const currentIndex = ref(props.startIndex)

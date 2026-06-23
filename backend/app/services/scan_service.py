@@ -288,3 +288,46 @@ def _rescan_locked() -> dict:
     from app.services import scan_worker
     scan_worker.wake()
     return result
+
+
+# ── 单条删除(含源文件)─────────────────────────────────────────────
+
+def delete_entry(db, fs_entry_id: int) -> Optional[dict]:
+    """删除一条 fs_entry,**并删除其磁盘源文件**。
+
+    - 源文件:经 `(repo_id, rel_path)` 解析到本机绝对路径后 os.remove(已不存在则跳过)。
+    - 自有 scan_thumb:非 reused 行才拥有(reused 指向 Media 缩略图,不动)。
+    - **不触碰 media 表** —— fs_entry 与去重资产库正交,删扫描条目不级联删 Media。
+      (若该文件同时是某 Media 的源,Media 行会保留、其缩略图仍在;那是另一条清理路径。)
+
+    找不到该 id → 返回 None(路由转 404)。
+    """
+    row = db.query(FsEntry).filter(FsEntry.id == fs_entry_id).first()
+    if row is None:
+        return None
+
+    file_deleted = False
+    abs_path = config.resolve_to_absolute(row.repo_id, row.rel_path)
+    if abs_path and os.path.exists(abs_path):
+        try:
+            os.remove(abs_path)
+            file_deleted = True
+        except OSError as e:
+            logger.warning("[scan] 删除源文件失败 %s: %s", abs_path, e)
+
+    # 自有 scan_thumb(reused 行指向 Media 缩略图,不拥有,不删)
+    if row.media_id is None or row.thumb_status != "reused":
+        tp = config.get_scan_thumbnail_path(row.id)
+        if os.path.exists(tp):
+            try:
+                os.remove(tp)
+            except OSError:
+                pass
+
+    db.delete(row)
+    db.commit()
+    return {
+        "id": fs_entry_id,
+        "file_deleted": file_deleted,
+        "rel_path": row.rel_path,
+    }

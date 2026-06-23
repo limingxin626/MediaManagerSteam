@@ -4,6 +4,7 @@
 - POST /scan/rescan   —— 手动触发增量扫描(只 stat,秒级),唤醒后台 worker
 - GET  /scan/status   —— 队列进度(total/pending/done/failed/running)
 - GET  /scan/repos    —— repo 列表,给前端过滤下拉
+- DELETE /scan/{id}   —— 删除一条扫描条目并删除其磁盘源文件
 """
 import logging
 from typing import Optional, Literal
@@ -120,3 +121,13 @@ def scan_status(db: Session = Depends(get_db)):
 @router.get("/repos")
 def list_repos():
     return [{"repo_id": rid} for rid in config.get_repositories().keys()]
+
+
+@router.delete("/{fs_entry_id}")
+def delete_scan_entry(fs_entry_id: int, db: Session = Depends(get_db)):
+    """删除一条扫描条目 **并删除其磁盘源文件**。不级联删 media 表。"""
+    from app.services import scan_service
+    result = scan_service.delete_entry(db, fs_entry_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Scan entry not found")
+    return result
