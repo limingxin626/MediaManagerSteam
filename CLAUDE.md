@@ -24,6 +24,8 @@ Key env vars:
 - `DATA_ROOT` — data directory (required, no default), contains SQLite DB (`db.sqlite3`), uploads, thumbnails
 - `FFMPEG_PATH` / `FFPROBE_PATH` — paths to ffmpeg binaries
 
+**配置来源 / 切 instance**:`app/config.py` 在 import 时 `load_dotenv(backend/.env, override=False)`,优先级 高→低 = 真实环境变量 / `python api.py --data-root <path>` > `backend/.env`。因为 `app.models → app.config`,**所有**走 `from app.*` 的入口(api.py / alembic / `scripts/*` 如 import_bilibili)都自动跟随同一份 `.env`,无需各自配。一个 instance == 一个 `DATA_ROOT`(各自独立的 db/repositories.json/thumbs);日常切 instance 只改 `backend/.env` 里 `DATA_ROOT` 那行(注释切换)再重启。`backend/.env` 已 gitignored,模板见 `backend/.env.example`(复制即用)。`DB_NAME` 已废弃。
+
 Routers (registered via `backend/app/routers/__init__.py:all_routers`): `actor`, `message`, `media`, `files`, `tags`, `sync`, `admin`, `dashboard`, `todos`.
 
 Services:
