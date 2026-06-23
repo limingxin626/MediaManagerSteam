@@ -205,6 +205,10 @@ def _rescan_locked() -> dict:
                         n_matched += 1
                     else:
                         n_pending += 1
+                    # 状态一律 pending —— 即使匹配到 Media。reuse 分支(从 Media 搬
+                    # metadata + 复用缩略图 + probe HDR)在 worker 里跑;这里只记下
+                    # media_id 当作"走 reuse 分支"的标记。直接写 reused 会让 worker 跳过,
+                    # metadata 列永远留空(width/height 等)。
                     insert_batch.append({
                         "repo_id": repo_id,
                         "rel_path": rel,
@@ -215,8 +219,8 @@ def _rescan_locked() -> dict:
                         "scanned_at": run_token,
                         "created_at": run_token,
                         "media_id": media_id,
-                        "meta_status": "reused" if matched else "pending",
-                        "thumb_status": "reused" if matched else "pending",
+                        "meta_status": "pending",
+                        "thumb_status": "pending",
                     })
                     n_ins += 1
                 else:
@@ -226,7 +230,8 @@ def _rescan_locked() -> dict:
                         update_batch.append({"id": fid, "scanned_at": run_token})
                         n_same += 1
                     else:
-                        # 原地修改 —— 重算 media_id、重置状态、重新入队
+                        # 原地修改 —— 重算 media_id、重置 pending、重新入队。
+                        # 状态一律 pending(理由同上:reused 会让 worker 跳过补 metadata)。
                         media_id = media_index.get(key)
                         matched = media_id is not None
                         if matched:
@@ -241,8 +246,8 @@ def _rescan_locked() -> dict:
                             "mime_type": scan_mime_type(rel),
                             "media_type": scan_media_type(rel),
                             "media_id": media_id,
-                            "meta_status": "reused" if matched else "pending",
-                            "thumb_status": "reused" if matched else "pending",
+                            "meta_status": "pending",
+                            "thumb_status": "pending",
                         })
                         n_upd += 1
 
