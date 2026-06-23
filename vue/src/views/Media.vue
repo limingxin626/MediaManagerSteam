@@ -184,6 +184,7 @@
       :is-open="previewOpen"
       :items="previewItems"
       :start-index="previewStartIndex"
+      :all-tags="tags"
       :prev-peek-items="previewPrevPeekItems"
       :next-peek-items="previewNextPeekItems"
       @close="previewOpen = false"
@@ -192,6 +193,7 @@
       @toggle-star="handlePreviewToggleStar"
       @media-deleted="handleMediaDeleted"
       @media-rotated="handleMediaRotated"
+      @media-tags-changed="handleMediaTagsChanged"
       @find-similar="enterSimilarMode"
     />
   </div>
@@ -504,6 +506,19 @@ function handleMediaRotated(mediaId: number) {
     if ((pItem as any).local_file_path) {
       ;(pItem as any).local_file_path = (pItem as any).local_file_path.split('?')[0] + `?t=${t}`
     }
+  }
+}
+
+const handleMediaTagsChanged = (
+  mediaId: number,
+  newTags: { id: number; name: string; category?: string | null }[],
+) => {
+  vg.updateItem(mediaId, (item) => {
+    item.tags = newTags
+  })
+  const smartIdx = smartItems.value.findIndex((m) => m.id === mediaId)
+  if (smartIdx !== -1) {
+    smartItems.value[smartIdx] = { ...smartItems.value[smartIdx], tags: newTags }
   }
 }
 

@@ -170,6 +170,7 @@
             :video-media-id="mediaItem.id"
             :video-el="videoPlayer"
             @preview-added="onPreviewAdded"
+            @cover-updated="onCoverUpdated"
           />
         </div>
       </div>
@@ -312,6 +313,17 @@ const removeMediaTag = async (tagId: number) => {
 
 const onPreviewAdded = (item: VideoPreviewItem) => {
   previews.value = [...previews.value, item].sort((a, b) => a.frame_ms - b.frame_ms)
+}
+
+const onCoverUpdated = async () => {
+  // 重新拉媒体,把新的 thumb_url / local_thumb_path 带回来,
+  // 回到 media 列表时 grid 即可看到新封面。
+  try {
+    const fresh = await api.get<Media>(`/media/${props.mediaId}`)
+    mediaItem.value = fresh
+  } catch {
+    // ignore —— 不阻断视频播放
+  }
 }
 
 const handleKeydown = (e: KeyboardEvent) => {

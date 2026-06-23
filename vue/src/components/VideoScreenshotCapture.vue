@@ -75,6 +75,18 @@
         class="flex-1 px-2 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs disabled:opacity-40"
       >{{ busy ? '上传中...' : '确认上传' }}</button>
     </div>
+
+    <button
+      @click="setAsCover"
+      :disabled="busy || !pendingShot"
+      class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs"
+      title="把当前截图存为视频封面(写入视频同目录的 .cover.jpg sidecar,并立刻重生成缩略图)"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+      {{ busy ? '上传中...' : '设为封面' }}
+    </button>
   </div>
 </template>
 
@@ -91,6 +103,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'preview-added', item: VideoPreviewItem): void
+  (e: 'cover-updated', mediaId: number): void
 }>()
 
 const toast = useToast()
@@ -189,6 +202,33 @@ const confirmShot = async () => {
     toast.success('已添加预览')
   } catch (e) {
     const msg = e instanceof Error ? e.message : '上传失败'
+    toast.error(msg)
+  } finally {
+    busy.value = false
+  }
+}
+
+const setAsCover = async () => {
+  if (!pendingShot.value || busy.value) return
+  busy.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', pendingShot.value.blob, `cover_${Date.now()}.jpg`)
+    const res = await fetch(`${API_BASE_URL}/media/${props.videoMediaId}/cover`, {
+      method: 'POST',
+      body: fd,
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail ?? `${res.status}`)
+    }
+    emit('cover-updated', props.videoMediaId)
+    pendingShot.value = null
+    shotForm.start_ms = null
+    shotForm.end_ms = null
+    toast.success('已设为封面')
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '设置封面失败'
     toast.error(msg)
   } finally {
     busy.value = false
