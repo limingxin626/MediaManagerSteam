@@ -190,3 +190,4 @@ def get_db():
 from app.models.todo import Todo  # noqa: E402,F401
 from app.models.issue import Issue  # noqa: E402,F401
 from app.models.transaction import Transaction, TxnCategoryRule  # noqa: E402,F401
+from app.models.telegram import TelegramSyncState, RemoteMediaReference  # noqa: E402,F401

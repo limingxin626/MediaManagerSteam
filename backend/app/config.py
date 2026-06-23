@@ -138,6 +138,21 @@ class AppConfig:
     FFMPEG_PATH: str = os.getenv("FFMPEG_PATH", "ffmpeg")
     FFPROBE_PATH: str = os.getenv("FFPROBE_PATH", "ffprobe")
 
+    # ── Telegram "Saved Messages" 同步 ──────────────────────────────
+    # 单文件 ≥ 此字节数 → 只下载封面/缩略图,不下载原文件,
+    # 同时在 remote_media_reference 表记一行 source_url 供以后按需下载。
+    TELEGRAM_LARGE_FILE_THRESHOLD: int = int(
+        os.getenv("TELEGRAM_LARGE_FILE_THRESHOLD", str(50 * 1024 * 1024))
+    )
+    TELEGRAM_API_ID: int = int(os.getenv("TELEGRAM_API_ID", "0") or "0")
+    TELEGRAM_API_HASH: str = os.getenv("TELEGRAM_API_HASH", "").strip()
+    # session / inbox 默认放 DATA_ROOT(机器本地,gitignored),不污染 backend 仓库
+    # 留空让 get_telegram_session_path() / get_telegram_inbox_dir() 在解析时拼 DATA_ROOT,
+    # 因为类体里没有 cls.DATA_ROOT
+    TELEGRAM_SESSION_PATH: str = os.getenv("TELEGRAM_SESSION_PATH", "").strip()
+    TELEGRAM_INBOX_DIR: str = os.getenv("TELEGRAM_INBOX_DIR", "").strip()
+    TELEGRAM_POLL_INTERVAL: int = int(os.getenv("TELEGRAM_POLL_INTERVAL", "60"))
+
     ALLOWED_ORIGINS: list = [
         "http://127.0.0.1",
         "http://localhost",
@@ -251,6 +266,25 @@ class AppConfig:
     @classmethod
     def get_thumbnail_path(cls, media_id: int) -> str:
         return os.path.join(cls.get_thumbs_dir(), f"{media_id}.webp")
+
+    # ── Telegram 路径解析 ──────────────────────────────────────────
+    @classmethod
+    def get_telegram_session_path(cls) -> str:
+        """Telethon session 文件绝对路径(默认 DATA_ROOT/.telegram.session)。"""
+        return cls.TELEGRAM_SESSION_PATH or os.path.join(
+            cls.DATA_ROOT, ".telegram.session"
+        )
+
+    @classmethod
+    def get_telegram_inbox_dir(cls) -> str:
+        """Telegram 媒体下载暂存目录(默认 DATA_ROOT/telegram_inbox/)。
+
+        自动 mkdir。process_file() 之后会把文件 copy 进 uploads/YYYY/MM/DD/,
+        inbox 文件本身不视为 repo(不被 register_relative 命中)。
+        """
+        d = cls.TELEGRAM_INBOX_DIR or os.path.join(cls.DATA_ROOT, "telegram_inbox")
+        os.makedirs(d, exist_ok=True)
+        return d
 
     # ── MP4 preview(为 GIF 等动画格式生成的小尺寸 H.264 视频)────
     # iOS MyNote 在 grid cell / 详情里优先用 AVPlayer 播这个文件
