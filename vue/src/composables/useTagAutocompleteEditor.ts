@@ -19,7 +19,7 @@ export function useTagAutocompleteEditor(
   const tagSuggestions = ref<TagItem[]>([])
   const tagSuggestionVisible = ref(false)
   const tagSuggestionIndex = ref(0)
-  const tagSuggestionPosition = ref({ top: 0, left: 0 })
+  const tagSuggestionPosition = ref({ top: 0, left: 0, placement: 'above' as 'above' | 'below' })
   const suggestionListRef = ref<HTMLElement | null>(null)
 
   const recentTags = ref<number[]>([])
@@ -61,7 +61,15 @@ export function useTagAutocompleteEditor(
     tagSuggestionIndex.value = 0
 
     const c = editor.getCursorCoords()
-    if (c) tagSuggestionPosition.value = { top: c.top - 4, left: c.left }
+    if (c) {
+      // 光标上方空间不足以放下浮层(约 192px)时,改为在光标下方弹出
+      const POPOVER_H = 192
+      if (c.top < POPOVER_H + 8) {
+        tagSuggestionPosition.value = { top: c.bottom + 4, left: c.left, placement: 'below' }
+      } else {
+        tagSuggestionPosition.value = { top: c.top - 4, left: c.left, placement: 'above' }
+      }
+    }
   }
 
   function selectTag(tag: TagItem) {

@@ -57,7 +57,7 @@
     <div v-if="tag.tagSuggestionVisible.value && tag.tagSuggestions.value.length > 0"
       ref="tagSuggestionListEl"
       class="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[100]"
-      :style="{ top: tag.tagSuggestionPosition.value.top + 'px', left: tag.tagSuggestionPosition.value.left + 'px', transform: 'translateY(-100%)' }">
+      :style="{ top: tag.tagSuggestionPosition.value.top + 'px', left: tag.tagSuggestionPosition.value.left + 'px', transform: tag.tagSuggestionPosition.value.placement === 'above' ? 'translateY(-100%)' : 'none' }">
       <div v-for="(t, index) in tag.tagSuggestions.value" :key="t.id" @click="tag.selectTag(t)"
         class="px-3 py-2 cursor-pointer text-sm"
         :class="index === tag.tagSuggestionIndex.value ? 'bg-indigo-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">

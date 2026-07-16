@@ -24,6 +24,15 @@
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div class="flex gap-2 items-center justify-between max-w-6xl mx-auto pr-10">
               <h2 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">消息流</h2>
+              <!-- New message -->
+              <button @click="openCreateDialog"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-[var(--radius-sm)] bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)] transition-colors"
+                title="新建消息">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                新建
+              </button>
               <!-- Refresh -->
               <button @click="resetAndFetch()" :disabled="loading"
                 class="p-1.5 rounded-[var(--radius-sm)] transition-colors text-[var(--text-muted)] hover:text-[var(--color-primary-600)] hover:bg-[var(--bg-secondary)] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -217,12 +226,6 @@
             回到最新
           </button>
         </div>
-
-        <!-- Bottom Input Bar -->
-        <div class="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-t border-[var(--border-color)] mb-20 md:mb-0">
-          <MessageComposeInline :all-tags="tags" :tag-id="selectedTagId ?? null"
-            :actor-id="selectedActorId ?? undefined" :issue-id="selectedIssueId ?? undefined" @created="onDialogCreated" />
-        </div>
       </div>
 
       <!-- Right Tag Media Panel (常驻) -->
@@ -232,8 +235,9 @@
       <MessageComposeDialog :visible="dialogVisible" :mode="dialogMode" :message-id="dialogMessageId"
         :initial-text="dialogInitialText" :initial-date="dialogInitialDate" :initial-media="dialogInitialMedia"
         :initial-tags="dialogInitialTags"
-        :all-tags="tags" :tag-id="selectedTagId ?? null" :actor-id="selectedActorId ?? undefined" @close="dialogVisible = false"
-        @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" />
+        :all-tags="tags" :tag-id="selectedTagId ?? null" :actor-id="selectedActorId ?? undefined"
+        :issue-id="selectedIssueId ?? undefined" @close="dialogVisible = false"
+        @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" @tag-created="fetchTags" />
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
         :starred="previewMessageStarred" :message-id="previewMessageId" :all-tags="tags"
@@ -264,7 +268,6 @@ import MessageGridCard from '../components/MessageGridCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import SearchInput from '../components/SearchInput.vue'
 import MessageComposeDialog from '../components/MessageComposeDialog.vue'
-import MessageComposeInline from '../components/MessageComposeInline.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
 import IssuePinnedBanner from '../components/IssuePinnedBanner.vue'
 import TagMediaPanel from '../components/TagMediaPanel.vue'
@@ -744,6 +747,16 @@ const dialogInitialText = ref('')
 const dialogInitialDate = ref('')
 const dialogInitialMedia = ref<MessageMediaItem[]>([])
 const dialogInitialTags = ref<{ id: number; name: string }[]>([])
+
+const openCreateDialog = () => {
+  dialogMode.value = 'create'
+  dialogMessageId.value = undefined
+  dialogInitialText.value = ''
+  dialogInitialDate.value = ''
+  dialogInitialMedia.value = []
+  dialogInitialTags.value = []
+  dialogVisible.value = true
+}
 
 const openEditDialog = (messageId: number) => {
   const msg = messages.value.find(m => m.id === messageId)
