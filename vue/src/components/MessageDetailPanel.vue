@@ -28,14 +28,35 @@
     <template v-else-if="message">
       <!-- Body: 左媒体 + 右信息,居中容器 -->
       <div class="flex-1 overflow-y-auto">
-        <div class="max-w-5xl mx-auto px-6 py-6 flex flex-col lg:flex-row gap-8">
-          <!-- 左:正文 + 媒体网格 -->
+        <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col lg:flex-row gap-10">
+          <!-- 左:正文 + 媒体 -->
           <div class="flex-1 min-w-0 space-y-6">
             <div v-if="message.text"
-              class="markdown-body text-sm text-[var(--text-primary)] leading-relaxed"
+              class="markdown-body text-[15px] text-[var(--text-primary)] leading-relaxed"
               v-html="renderMarkdown(message.text)"></div>
 
-            <div v-if="mediaItems.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <!-- 单媒体:大图铺满,保留原始比例 -->
+            <div v-if="mediaItems.length === 1"
+              class="relative overflow-hidden rounded-[var(--radius-lg)] bg-[var(--bg-secondary)] cursor-pointer group flex items-center justify-center"
+              @click="emit('media-click', 0)">
+              <img :src="resolveThumb(mediaItems[0])" alt="Media"
+                class="max-w-full max-h-[70vh] object-contain transition-transform duration-200 group-hover:scale-[1.01]" />
+              <div v-if="isVideo(mediaItems[0].mime_type)"
+                class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="w-14 h-14 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/25">
+                  <svg class="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                </div>
+              </div>
+              <div v-if="mediaItems[0].duration_ms"
+                class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-0.5 rounded backdrop-blur-sm font-medium">
+                {{ formatDuration(mediaItems[0].duration_ms) }}
+              </div>
+            </div>
+
+            <!-- 多媒体:自适应网格 -->
+            <div v-else-if="mediaItems.length > 1"
+              class="grid gap-3"
+              :class="mediaItems.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'">
               <div v-for="(media, index) in mediaItems" :key="media.id"
                 class="relative overflow-hidden rounded-[var(--radius-md)] bg-[var(--bg-secondary)] cursor-pointer group aspect-square"
                 @click="emit('media-click', index)">
@@ -56,10 +77,10 @@
           </div>
 
           <!-- 右:标签 + 基本信息 -->
-          <div class="w-full lg:w-72 shrink-0 space-y-6">
+          <div class="w-full lg:w-72 shrink-0 lg:sticky lg:top-0 lg:self-start space-y-6">
             <!-- 标签 -->
-            <div>
-              <div class="flex items-center justify-between mb-2">
+            <div class="rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-secondary)]/40 p-4">
+              <div class="flex items-center justify-between mb-3">
                 <h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">标签</h4>
                 <TagPickerPopover v-if="allTags.length" :all-tags="allTags" :message-tags="message.tags || []"
                   @select="addTag" />
@@ -75,28 +96,28 @@
             </div>
 
             <!-- 基本信息 -->
-            <div>
-              <h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">基本信息</h4>
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-[var(--text-muted)]">ID</span>
+            <div class="rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-secondary)]/40 p-4">
+              <h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">基本信息</h4>
+              <div class="space-y-2.5 text-sm">
+                <div class="flex justify-between gap-3">
+                  <span class="text-[var(--text-muted)] shrink-0">ID</span>
                   <span class="text-[var(--text-primary)]">{{ message.id }}</span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-[var(--text-muted)]">媒体数量</span>
+                <div class="flex justify-between gap-3">
+                  <span class="text-[var(--text-muted)] shrink-0">媒体数量</span>
                   <span class="text-[var(--text-primary)]">{{ mediaItems.length }}</span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-[var(--text-muted)]">收藏</span>
+                <div class="flex justify-between gap-3">
+                  <span class="text-[var(--text-muted)] shrink-0">收藏</span>
                   <span class="text-[var(--text-primary)]">{{ message.starred ? '是' : '否' }}</span>
                 </div>
-                <div v-if="message.issue_title" class="flex justify-between">
-                  <span class="text-[var(--text-muted)]">Issue</span>
-                  <span class="text-[var(--text-primary)] truncate ml-3">{{ message.issue_title }}</span>
+                <div v-if="message.issue_title" class="flex justify-between gap-3">
+                  <span class="text-[var(--text-muted)] shrink-0">Issue</span>
+                  <span class="text-[var(--text-primary)] truncate">{{ message.issue_title }}</span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-[var(--text-muted)]">创建时间</span>
-                  <span class="text-[var(--text-primary)]">{{ formatDate(message.created_at) }}</span>
+                <div class="flex justify-between gap-3">
+                  <span class="text-[var(--text-muted)] shrink-0">创建时间</span>
+                  <span class="text-[var(--text-primary)] text-right">{{ formatDate(message.created_at) }}</span>
                 </div>
               </div>
             </div>

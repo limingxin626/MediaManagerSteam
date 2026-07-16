@@ -251,7 +251,7 @@
       </div>
 
       <!-- Message Text -->
-      <div v-if="message.text" class="mb-2 prose dark:prose-invert prose-sm max-w-none text-[var(--text-secondary)]">
+      <div v-if="message.text" class="mb-2 markdown-body markdown-body--compact text-[var(--text-secondary)]">
         <div class="line-clamp-10" v-html="renderedText"></div>
       </div>
 
