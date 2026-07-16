@@ -39,16 +39,22 @@
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'">
                 {{ mergeMode ? '取消合并' : '合并' }}
               </button>
-              <!-- Layout toggle (mosaic / grid) -->
+              <!-- Layout toggle (grid / mosaic / card 三态循环) -->
               <button @click="toggleLayout"
                 class="p-1.5 rounded-[var(--radius-sm)] transition-colors text-[var(--text-muted)] hover:text-[var(--color-primary-600)] hover:bg-[var(--bg-secondary)]"
-                :title="messageLayout === 'grid' ? '切换到拼图布局' : '切换到网格布局'">
-                <!-- grid 态显示「拼图」图标，mosaic 态显示「网格」图标：均提示点击后会切到的目标布局 -->
+                :title="layoutToggleTitle">
+                <!-- 显示当前布局图标 -->
+                <!-- grid：卡内媒体网格 -->
                 <svg v-if="messageLayout === 'grid'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h6a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
                 </svg>
-                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- mosaic：拼图 -->
+                <svg v-else-if="messageLayout === 'mosaic'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+                <!-- card：页面级卡片网格(相册) -->
+                <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z" />
                 </svg>
               </button>
               <!-- Starred filter -->
@@ -130,8 +136,21 @@
               <p class="text-xs text-[var(--text-muted)]">已经到底了</p>
             </div>
 
-            <!-- Messages Feed -->
-            <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-6xl mx-auto">
+            <!-- Card grid layout (页面级固定卡片网格) -->
+            <div v-if="messageLayout === 'card' && messages.length > 0"
+              class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-w-7xl mx-auto">
+              <div v-for="message in messages" :key="message.id"
+                :data-message-id="message.id" :data-message-date="message.created_at.substring(0, 10)"
+                class="rounded-[var(--radius-lg)] transition-shadow"
+                :class="highlightMessageId === message.id ? 'ring-2 ring-[var(--color-primary-500)]' : ''">
+                <MessageGridCard :message="message" :media-items="message.media_items" :tags="message.tags"
+                  :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
+                  @click="openDetailPanel" @toggle-select="toggleSelectMessage" />
+              </div>
+            </div>
+
+            <!-- Messages Feed (grid / mosaic 消息流) -->
+            <div v-else-if="messages.length > 0" class="flex flex-col gap-4 max-w-6xl mx-auto">
               <template v-for="(message, idx) in messages" :key="message.id">
                 <!-- Date separator -->
                 <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1]?.created_at ?? '')"
@@ -142,7 +161,7 @@
                   class="rounded-xl transition-shadow"
                   :class="highlightMessageId === message.id ? 'ring-2 ring-[var(--color-primary-500)]' : ''">
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
-                    :all-tags="tags" :layout="messageLayout"
+                    :all-tags="tags" :layout="messageLayout === 'mosaic' ? 'mosaic' : 'grid'"
                     :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
                     @click="openDetailPanel"
                     @media-click="(index) => handleMediaClick(message.id, index)"
@@ -240,6 +259,7 @@ import { Calendar } from 'v-calendar'
 import 'v-calendar/style.css'
 import { type Actor, type Issue, type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
+import MessageGridCard from '../components/MessageGridCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import SearchInput from '../components/SearchInput.vue'
 import MessageComposeDialog from '../components/MessageComposeDialog.vue'
@@ -267,6 +287,15 @@ const { confirm } = useConfirm()
 const { theme } = useTheme()
 const isDark = computed(() => theme.value === 'dark')
 const { layout: messageLayout, toggleLayout, initLayout } = useMessageLayout()
+
+// toggle 循环 grid → mosaic → card，title 提示下一个目标布局
+const layoutToggleTitle = computed(() => {
+  switch (messageLayout.value) {
+    case 'grid': return '切换到拼图布局'
+    case 'mosaic': return '切换到卡片网格'
+    default: return '切换到网格布局'
+  }
+})
 
 // --- Calendar date jump ---
 const calendarOpen = ref(false)
