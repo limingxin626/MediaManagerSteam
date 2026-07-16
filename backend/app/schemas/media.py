@@ -31,6 +31,8 @@ class MediaResponse(MediaUrlMixin, TimestampMixin):
     has_audio: int | None = None
     fps: float | None = None
     bitrate: int | None = None
+    # 仅 /media/feed 填充：该 media 来源 MessageMedia 所属的 message id（用于「跳转到消息」）
+    source_message_id: int | None = None
 
 
 class MediaDetailResponse(MediaResponse):

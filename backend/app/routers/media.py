@@ -269,7 +269,11 @@ def get_media_feed(
 
     next_cursor = str(rows[-1][1].id) if has_more and rows else None
 
-    result = [MediaResponse.model_validate(media) for media, _ in rows]
+    result = []
+    for media, mm in rows:
+        item = MediaResponse.model_validate(media)
+        item.source_message_id = mm.message_id
+        result.append(item)
 
     return MediaCursorResponse(
         items=result,

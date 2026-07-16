@@ -9,6 +9,7 @@ export type MessageMediaItem = components['schemas']['MessageMediaItem'] & {
   repo_id?: string
   local_file_path?: string
   local_thumb_path?: string
+  source_message_id?: number | null
 }
 type _Message = components['schemas']['MessageResponse']
 type _MessageDetail = components['schemas']['MessageDetailResponse']
