@@ -26,11 +26,11 @@ Key env vars:
 
 **配置来源 / 切 instance**:`app/config.py` 在 import 时 `load_dotenv(backend/.env, override=False)`,优先级 高→低 = 真实环境变量 / `python api.py --data-root <path>` > `backend/.env`。因为 `app.models → app.config`,**所有**走 `from app.*` 的入口(api.py / alembic / `scripts/*` 如 import_bilibili)都自动跟随同一份 `.env`,无需各自配。一个 instance == 一个 `DATA_ROOT`(各自独立的 db/repositories.json/thumbs);日常切 instance 只改 `backend/.env` 里 `DATA_ROOT` 那行(注释切换)再重启。`backend/.env` 已 gitignored,模板见 `backend/.env.example`(复制即用)。`DB_NAME` 已废弃。
 
-Routers (registered via `backend/app/routers/__init__.py:all_routers`): `actor`, `message`, `media`, `files`, `tags`, `sync`, `admin`, `dashboard`, `todos`.
+Routers (registered via `backend/app/routers/__init__.py:all_routers`): `collection`, `person`, `message`, `media`, `files`, `tags`, `sync`, `admin`, `dashboard`, `todos`.
 
 Services:
 - `media_service.py` — file hashing (Blake2b), deduplication, ffprobe info extraction, thumbnail generation. `process_file()` returns `{"media": Media, "is_new": bool}` — calls `db.flush()` (not commit) to get IDs; router commits. **Video cover sidecar 通用约定**:视频 `foo.mp4` 同目录如果有 `foo.cover.{jpg,jpeg,png,webp}`(case-insensitive),会被自动用作 thumb,优先于 ffmpeg 抽帧;失败时 fallback 抽帧。这是后端的通用接口 —— 任何批量导入(bilibili / youtube / 本地相册 / …)只要把 cover 放在视频旁边即可,无需写脚本覆盖缩略图。见 `_find_video_cover_sidecar`。
-- `message_service.py` — `#hashtag` auto-extraction (regex `#[\w\u4e00-\u9fff]+`) from message text. Web/HTTP path uses full replacement (`merge=False`); sync-apply path from Android uses `merge=True` to preserve manually-added tags. Also handles media position reordering.
+- `message_service.py` — tags are set explicitly via `tag_ids` on create/update; no auto-extraction from text. Also handles media position reordering.
 - `base.py` — static CRUD methods (`get_all`, `get_by_id`, `create`, `update`, `delete`) accepting SQLAlchemy model type.
 
 DB session: `get_db()` generator in `models/__init__.py`, injected via `Depends(get_db)`. Configured with `autocommit=False`, `autoflush=False`.
@@ -43,7 +43,7 @@ Single-user LAN-only model — no LWW conflict resolution, no SSE.
 
 - **Pull**: `GET /sync/changes?since=<ISO>&since_id=<int>` — incremental from `SyncLog`. Composite cursor `(timestamp, id)` to avoid same-millisecond skips. Same-page dedup keeps DELETE over later UPSERT. Returns 410 if `since` exceeds `SYNC_LOG_RETENTION_DAYS=365`.
 - **Push**: `POST /api/sync/apply` — Android Outbox batches mutations; backend applies all in a single transaction, rolls back on any failure. Upserts unconditionally overwrite (no `updated_at` comparison).
-- **SyncLog tracking**: `services/sync_log_service.py` registers SQLAlchemy `after_flush` listener to record `Message`/`Actor`/`Media`/`Tag` mutations. `Message.tags` / `Media.tags` collection events bump host `updated_at` so tag-association changes show up in SyncLog.
+- **SyncLog tracking**: `services/sync_log_service.py` registers SQLAlchemy `after_flush` listener to record `Message`/`Collection`/`Media`/`Tag`/`Person` mutations. `Message.tags` / `Media.tags` / `Media.people` collection events bump host `updated_at` so association changes show up in SyncLog.
 
 ### Pagination
 
@@ -64,7 +64,7 @@ Key composables:
 
 API base URL hardcoded in `vue/src/utils/constants.ts` pointing to `http://127.0.0.1:8002`.
 
-Routes: `/` (Message feed), `/media` (grid), `/actor` (list), `404` catch-all. All views use `<keep-alive>` caching.
+Routes: `/` (Message feed), `/media` (grid), `/collection` (list), `/people` (人物), `404` catch-all. All views use `<keep-alive>` caching.
 
 UI: Tailwind v4 (Vite plugin), HeadlessUI, Vidstack (video player), v-calendar. Mobile-first responsive (sidebar hidden on mobile, bottom nav shown). Dark purple gradient background.
 
@@ -79,7 +79,7 @@ Media path/URL fields (filled by `MediaUrlMixin._fill_urls` in `app/schemas/base
 | `file_url`        | 相对 URL `/{repo_id}/{file_path}`            | Android(拼 baseUrl) |
 | `thumb_url`       | 相对 URL `/data/thumbs/{id}.webp`            | Android(拼 baseUrl) |
 
-URL 都是**相对**的 —— 客户端用自己 sync 时配的 backend baseUrl 拼绝对 URL,这样换网段/host 不会有缓存污染。`/data` URL 前缀通过 StaticFiles 直接挂到 `DATA_ROOT` 根(所以 `/data/thumbs/x.webp` 物理对应 `DATA_ROOT/thumbs/x.webp`)。Actor 头像同步:`avatar_url` → `/data/actor_cover/{id}.webp`。
+URL 都是**相对**的 —— 客户端用自己 sync 时配的 backend baseUrl 拼绝对 URL,这样换网段/host 不会有缓存污染。`/data` URL 前缀通过 StaticFiles 直接挂到 `DATA_ROOT` 根(所以 `/data/thumbs/x.webp` 物理对应 `DATA_ROOT/thumbs/x.webp`)。Collection 封面:`cover_url` → `/data/collection_cover/{id}.webp`;Person 封面:`cover_url` → `/data/person_cover/{id}.webp`。
 
 ### Electron
 
@@ -101,7 +101,9 @@ SwiftUI app with **direct read-only access** to the shared SQLite database via G
 
 ### Database Models
 
-`Message` → `MessageMedia` (junction with position) → `Media` (deduplicated by file_hash). `Tag` linked to Message via `message_tag`, to Media via `media_tag`. `Actor` linked to Message via FK. `starred` fields use Integer 0|1 (not boolean) for SQLite compatibility.
+`Message` → `MessageMedia` (junction with position) → `Media` (deduplicated by file_hash). `Tag` linked to Message via `message_tag`, to Media via `media_tag`. `Person` linked to Media via `media_person` (many-to-many, 类似 Mac 相册人物). `Collection`(原 Actor)linked to Message via FK (one-to-many). `starred` fields use Integer 0|1 (not boolean) for SQLite compatibility.
+
+> **Mac (`MyNote/`) / Android (`android/`) 尚未跟进本次 actor→collection 重命名 + people** —— 它们各有独立 schema 副本,不会因后端表名改动而立即编译报错,但同步/直读到旧 `actor` 表/`actor_id` 列会失效,需单独任务适配(`collection` 表、`message.collection_id`、`person`/`media_person`)。
 
 Video chapter/preview fields on `Media`: `video_media_id` (self-FK to parent video), `frame_ms`, `start_ms`, `end_ms` — child rows represent extracted frames or chapter clips of a parent video.
 
@@ -152,7 +154,7 @@ npm run build             # electron-builder, packages backend + vue dist
 - Media files are deduplicated by Blake2b hash; files >100MB use file size as hash
 - Thumbnails stored as WebP in `{DATA_ROOT}/thumbs/{media_id}.webp`
 - Uploads auto-organized by date: `{DATA_ROOT}/uploads/YYYY/MM/DD/`
-- `#hashtag` text in messages is auto-parsed into Tag records on create/update (full replacement, orphan tags not auto-deleted)
+- Message tags are set explicitly via `tag_ids` on create/update — no `#hashtag` auto-parsing (orphan tags not auto-deleted)
 - Services call `db.flush()` for intermediate IDs; routers call `db.commit()` once at the end
 - Backend query patterns avoid N+1: bulk media counts via grouped subquery, tag counts via `outerjoin` + `group_by`
 - Electron detection in frontend: `navigator.userAgent.indexOf('Electron')`

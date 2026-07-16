@@ -59,7 +59,7 @@ def _parse_cursor(cursor: Optional[str]) -> Optional[datetime]:
 
 def _build_detail_query(
     db: Session,
-    actor_id: Optional[int],
+    collection_id: Optional[int],
     query_text: Optional[str],
     media_id: Optional[int],
     tag_id: Optional[int],
@@ -68,11 +68,11 @@ def _build_detail_query(
 ):
     """공통 필터만 적용한 Message 쿼리를 반환 (정렬·커서 없음)."""
     query = db.query(Message)
-    if actor_id is not None:
-        if actor_id == 0:
-            query = query.filter(Message.actor_id.is_(None))
+    if collection_id is not None:
+        if collection_id == 0:
+            query = query.filter(Message.collection_id.is_(None))
         else:
-            query = query.filter(Message.actor_id == actor_id)
+            query = query.filter(Message.collection_id == collection_id)
     if issue_id is not None:
         if issue_id == 0:
             query = query.filter(Message.issue_id.is_(None))
@@ -98,7 +98,7 @@ def _build_detail_query(
 
 def _build_message_query(
     db: Session,
-    actor_id: Optional[int],
+    collection_id: Optional[int],
     query_text: Optional[str],
     media_id: Optional[int],
     tag_id: Optional[int],
@@ -108,7 +108,7 @@ def _build_message_query(
     issue_id: Optional[int] = None,
 ):
     """공통 필터·정렬을 적용한 Message 쿼리를 반환한다。"""
-    query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred, issue_id)
+    query = _build_detail_query(db, collection_id, query_text, media_id, tag_id, starred, issue_id)
     if cursor_time:
         if inclusive:
             query = query.filter(Message.created_at <= cursor_time)
@@ -176,13 +176,13 @@ def _build_detail_response(
     else:
         media_items = _media_items_for(db, msg.id, limit=media_limit)
     tags = _aggregate_tags(msg)
-    actor_name = msg.actor.name if msg.actor else None
+    collection_name = msg.collection.name if msg.collection else None
     issue_title = msg.issue.title if msg.issue else None
     return MessageDetailResponse(
         id=msg.id,
         text=msg.text,
-        actor_id=msg.actor_id,
-        actor_name=actor_name,
+        collection_id=msg.collection_id,
+        collection_name=collection_name,
         issue_id=msg.issue_id,
         issue_title=issue_title,
         media_count=len(media_items),
@@ -217,8 +217,8 @@ def _build_sync_response(db: Session, db_message: Message) -> MessageSyncRespons
     return MessageSyncResponse(
         id=db_message.id,
         text=db_message.text,
-        actor_id=db_message.actor_id,
-        actor_name=db_message.actor.name if db_message.actor else None,
+        collection_id=db_message.collection_id,
+        collection_name=db_message.collection.name if db_message.collection else None,
         issue_id=db_message.issue_id,
         issue_title=db_message.issue.title if db_message.issue else None,
         starred=bool(db_message.starred),
@@ -238,14 +238,14 @@ def _build_sync_response(db: Session, db_message: Message) -> MessageSyncRespons
 def get_messages(
     cursor: Optional[str] = Query(None, description="游标，ISO 格式的 created_at"),
     limit: int = Query(20, ge=1, le=100),
-    actor_id: Optional[int] = None,
+    collection_id: Optional[int] = None,
     issue_id: Optional[int] = None,
     starred: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
 ):
     """获取消息列表（游标分页）"""
     cursor_time = _parse_cursor(cursor)
-    query = _build_message_query(db, actor_id, None, None, None, cursor_time, starred=starred, issue_id=issue_id)
+    query = _build_message_query(db, collection_id, None, None, None, cursor_time, starred=starred, issue_id=issue_id)
     items, has_more, next_cursor = _paginate(query, limit)
 
     # 批量查 media_count，避免 N+1
@@ -261,8 +261,8 @@ def get_messages(
         MessageResponse(
             id=msg.id,
             text=msg.text,
-            actor_id=msg.actor_id,
-            actor_name=msg.actor.name if msg.actor else None,
+            collection_id=msg.collection_id,
+            collection_name=msg.collection.name if msg.collection else None,
             issue_id=msg.issue_id,
             issue_title=msg.issue.title if msg.issue else None,
             media_count=counts.get(msg.id, 0),
@@ -279,7 +279,7 @@ def get_messages(
 def get_message_dates(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
-    actor_id: Optional[int] = None,
+    collection_id: Optional[int] = None,
     issue_id: Optional[int] = None,
     query_text: Optional[str] = Query(None),
     media_id: Optional[int] = Query(None),
@@ -290,11 +290,11 @@ def get_message_dates(
     date_label = func.strftime('%Y-%m-%d', Message.created_at).label('date_str')
     query = db.query(date_label, func.count().label('cnt'))
 
-    if actor_id is not None:
-        if actor_id == 0:
-            query = query.filter(Message.actor_id.is_(None))
+    if collection_id is not None:
+        if collection_id == 0:
+            query = query.filter(Message.collection_id.is_(None))
         else:
-            query = query.filter(Message.actor_id == actor_id)
+            query = query.filter(Message.collection_id == collection_id)
     if issue_id is not None:
         if issue_id == 0:
             query = query.filter(Message.issue_id.is_(None))
@@ -351,8 +351,8 @@ def sync_messages(db: Session = Depends(get_db)):
         results.append(MessageSyncResponse(
             id=msg.id,
             text=msg.text,
-            actor_id=msg.actor_id,
-            actor_name=msg.actor.name if msg.actor else None,
+            collection_id=msg.collection_id,
+            collection_name=msg.collection.name if msg.collection else None,
             media_count=len(media_items),
             issue_id=msg.issue_id,
             issue_title=msg.issue.title if msg.issue else None,
@@ -371,7 +371,7 @@ def get_messages_with_detail(
     direction: Optional[str] = Query(None, description="分页方向: 'forward' 加载更新的消息（cursor 之后）"),
     inclusive: bool = Query(False, description="是否包含 cursor 本身（用 <= / >= 而非 < / >），用于位置恢复"),
     limit: int = Query(20, ge=1, le=100),
-    actor_id: Optional[int] = None,
+    collection_id: Optional[int] = None,
     issue_id: Optional[int] = None,
     query_text: Optional[str] = Query(None, description="搜索文本，匹配 message.text"),
     media_id: Optional[int] = Query(None, description="媒体 ID，查询包含该媒体的所有消息"),
@@ -384,13 +384,13 @@ def get_messages_with_detail(
     if direction == "forward" and cursor:
         pivot = _parse_cursor(cursor)
         op = Message.created_at >= pivot if inclusive else Message.created_at > pivot
-        query = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred, issue_id)
+        query = _build_detail_query(db, collection_id, query_text, media_id, tag_id, starred, issue_id)
         query = query.filter(op).order_by(Message.created_at.asc())
         rows = query.limit(limit + 1).all()
         has_more = len(rows) > limit
         items = rows[:limit]
 
-        base = _build_detail_query(db, actor_id, query_text, media_id, tag_id, starred, issue_id)
+        base = _build_detail_query(db, collection_id, query_text, media_id, tag_id, starred, issue_id)
         has_more_before = base.filter(Message.created_at < pivot).first() is not None
 
         ids = [m.id for m in items]
@@ -406,7 +406,7 @@ def get_messages_with_detail(
 
     # 默认：向后（desc）分页
     cursor_time = _parse_cursor(cursor)
-    query = _build_message_query(db, actor_id, query_text, media_id, tag_id, cursor_time, starred=starred, inclusive=inclusive, issue_id=issue_id)
+    query = _build_message_query(db, collection_id, query_text, media_id, tag_id, cursor_time, starred=starred, inclusive=inclusive, issue_id=issue_id)
     items, has_more, next_cursor = _paginate(query, limit)
 
     ids = [m.id for m in items]
@@ -430,7 +430,7 @@ def _escape_fts_query(q: str) -> str:
 def _execute_like_search(
     db: Session,
     like_q: str,
-    actor_id: Optional[int],
+    collection_id: Optional[int],
     issue_id: Optional[int],
     tag_id: Optional[int],
     starred: Optional[bool],
@@ -444,12 +444,12 @@ def _execute_like_search(
     params: dict = {"pat": f"%{like_q}%", "limit": limit + 1}
     where = ["m.text LIKE :pat"]
 
-    if actor_id is not None:
-        if actor_id == 0:
-            where.append("m.actor_id IS NULL")
+    if collection_id is not None:
+        if collection_id == 0:
+            where.append("m.collection_id IS NULL")
         else:
-            where.append("m.actor_id = :actor_id")
-            params["actor_id"] = actor_id
+            where.append("m.collection_id = :collection_id")
+            params["collection_id"] = collection_id
     if issue_id is not None:
         if issue_id == 0:
             where.append("m.issue_id IS NULL")
@@ -472,7 +472,7 @@ def _execute_like_search(
     sql = sql_text(f"""
         SELECT m.id AS id,
                m.created_at AS created_at,
-               m.actor_id AS actor_id,
+               m.collection_id AS collection_id,
                m.issue_id AS issue_id,
                m.starred AS starred,
                0.0 AS rank,
@@ -505,7 +505,7 @@ def _execute_like_search(
         def __init__(self, r):
             self.id = r.id
             self.created_at = r.created_at
-            self.actor_id = r.actor_id
+            self.collection_id = r.collection_id
             self.issue_id = r.issue_id
             self.starred = r.starred
             self.rank = r.rank
@@ -517,7 +517,7 @@ def _execute_like_search(
 def _execute_fts_search(
     db: Session,
     match_q: str,
-    actor_id: Optional[int],
+    collection_id: Optional[int],
     issue_id: Optional[int],
     tag_id: Optional[int],
     starred: Optional[bool],
@@ -530,12 +530,12 @@ def _execute_fts_search(
     params: dict = {"q": match_q, "limit": limit + 1}
     where = ["message_fts MATCH :q"]
 
-    if actor_id is not None:
-        if actor_id == 0:
-            where.append("m.actor_id IS NULL")
+    if collection_id is not None:
+        if collection_id == 0:
+            where.append("m.collection_id IS NULL")
         else:
-            where.append("m.actor_id = :actor_id")
-            params["actor_id"] = actor_id
+            where.append("m.collection_id = :collection_id")
+            params["collection_id"] = collection_id
     if issue_id is not None:
         if issue_id == 0:
             where.append("m.issue_id IS NULL")
@@ -562,7 +562,7 @@ def _execute_fts_search(
     sql = sql_text(f"""
         SELECT m.id AS id,
                m.created_at AS created_at,
-               m.actor_id AS actor_id,
+               m.collection_id AS collection_id,
                m.issue_id AS issue_id,
                m.starred AS starred,
                bm25(message_fts) AS rank,
@@ -579,7 +579,7 @@ def _execute_fts_search(
 @router.get("/search", response_model=MessageSearchCursorResponse)
 def search_messages_fts(
     q: str = Query(..., min_length=1, description="搜索关键词（FTS5），多词之间隐式 AND"),
-    actor_id: Optional[int] = Query(None),
+    collection_id: Optional[int] = Query(None),
     issue_id: Optional[int] = Query(None),
     tag_id: Optional[int] = Query(None),
     starred: Optional[bool] = Query(None),
@@ -603,7 +603,7 @@ def search_messages_fts(
             raise HTTPException(status_code=400, detail="Invalid cursor format")
 
     rows = _execute_fts_search(
-        db, match_q, actor_id, issue_id, tag_id, starred, limit, cursor_rank, cursor_id
+        db, match_q, collection_id, issue_id, tag_id, starred, limit, cursor_rank, cursor_id
     )
 
     # 中文 fallback：unicode61 把连续中文当一个 token，搜「工作」这种总粘在
@@ -613,7 +613,7 @@ def search_messages_fts(
         like_q = "".join(q.replace('"', ' ').split())
         if like_q:
             rows = _execute_like_search(
-                db, like_q, actor_id, issue_id, tag_id, starred, limit
+                db, like_q, collection_id, issue_id, tag_id, starred, limit
             )
             used_fallback = True
 
@@ -641,8 +641,8 @@ def search_messages_fts(
             id=r.id,
             created_at=msg.created_at.isoformat(),
             snippet=r.snippet or "",
-            actor_id=r.actor_id,
-            actor_name=msg.actor.name if msg.actor else None,
+            collection_id=r.collection_id,
+            collection_name=msg.collection.name if msg.collection else None,
             issue_id=r.issue_id,
             issue_title=msg.issue.title if msg.issue else None,
             tags=tag_names,
@@ -682,7 +682,7 @@ def create_message(
     db_message = create_message_service(
         db,
         text=message_data.text,
-        actor_id=message_data.actor_id,
+        collection_id=message_data.collection_id,
         files=message_data.files,
         tag_ids=message_data.tag_ids,
         issue_id=message_data.issue_id,
@@ -710,7 +710,7 @@ def create_message_from_client(
     db_message = create_message_service(
         db,
         text=message_data.text,
-        actor_id=message_data.actor_id,
+        collection_id=message_data.collection_id,
         files=[cf.file_path for cf in message_data.files],
         tag_ids=None,
         created_at=created_at,
@@ -730,7 +730,7 @@ def update_message(
     update_data: MessageUpdate,
     db: Session = Depends(get_db),
 ):
-    """更新消息：文字、actor、媒体顺序"""
+    """更新消息：文字、collection、媒体顺序"""
     created_at = None
     if update_data.created_at is not None:
         try:
@@ -743,7 +743,7 @@ def update_message(
             db,
             message_id=message_id,
             text=update_data.text,
-            actor_id=update_data.actor_id,
+            collection_id=update_data.collection_id,
             issue_id=update_data.issue_id,
             starred=update_data.starred,
             created_at=created_at,
@@ -790,7 +790,7 @@ def split_message(
     split_data: MessageSplit,
     db: Session = Depends(get_db),
 ):
-    """拆分消息：将选中的媒体移动到新消息中，复制 text/actor/starred/tags。"""
+    """拆分消息：将选中的媒体移动到新消息中，复制 text/collection/starred/tags。"""
     try:
         new_msg = split_message_service(
             db,

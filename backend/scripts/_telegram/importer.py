@@ -177,7 +177,7 @@ def _import_album(db: Session, group: list[Message], stats: CycleStats) -> bool:
         msg_row = create_message_with_files(
             db,
             text=caption,
-            actor_id=None,
+            collection_id=None,
             files=files,
             tag_ids=[_get_telegram_tag_id(db)],
             created_at=group[0].date,
@@ -218,7 +218,7 @@ def _import_standalone(db: Session, msg: Message, stats: CycleStats) -> None:
     msg_row = create_message_with_files(
         db,
         text=msg.message or msg.text or None,
-        actor_id=None,
+        collection_id=None,
         files=files,
         tag_ids=[_get_telegram_tag_id(db)],
         created_at=msg.date,

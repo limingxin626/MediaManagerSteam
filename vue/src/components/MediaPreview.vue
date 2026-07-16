@@ -218,6 +218,44 @@
                 @select="addMediaTag"
               />
             </div>
+
+            <!-- Media people (标注人物) -->
+            <div v-if="currentItem && !minimal" class="flex items-center gap-1.5 flex-wrap justify-center">
+              <span
+                v-for="person in (currentItem.people || [])"
+                :key="'p-' + person.id"
+                @click.stop="removeMediaPerson(person.id)"
+                class="px-2 py-0.5 text-xs rounded-full bg-emerald-500/20 text-emerald-200 hover:bg-red-500/40 hover:line-through cursor-pointer transition-colors"
+              >
+                @{{ person.name }}
+              </span>
+              <div class="relative">
+                <button
+                  @click.stop="togglePeoplePicker"
+                  class="px-2 py-0.5 text-xs rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-colors"
+                >
+                  + 标注人物
+                </button>
+                <div
+                  v-if="peoplePickerOpen"
+                  class="absolute z-[110] bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 max-h-60 overflow-y-auto rounded-lg bg-gray-900 border border-white/10 shadow-xl p-1"
+                  @click.stop
+                >
+                  <div v-if="!allPeople.length" class="px-2 py-2 text-xs text-white/50 text-center">暂无人物</div>
+                  <button
+                    v-for="person in allPeople"
+                    :key="person.id"
+                    @click="toggleMediaPerson(person.id)"
+                    class="w-full flex items-center justify-between px-2 py-1.5 text-xs rounded text-left text-white/80 hover:bg-white/10 transition-colors"
+                  >
+                    <span class="truncate">{{ person.name }}</span>
+                    <svg v-if="(currentItem.people || []).some(p => p.id === person.id)" class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Next button (right) -->
@@ -328,7 +366,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import type { MessageMediaItem, TagWithCount, TagItem, Media } from '../types'
+import type { MessageMediaItem, TagWithCount, TagItem, Media, Person, MediaPersonItem } from '../types'
 import { isVideo, isImage, resolveThumb, resolveMediaUrl, rotateMedia } from '../utils/media'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
@@ -580,6 +618,53 @@ async function removeMediaTag(tagId: number) {
   }
 }
 
+// --- People tagging (标注人物) ---
+const allPeople = ref<Person[]>([])
+const peoplePickerOpen = ref(false)
+
+async function fetchPeople() {
+  try {
+    allPeople.value = await api.get<Person[]>('/people')
+  } catch {
+    // silent
+  }
+}
+
+function togglePeoplePicker() {
+  peoplePickerOpen.value = !peoplePickerOpen.value
+  if (peoplePickerOpen.value && !allPeople.value.length) fetchPeople()
+}
+
+async function setMediaPeople(personIds: number[]) {
+  if (!currentItem.value) return
+  const mediaId = currentItem.value.id
+  try {
+    await api.put(`/media/${mediaId}/people`, { person_ids: personIds })
+    const next: MediaPersonItem[] = personIds.map(id => {
+      const found = allPeople.value.find(p => p.id === id)
+      return { id, name: found?.name ?? '' }
+    })
+    currentItem.value.people = next
+  } catch {
+    toast.error('更新人物标注失败')
+  }
+}
+
+function toggleMediaPerson(personId: number) {
+  if (!currentItem.value) return
+  const current = (currentItem.value.people || []).map(p => p.id)
+  const next = current.includes(personId)
+    ? current.filter(id => id !== personId)
+    : [...current, personId]
+  setMediaPeople(next)
+}
+
+function removeMediaPerson(personId: number) {
+  if (!currentItem.value) return
+  const next = (currentItem.value.people || []).map(p => p.id).filter(id => id !== personId)
+  setMediaPeople(next)
+}
+
 const mediaTransformStyle = computed(() => {
   if (rotationDegrees.value === 0) return {}
   const isSwapped = rotationDegrees.value === 90 || rotationDegrees.value === 270
@@ -716,6 +801,8 @@ const handleKeydown = (e: KeyboardEvent) => {
   
   switch (e.key) {
     case 'Escape':
+      // 阻止同在 window 上监听的详情面板 handler 也触发,避免 Esc 连详情一起关掉
+      e.stopImmediatePropagation()
       close()
       break
     case 'ArrowLeft':
@@ -757,6 +844,7 @@ watch(() => props.isOpen, async (newValue) => {
 
 watch(currentIndex, async () => {
   rotationDegrees.value = 0
+  peoplePickerOpen.value = false
   await nextTick()
   if (videoRef.value) {
     videoRef.value.play().catch(() => {})

@@ -25,8 +25,8 @@ const messageDef: TableDef = {
   columns: [
     { key: 'id', label: 'ID', type: 'number' },
     { key: 'text', label: '文本', type: 'text', editable: true, truncate: 80 },
-    { key: 'actor_id', label: 'Actor ID', type: 'number' },
-    { key: 'actor_name', label: '演员', type: 'string' },
+    { key: 'collection_id', label: 'Collection ID', type: 'number' },
+    { key: 'collection_name', label: '合集', type: 'string' },
     { key: 'media_count', label: '媒体数', type: 'number' },
     { key: 'starred', label: '收藏', type: 'number', editable: true },
     { key: 'created_at', label: '创建时间', type: 'datetime' },
@@ -60,9 +60,9 @@ const mediaDef: TableDef = {
   apiDelete: undefined,
 }
 
-const actorDef: TableDef = {
-  name: 'actor',
-  label: 'Actor',
+const collectionDef: TableDef = {
+  name: 'collection',
+  label: 'Collection',
   columns: [
     { key: 'id', label: 'ID', type: 'number' },
     { key: 'name', label: '名称', type: 'string', editable: true },
@@ -72,12 +72,32 @@ const actorDef: TableDef = {
     { key: 'updated_at', label: '更新时间', type: 'datetime' },
   ],
   apiList: ({ search }) =>
-    // Actor API 不分页，包装为 CursorResponse
-    api.get<Record<string, unknown>[]>('/actors', { name: search || undefined }).then(items => ({
+    // Collection API 返回 { items, no_collection_count }，包装为 CursorResponse
+    api.get<{ items: Record<string, unknown>[] }>('/collections', { name: search || undefined }).then(res => ({
+      items: res.items, next_cursor: null, has_more: false,
+    })),
+  apiUpdate: (id, data) => api.put(`/collections/${id}`, data),
+  apiDelete: (id) => api.del(`/collections/${id}`),
+}
+
+const personDef: TableDef = {
+  name: 'person',
+  label: 'Person',
+  columns: [
+    { key: 'id', label: 'ID', type: 'number' },
+    { key: 'name', label: '名称', type: 'string', editable: true },
+    { key: 'description', label: '简介', type: 'text', editable: true, truncate: 60 },
+    { key: 'media_count', label: '媒体数', type: 'number' },
+    { key: 'created_at', label: '创建时间', type: 'datetime' },
+    { key: 'updated_at', label: '更新时间', type: 'datetime' },
+  ],
+  apiList: () =>
+    // People API 返回 PersonResponse[]，包装为 CursorResponse
+    api.get<Record<string, unknown>[]>('/people').then(items => ({
       items, next_cursor: null, has_more: false,
     })),
-  apiUpdate: (id, data) => api.put(`/actors/${id}`, data),
-  apiDelete: (id) => api.del(`/actors/${id}`),
+  apiUpdate: (id, data) => api.put(`/people/${id}`, data),
+  apiDelete: (id) => api.del(`/people/${id}`),
 }
 
 const tagDef: TableDef = {
@@ -109,4 +129,4 @@ const syncLogDef: TableDef = {
     api.get<CursorResponse<Record<string, unknown>>>('/admin/sync-logs', { cursor, limit }),
 }
 
-export const tableDefs: TableDef[] = [messageDef, mediaDef, actorDef, tagDef, syncLogDef]
+export const tableDefs: TableDef[] = [messageDef, mediaDef, collectionDef, personDef, tagDef, syncLogDef]

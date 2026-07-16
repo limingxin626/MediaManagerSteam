@@ -97,7 +97,7 @@ def main():
                 # 创建 Message（时间戳使用 flomo 原始时间）
                 db_message = Message(
                     text=plain_text,
-                    actor_id=None,
+                    collection_id=None,
                     created_at=memo_dt,
                     updated_at=memo_dt,
                 )

@@ -57,7 +57,7 @@
     <div v-if="tag.tagSuggestionVisible.value && tag.tagSuggestions.value.length > 0"
       ref="tagSuggestionListEl"
       class="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[100]"
-      :style="{ top: tag.tagSuggestionPosition.value.top + 'px', left: tag.tagSuggestionPosition.value.left + 'px', transform: 'translateY(-100%)' }">
+      :style="{ top: tag.tagSuggestionPosition.value.top + 'px', left: tag.tagSuggestionPosition.value.left + 'px', transform: tag.tagSuggestionPosition.value.placement === 'above' ? 'translateY(-100%)' : 'none' }">
       <div v-for="(t, index) in tag.tagSuggestions.value" :key="t.id" @click="tag.selectTag(t)"
         class="px-3 py-2 cursor-pointer text-sm"
         :class="index === tag.tagSuggestionIndex.value ? 'bg-indigo-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
@@ -78,7 +78,7 @@ import PlainTextEditor from './PlainTextEditor.vue'
 interface Props {
   allTags?: TagItem[]
   tagId?: number | null
-  actorId?: number | null
+  collectionId?: number | null
   issueId?: number | null
 }
 
@@ -145,7 +145,7 @@ const handleSubmit = async () => {
     const result = await api.post<MessageDetail>('/messages', {
       text: text.value || null,
       files: files.value,
-      actor_id: props.actorId ?? undefined,
+      collection_id: props.collectionId ?? undefined,
       issue_id: props.issueId ?? undefined,
       tag_ids: selectedTags.value.map(t => t.id),
     })

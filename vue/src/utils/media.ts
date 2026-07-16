@@ -66,11 +66,11 @@ export function resolveMediaUrl(item: { file_url?: string | null; local_file_pat
   return ''
 }
 
-/** Resolve actor avatar to absolute path */
-export function resolveAvatar(actor: { avatar_url?: string | null; avatar_abs_path?: string | null } | null): string {
-  if (!actor) return ''
-  if (actor.avatar_abs_path) return resolveUrl(actor.avatar_abs_path)
-  if (actor.avatar_url) return resolveUrl(actor.avatar_url)
+/** Resolve collection / person cover to absolute path */
+export function resolveCover(entity: { cover_url?: string | null; cover_abs_path?: string | null } | null): string {
+  if (!entity) return ''
+  if (entity.cover_abs_path) return resolveUrl(entity.cover_abs_path)
+  if (entity.cover_url) return resolveUrl(entity.cover_url)
   return ''
 }
 

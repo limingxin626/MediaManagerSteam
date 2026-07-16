@@ -1,13 +1,13 @@
 <template>
   <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 md:hidden">
-    <nav class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-full shadow-xl border border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center gap-6">
+    <nav class="bg-[var(--bg-card)]/85 backdrop-blur-lg rounded-full shadow-[var(--shadow-md)] border border-[var(--border-color)] px-3 py-2 flex items-center gap-4">
       <button
         v-for="item in navItems"
         :key="item.path"
         @click="navigateTo(item.path)"
         :class="[
-          'flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-full transition-all',
-          isActive(item.path) ? 'bg-[var(--color-primary-500)]/15 text-[var(--color-primary-600)]' : 'text-gray-600 dark:text-gray-400 hover:text-[var(--color-primary-600)]'
+          'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-full transition-colors',
+          isActive(item.path) ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
         ]"
       >
         <svg :class="['w-5 h-5']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -40,6 +40,11 @@ const navItems = [
     path: '/media',
     label: '媒体',
     icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z'
+  },
+  {
+    path: '/people',
+    label: '人物',
+    icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'
   },
   {
     path: '/scan',

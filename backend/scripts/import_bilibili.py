@@ -2,7 +2,7 @@
 
 每个子目录 = 一条 message:
   - text = 目录名(视频标题)
-  - actor_id = None
+  - collection_id = None
   - created_at = 目录里所有 mp4 的最早 mtime(下载时间)
   - media = 目录里所有 *.mp4(按文件名排序作为 position 0/1/2…)
   - tag = bilibili(平台 tag,自动 get_or_create)
@@ -80,7 +80,7 @@ def import_one(db, folder: Path, tag_id, stats: dict, dry_run: bool) -> None:
         msg = create_message_with_files(
             db,
             text=title,
-            actor_id=None,
+            collection_id=None,
             files=mp4s,
             tag_ids=[tag_id] if tag_id is not None else None,
             created_at=created_at,

@@ -70,7 +70,7 @@ def get_message(db: Session, message_id: int) -> Optional[Message]:
 def create_message_service(
     db: Session,
     text: Optional[str],
-    actor_id: Optional[int],
+    collection_id: Optional[int],
     files: List[str],
     tag_ids: Optional[List[int]] = None,
     created_at: Optional[datetime] = None,
@@ -95,7 +95,7 @@ def create_message_service(
 
     db_message = Message(
         text=text,
-        actor_id=actor_id,
+        collection_id=collection_id,
         issue_id=issue_id,
         created_at=created_at or datetime.now(),
     )
@@ -126,7 +126,7 @@ def update_message_service(
     db: Session,
     message_id: int,
     text: Optional[str] = None,
-    actor_id: Optional[int] = None,
+    collection_id: Optional[int] = None,
     issue_id: Optional[int] = None,
     starred: Optional[bool] = None,
     created_at: Optional[datetime] = None,
@@ -153,8 +153,8 @@ def update_message_service(
         tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all() if tag_ids else []
         message.tags = tags
 
-    if actor_id is not None:
-        message.actor_id = actor_id
+    if collection_id is not None:
+        message.collection_id = collection_id
 
     if issue_id is not None:
         message.issue_id = issue_id if issue_id != 0 else None
@@ -275,7 +275,7 @@ def split_message_service(
     media_ids: List[int],
     commit: bool = True,
 ) -> Optional[Message]:
-    """把选中的 media 从 source 拆到一条新 message。继承 source 的 tag/actor/starred。
+    """把选中的 media 从 source 拆到一条新 message。继承 source 的 tag/collection/starred。
 
     - new_message_id: 客户端提供的 id(用于 Android sync 幂等)
     - new_text: 新 message 的文本
@@ -314,7 +314,7 @@ def split_message_service(
     new_msg = Message(
         id=new_message_id,
         text=new_text,
-        actor_id=source.actor_id,
+        collection_id=source.collection_id,
         starred=source.starred,
         created_at=source.created_at + timedelta(seconds=nearby_count + 1),
     )
@@ -425,7 +425,7 @@ def remove_media_from_message_service(
 def create_message_with_files(
     db: Session,
     text: Optional[str],
-    actor_id: Optional[int],
+    collection_id: Optional[int],
     files: List[str],
     tag_ids: Optional[List[int]] = None,
     created_at: Optional[datetime] = None,
@@ -440,7 +440,7 @@ def create_message_with_files(
     Args:
         db: SQLAlchemy session
         text: 消息文本
-        actor_id: 作者 ID(None 则 actor_id=NULL)
+        collection_id: 作者 ID(None 则 collection_id=NULL)
         files: 文件绝对路径列表,按顺序作为 media(position 0,1,2...)
         tag_ids: 要绑定的 tag ID 列表(None 则不绑)
         created_at: 自定义时间;None 则用 datetime.now()
@@ -452,7 +452,7 @@ def create_message_with_files(
     """
     db_message = Message(
         text=text,
-        actor_id=actor_id,
+        collection_id=collection_id,
         issue_id=issue_id,
         created_at=created_at or datetime.now(),
     )

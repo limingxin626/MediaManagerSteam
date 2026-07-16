@@ -5,7 +5,7 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.config import config
-from app.models import get_db, Message, Media, Actor, Tag, MessageMedia, SyncLog, message_tag
+from app.models import get_db, Message, Media, Collection, Person, Tag, MessageMedia, SyncLog, message_tag
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -15,10 +15,12 @@ def get_stats(db: Session = Depends(get_db)):
     table_counts = {
         "message": db.query(func.count(Message.id)).scalar() or 0,
         "media": db.query(func.count(Media.id)).scalar() or 0,
-        "actor": db.query(func.count(Actor.id)).scalar() or 0,
+        "collection": db.query(func.count(Collection.id)).scalar() or 0,
+        "person": db.query(func.count(Person.id)).scalar() or 0,
         "tag": db.query(func.count(Tag.id)).scalar() or 0,
         "message_media": db.query(func.count(MessageMedia.message_id)).scalar() or 0,
         "message_tag": db.scalar(text("SELECT COUNT(*) FROM message_tag")) or 0,
+        "media_person": db.scalar(text("SELECT COUNT(*) FROM media_person")) or 0,
         "sync_log": db.query(func.count(SyncLog.id)).scalar() or 0,
     }
 
@@ -31,7 +33,7 @@ def get_stats(db: Session = Depends(get_db)):
     db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
 
     recent = (
-        db.query(Message.id, Message.text, Message.actor_id, Message.created_at)
+        db.query(Message.id, Message.text, Message.collection_id, Message.created_at)
         .order_by(Message.created_at.desc())
         .limit(10)
         .all()
@@ -48,7 +50,7 @@ def get_stats(db: Session = Depends(get_db)):
             {
                 "id": r.id,
                 "text": r.text,
-                "actor_id": r.actor_id,
+                "collection_id": r.collection_id,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in recent

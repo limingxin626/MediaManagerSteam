@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, Integer
-from app.models import get_db, Media, MessageMedia, Message, Tag, message_tag, media_tag
+from app.models import get_db, Media, MessageMedia, Message, Tag, Person, message_tag, media_tag
 from typing import Optional, List, Literal
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ def get_media(
     starred: Optional[bool] = Query(None),
     type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
     tag_id: Optional[int] = Query(None, description="标签 ID"),
-    actor_id: Optional[int] = Query(None, description="演员 ID"),
+    collection_id: Optional[int] = Query(None, description="合集 ID"),
     db: Session = Depends(get_db)
 ):
     """获取媒体列表（游标分页，显示所有媒体）"""
@@ -87,13 +87,13 @@ def get_media(
             combined = media_ids_msg.union(media_ids_direct).subquery()
             query = query.filter(Media.id.in_(db.query(combined.c.mid)))
 
-        if actor_id is not None:
-            media_ids_actor = (
+        if collection_id is not None:
+            media_ids_collection = (
                 db.query(MessageMedia.media_id)
                 .join(Message, Message.id == MessageMedia.message_id)
-                .filter(Message.actor_id == actor_id)
+                .filter(Message.collection_id == collection_id)
             )
-            query = query.filter(Media.id.in_(media_ids_actor))
+            query = query.filter(Media.id.in_(media_ids_collection))
 
         # 游标格式："{created_at}|{id}"
         if cursor:
@@ -182,7 +182,7 @@ def get_media_timeline(
     starred: Optional[bool] = Query(None),
     type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
     tag_id: Optional[int] = Query(None),
-    actor_id: Optional[int] = Query(None),
+    collection_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
     year_col = func.cast(func.strftime('%Y', Media.created_at), Integer)
@@ -210,13 +210,13 @@ def get_media_timeline(
         combined = media_ids_msg.union(media_ids_direct).subquery()
         query = query.filter(Media.id.in_(db.query(combined.c.mid)))
 
-    if actor_id is not None:
-        media_ids_actor = (
+    if collection_id is not None:
+        media_ids_collection = (
             db.query(MessageMedia.media_id)
             .join(Message, Message.id == MessageMedia.message_id)
-            .filter(Message.actor_id == actor_id)
+            .filter(Message.collection_id == collection_id)
         )
-        query = query.filter(Media.id.in_(media_ids_actor))
+        query = query.filter(Media.id.in_(media_ids_collection))
 
     rows = query.group_by('year', 'month', 'day').order_by(
         year_col.desc(), month_col.desc(), day_col.desc()
@@ -230,11 +230,11 @@ def get_media_feed(
     cursor: Optional[int] = Query(None, description="游标：message_media.id"),
     limit: int = Query(40, ge=1, le=100),
     tag_id: Optional[int] = Query(None),
-    actor_id: Optional[int] = Query(None),
+    collection_id: Optional[int] = Query(None),
     starred: Optional[bool] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """按 MessageMedia 展开的媒体流（Telegram风格，媒体可重复），支持 tag/actor 筛选"""
+    """按 MessageMedia 展开的媒体流（Telegram风格，媒体可重复），支持 tag/collection 筛选"""
     query = (
         db.query(Media, MessageMedia)
         .join(MessageMedia, MessageMedia.media_id == Media.id)
@@ -251,8 +251,8 @@ def get_media_feed(
         combined = msg_with_tag.union(media_with_tag).subquery()
         query = query.filter(Message.id.in_(db.query(combined.c.message_id)))
 
-    if actor_id is not None:
-        query = query.filter(Message.actor_id == actor_id)
+    if collection_id is not None:
+        query = query.filter(Message.collection_id == collection_id)
 
     if starred is not None:
         query = query.filter(Media.starred == (1 if starred else 0))
@@ -470,6 +470,26 @@ def set_media_tags(
     media.tags = tags
     db.commit()
     return [{"id": t.id, "name": t.name, "category": t.category} for t in media.tags]
+
+
+class PeopleRequest(BaseModel):
+    person_ids: List[int]
+
+
+@router.put("/{media_id}/people")
+def set_media_people(
+    media_id: int,
+    body: PeopleRequest,
+    db: Session = Depends(get_db)
+):
+    """整体替换该 media 关联的人物集合。"""
+    media = db.query(Media).filter(Media.id == media_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+    people = db.query(Person).filter(Person.id.in_(body.person_ids)).all()
+    media.people = people
+    db.commit()
+    return [{"id": p.id, "name": p.name} for p in media.people]
 
 
 @router.delete("/{media_id}")

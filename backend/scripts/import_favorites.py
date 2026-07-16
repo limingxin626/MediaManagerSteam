@@ -12,7 +12,7 @@
     - 1 message / thread(post 文本合并,正文末尾追加 `imported:<tid>` 一行)
     - N media(thread 内所有附件,按出现顺序)
     - 1 tag / message: 司机社(平台)
-    - actor_id 留空(导入内容不关联作者)
+    - collection_id 留空(导入内容不关联合集)
 
 幂等: 重跑时通过查 `message.text LIKE '%imported:<tid>%'` 跳过。
 
@@ -167,7 +167,7 @@ def import_one(db, thread_path: Path, args, stats: dict) -> None:
         msg = create_message_with_files(
             db,
             text=text,
-            actor_id=None,  # 导入的内容不关联作者
+            collection_id=None,  # 导入的内容不关联作者
             files=files,
             tag_ids=tag_ids,
             created_at=created_at,

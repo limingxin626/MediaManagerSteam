@@ -1,31 +1,31 @@
 <template>
   <div class="h-screen flex transition-colors">
-    <!-- Left Actor Column -->
+    <!-- Left Collection Column -->
     <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] overflow-y-auto">
-      <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">演员列表</div>
+      <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">合集列表</div>
       <div class="flex flex-col gap-0.5 px-2 pb-4">
         <button
-          v-if="noActorCount > 0 || selectedActorId === 0"
-          @click="selectActor(0)"
+          v-if="noCollectionCount > 0 || selectedCollectionId === 0"
+          @click="selectCollection(0)"
           class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
-          :class="selectedActorId === 0
+          :class="selectedCollectionId === 0
             ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
         >
           <span class="truncate">无</span>
-          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ noActorCount }}</span>
+          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ noCollectionCount }}</span>
         </button>
         <button
-          v-for="actor in actorsData"
-          :key="actor.id"
-          @click="selectActor(actor.id)"
+          v-for="collection in collectionsData"
+          :key="collection.id"
+          @click="selectCollection(collection.id)"
           class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
-          :class="selectedActorId === actor.id
+          :class="selectedCollectionId === collection.id
             ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
         >
-          <span class="truncate">{{ actor.name }}</span>
-          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ actor.message_count }}</span>
+          <span class="truncate">{{ collection.name }}</span>
+          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ collection.message_count }}</span>
         </button>
       </div>
     </div>
@@ -36,9 +36,9 @@
       <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
         <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div class="flex gap-4 items-center max-w-2xl mx-auto">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">演员消息</h2>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">合集消息</h2>
             <!-- Search -->
-            <SearchInput v-model="filterName" placeholder="搜索演员..." @search="resetAndFetch" />
+            <SearchInput v-model="filterName" placeholder="搜索合集..." @search="resetAndFetch" />
           </div>
         </div>
       </div>
@@ -112,7 +112,7 @@
               </div>
             </div>
             <h3 class="text-sm font-medium text-[var(--text-primary)]">暂无消息</h3>
-            <p class="mt-1 text-sm text-[var(--text-muted)]">选择一个演员查看消息</p>
+            <p class="mt-1 text-sm text-[var(--text-muted)]">选择一个合集查看消息</p>
           </div>
         </div>
 
@@ -122,19 +122,18 @@
 
       <!-- Input Area at Bottom -->
       <MessageCompose
-        v-if="selectedActorId != null && selectedActorId !== 0"
-        :actor-id="selectedActorId"
+        v-if="selectedCollectionId != null && selectedCollectionId !== 0"
         @sent="onMessageSent"
       />
     </div>
 
     <!-- Add/Edit Modal -->
-    <ActorEditModal
+    <CollectionEditModal
       :is-open="showModal"
       :title="editMode ? '编辑数据' : '添加新数据'"
       :form-data="formData"
       @close="closeModal"
-      @save="saveActor"
+      @save="saveCollection"
     />
 
     <!-- Media Preview -->
@@ -154,8 +153,8 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
-import type { Actor, MessageDetail, MessageMediaItem } from '../types'
-import ActorEditModal from '../components/ActorEditModal.vue'
+import type { Collection, MessageDetail, MessageMediaItem } from '../types'
+import CollectionEditModal from '../components/CollectionEditModal.vue'
 import MessageCard from '../components/MessageCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import SearchInput from '../components/SearchInput.vue'
@@ -165,19 +164,19 @@ import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
 import { formatDateLabel } from '../utils/date'
 
-defineOptions({ name: 'Actor' })
+defineOptions({ name: 'Collection' })
 
 const toast = useToast()
 const { confirm } = useConfirm()
 
 const pageSize = 20
-const actorsData = ref<Actor[]>([])
-const noActorCount = ref(0)
+const collectionsData = ref<Collection[]>([])
+const noCollectionCount = ref(0)
 const loading = ref(false)
 
 const filterName = ref('')
 
-const selectedActorId = ref<number | null>(null)
+const selectedCollectionId = ref<number | null>(null)
 
 const messages = ref<MessageDetail[]>([])
 const hasMoreMessages = ref(true)
@@ -203,49 +202,49 @@ const previewMessageStarred = computed(() => {
 
 let observer: IntersectionObserver | null = null
 
-// --- Fetch Actors ---
+// --- Fetch Collections ---
 
-const fetchActors = async (reset = false) => {
+const fetchCollections = async (reset = false) => {
   if (loading.value) return
 
   if (reset) {
-    actorsData.value = []
+    collectionsData.value = []
   }
 
   loading.value = true
   try {
-    const data = await api.get<{ items: Actor[]; no_actor_count: number }>('/actors', {
+    const data = await api.get<{ items: Collection[]; no_collection_count: number }>('/collections', {
       name: filterName.value || undefined,
     })
 
-    actorsData.value = data.items
-    noActorCount.value = data.no_actor_count
+    collectionsData.value = data.items
+    noCollectionCount.value = data.no_collection_count
 
-    if (actorsData.value.length > 0 && selectedActorId.value == null) {
-      selectActor(actorsData.value[0]!.id)
+    if (collectionsData.value.length > 0 && selectedCollectionId.value == null) {
+      selectCollection(collectionsData.value[0]!.id)
     }
   } catch (error) {
-    toast.error('获取演员数据失败')
+    toast.error('获取合集数据失败')
   } finally {
     loading.value = false
   }
 }
 
 const resetAndFetch = () => {
-  fetchActors(true)
+  fetchCollections(true)
 }
 
-// --- Select Actor ---
+// --- Select Collection ---
 
-const selectActor = (id: number) => {
-  selectedActorId.value = id
+const selectCollection = (id: number) => {
+  selectedCollectionId.value = id
   fetchMessages(true)
 }
 
 // --- Fetch Messages ---
 
 const fetchMessages = async (reset = false) => {
-  if (selectedActorId.value == null) return
+  if (selectedCollectionId.value == null) return
 
   if (reset) {
     messages.value = []
@@ -260,7 +259,7 @@ const fetchMessages = async (reset = false) => {
       next_cursor: string | null
       has_more: boolean
     }>('/messages/with-detail', {
-      actor_id: selectedActorId.value,
+      collection_id: selectedCollectionId.value,
       cursor: nextCursor.value,
       limit: pageSize,
     })
@@ -311,18 +310,18 @@ const onMessageSent = async (message: MessageDetail) => {
 
 // --- CRUD ---
 
-const saveActor = async (data: typeof formData.value) => {
+const saveCollection = async (data: typeof formData.value) => {
   try {
     if (editMode.value && currentEditId.value) {
-      await api.put(`/actors/${currentEditId.value}`, data)
+      await api.put(`/collections/${currentEditId.value}`, data)
     } else {
-      await api.post('/actors', data)
+      await api.post('/collections', data)
     }
-    await fetchActors(true)
+    await fetchCollections(true)
     closeModal()
     toast.success('保存成功')
   } catch (error) {
-    toast.error('保存演员数据失败')
+    toast.error('保存合集数据失败')
   }
 }
 
@@ -439,7 +438,7 @@ const getDateStr = (dateStr: string) => dateStr.substring(0, 10)
 // --- Infinite scroll ---
 
 onMounted(() => {
-  fetchActors(true)
+  fetchCollections(true)
   const root = scrollContainer.value
   observer = new IntersectionObserver(
     (entries) => {

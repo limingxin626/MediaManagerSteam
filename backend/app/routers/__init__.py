@@ -1,4 +1,5 @@
-from .actor import router as actor_router
+from .collection import router as collection_router
+from .person import router as person_router
 from .message import router as message_router
 from .media import router as media_router
 from .files import router as files_router
@@ -14,7 +15,8 @@ from .scan import router as scan_router
 
 # 所有路由列表
 all_routers = [
-    actor_router,
+    collection_router,
+    person_router,
     message_router,
     media_router,
     files_router,

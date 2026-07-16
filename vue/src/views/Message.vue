@@ -2,16 +2,16 @@
   <div class="h-screen flex transition-colors">
     <FilterSidebar
       :tags="tags"
-      :actors="actors"
-      :no-actor-count="noActorCount"
+      :collections="collections"
+      :no-collection-count="noCollectionCount"
       :selected-tag-id="selectedTagId"
-      :selected-actor-id="selectedActorId"
+      :selected-collection-id="selectedCollectionId"
       :issues="issues"
       :no-issue-count="noIssueCount"
       :selected-issue-id="selectedIssueId"
       :on-create-issue="promptCreateIssue"
       @select-tag="selectTag"
-      @select-actor="selectActor"
+      @select-collection="selectCollection"
       @select-issue="selectIssue"
     />
 
@@ -20,13 +20,22 @@
       <!-- Left Feed Section -->
       <div class="flex-1 flex flex-col min-w-0 relative">
         <!-- Search Header -->
-        <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
+        <div class="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div class="flex gap-2 items-center justify-between max-w-6xl mx-auto pr-10">
-              <h2 class="text-lg font-bold text-gray-900 dark:text-white">消息流</h2>
+              <h2 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">消息流</h2>
+              <!-- New message -->
+              <button @click="openCreateDialog"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-[var(--radius-sm)] bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)] transition-colors"
+                title="新建消息">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                新建
+              </button>
               <!-- Refresh -->
               <button @click="resetAndFetch()" :disabled="loading"
-                class="p-1 rounded-md transition-colors text-gray-400 hover:text-[var(--color-primary-600)] bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="p-1.5 rounded-[var(--radius-sm)] transition-colors text-[var(--text-muted)] hover:text-[var(--color-primary-600)] hover:bg-[var(--bg-secondary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 title="刷新">
                 <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -34,28 +43,34 @@
                 </svg>
               </button>
               <!-- Merge toggle -->
-              <button @click="toggleMergeMode" class="px-2 py-1 text-xs rounded-md transition-colors" :class="mergeMode
+              <button @click="toggleMergeMode" class="px-2.5 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-colors" :class="mergeMode
                 ? 'bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)]'
-                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'">
+                : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'">
                 {{ mergeMode ? '取消合并' : '合并' }}
               </button>
-              <!-- Layout toggle (mosaic / grid) -->
+              <!-- Layout toggle (grid / mosaic / card 三态循环) -->
               <button @click="toggleLayout"
-                class="p-1 rounded-md transition-colors text-gray-400 hover:text-[var(--color-primary-600)] bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20"
-                :title="messageLayout === 'grid' ? '切换到拼图布局' : '切换到网格布局'">
-                <!-- grid 态显示「拼图」图标，mosaic 态显示「网格」图标：均提示点击后会切到的目标布局 -->
+                class="p-1.5 rounded-[var(--radius-sm)] transition-colors text-[var(--text-muted)] hover:text-[var(--color-primary-600)] hover:bg-[var(--bg-secondary)]"
+                :title="layoutToggleTitle">
+                <!-- 显示当前布局图标 -->
+                <!-- grid：卡内媒体网格 -->
                 <svg v-if="messageLayout === 'grid'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h6a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
                 </svg>
-                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- mosaic：拼图 -->
+                <svg v-else-if="messageLayout === 'mosaic'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+                <!-- card：页面级卡片网格(相册) -->
+                <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z" />
                 </svg>
               </button>
               <!-- Starred filter -->
               <button @click="starredFilter = !starredFilter; resetAndFetch()"
-                class="p-1 rounded-md transition-colors" :class="starredFilter
-                  ? 'text-yellow-400 bg-yellow-900/20'
-                  : 'text-gray-400 hover:text-yellow-400 bg-gray-100 dark:bg-white/10'" title="仅看收藏">
+                class="p-1.5 rounded-[var(--radius-sm)] transition-colors" :class="starredFilter
+                  ? 'text-amber-400 bg-amber-400/10'
+                  : 'text-[var(--text-muted)] hover:text-amber-400 hover:bg-[var(--bg-secondary)]'" title="仅看收藏">
                 <svg class="w-4 h-4" :fill="starredFilter ? 'currentColor' : 'none'" stroke="currentColor"
                   viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -82,7 +97,7 @@
           <div v-if="currentVisibleDate" class="sticky top-0 z-20 flex justify-center py-2">
             <div class="relative">
               <button @click="toggleCalendar"
-                class="px-3 py-1 text-xs text-[var(--text-secondary)] bg-[var(--bg-card)]/80 dark:bg-white/10 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-sm hover:bg-[var(--bg-card)] dark:hover:bg-white/20 transition-colors cursor-pointer flex items-center gap-1">
+                class="px-3 py-1 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-card)]/85 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-[var(--shadow-sm)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1.5">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
@@ -108,17 +123,17 @@
             <!-- Loading skeleton (initial load) -->
             <div v-if="loading && messages.length === 0" class="flex flex-col gap-4 max-w-4xl mx-auto">
               <div v-for="i in 3" :key="i"
-                class="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 animate-pulse">
+                class="bg-[var(--bg-card)] rounded-[var(--radius-lg)] border border-[var(--border-color)] p-4 animate-pulse">
                 <div class="flex items-center gap-3 mb-3">
-                  <div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-white/10"></div>
+                  <div class="w-9 h-9 rounded-full bg-[var(--bg-secondary)]"></div>
                   <div class="flex-1">
-                    <div class="h-4 w-20 bg-gray-200 dark:bg-white/10 rounded"></div>
-                    <div class="h-3 w-16 bg-gray-200 dark:bg-white/10 rounded mt-1.5"></div>
+                    <div class="h-4 w-20 bg-[var(--bg-secondary)] rounded"></div>
+                    <div class="h-3 w-16 bg-[var(--bg-secondary)] rounded mt-1.5"></div>
                   </div>
                 </div>
-                <div class="aspect-video bg-gray-200 dark:bg-white/10 rounded-xl mb-2"></div>
-                <div class="h-3 w-3/4 bg-gray-200 dark:bg-white/10 rounded"></div>
-                <div class="h-3 w-1/2 bg-gray-200 dark:bg-white/10 rounded mt-1.5"></div>
+                <div class="aspect-video bg-[var(--bg-secondary)] rounded-[var(--radius-md)] mb-2"></div>
+                <div class="h-3 w-3/4 bg-[var(--bg-secondary)] rounded"></div>
+                <div class="h-3 w-1/2 bg-[var(--bg-secondary)] rounded mt-1.5"></div>
               </div>
             </div>
             <div v-if="loading && messages.length > 0" class="text-center py-4">
@@ -127,23 +142,37 @@
 
             <!-- No more data -->
             <div v-if="!loading && !hasMoreData && messages.length > 0" class="text-center py-8">
-              <p class="text-sm text-gray-400">已经到底了</p>
+              <p class="text-xs text-[var(--text-muted)]">已经到底了</p>
             </div>
 
-            <!-- Messages Feed -->
-            <div v-if="messages.length > 0" class="flex flex-col gap-4 max-w-6xl mx-auto">
+            <!-- Card grid layout (页面级固定卡片网格) -->
+            <div v-if="messageLayout === 'card' && messages.length > 0"
+              class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-w-7xl mx-auto">
+              <div v-for="message in messages" :key="message.id"
+                :data-message-id="message.id" :data-message-date="message.created_at.substring(0, 10)"
+                class="rounded-[var(--radius-lg)] transition-shadow"
+                :class="highlightMessageId === message.id ? 'ring-2 ring-[var(--color-primary-500)]' : ''">
+                <MessageGridCard :message="message" :media-items="message.media_items" :tags="message.tags"
+                  :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
+                  @click="openDetailPanel" @toggle-select="toggleSelectMessage" />
+              </div>
+            </div>
+
+            <!-- Messages Feed (grid / mosaic 消息流) -->
+            <div v-else-if="messages.length > 0" class="flex flex-col gap-4 max-w-6xl mx-auto">
               <template v-for="(message, idx) in messages" :key="message.id">
                 <!-- Date separator -->
                 <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1]?.created_at ?? '')"
                   class="flex justify-center py-2">
-                  <span class="px-3 py-1 text-xs text-[var(--text-secondary)] bg-[var(--bg-card)]/80 dark:bg-white/10 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-sm">{{ formatDateLabel(message.created_at) }}</span>
+                  <span class="px-3 py-1 text-xs font-medium text-[var(--text-muted)] bg-[var(--bg-card)]/85 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-[var(--shadow-sm)]">{{ formatDateLabel(message.created_at) }}</span>
                 </div>
                 <div :data-message-id="message.id" :data-message-date="message.created_at.substring(0, 10)"
                   class="rounded-xl transition-shadow"
                   :class="highlightMessageId === message.id ? 'ring-2 ring-[var(--color-primary-500)]' : ''">
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
-                    :all-tags="tags" :layout="messageLayout"
+                    :all-tags="tags" :layout="messageLayout === 'mosaic' ? 'mosaic' : 'grid'"
                     :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
+                    @click="openDetailPanel"
                     @media-click="(index) => handleMediaClick(message.id, index)"
                     @delete="handleDeleteMessage" @find-messages-by-media="handleFindMessagesByMedia"
                     @toggle-select="toggleSelectMessage" @toggle-star="handleToggleStar"
@@ -155,18 +184,14 @@
 
             <!-- Empty State -->
             <div v-if="messages.length === 0 && !loading" class="flex flex-col items-center justify-center py-20">
-              <div class="relative w-24 h-24 mb-4">
-                <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/10 rotate-6"></div>
-                <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/5 -rotate-3"></div>
-                <div class="absolute inset-0 flex items-center justify-center">
-                  <svg class="w-10 h-10 text-[var(--color-primary-500)]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
+              <div class="w-14 h-14 mb-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] flex items-center justify-center">
+                <svg class="w-7 h-7 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
               </div>
               <h3 class="text-sm font-medium text-[var(--text-primary)]">暂无消息</h3>
-              <p class="mt-1 text-sm text-[var(--text-muted)]">还没有任何消息内容</p>
+              <p class="mt-1 text-xs text-[var(--text-muted)]">还没有任何消息内容</p>
             </div>
 
             <!-- Loading indicator (bottom, for loading newer) -->
@@ -201,12 +226,6 @@
             回到最新
           </button>
         </div>
-
-        <!-- Bottom Input Bar -->
-        <div class="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-t border-[var(--border-color)] mb-20 md:mb-0">
-          <MessageComposeInline :all-tags="tags" :tag-id="selectedTagId ?? null"
-            :actor-id="selectedActorId ?? undefined" :issue-id="selectedIssueId ?? undefined" @created="onDialogCreated" />
-        </div>
       </div>
 
       <!-- Right Tag Media Panel (常驻) -->
@@ -216,8 +235,9 @@
       <MessageComposeDialog :visible="dialogVisible" :mode="dialogMode" :message-id="dialogMessageId"
         :initial-text="dialogInitialText" :initial-date="dialogInitialDate" :initial-media="dialogInitialMedia"
         :initial-tags="dialogInitialTags"
-        :all-tags="tags" :tag-id="selectedTagId ?? null" :actor-id="selectedActorId ?? undefined" @close="dialogVisible = false"
-        @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" />
+        :all-tags="tags" :tag-id="selectedTagId ?? null" :collection-id="selectedCollectionId ?? undefined"
+        :issue-id="selectedIssueId ?? undefined" @close="dialogVisible = false"
+        @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" @tag-created="fetchTags" />
 
       <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewStartIndex"
         :starred="previewMessageStarred" :message-id="previewMessageId" :all-tags="tags"
@@ -225,6 +245,13 @@
         @close="closePreview" @navigate-prev="navigateToPrevMessage"
         @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @media-deleted="handleMediaDeleted"
         @media-rotated="handleMediaRotated" @media-tags-changed="handleMediaTagsChanged" />
+
+      <!-- Message 详情面板(右侧滑入) -->
+      <MessageDetailPanel v-if="detailMessageId !== null" :message-id="detailMessageId" :all-tags="tags"
+        :preview-open="previewOpen"
+        @close="detailMessageId = null" @edit="(id) => { detailMessageId = null; openEditDialog(id) }"
+        @media-click="(items, index) => handlePanelPreview({ items, index })"
+        @toggle-star="handleToggleStar" @tags-changed="handleDetailTagsChanged" />
 
     </div>
   </div>
@@ -235,15 +262,16 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Calendar } from 'v-calendar'
 import 'v-calendar/style.css'
-import { type Actor, type Issue, type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
+import { type Collection, type Issue, type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
+import MessageGridCard from '../components/MessageGridCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import SearchInput from '../components/SearchInput.vue'
 import MessageComposeDialog from '../components/MessageComposeDialog.vue'
-import MessageComposeInline from '../components/MessageComposeInline.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
 import IssuePinnedBanner from '../components/IssuePinnedBanner.vue'
 import TagMediaPanel from '../components/TagMediaPanel.vue'
+import MessageDetailPanel from '../components/MessageDetailPanel.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
@@ -263,6 +291,15 @@ const { confirm } = useConfirm()
 const { theme } = useTheme()
 const isDark = computed(() => theme.value === 'dark')
 const { layout: messageLayout, toggleLayout, initLayout } = useMessageLayout()
+
+// toggle 循环 grid → mosaic → card，title 提示下一个目标布局
+const layoutToggleTitle = computed(() => {
+  switch (messageLayout.value) {
+    case 'grid': return '切换到拼图布局'
+    case 'mosaic': return '切换到卡片网格'
+    default: return '切换到网格布局'
+  }
+})
 
 // --- Calendar date jump ---
 const calendarOpen = ref(false)
@@ -286,7 +323,7 @@ const loadCalendarMonth = async (year: number, month: number) => {
       year,
       month,
       tag_id: selectedTagId.value ?? undefined,
-      actor_id: selectedActorId.value ?? undefined,
+      collection_id: selectedCollectionId.value ?? undefined,
       issue_id: selectedIssueId.value ?? undefined,
       query_text: searchQuery.value || undefined,
     })
@@ -343,7 +380,7 @@ const jumpToDate = async (dateStr: string) => {
         media_id: activeMediaFilter.value ?? undefined,
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
-        actor_id: selectedActorId.value ?? undefined,
+        collection_id: selectedCollectionId.value ?? undefined,
         issue_id: selectedIssueId.value ?? undefined,
       },
     )
@@ -383,9 +420,9 @@ const onDocumentClick = (e: MouseEvent) => {
 const tags = ref<TagWithCount[]>([])
 const selectedTagId = ref<number | null>(null)
 
-const actors = ref<Actor[]>([])
-const noActorCount = ref(0)
-const selectedActorId = ref<number | null>(null)
+const collections = ref<Collection[]>([])
+const noCollectionCount = ref(0)
+const selectedCollectionId = ref<number | null>(null)
 
 const issues = ref<Issue[]>([])
 const noIssueCount = ref(0)
@@ -405,7 +442,7 @@ const scrollPositionCache = new Map<string, FilterScrollCache>()
 
 const getFilterKey = (): string => {
   if (selectedTagId.value !== null) return `tag:${selectedTagId.value}`
-  if (selectedActorId.value !== null) return `actor:${selectedActorId.value}`
+  if (selectedCollectionId.value !== null) return `collection:${selectedCollectionId.value}`
   if (selectedIssueId.value !== null) return `issue:${selectedIssueId.value}`
   return 'all'
 }
@@ -489,11 +526,11 @@ const fetchTags = async () => {
   }
 }
 
-const fetchActors = async () => {
+const fetchCollections = async () => {
   try {
-    const data = await api.get<{ items: Actor[]; no_actor_count: number }>('/actors')
-    actors.value = data.items
-    noActorCount.value = data.no_actor_count
+    const data = await api.get<{ items: Collection[]; no_collection_count: number }>('/collections')
+    collections.value = data.items
+    noCollectionCount.value = data.no_collection_count
   } catch {
     // silent fail
   }
@@ -548,7 +585,7 @@ const resetFilters = () => {
 const selectTag = (tagId: number | null) => {
   saveScrollPosition()
   selectedTagId.value = tagId
-  selectedActorId.value = null
+  selectedCollectionId.value = null
   selectedIssueId.value = null
   resetFilters()
   if (!restoreFromCache(getFilterKey())) {
@@ -556,9 +593,9 @@ const selectTag = (tagId: number | null) => {
   }
 }
 
-const selectActor = (actorId: number | null) => {
+const selectCollection = (collectionId: number | null) => {
   saveScrollPosition()
-  selectedActorId.value = actorId
+  selectedCollectionId.value = collectionId
   selectedTagId.value = null
   selectedIssueId.value = null
   resetFilters()
@@ -571,7 +608,7 @@ const selectIssue = (issueId: number | null) => {
   saveScrollPosition()
   selectedIssueId.value = issueId
   selectedTagId.value = null
-  selectedActorId.value = null
+  selectedCollectionId.value = null
   resetFilters()
   if (!restoreFromCache(getFilterKey())) {
     resetAndFetch()
@@ -664,7 +701,7 @@ const fetchForwardMessages = async () => {
       media_id: activeMediaFilter.value ?? undefined,
       starred: starredFilter.value || undefined,
       tag_id: selectedTagId.value ?? undefined,
-      actor_id: selectedActorId.value ?? undefined,
+      collection_id: selectedCollectionId.value ?? undefined,
       issue_id: selectedIssueId.value ?? undefined,
     })
 
@@ -710,6 +747,16 @@ const dialogInitialText = ref('')
 const dialogInitialDate = ref('')
 const dialogInitialMedia = ref<MessageMediaItem[]>([])
 const dialogInitialTags = ref<{ id: number; name: string }[]>([])
+
+const openCreateDialog = () => {
+  dialogMode.value = 'create'
+  dialogMessageId.value = undefined
+  dialogInitialText.value = ''
+  dialogInitialDate.value = ''
+  dialogInitialMedia.value = []
+  dialogInitialTags.value = []
+  dialogVisible.value = true
+}
 
 const openEditDialog = (messageId: number) => {
   const msg = messages.value.find(m => m.id === messageId)
@@ -777,6 +824,23 @@ const onMediaChanged = async (messageId: number) => {
   }
 }
 
+// --- Message 详情面板 ---
+const detailMessageId = ref<number | null>(null)
+
+const openDetailPanel = (messageId: number) => {
+  detailMessageId.value = messageId
+}
+
+// 详情面板里改了标签,同步回 feed 列表里对应的卡片
+const handleDetailTagsChanged = (
+  messageId: number,
+  tagList: { id: number; name: string; category?: string | null }[],
+) => {
+  const msg = messages.value.find(m => m.id === messageId)
+  if (msg) msg.tags = tagList as MessageDetail['tags']
+  fetchTags()
+}
+
 const handleQuickAddTag = async (messageId: number, tagId: number) => {
   const msg = messages.value.find(m => m.id === messageId)
   if (!msg) return
@@ -828,7 +892,7 @@ const fetchMessages = async (isLoadingMore = false) => {
         media_id: activeMediaFilter.value ?? undefined,
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
-        actor_id: selectedActorId.value ?? undefined,
+        collection_id: selectedCollectionId.value ?? undefined,
         issue_id: selectedIssueId.value ?? undefined,
       },
     )
@@ -1103,7 +1167,7 @@ const handlePanelJump = async (messageId: number) => {
         media_id: activeMediaFilter.value ?? undefined,
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
-        actor_id: selectedActorId.value ?? undefined,
+        collection_id: selectedCollectionId.value ?? undefined,
         issue_id: selectedIssueId.value ?? undefined,
       },
     )
@@ -1266,7 +1330,7 @@ watch(() => route.path, (path) => {
 onMounted(() => {
   initLayout()
   fetchTags()
-  fetchActors()
+  fetchCollections()
   fetchIssues()
   const saved = localStorage.getItem(SCROLL_POS_KEY)
   if (saved) {
@@ -1284,7 +1348,7 @@ onMounted(() => {
             media_id: activeMediaFilter.value ?? undefined,
             starred: starredFilter.value || undefined,
             tag_id: selectedTagId.value ?? undefined,
-            actor_id: selectedActorId.value ?? undefined,
+            collection_id: selectedCollectionId.value ?? undefined,
             issue_id: selectedIssueId.value ?? undefined,
           },
         ),
@@ -1297,7 +1361,7 @@ onMounted(() => {
             media_id: activeMediaFilter.value ?? undefined,
             starred: starredFilter.value || undefined,
             tag_id: selectedTagId.value ?? undefined,
-            actor_id: selectedActorId.value ?? undefined,
+            collection_id: selectedCollectionId.value ?? undefined,
             issue_id: selectedIssueId.value ?? undefined,
             direction: 'forward',
           },
