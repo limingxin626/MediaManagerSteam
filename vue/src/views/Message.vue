@@ -20,13 +20,13 @@
       <!-- Left Feed Section -->
       <div class="flex-1 flex flex-col min-w-0 relative">
         <!-- Search Header -->
-        <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
+        <div class="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div class="flex gap-2 items-center justify-between max-w-6xl mx-auto pr-10">
-              <h2 class="text-lg font-bold text-gray-900 dark:text-white">消息流</h2>
+              <h2 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">消息流</h2>
               <!-- Refresh -->
               <button @click="resetAndFetch()" :disabled="loading"
-                class="p-1 rounded-md transition-colors text-gray-400 hover:text-[var(--color-primary-600)] bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="p-1.5 rounded-[var(--radius-sm)] transition-colors text-[var(--text-muted)] hover:text-[var(--color-primary-600)] hover:bg-[var(--bg-secondary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 title="刷新">
                 <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -34,14 +34,14 @@
                 </svg>
               </button>
               <!-- Merge toggle -->
-              <button @click="toggleMergeMode" class="px-2 py-1 text-xs rounded-md transition-colors" :class="mergeMode
+              <button @click="toggleMergeMode" class="px-2.5 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-colors" :class="mergeMode
                 ? 'bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)]'
-                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'">
+                : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'">
                 {{ mergeMode ? '取消合并' : '合并' }}
               </button>
               <!-- Layout toggle (mosaic / grid) -->
               <button @click="toggleLayout"
-                class="p-1 rounded-md transition-colors text-gray-400 hover:text-[var(--color-primary-600)] bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20"
+                class="p-1.5 rounded-[var(--radius-sm)] transition-colors text-[var(--text-muted)] hover:text-[var(--color-primary-600)] hover:bg-[var(--bg-secondary)]"
                 :title="messageLayout === 'grid' ? '切换到拼图布局' : '切换到网格布局'">
                 <!-- grid 态显示「拼图」图标，mosaic 态显示「网格」图标：均提示点击后会切到的目标布局 -->
                 <svg v-if="messageLayout === 'grid'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,9 +53,9 @@
               </button>
               <!-- Starred filter -->
               <button @click="starredFilter = !starredFilter; resetAndFetch()"
-                class="p-1 rounded-md transition-colors" :class="starredFilter
-                  ? 'text-yellow-400 bg-yellow-900/20'
-                  : 'text-gray-400 hover:text-yellow-400 bg-gray-100 dark:bg-white/10'" title="仅看收藏">
+                class="p-1.5 rounded-[var(--radius-sm)] transition-colors" :class="starredFilter
+                  ? 'text-amber-400 bg-amber-400/10'
+                  : 'text-[var(--text-muted)] hover:text-amber-400 hover:bg-[var(--bg-secondary)]'" title="仅看收藏">
                 <svg class="w-4 h-4" :fill="starredFilter ? 'currentColor' : 'none'" stroke="currentColor"
                   viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -82,7 +82,7 @@
           <div v-if="currentVisibleDate" class="sticky top-0 z-20 flex justify-center py-2">
             <div class="relative">
               <button @click="toggleCalendar"
-                class="px-3 py-1 text-xs text-[var(--text-secondary)] bg-[var(--bg-card)]/80 dark:bg-white/10 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-sm hover:bg-[var(--bg-card)] dark:hover:bg-white/20 transition-colors cursor-pointer flex items-center gap-1">
+                class="px-3 py-1 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-card)]/85 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-[var(--shadow-sm)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1.5">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
@@ -108,17 +108,17 @@
             <!-- Loading skeleton (initial load) -->
             <div v-if="loading && messages.length === 0" class="flex flex-col gap-4 max-w-4xl mx-auto">
               <div v-for="i in 3" :key="i"
-                class="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 animate-pulse">
+                class="bg-[var(--bg-card)] rounded-[var(--radius-lg)] border border-[var(--border-color)] p-4 animate-pulse">
                 <div class="flex items-center gap-3 mb-3">
-                  <div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-white/10"></div>
+                  <div class="w-9 h-9 rounded-full bg-[var(--bg-secondary)]"></div>
                   <div class="flex-1">
-                    <div class="h-4 w-20 bg-gray-200 dark:bg-white/10 rounded"></div>
-                    <div class="h-3 w-16 bg-gray-200 dark:bg-white/10 rounded mt-1.5"></div>
+                    <div class="h-4 w-20 bg-[var(--bg-secondary)] rounded"></div>
+                    <div class="h-3 w-16 bg-[var(--bg-secondary)] rounded mt-1.5"></div>
                   </div>
                 </div>
-                <div class="aspect-video bg-gray-200 dark:bg-white/10 rounded-xl mb-2"></div>
-                <div class="h-3 w-3/4 bg-gray-200 dark:bg-white/10 rounded"></div>
-                <div class="h-3 w-1/2 bg-gray-200 dark:bg-white/10 rounded mt-1.5"></div>
+                <div class="aspect-video bg-[var(--bg-secondary)] rounded-[var(--radius-md)] mb-2"></div>
+                <div class="h-3 w-3/4 bg-[var(--bg-secondary)] rounded"></div>
+                <div class="h-3 w-1/2 bg-[var(--bg-secondary)] rounded mt-1.5"></div>
               </div>
             </div>
             <div v-if="loading && messages.length > 0" class="text-center py-4">
@@ -127,7 +127,7 @@
 
             <!-- No more data -->
             <div v-if="!loading && !hasMoreData && messages.length > 0" class="text-center py-8">
-              <p class="text-sm text-gray-400">已经到底了</p>
+              <p class="text-xs text-[var(--text-muted)]">已经到底了</p>
             </div>
 
             <!-- Messages Feed -->
@@ -136,7 +136,7 @@
                 <!-- Date separator -->
                 <div v-if="idx === 0 || getDateStr(message.created_at) !== getDateStr(messages[idx - 1]?.created_at ?? '')"
                   class="flex justify-center py-2">
-                  <span class="px-3 py-1 text-xs text-[var(--text-secondary)] bg-[var(--bg-card)]/80 dark:bg-white/10 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-sm">{{ formatDateLabel(message.created_at) }}</span>
+                  <span class="px-3 py-1 text-xs font-medium text-[var(--text-muted)] bg-[var(--bg-card)]/85 backdrop-blur-md rounded-full border border-[var(--border-color)] shadow-[var(--shadow-sm)]">{{ formatDateLabel(message.created_at) }}</span>
                 </div>
                 <div :data-message-id="message.id" :data-message-date="message.created_at.substring(0, 10)"
                   class="rounded-xl transition-shadow"
@@ -144,6 +144,7 @@
                   <MessageCard :message="message" :media-items="message.media_items" :tags="message.tags"
                     :all-tags="tags" :layout="messageLayout"
                     :selectable="mergeMode" :selected="selectedMessageIds.has(message.id)"
+                    @click="openDetailPanel"
                     @media-click="(index) => handleMediaClick(message.id, index)"
                     @delete="handleDeleteMessage" @find-messages-by-media="handleFindMessagesByMedia"
                     @toggle-select="toggleSelectMessage" @toggle-star="handleToggleStar"
@@ -155,18 +156,14 @@
 
             <!-- Empty State -->
             <div v-if="messages.length === 0 && !loading" class="flex flex-col items-center justify-center py-20">
-              <div class="relative w-24 h-24 mb-4">
-                <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/10 rotate-6"></div>
-                <div class="absolute inset-0 rounded-2xl bg-[var(--color-primary-500)]/5 -rotate-3"></div>
-                <div class="absolute inset-0 flex items-center justify-center">
-                  <svg class="w-10 h-10 text-[var(--color-primary-500)]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
+              <div class="w-14 h-14 mb-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] flex items-center justify-center">
+                <svg class="w-7 h-7 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
               </div>
               <h3 class="text-sm font-medium text-[var(--text-primary)]">暂无消息</h3>
-              <p class="mt-1 text-sm text-[var(--text-muted)]">还没有任何消息内容</p>
+              <p class="mt-1 text-xs text-[var(--text-muted)]">还没有任何消息内容</p>
             </div>
 
             <!-- Loading indicator (bottom, for loading newer) -->
@@ -226,6 +223,12 @@
         @navigate-next="navigateToNextMessage" @toggle-star="handlePreviewToggleStar" @media-deleted="handleMediaDeleted"
         @media-rotated="handleMediaRotated" @media-tags-changed="handleMediaTagsChanged" />
 
+      <!-- Message 详情面板(右侧滑入) -->
+      <MessageDetailPanel v-if="detailMessageId !== null" :message-id="detailMessageId" :all-tags="tags"
+        @close="detailMessageId = null" @edit="(id) => { detailMessageId = null; openEditDialog(id) }"
+        @media-click="(index) => handleMediaClick(detailMessageId!, index)"
+        @toggle-star="handleToggleStar" @tags-changed="handleDetailTagsChanged" />
+
     </div>
   </div>
 </template>
@@ -244,6 +247,7 @@ import MessageComposeInline from '../components/MessageComposeInline.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
 import IssuePinnedBanner from '../components/IssuePinnedBanner.vue'
 import TagMediaPanel from '../components/TagMediaPanel.vue'
+import MessageDetailPanel from '../components/MessageDetailPanel.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
@@ -775,6 +779,23 @@ const onMediaChanged = async (messageId: number) => {
   } catch {
     // silent
   }
+}
+
+// --- Message 详情面板 ---
+const detailMessageId = ref<number | null>(null)
+
+const openDetailPanel = (messageId: number) => {
+  detailMessageId.value = messageId
+}
+
+// 详情面板里改了标签,同步回 feed 列表里对应的卡片
+const handleDetailTagsChanged = (
+  messageId: number,
+  tagList: { id: number; name: string; category?: string | null }[],
+) => {
+  const msg = messages.value.find(m => m.id === messageId)
+  if (msg) msg.tags = tagList as MessageDetail['tags']
+  fetchTags()
 }
 
 const handleQuickAddTag = async (messageId: number, tagId: number) => {

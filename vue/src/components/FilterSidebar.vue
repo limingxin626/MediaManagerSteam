@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] min-h-0">
+  <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] min-h-0">
     <!-- Tab bar -->
     <div class="shrink-0 flex border-b border-[var(--border-color)]">
       <button
@@ -9,7 +9,7 @@
         class="flex-1 px-2 py-2.5 text-xs font-semibold transition-colors relative"
         :class="activeTab === tab.key
           ? 'text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+          : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'"
       >
         {{ tab.label }}
         <span
@@ -23,25 +23,25 @@
     <div v-show="activeTab === 'tag'" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 py-3">
       <button @click="onSelectTag(null)"
         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === null
-          ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
+          ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'">
         <span>全部</span>
       </button>
       <div v-for="(parentTag, index) in tagTree" :key="index" class="flex flex-col gap-0.5">
         <button @click="onSelectTag(parentTag.id)"
           class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === parentTag.id
-            ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
+            ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'">
           <span class="truncate">{{ parentTag.name }}</span>
-          <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ parentTag.message_count }}</span>
+          <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ parentTag.message_count }}</span>
         </button>
         <div v-if="parentTag.children && parentTag.children.length > 0" class="pl-6 flex flex-col gap-0.5">
           <button v-for="childTag in parentTag.children" :key="childTag.id" @click="onSelectTag(childTag.id)"
             class="flex items-center justify-between px-3 py-1.5 rounded-lg text-sm transition-colors text-left" :class="selectedTagId === childTag.id
-              ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10'">
+              ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+              : 'text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]'">
             <span class="truncate">{{ childTag.name }}</span>
-            <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ childTag.message_count }}</span>
+            <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ childTag.message_count }}</span>
           </button>
         </div>
       </div>
@@ -51,8 +51,8 @@
     <div v-show="activeTab === 'actor'" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 py-3">
       <button @click="onSelectActor(null)"
         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedActorId === null
-          ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
+          ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'">
         <span>全部</span>
       </button>
       <button
@@ -60,11 +60,11 @@
         @click="onSelectActor(0)"
         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
         :class="selectedActorId === 0
-          ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
+          ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
       >
         <span class="truncate">无</span>
-        <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ noActorCount }}</span>
+        <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ noActorCount }}</span>
       </button>
       <button
         v-for="actor in actors"
@@ -72,11 +72,11 @@
         @click="onSelectActor(actor.id)"
         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
         :class="selectedActorId === actor.id
-          ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
+          ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
       >
         <span class="truncate">{{ actor.name }}</span>
-        <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ actor.message_count }}</span>
+        <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ actor.message_count }}</span>
       </button>
     </div>
 
@@ -85,14 +85,14 @@
       <div v-if="onCreateIssue" class="flex justify-end px-1 pb-1">
         <button
           @click="onCreateIssue"
-          class="text-gray-400 hover:text-[var(--color-primary-500)] text-sm leading-none"
+          class="text-[var(--text-muted)] hover:text-[var(--color-primary-600)] text-sm leading-none transition-colors"
           title="新增 issue"
         >＋ 新增</button>
       </div>
       <button @click="onSelectIssue(null)"
         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedIssueId === null
-          ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'">
+          ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'">
         <span>全部</span>
       </button>
       <button
@@ -100,11 +100,11 @@
         @click="onSelectIssue(0)"
         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
         :class="selectedIssueId === 0
-          ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
+          ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
       >
         <span class="truncate">无</span>
-        <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ noIssueCount }}</span>
+        <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ noIssueCount }}</span>
       </button>
       <button
         v-for="issue in issues"
@@ -112,11 +112,11 @@
         @click="onSelectIssue(issue.id)"
         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
         :class="selectedIssueId === issue.id
-          ? 'bg-[var(--color-primary-600)]/30 text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'"
+          ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
       >
         <span class="truncate">{{ issue.title }}</span>
-        <span class="ml-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ issue.message_count }}</span>
+        <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ issue.message_count }}</span>
       </button>
     </div>
   </div>

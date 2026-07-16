@@ -1,5 +1,24 @@
 # 开发日志
 
+## 2026-07-16
+
+### Vue 前端视觉层重做（Hallmark · modern-minimal）
+
+用 hallmark skill 对 Web 端做了一轮「保留结构、只重做视觉层」的 redesign，气质从通用 Instagram 风 indigo 收敛到 Linear/Stripe 学派的精致极简。路由、props、emits、composables、信息架构一律不变。
+
+1. **设计 token 重构（`style.css`）**：
+   - 暗色中性色从暖灰（`#212121`/`#333`）转为冷调 slate（`#0f1729`/`#1a2436`）；亮色卡片背景从 `#fff-on-#fff` 改为 slate 微底（`--bg-primary: #f6f7f9`），卡片才有层次
+   - 新增 token：类型刻度 `--text-*`、圆角刻度 `--radius-sm/md/lg`、两级真实阴影 `--shadow-sm/md`、`--color-accent-soft`、`--focus-ring`、`--border-strong`
+   - 全局 `:focus-visible` 环（不做动画）、标题 `letter-spacing: -0.011em`、`.tabular-nums` 工具类
+   - `.tag-chip` 从双色渐变改为 accent-soft 平色 + 细边；滚动条改用 token
+2. **头像**：`MessageCard` / `MessageDetailPanel` 的 indigo→purple 渐变圆头像改为平色 tinted 圆（`accent-soft` 底 + 主色首字母），去掉常见 AI 味
+3. **MessageCard**：修掉 actor 名 `text-white`（亮色下不可见）的 bug → token；详情箭头按钮从实心 indigo 圆改为描边幽灵按钮；星标统一 amber；圆角/阴影走 token
+4. **Message.vue**：顶栏、日期胶囊、骨架屏、空状态（去掉旋转方块）、按钮全部 token 化；计数加 tabular-nums
+5. **FilterSidebar**：选中态从浑浊 `/30` 改为 `accent-soft` + 底纹 hover；加 sidebar 背景；所有 `gray-*` 硬编码 → token
+6. **BottomNavBar**：玻璃拟态胶囊改用 token 背景/边框/阴影
+
+涉及文件（仅改，无删除）：`vue/src/style.css`、`views/Message.vue`、`components/MessageCard.vue`、`components/MessageDetailPanel.vue`、`components/FilterSidebar.vue`、`components/BottomNavBar.vue`。`pnpm build`（vue-tsc + vite）通过。
+
 ## 2026-05-07
 
 ### 消息编辑器升级为 Milkdown (Crepe) WYSIWYG
