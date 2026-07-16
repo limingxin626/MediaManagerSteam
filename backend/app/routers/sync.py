@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.models import (
-    get_db, SyncLog, Message, Actor, Media, Tag, MessageMedia, message_tag
+    get_db, SyncLog, Message, Collection, Media, Tag, Person, MessageMedia, message_tag
 )
 from app.schemas.sync import (
     SyncChangesResponse, SyncChangeItem,
@@ -68,8 +68,8 @@ def _message_snapshot(db: Session, msg: Message) -> Dict[str, Any]:
     return {
         "id": msg.id,
         "text": msg.text,
-        "actor_id": msg.actor_id,
-        "actor_name": msg.actor.name if msg.actor else None,
+        "collection_id": msg.collection_id,
+        "collection_name": msg.collection.name if msg.collection else None,
         "starred": bool(msg.starred),
         "created_at": msg.created_at.isoformat(),
         "updated_at": msg.updated_at.isoformat(),
@@ -78,14 +78,25 @@ def _message_snapshot(db: Session, msg: Message) -> Dict[str, Any]:
     }
 
 
-def _actor_snapshot(actor: Actor) -> Dict[str, Any]:
+def _collection_snapshot(collection: Collection) -> Dict[str, Any]:
     return {
-        "id": actor.id,
-        "name": actor.name,
-        "description": actor.description,
-        "avatar": config.get_actor_avatar_url(actor.id) if actor.avatar_path else None,
-        "created_at": actor.created_at.isoformat(),
-        "updated_at": actor.updated_at.isoformat(),
+        "id": collection.id,
+        "name": collection.name,
+        "description": collection.description,
+        "cover": config.get_collection_cover_url(collection.id) if collection.cover_path else None,
+        "created_at": collection.created_at.isoformat(),
+        "updated_at": collection.updated_at.isoformat(),
+    }
+
+
+def _person_snapshot(person: Person) -> Dict[str, Any]:
+    return {
+        "id": person.id,
+        "name": person.name,
+        "description": person.description,
+        "cover": config.get_person_cover_url(person.id) if person.cover_path else None,
+        "created_at": person.created_at.isoformat(),
+        "updated_at": person.updated_at.isoformat(),
     }
 
 
@@ -114,6 +125,7 @@ def _media_snapshot(media: Media) -> Dict[str, Any]:
         "frame_ms": media.frame_ms,
         "start_ms": media.start_ms,
         "end_ms": media.end_ms,
+        "people": [{"id": p.id, "name": p.name} for p in media.people],
         "created_at": media.created_at.isoformat(),
         "updated_at": media.updated_at.isoformat(),
     }
@@ -131,9 +143,12 @@ def _fetch_snapshot(db: Session, entity_type: str, entity_id: int) -> Optional[D
     if entity_type == "MESSAGE":
         obj = db.query(Message).filter(Message.id == entity_id).first()
         return _message_snapshot(db, obj) if obj else None
-    elif entity_type == "ACTOR":
-        obj = db.query(Actor).filter(Actor.id == entity_id).first()
-        return _actor_snapshot(obj) if obj else None
+    elif entity_type == "COLLECTION":
+        obj = db.query(Collection).filter(Collection.id == entity_id).first()
+        return _collection_snapshot(obj) if obj else None
+    elif entity_type == "PERSON":
+        obj = db.query(Person).filter(Person.id == entity_id).first()
+        return _person_snapshot(obj) if obj else None
     elif entity_type == "MEDIA":
         obj = db.query(Media).filter(Media.id == entity_id).first()
         return _media_snapshot(obj) if obj else None
@@ -286,7 +301,7 @@ def apply_sync_changes(
 
 
 def _apply_delete(db: Session, entity_type: str, entity_id: int) -> None:
-    model_map = {"MESSAGE": Message, "ACTOR": Actor, "MEDIA": Media, "TAG": Tag}
+    model_map = {"MESSAGE": Message, "COLLECTION": Collection, "MEDIA": Media, "TAG": Tag, "PERSON": Person}
     model = model_map.get(entity_type)
     if not model:
         return
@@ -301,8 +316,10 @@ def _apply_delete(db: Session, entity_type: str, entity_id: int) -> None:
 def _apply_upsert(db: Session, entity_type: str, entity_id: int, payload: dict) -> None:
     if entity_type == "MESSAGE":
         _upsert_message(db, entity_id, payload)
-    elif entity_type == "ACTOR":
-        _upsert_actor(db, entity_id, payload)
+    elif entity_type == "COLLECTION":
+        _upsert_collection(db, entity_id, payload)
+    elif entity_type == "PERSON":
+        _upsert_person(db, entity_id, payload)
     elif entity_type == "MEDIA":
         _upsert_media(db, entity_id, payload)
     elif entity_type == "TAG":
@@ -325,8 +342,11 @@ def _upsert_message(db: Session, entity_id: int, payload: dict) -> None:
     if existing:
         if "text" in payload:
             existing.text = payload["text"]
-        if "actorId" in payload or "actor_id" in payload:
-            existing.actor_id = payload.get("actorId") or payload.get("actor_id")
+        if any(k in payload for k in ("collectionId", "collection_id", "actorId", "actor_id")):
+            existing.collection_id = (
+                payload.get("collectionId") or payload.get("collection_id")
+                or payload.get("actorId") or payload.get("actor_id")
+            )
         if "starred" in payload:
             existing.starred = 1 if payload["starred"] else 0
         existing.updated_at = incoming_updated or datetime.utcnow()
@@ -335,7 +355,10 @@ def _upsert_message(db: Session, entity_id: int, payload: dict) -> None:
         msg = Message(
             id=entity_id,
             text=payload.get("text"),
-            actor_id=payload.get("actorId") or payload.get("actor_id"),
+            collection_id=(
+                payload.get("collectionId") or payload.get("collection_id")
+                or payload.get("actorId") or payload.get("actor_id")
+            ),
             starred=1 if payload.get("starred") else 0,
             created_at=created_at,
             updated_at=incoming_updated or datetime.utcnow(),
@@ -344,8 +367,8 @@ def _upsert_message(db: Session, entity_id: int, payload: dict) -> None:
         db.flush()
 
 
-def _upsert_actor(db: Session, entity_id: int, payload: dict) -> None:
-    existing = db.query(Actor).filter(Actor.id == entity_id).first()
+def _upsert_collection(db: Session, entity_id: int, payload: dict) -> None:
+    existing = db.query(Collection).filter(Collection.id == entity_id).first()
     incoming_updated = _parse_dt(payload.get("updatedAt") or payload.get("updated_at"))
 
     if existing:
@@ -356,14 +379,36 @@ def _upsert_actor(db: Session, entity_id: int, payload: dict) -> None:
         existing.updated_at = incoming_updated or datetime.utcnow()
     else:
         created_at = _parse_dt(payload.get("createdAt") or payload.get("created_at")) or datetime.utcnow()
-        actor = Actor(
+        collection = Collection(
             id=entity_id,
             name=payload.get("name", ""),
             description=payload.get("description"),
             created_at=created_at,
             updated_at=incoming_updated or datetime.utcnow(),
         )
-        db.add(actor)
+        db.add(collection)
+
+
+def _upsert_person(db: Session, entity_id: int, payload: dict) -> None:
+    existing = db.query(Person).filter(Person.id == entity_id).first()
+    incoming_updated = _parse_dt(payload.get("updatedAt") or payload.get("updated_at"))
+
+    if existing:
+        if "name" in payload:
+            existing.name = payload["name"]
+        if "description" in payload:
+            existing.description = payload["description"]
+        existing.updated_at = incoming_updated or datetime.utcnow()
+    else:
+        created_at = _parse_dt(payload.get("createdAt") or payload.get("created_at")) or datetime.utcnow()
+        person = Person(
+            id=entity_id,
+            name=payload.get("name", ""),
+            description=payload.get("description"),
+            created_at=created_at,
+            updated_at=incoming_updated or datetime.utcnow(),
+        )
+        db.add(person)
 
 
 def _upsert_media(db: Session, entity_id: int, payload: dict) -> None:

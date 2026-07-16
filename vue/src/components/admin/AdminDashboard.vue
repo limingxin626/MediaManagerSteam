@@ -76,10 +76,12 @@ const loading = ref(false)
 const tableNames: Record<string, string> = {
   message: 'Message',
   media: 'Media',
-  actor: 'Actor',
+  collection: 'Collection',
+  person: 'Person',
   tag: 'Tag',
   message_media: 'MessageMedia',
   message_tag: 'MessageTag',
+  media_person: 'MediaPerson',
   sync_log: 'SyncLog',
 }
 

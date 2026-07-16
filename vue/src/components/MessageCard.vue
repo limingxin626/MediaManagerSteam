@@ -4,15 +4,15 @@
     class="group flex-1 min-w-0 bg-[var(--bg-card)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] border border-[var(--border-color)] overflow-hidden hover:shadow-[var(--shadow-md)] transition-shadow duration-200"
     :class="{ 'ring-2 ring-[var(--color-primary-500)] border-transparent': props.selected }">
     <div class="px-4 pt-3">
-      <!-- Actor Info -->
+      <!-- Collection Info -->
       <div class="flex items-center justify-between gap-3">
-        <div v-if="message.actor_name"
+        <div v-if="message.collection_name"
           class="w-9 h-9 rounded-full bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] flex items-center justify-center text-sm font-semibold">
-          {{ actorInitial }}
+          {{ collectionInitial }}
         </div>
         <div class="flex-1 min-w-0">
-          <h3 v-if="message.actor_name" class="text-sm font-semibold text-[var(--text-primary)] truncate">
-            {{ message.actor_name }}
+          <h3 v-if="message.collection_name" class="text-sm font-semibold text-[var(--text-primary)] truncate">
+            {{ message.collection_name }}
           </h3>
         </div>
       </div>
@@ -415,9 +415,9 @@ const handleEdit = () => {
   emit('edit', props.message.id)
 }
 
-const actorInitial = computed(() => {
-  if (!props.message.actor_name) return '?'
-  return props.message.actor_name.charAt(0).toUpperCase()
+const collectionInitial = computed(() => {
+  if (!props.message.collection_name) return '?'
+  return props.message.collection_name.charAt(0).toUpperCase()
 })
 
 const messageTags = computed(() => {

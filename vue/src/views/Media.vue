@@ -2,12 +2,12 @@
   <div class="h-screen flex transition-colors">
     <FilterSidebar
       :tags="tags"
-      :actors="actors"
-      :no-actor-count="noActorCount"
+      :collections="collections"
+      :no-collection-count="noCollectionCount"
       :selected-tag-id="selectedTagId"
-      :selected-actor-id="selectedActorId"
+      :selected-collection-id="selectedCollectionId"
       @select-tag="selectTag"
-      @select-actor="selectActor"
+      @select-collection="selectCollection"
     />
 
     <!-- Main Content -->
@@ -48,7 +48,7 @@
             v-model="searchInput"
             @keydown.enter="commitSearch"
             type="text"
-            placeholder="智能搜索：sunset / 猫 / actor..."
+            placeholder="智能搜索：sunset / 猫 / 合集..."
             class="w-full px-3 py-1.5 pr-8 rounded-full text-sm bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[var(--color-primary-500)]"
           />
           <button
@@ -205,7 +205,7 @@ import MediaPreview from '../components/MediaPreview.vue'
 import DateScrubber from '../components/DateScrubber.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
 import MediaCell from '../components/MediaCell.vue'
-import type { Media, TagWithCount, Actor, CursorResponse } from '../types'
+import type { Media, TagWithCount, Collection, CursorResponse, MessageMediaItem } from '../types'
 import { api } from '../composables/useApi'
 import { useVirtualGrid } from '../composables/useVirtualGrid'
 import { toggleMediaStar } from '../utils/media'
@@ -224,7 +224,7 @@ const typeOptions = [
 const selectedType = ref('')
 const starredFilter = ref(false)
 const selectedTagId = ref<number | null>(null)
-const selectedActorId = ref<number | null>(null)
+const selectedCollectionId = ref<number | null>(null)
 
 const scrollContainer = ref<HTMLElement | null>(null)
 const measureEl = ref<HTMLElement | null>(null)
@@ -233,7 +233,7 @@ const filters = computed(() => ({
   starred: starredFilter.value || undefined,
   type: selectedType.value || undefined,
   tag_id: selectedTagId.value ?? undefined,
-  actor_id: selectedActorId.value ?? undefined,
+  collection_id: selectedCollectionId.value ?? undefined,
 }))
 
 const vg = useVirtualGrid({
@@ -251,9 +251,11 @@ const refreshing = ref(false)
 
 const PEEK_COUNT = 5
 
-function mapToPreviewItem(m: Media) {
+function mapToPreviewItem(m: Media): MessageMediaItem {
   return {
     id: m.id,
+    created_at: (m as any).created_at,
+    updated_at: (m as any).updated_at,
     repo_id: m.repo_id,
     file_path: m.file_path,
     local_file_path: m.local_file_path,
@@ -266,7 +268,8 @@ function mapToPreviewItem(m: Media) {
     duration_ms: m.duration_ms,
     starred: m.starred,
     tags: m.tags,
-  }
+    people: (m as any).people,
+  } as MessageMediaItem
 }
 
 function findAdjacentBucket(currentKey: string | null, direction: -1 | 1) {
@@ -398,6 +401,7 @@ function openSmartPreview(idx: number) {
     duration_ms: m.duration_ms,
     starred: m.starred,
     tags: m.tags,
+    people: (m as any).people,
   }))
   previewStartIndex.value = idx
   previewOpen.value = true
@@ -409,10 +413,10 @@ function starWithBounce(item: Media) {
   toggleMediaStar(item)
 }
 
-// --- Tag & Actor sidebar data ---
+// --- Tag & Collection sidebar data ---
 const tags = ref<TagWithCount[]>([])
-const actors = ref<Actor[]>([])
-const noActorCount = ref(0)
+const collections = ref<Collection[]>([])
+const noCollectionCount = ref(0)
 
 async function fetchTags() {
   try {
@@ -420,21 +424,21 @@ async function fetchTags() {
   } catch {}
 }
 
-async function fetchActors() {
+async function fetchCollections() {
   try {
-    const data = await api.get<{ items: Actor[]; no_actor_count: number }>('/actors')
-    actors.value = data.items
-    noActorCount.value = data.no_actor_count
+    const data = await api.get<{ items: Collection[]; no_collection_count: number }>('/collections')
+    collections.value = data.items
+    noCollectionCount.value = data.no_collection_count
   } catch {}
 }
 
 function selectTag(tagId: number | null) {
   selectedTagId.value = tagId
-  selectedActorId.value = null
+  selectedCollectionId.value = null
 }
 
-function selectActor(actorId: number | null) {
-  selectedActorId.value = actorId
+function selectCollection(collectionId: number | null) {
+  selectedCollectionId.value = collectionId
   selectedTagId.value = null
 }
 
@@ -524,6 +528,6 @@ const handleMediaTagsChanged = (
 
 onMounted(() => {
   fetchTags()
-  fetchActors()
+  fetchCollections()
 })
 </script>

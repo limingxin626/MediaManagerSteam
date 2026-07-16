@@ -5,6 +5,12 @@ from app.schemas.base import TimestampMixin, MediaUrlMixin
 from app.schemas.message import MessageTagItem
 
 
+class MediaPersonItem(BaseModel):
+    id: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MediaResponse(MediaUrlMixin, TimestampMixin):
     file_size: int | None
     mime_type: str | None
@@ -15,6 +21,7 @@ class MediaResponse(MediaUrlMixin, TimestampMixin):
     starred: bool = False
     view_count: int
     tags: List[MessageTagItem] = []
+    people: List[MediaPersonItem] = []
     video_media_id: int | None = None
     frame_ms: int | None = None
     start_ms: int | None = None

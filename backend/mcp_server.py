@@ -19,7 +19,7 @@ mcp = FastMCP(
         "个人工作笔记系统，贯穿所有对话使用。"
         "当用户完成一项工作、整理信息、记录决策，或明确要求「记到笔记里」「发到笔记」时，"
         "使用 write_message 写入笔记。"
-        "笔记通过 #tag 分类（如 #简报 #会议 #决策），通过 actor 关联到具体的人，"
+        "笔记通过 #tag 分类（如 #简报 #会议 #决策），通过 collection 关联到具体的合集，"
         "也可以通过 issue_id 归到某个工作主题的时间线下。"
         "使用 search_messages 检索历史笔记，使用 list_tags 浏览已有分类，"
         "使用 list_issues / read_issue 查看进行中的工作主题。"
@@ -52,7 +52,7 @@ def _compact(d: dict[str, Any]) -> dict[str, Any]:
 @mcp.tool()
 async def write_message(
     text: str | None = None,
-    actor_id: int | None = None,
+    collection_id: int | None = None,
     issue_id: int | None = None,
     file_paths: list[str] | None = None,
     tag_list: list[str] | None = None,
@@ -65,7 +65,7 @@ async def write_message(
 
     Args:
         text: 笔记正文，支持 Markdown。正文中的 #hashtag 会被自动提取为标签
-        actor_id: 关联的人物 ID（通过 list_actors 查询获得）
+        collection_id: 关联的人物 ID（通过 list_collections 查询获得）
         issue_id: 关联的 Issue ID（通过 list_issues 查询获得），笔记会出现在该 issue 的时间线
         file_paths: 要附加的本地文件路径列表
         tag_list: 标签列表（如 ["简报", "周报"]）
@@ -73,8 +73,8 @@ async def write_message(
     body: dict[str, Any] = {}
     if text is not None:
         body["text"] = text
-    if actor_id is not None:
-        body["actor_id"] = actor_id
+    if collection_id is not None:
+        body["collection_id"] = collection_id
     if issue_id is not None:
         body["issue_id"] = issue_id
     if file_paths is not None:
@@ -111,7 +111,7 @@ async def _resolve_tag_ids(names: list[str]) -> list[int]:
 @mcp.tool()
 async def write_message_from_md(
     file_path: str,
-    actor_id: int | None = None,
+    collection_id: int | None = None,
     tag_list: list[str] | None = None,
     delete_after: bool = False,
 ) -> str:
@@ -119,7 +119,7 @@ async def write_message_from_md(
 
     Args:
         file_path: Markdown 文件的绝对路径
-        actor_id: 关联的人物 ID
+        collection_id: 关联的人物 ID
         tag_list: 标签列表（如 ["简报", "周报"]）
         delete_after: 写入成功后是否删除源 md 文件，默认 False
     """
@@ -134,7 +134,7 @@ async def write_message_from_md(
     if not text.strip():
         return json.dumps({"error": True, "detail": "文件内容为空"}, ensure_ascii=False)
 
-    result = await write_message(text=text, actor_id=actor_id, tag_list=tag_list)
+    result = await write_message(text=text, collection_id=collection_id, tag_list=tag_list)
 
     if delete_after:
         try:
@@ -156,7 +156,7 @@ async def write_message_from_md(
 @mcp.tool()
 async def search_messages(
     query_text: str,
-    actor_id: int | None = None,
+    collection_id: int | None = None,
     issue_id: int | None = None,
     tag_id: int | None = None,
     starred: bool | None = None,
@@ -169,7 +169,7 @@ async def search_messages(
 
     Args:
         query_text: 搜索关键词，必填。多词空格分隔（隐式 AND），如 "briefing 周报"
-        actor_id: 按关联人物过滤
+        collection_id: 按关联人物过滤
         issue_id: 按 issue 过滤
         tag_id: 按标签 ID 过滤（通过 list_tags 查询获得）
         starred: 仅返回收藏的笔记
@@ -179,7 +179,7 @@ async def search_messages(
     params = _compact(
         {
             "q": query_text,
-            "actor_id": actor_id,
+            "collection_id": collection_id,
             "issue_id": issue_id,
             "tag_id": tag_id,
             "starred": starred,

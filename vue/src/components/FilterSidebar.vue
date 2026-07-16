@@ -47,36 +47,36 @@
       </div>
     </div>
 
-    <!-- Actor panel -->
-    <div v-show="activeTab === 'actor'" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 py-3">
-      <button @click="onSelectActor(null)"
-        class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedActorId === null
+    <!-- Collection panel -->
+    <div v-show="activeTab === 'collection'" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 py-3">
+      <button @click="onSelectCollection(null)"
+        class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left" :class="selectedCollectionId === null
           ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'">
         <span>全部</span>
       </button>
       <button
-        v-if="noActorCount > 0 || selectedActorId === 0"
-        @click="onSelectActor(0)"
+        v-if="noCollectionCount > 0 || selectedCollectionId === 0"
+        @click="onSelectCollection(0)"
         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
-        :class="selectedActorId === 0
+        :class="selectedCollectionId === 0
           ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
       >
         <span class="truncate">无</span>
-        <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ noActorCount }}</span>
+        <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ noCollectionCount }}</span>
       </button>
       <button
-        v-for="actor in actors"
-        :key="actor.id"
-        @click="onSelectActor(actor.id)"
+        v-for="collection in collections"
+        :key="collection.id"
+        @click="onSelectCollection(collection.id)"
         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left"
-        :class="selectedActorId === actor.id
+        :class="selectedCollectionId === collection.id
           ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
       >
-        <span class="truncate">{{ actor.name }}</span>
-        <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ actor.message_count }}</span>
+        <span class="truncate">{{ collection.name }}</span>
+        <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ collection.message_count }}</span>
       </button>
     </div>
 
@@ -124,16 +124,16 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Actor, Issue, TagWithCount } from '../types'
+import type { Collection, Issue, TagWithCount } from '../types'
 
-type TabKey = 'tag' | 'actor' | 'issue'
+type TabKey = 'tag' | 'collection' | 'issue'
 
 const props = withDefaults(defineProps<{
   tags: TagWithCount[]
-  actors: Actor[]
-  noActorCount: number
+  collections: Collection[]
+  noCollectionCount: number
   selectedTagId: number | null
-  selectedActorId: number | null
+  selectedCollectionId: number | null
   issues?: Issue[]
   noIssueCount?: number
   selectedIssueId?: number | null
@@ -146,12 +146,12 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'select-tag', tagId: number | null): void
-  (e: 'select-actor', actorId: number | null): void
+  (e: 'select-collection', collectionId: number | null): void
   (e: 'select-issue', issueId: number | null): void
 }>()
 
 // Issue 功能仅在消费方接入(传 issues / onCreateIssue / 已选 issue)时启用;
-// Media 页不传这些,自然退化为「标签 / 演员」两个 tab。
+// Media 页不传这些,自然退化为「标签 / 合集」两个 tab。
 const issueEnabled = computed(() =>
   props.issues.length > 0 || !!props.onCreateIssue || (props.selectedIssueId ?? null) !== null,
 )
@@ -159,7 +159,7 @@ const issueEnabled = computed(() =>
 const visibleTabs = computed<{ key: TabKey; label: string }[]>(() => {
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'tag', label: '标签' },
-    { key: 'actor', label: '演员' },
+    { key: 'collection', label: '合集' },
   ]
   if (issueEnabled.value) tabs.push({ key: 'issue', label: 'Issue' })
   return tabs
@@ -169,9 +169,9 @@ const activeTab = ref<TabKey>('tag')
 
 // 当前有选中项时,自动切到对应 tab,使 keep-alive 返回 / 外部改选时 UI 一致。
 watch(
-  () => [props.selectedActorId, props.selectedIssueId, props.selectedTagId] as const,
-  ([actorId, issueId]) => {
-    if (actorId !== null) activeTab.value = 'actor'
+  () => [props.selectedCollectionId, props.selectedIssueId, props.selectedTagId] as const,
+  ([collectionId, issueId]) => {
+    if (collectionId !== null) activeTab.value = 'collection'
     else if (issueEnabled.value && (issueId ?? null) !== null) activeTab.value = 'issue'
   },
   { immediate: true },
@@ -182,8 +182,8 @@ const onSelectTag = (tagId: number | null) => {
   emit('select-tag', tagId)
 }
 
-const onSelectActor = (actorId: number | null) => {
-  emit('select-actor', actorId)
+const onSelectCollection = (collectionId: number | null) => {
+  emit('select-collection', collectionId)
 }
 
 const onSelectIssue = (issueId: number | null) => {

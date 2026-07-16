@@ -82,7 +82,7 @@ import {
 } from '@headlessui/vue'
 
 
-interface ActorFormData {
+interface CollectionFormData {
   name: string
   description: string
 }
@@ -90,17 +90,17 @@ interface ActorFormData {
 interface Props {
   isOpen: boolean
   title: string
-  formData: ActorFormData
+  formData: CollectionFormData
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
   close: []
-  save: [data: ActorFormData]
+  save: [data: CollectionFormData]
 }>()
 
-const localFormData = ref<ActorFormData>({ ...props.formData })
+const localFormData = ref<CollectionFormData>({ ...props.formData })
 
 // Watch for formData changes to sync with parent
 watch(() => props.formData, (newData) => {

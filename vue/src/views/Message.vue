@@ -2,16 +2,16 @@
   <div class="h-screen flex transition-colors">
     <FilterSidebar
       :tags="tags"
-      :actors="actors"
-      :no-actor-count="noActorCount"
+      :collections="collections"
+      :no-collection-count="noCollectionCount"
       :selected-tag-id="selectedTagId"
-      :selected-actor-id="selectedActorId"
+      :selected-collection-id="selectedCollectionId"
       :issues="issues"
       :no-issue-count="noIssueCount"
       :selected-issue-id="selectedIssueId"
       :on-create-issue="promptCreateIssue"
       @select-tag="selectTag"
-      @select-actor="selectActor"
+      @select-collection="selectCollection"
       @select-issue="selectIssue"
     />
 
@@ -235,7 +235,7 @@
       <MessageComposeDialog :visible="dialogVisible" :mode="dialogMode" :message-id="dialogMessageId"
         :initial-text="dialogInitialText" :initial-date="dialogInitialDate" :initial-media="dialogInitialMedia"
         :initial-tags="dialogInitialTags"
-        :all-tags="tags" :tag-id="selectedTagId ?? null" :actor-id="selectedActorId ?? undefined"
+        :all-tags="tags" :tag-id="selectedTagId ?? null" :collection-id="selectedCollectionId ?? undefined"
         :issue-id="selectedIssueId ?? undefined" @close="dialogVisible = false"
         @created="onDialogCreated" @updated="onDialogUpdated" @media-changed="onMediaChanged" @tag-created="fetchTags" />
 
@@ -262,7 +262,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Calendar } from 'v-calendar'
 import 'v-calendar/style.css'
-import { type Actor, type Issue, type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
+import { type Collection, type Issue, type MessageDetail, type MessageMediaItem, type TagWithCount } from '../types'
 import MessageCard from '../components/MessageCard.vue'
 import MessageGridCard from '../components/MessageGridCard.vue'
 import MediaPreview from '../components/MediaPreview.vue'
@@ -323,7 +323,7 @@ const loadCalendarMonth = async (year: number, month: number) => {
       year,
       month,
       tag_id: selectedTagId.value ?? undefined,
-      actor_id: selectedActorId.value ?? undefined,
+      collection_id: selectedCollectionId.value ?? undefined,
       issue_id: selectedIssueId.value ?? undefined,
       query_text: searchQuery.value || undefined,
     })
@@ -380,7 +380,7 @@ const jumpToDate = async (dateStr: string) => {
         media_id: activeMediaFilter.value ?? undefined,
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
-        actor_id: selectedActorId.value ?? undefined,
+        collection_id: selectedCollectionId.value ?? undefined,
         issue_id: selectedIssueId.value ?? undefined,
       },
     )
@@ -420,9 +420,9 @@ const onDocumentClick = (e: MouseEvent) => {
 const tags = ref<TagWithCount[]>([])
 const selectedTagId = ref<number | null>(null)
 
-const actors = ref<Actor[]>([])
-const noActorCount = ref(0)
-const selectedActorId = ref<number | null>(null)
+const collections = ref<Collection[]>([])
+const noCollectionCount = ref(0)
+const selectedCollectionId = ref<number | null>(null)
 
 const issues = ref<Issue[]>([])
 const noIssueCount = ref(0)
@@ -442,7 +442,7 @@ const scrollPositionCache = new Map<string, FilterScrollCache>()
 
 const getFilterKey = (): string => {
   if (selectedTagId.value !== null) return `tag:${selectedTagId.value}`
-  if (selectedActorId.value !== null) return `actor:${selectedActorId.value}`
+  if (selectedCollectionId.value !== null) return `collection:${selectedCollectionId.value}`
   if (selectedIssueId.value !== null) return `issue:${selectedIssueId.value}`
   return 'all'
 }
@@ -526,11 +526,11 @@ const fetchTags = async () => {
   }
 }
 
-const fetchActors = async () => {
+const fetchCollections = async () => {
   try {
-    const data = await api.get<{ items: Actor[]; no_actor_count: number }>('/actors')
-    actors.value = data.items
-    noActorCount.value = data.no_actor_count
+    const data = await api.get<{ items: Collection[]; no_collection_count: number }>('/collections')
+    collections.value = data.items
+    noCollectionCount.value = data.no_collection_count
   } catch {
     // silent fail
   }
@@ -585,7 +585,7 @@ const resetFilters = () => {
 const selectTag = (tagId: number | null) => {
   saveScrollPosition()
   selectedTagId.value = tagId
-  selectedActorId.value = null
+  selectedCollectionId.value = null
   selectedIssueId.value = null
   resetFilters()
   if (!restoreFromCache(getFilterKey())) {
@@ -593,9 +593,9 @@ const selectTag = (tagId: number | null) => {
   }
 }
 
-const selectActor = (actorId: number | null) => {
+const selectCollection = (collectionId: number | null) => {
   saveScrollPosition()
-  selectedActorId.value = actorId
+  selectedCollectionId.value = collectionId
   selectedTagId.value = null
   selectedIssueId.value = null
   resetFilters()
@@ -608,7 +608,7 @@ const selectIssue = (issueId: number | null) => {
   saveScrollPosition()
   selectedIssueId.value = issueId
   selectedTagId.value = null
-  selectedActorId.value = null
+  selectedCollectionId.value = null
   resetFilters()
   if (!restoreFromCache(getFilterKey())) {
     resetAndFetch()
@@ -701,7 +701,7 @@ const fetchForwardMessages = async () => {
       media_id: activeMediaFilter.value ?? undefined,
       starred: starredFilter.value || undefined,
       tag_id: selectedTagId.value ?? undefined,
-      actor_id: selectedActorId.value ?? undefined,
+      collection_id: selectedCollectionId.value ?? undefined,
       issue_id: selectedIssueId.value ?? undefined,
     })
 
@@ -892,7 +892,7 @@ const fetchMessages = async (isLoadingMore = false) => {
         media_id: activeMediaFilter.value ?? undefined,
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
-        actor_id: selectedActorId.value ?? undefined,
+        collection_id: selectedCollectionId.value ?? undefined,
         issue_id: selectedIssueId.value ?? undefined,
       },
     )
@@ -1167,7 +1167,7 @@ const handlePanelJump = async (messageId: number) => {
         media_id: activeMediaFilter.value ?? undefined,
         starred: starredFilter.value || undefined,
         tag_id: selectedTagId.value ?? undefined,
-        actor_id: selectedActorId.value ?? undefined,
+        collection_id: selectedCollectionId.value ?? undefined,
         issue_id: selectedIssueId.value ?? undefined,
       },
     )
@@ -1330,7 +1330,7 @@ watch(() => route.path, (path) => {
 onMounted(() => {
   initLayout()
   fetchTags()
-  fetchActors()
+  fetchCollections()
   fetchIssues()
   const saved = localStorage.getItem(SCROLL_POS_KEY)
   if (saved) {
@@ -1348,7 +1348,7 @@ onMounted(() => {
             media_id: activeMediaFilter.value ?? undefined,
             starred: starredFilter.value || undefined,
             tag_id: selectedTagId.value ?? undefined,
-            actor_id: selectedActorId.value ?? undefined,
+            collection_id: selectedCollectionId.value ?? undefined,
             issue_id: selectedIssueId.value ?? undefined,
           },
         ),
@@ -1361,7 +1361,7 @@ onMounted(() => {
             media_id: activeMediaFilter.value ?? undefined,
             starred: starredFilter.value || undefined,
             tag_id: selectedTagId.value ?? undefined,
-            actor_id: selectedActorId.value ?? undefined,
+            collection_id: selectedCollectionId.value ?? undefined,
             issue_id: selectedIssueId.value ?? undefined,
             direction: 'forward',
           },

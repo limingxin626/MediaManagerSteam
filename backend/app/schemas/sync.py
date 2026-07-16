@@ -27,7 +27,7 @@ class SyncChangesResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class SyncApplyItem(BaseModel):
-    entityType: str       # ACTOR | MEDIA | MESSAGE | TAG
+    entityType: str       # COLLECTION | MEDIA | MESSAGE | TAG | PERSON
     operation: str        # UPSERT | DELETE
     entityId: int
     payload: Optional[Dict[str, Any]] = None

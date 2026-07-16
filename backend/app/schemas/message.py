@@ -7,7 +7,7 @@ MEDIA_PREVIEW_LIMIT = 30  # 消息内媒体预览上限
 
 class MessageCreate(BaseModel):
     text: Optional[str] = None
-    actor_id: Optional[int] = None
+    collection_id: Optional[int] = None
     issue_id: Optional[int] = None
     files: List[str] = []
     tag_ids: Optional[List[int]] = None
@@ -21,7 +21,7 @@ class ClientMediaFile(BaseModel):
 class MessageCreateFromClient(BaseModel):
     id: int                            # 客户端提供的 Message ID
     text: Optional[str] = None
-    actor_id: Optional[int] = None
+    collection_id: Optional[int] = None
     issue_id: Optional[int] = None
     created_at: Optional[str] = None   # ISO 时间戳
     files: List[ClientMediaFile] = []  # 客户端提供 media_id + 服务器文件路径
@@ -29,7 +29,7 @@ class MessageCreateFromClient(BaseModel):
 
 class MessageUpdate(BaseModel):
     text: Optional[str] = None
-    actor_id: Optional[int] = None
+    collection_id: Optional[int] = None
     issue_id: Optional[int] = None
     starred: Optional[bool] = None
     created_at: Optional[str] = None  # ISO 时间戳
@@ -55,8 +55,8 @@ class MessageTagItem(OrmBase):
 class MessageResponse(TimestampMixin):
     id: int
     text: str | None = None
-    actor_id: int | None = None
-    actor_name: str | None = None
+    collection_id: int | None = None
+    collection_name: str | None = None
     issue_id: int | None = None
     issue_title: str | None = None
     media_count: int
@@ -86,8 +86,8 @@ class MessageSearchItem(BaseModel):
     id: int
     created_at: str
     snippet: str
-    actor_id: Optional[int] = None
-    actor_name: Optional[str] = None
+    collection_id: Optional[int] = None
+    collection_name: Optional[str] = None
     issue_id: Optional[int] = None
     issue_title: Optional[str] = None
     tags: List[str] = []

@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/actors/sync": {
+    "/collections/sync": {
         parameters: {
             query?: never;
             header?: never;
@@ -12,10 +12,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Sync Actors
-         * @description 全量同步：返回所有演员（供 Android 拉取）
+         * Sync Collections
+         * @description 全量同步：返回所有合集（供 Android 拉取）
          */
-        get: operations["sync_actors_actors_sync_get"];
+        get: operations["sync_collections_collections_sync_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24,7 +24,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/actors": {
+    "/collections": {
         parameters: {
             query?: never;
             header?: never;
@@ -32,13 +32,89 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Actors
-         * @description 获取演员列表（返回所有有消息的演员）
+         * Get Collections
+         * @description 获取合集列表（返回所有有消息的合集）
          */
-        get: operations["get_actors_actors_get"];
+        get: operations["get_collections_collections_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Collection
+         * @description 新建合集（名称唯一）
+         */
+        post: operations["create_collection_collections_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collections/{collection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Collection
+         * @description 重命名 / 修改合集描述
+         */
+        put: operations["update_collection_collections__collection_id__put"];
+        post?: never;
+        /**
+         * Delete Collection
+         * @description 删除合集：其下 message 的 collection_id 置 NULL，不级联删 message
+         */
+        delete: operations["delete_collection_collections__collection_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get People
+         * @description 获取所有人物，附带每个人物关联的媒体数量。
+         */
+        get: operations["get_people_people_get"];
+        put?: never;
+        /**
+         * Create Person
+         * @description 新建人物（名称唯一）
+         */
+        post: operations["create_person_people_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/people/{person_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Person
+         * @description 重命名 / 修改人物描述
+         */
+        put: operations["update_person_people__person_id__put"];
+        post?: never;
+        /**
+         * Delete Person
+         * @description 删除人物及其媒体关联
+         */
+        delete: operations["delete_person_people__person_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -128,6 +204,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messages/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Messages Fts
+         * @description 基于 FTS5 的全文检索，返回精简结果（snippet + 元数据）。
+         */
+        get: operations["search_messages_fts_messages_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/messages/{message_id}": {
         parameters: {
             query?: never;
@@ -151,7 +247,7 @@ export interface paths {
         head?: never;
         /**
          * Update Message
-         * @description 更新消息：文字、actor、媒体顺序
+         * @description 更新消息：文字、collection、媒体顺序
          */
         patch: operations["update_message_messages__message_id__patch"];
         trace?: never;
@@ -196,6 +292,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messages/{message_id}/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Split Message
+         * @description 拆分消息：将选中的媒体移动到新消息中，复制 text/collection/starred/tags。
+         */
+        post: operations["split_message_messages__message_id__split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/{message_id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Media To Message
+         * @description 向已有消息添加媒体文件
+         */
+        post: operations["add_media_to_message_messages__message_id__media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/{message_id}/media/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Media From Message
+         * @description 从消息中移除媒体（仅解除关联，不删除文件）
+         */
+        delete: operations["remove_media_from_message_messages__message_id__media__media_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/media": {
         parameters: {
             query?: never;
@@ -216,6 +372,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Media Timeline */
+        get: operations["get_media_timeline_media_timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/media/feed": {
         parameters: {
             query?: never;
@@ -225,12 +398,51 @@ export interface paths {
         };
         /**
          * Get Media Feed
-         * @description 按 MessageMedia 展开的媒体流（Telegram风格，媒体可重复），支持 tag/actor 筛选
+         * @description 按 MessageMedia 展开的媒体流（Telegram风格，媒体可重复），支持 tag/collection 筛选
          */
         get: operations["get_media_feed_media_feed_get"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/previews/{preview_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Preview */
+        delete: operations["delete_preview_media_previews__preview_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Preview */
+        patch: operations["update_preview_media_previews__preview_id__patch"];
+        trace?: never;
+    };
+    "/media/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Media By Id */
+        get: operations["get_media_by_id_media__media_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Media
+         * @description 删除媒体。若指定 message_id 且该媒体被多条消息引用，则仅解除当前关联。
+         */
+        delete: operations["delete_media_media__media_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -270,6 +482,139 @@ export interface paths {
          */
         put: operations["update_media_rating_media__media_id__rating_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate Media Endpoint */
+        post: operations["rotate_media_endpoint_media__media_id__rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace Media Endpoint
+         * @description 用上传文件替换该 media 对应的实际文件，保留 Media 行 id 及所有关联。
+         */
+        post: operations["replace_media_endpoint_media__media_id__replace_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Media Tags */
+        put: operations["set_media_tags_media__media_id__tags_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Media People
+         * @description 整体替换该 media 关联的人物集合。
+         */
+        put: operations["set_media_people_media__media_id__people_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Previews */
+        get: operations["list_previews_media__media_id__previews_get"];
+        put?: never;
+        /** Add Preview */
+        post: operations["add_preview_media__media_id__previews_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/previews/screenshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Preview From Screenshot */
+        post: operations["add_preview_from_screenshot_media__media_id__previews_screenshot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Video Cover
+         * @description 把上传的图片设为视频封面。
+         *
+         *     落地策略遵循既有 sidecar 约定:`<stem>.cover.jpg` 写在视频同目录,
+         *     并立刻基于这张 sidecar 重生成 `DATA_ROOT/thumbs/{id}.webp`。
+         *     下次 re-import / replace 同一路径时,sidecar 仍会被自动识别,封面不会丢。
+         */
+        post: operations["set_video_cover_media__media_id__cover_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -468,15 +813,43 @@ export interface paths {
         };
         /**
          * Get Tags
-         * @description 获取所有标签，支持按名称搜索，附带每个标签的消息数量。
+         * @description 获取所有标签，支持按名称搜索，附带每个标签的关联数量。
          */
         get: operations["get_tags_tags_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Tag
+         * @description 创建新标签
+         */
+        post: operations["create_tag_tags_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Tag
+         * @description 删除标签及其关联
+         */
+        delete: operations["delete_tag_tags__tag_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Tag
+         * @description 重命名/修改标签分类
+         */
+        patch: operations["update_tag_tags__tag_id__patch"];
         trace?: never;
     };
     "/sync/changes": {
@@ -524,18 +897,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/sync/events": {
+    "/admin/stats": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Sync Events
-         * @description SSE 端点：推送变更通知。客户端收到后调用 /sync/changes 拉取实际数据。
-         */
-        get: operations["sync_events_sync_events_get"];
+        /** Get Stats */
+        get: operations["get_stats_admin_stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -564,42 +934,482 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Stats */
+        get: operations["get_stats_api_dashboard_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/heatmap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Heatmap
+         * @description 过去 365 天每日消息数（GitHub 风格热力图）。
+         */
+        get: operations["get_heatmap_api_dashboard_heatmap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Board */
+        get: operations["get_board_issues_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_issues_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/issues/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Issues */
+        get: operations["list_issues_issues_list_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/issues/{issue_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get One */
+        get: operations["get_one_issues__issue_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete */
+        delete: operations["delete_issues__issue_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update */
+        patch: operations["update_issues__issue_id__patch"];
+        trace?: never;
+    };
+    "/issues/{issue_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Move */
+        patch: operations["move_issues__issue_id__move_patch"];
+        trace?: never;
+    };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health */
+        get: operations["health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/smart/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Smart Status */
+        get: operations["smart_status_smart_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/smart/tags/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suggest Tags */
+        post: operations["suggest_tags_smart_tags_suggest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/smart/tags/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Tags */
+        post: operations["apply_tags_smart_tags_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/smart/similar/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Similar Media */
+        get: operations["similar_media_smart_similar__media_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/smart/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Media */
+        get: operations["search_media_smart_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/smart/embeddings/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rebuild Embeddings */
+        post: operations["rebuild_embeddings_smart_embeddings_rebuild_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Transactions
+         * @description 按 (sort_col, id) 游标分页。时间窗口优先用 from_*\/to_* 月份范围(闭区间),否则用 year/month 单月。
+         */
+        get: operations["list_transactions_transactions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transactions/summary/monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Monthly */
+        get: operations["monthly_transactions_summary_monthly_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transactions/summary/range": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Range Summary
+         * @description 月份范围 [from, to] 闭区间的支出汇总;起止反了自动 swap。
+         */
+        get: operations["range_summary_transactions_summary_range_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transactions/months": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Months
+         * @description 所有有数据的 (year, month),倒序;附带笔数与计入支出。前端做月份选择器用。
+         */
+        get: operations["list_months_transactions_months_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transactions/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Categories
+         * @description 已出现的全部 category,按使用频次降序。
+         */
+        get: operations["list_categories_transactions_categories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transactions/{txn_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Transaction
+         * @description 部分更新单条流水。只允许改 category / excluded / counterparty / product 四个字段。
+         */
+        patch: operations["update_transaction_transactions__txn_id__patch"];
+        trace?: never;
+    };
+    "/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Scan */
+        get: operations["list_scan_scan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scan/rescan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger Rescan
+         * @description 触发增量扫描。阻塞到 stat-walk + sweep 完成(十万秒级),
+         *     metadata/缩略图继续后台异步。已有扫描在跑则 409。
+         */
+        post: operations["trigger_rescan_scan_rescan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scan/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scan Status */
+        get: operations["scan_status_scan_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scan/repos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Repos */
+        get: operations["list_repos_scan_repos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scan/{fs_entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Scan Entry
+         * @description 删除一条扫描条目 **并删除其磁盘源文件**。不级联删 media 表。
+         */
+        delete: operations["delete_scan_entry_scan__fs_entry_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** ActorResponse */
-        ActorResponse: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Description */
-            description?: string | null;
-            /** Avatar Path */
-            avatar_path?: string | null;
-            /**
-             * Avatar Url
-             * @default
-             */
-            avatar_url: string;
-            /** Message Count */
-            message_count: number;
-            /** Created At */
-            created_at: string;
-            /** Updated At */
-            updated_at: string;
+        /** ApplyRequest */
+        ApplyRequest: {
+            /** Media Id */
+            media_id: number;
+            /** Tag Ids */
+            tag_ids: number[];
         };
-        /** ActorSyncResponse */
-        ActorSyncResponse: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Description */
-            description?: string | null;
-            /** Avatar */
-            avatar?: string | null;
+        /** Body_add_preview_from_screenshot_media__media_id__previews_screenshot_post */
+        Body_add_preview_from_screenshot_media__media_id__previews_screenshot_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
+            /** Frame Ms */
+            frame_ms: number;
+            /** Start Ms */
+            start_ms?: number | null;
+            /** End Ms */
+            end_ms?: number | null;
+        };
+        /** Body_replace_media_endpoint_media__media_id__replace_post */
+        Body_replace_media_endpoint_media__media_id__replace_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
+        };
+        /** Body_set_video_cover_media__media_id__cover_post */
+        Body_set_video_cover_media__media_id__cover_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
         };
         /** Body_upload_file_files_upload_post */
         Body_upload_file_files_upload_post: {
@@ -622,12 +1432,78 @@ export interface components {
              */
             file: string;
         };
+        /** CategorySlot */
+        CategorySlot: {
+            /** Count */
+            count: number;
+            /** Amount */
+            amount: number;
+        };
         /** ClientMediaFile */
         ClientMediaFile: {
             /** Id */
             id: number;
             /** File Path */
             file_path: string;
+        };
+        /** CollectionCreate */
+        CollectionCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** CollectionListResponse */
+        CollectionListResponse: {
+            /** Items */
+            items: components["schemas"]["CollectionResponse"][];
+            /** No Collection Count */
+            no_collection_count: number;
+        };
+        /** CollectionResponse */
+        CollectionResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Cover Path */
+            cover_path?: string | null;
+            /**
+             * Cover Url
+             * @default
+             */
+            cover_url: string;
+            /**
+             * Cover Abs Path
+             * @default
+             */
+            cover_abs_path: string;
+            /** Message Count */
+            message_count: number;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** CollectionSyncResponse */
+        CollectionSyncResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Cover */
+            cover?: string | null;
+        };
+        /** CollectionUpdate */
+        CollectionUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
         };
         /** CursorResponse */
         CursorResponse: {
@@ -637,6 +1513,17 @@ export interface components {
             next_cursor?: string | null;
             /** Has More */
             has_more: boolean;
+        };
+        /** DashboardStats */
+        DashboardStats: {
+            /** Message Count */
+            message_count: number;
+            /** Media Count */
+            media_count: number;
+            /** Media This Month */
+            media_this_month: number;
+            /** Todo Doing Count */
+            todo_doing_count: number;
         };
         /** FileInfo */
         FileInfo: {
@@ -670,10 +1557,196 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** FsEntryCursorResponse */
+        FsEntryCursorResponse: {
+            /** Items */
+            items: components["schemas"]["FsEntryResponse"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Has More */
+            has_more: boolean;
+        };
+        /** FsEntryResponse */
+        FsEntryResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Repo Id
+             * @default
+             */
+            repo_id: string;
+            /** Rel Path */
+            rel_path: string;
+            /**
+             * File Path
+             * @default
+             */
+            file_path: string;
+            /** Mime Type */
+            mime_type?: string | null;
+            /** Media Type */
+            media_type: string;
+            /** File Size */
+            file_size?: number | null;
+            /** Mtime */
+            mtime: number;
+            /** Scanned At */
+            scanned_at: string;
+            /** Media Id */
+            media_id?: number | null;
+            /** Meta Status */
+            meta_status: string;
+            /** Thumb Status */
+            thumb_status: string;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Fps */
+            fps?: number | null;
+            /** Bitrate */
+            bitrate?: number | null;
+            /** Video Codec */
+            video_codec?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Has Audio */
+            has_audio?: number | null;
+            /** Taken At */
+            taken_at?: string | null;
+            /** Gps Lat */
+            gps_lat?: number | null;
+            /** Gps Lng */
+            gps_lng?: number | null;
+            /** Orientation */
+            orientation?: number | null;
+            /** Camera Make */
+            camera_make?: string | null;
+            /** Camera Model */
+            camera_model?: string | null;
+            /** Lens */
+            lens?: string | null;
+            /** Is Hdr */
+            is_hdr?: number | null;
+            /** Color Transfer */
+            color_transfer?: string | null;
+            /**
+             * File Url
+             * @default
+             */
+            file_url: string;
+            /**
+             * Thumb Url
+             * @default
+             */
+            thumb_url: string;
+            /**
+             * Local File Path
+             * @default
+             */
+            local_file_path: string;
+            /**
+             * Local Thumb Path
+             * @default
+             */
+            local_thumb_path: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HeatmapDay */
+        HeatmapDay: {
+            /** Date */
+            date: string;
+            /** Count */
+            count: number;
+        };
+        /** HeatmapResponse */
+        HeatmapResponse: {
+            /** Start Date */
+            start_date: string;
+            /** End Date */
+            end_date: string;
+            /** Days */
+            days: components["schemas"]["HeatmapDay"][];
+        };
+        /** IssueBoard */
+        IssueBoard: {
+            /** Doing */
+            doing: components["schemas"]["IssueOut"][];
+            /** Done */
+            done: components["schemas"]["IssueOut"][];
+            /** Archived */
+            archived: components["schemas"]["IssueOut"][];
+            /** Abandoned */
+            abandoned: components["schemas"]["IssueOut"][];
+        };
+        /** IssueCreate */
+        IssueCreate: {
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Status
+             * @default doing
+             * @enum {string}
+             */
+            status: "doing" | "done" | "archived" | "abandoned";
+        };
+        /** IssueMove */
+        IssueMove: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "doing" | "done" | "archived" | "abandoned";
+            /** Position */
+            position: number;
+        };
+        /** IssueOut */
+        IssueOut: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "doing" | "done" | "archived" | "abandoned";
+            /** Position */
+            position: number;
+            /**
+             * Message Count
+             * @default 0
+             */
+            message_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Completed At */
+            completed_at?: string | null;
+        };
+        /** IssueUpdate */
+        IssueUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
         };
         /** MediaCursorResponse */
         MediaCursorResponse: {
@@ -691,16 +1764,31 @@ export interface components {
              */
             has_more_before: boolean;
         };
-        /** MediaResponse */
-        MediaResponse: {
+        /** MediaDetailResponse */
+        MediaDetailResponse: {
             /** Created At */
             created_at: string;
             /** Updated At */
             updated_at: string;
             /** Id */
             id: number;
+            /**
+             * Repo Id
+             * @default
+             */
+            repo_id: string;
             /** File Path */
             file_path: string;
+            /**
+             * Local File Path
+             * @default
+             */
+            local_file_path: string;
+            /**
+             * Local Thumb Path
+             * @default
+             */
+            local_thumb_path: string;
             /**
              * File Url
              * @default
@@ -735,23 +1823,171 @@ export interface components {
              * @default []
              */
             tags: components["schemas"]["MessageTagItem"][];
+            /**
+             * People
+             * @default []
+             */
+            people: components["schemas"]["MediaPersonItem"][];
+            /** Video Media Id */
+            video_media_id?: number | null;
+            /** Frame Ms */
+            frame_ms?: number | null;
+            /** Start Ms */
+            start_ms?: number | null;
+            /** End Ms */
+            end_ms?: number | null;
+            /** Taken At */
+            taken_at?: string | null;
+            /** Gps Lat */
+            gps_lat?: number | null;
+            /** Gps Lng */
+            gps_lng?: number | null;
+            /** Orientation */
+            orientation?: number | null;
+            /** Camera Make */
+            camera_make?: string | null;
+            /** Camera Model */
+            camera_model?: string | null;
+            /** Lens */
+            lens?: string | null;
+            /** Video Codec */
+            video_codec?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Has Audio */
+            has_audio?: number | null;
+            /** Fps */
+            fps?: number | null;
+            /** Bitrate */
+            bitrate?: number | null;
+            /** Source Message Id */
+            source_message_id?: number | null;
+            /** Messages */
+            messages: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** MediaPersonItem */
+        MediaPersonItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** MediaResponse */
+        MediaResponse: {
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Id */
+            id: number;
+            /**
+             * Repo Id
+             * @default
+             */
+            repo_id: string;
+            /** File Path */
+            file_path: string;
+            /**
+             * Local File Path
+             * @default
+             */
+            local_file_path: string;
+            /**
+             * Local Thumb Path
+             * @default
+             */
+            local_thumb_path: string;
+            /**
+             * File Url
+             * @default
+             */
+            file_url: string;
+            /**
+             * Thumb Url
+             * @default
+             */
+            thumb_url: string;
+            /** File Size */
+            file_size: number | null;
+            /** Mime Type */
+            mime_type: string | null;
+            /** Width */
+            width: number | null;
+            /** Height */
+            height: number | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Rating */
+            rating: number;
+            /**
+             * Starred
+             * @default false
+             */
+            starred: boolean;
+            /** View Count */
+            view_count: number;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: components["schemas"]["MessageTagItem"][];
+            /**
+             * People
+             * @default []
+             */
+            people: components["schemas"]["MediaPersonItem"][];
+            /** Video Media Id */
+            video_media_id?: number | null;
+            /** Frame Ms */
+            frame_ms?: number | null;
+            /** Start Ms */
+            start_ms?: number | null;
+            /** End Ms */
+            end_ms?: number | null;
+            /** Taken At */
+            taken_at?: string | null;
+            /** Gps Lat */
+            gps_lat?: number | null;
+            /** Gps Lng */
+            gps_lng?: number | null;
+            /** Orientation */
+            orientation?: number | null;
+            /** Camera Make */
+            camera_make?: string | null;
+            /** Camera Model */
+            camera_model?: string | null;
+            /** Lens */
+            lens?: string | null;
+            /** Video Codec */
+            video_codec?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Has Audio */
+            has_audio?: number | null;
+            /** Fps */
+            fps?: number | null;
+            /** Bitrate */
+            bitrate?: number | null;
+            /** Source Message Id */
+            source_message_id?: number | null;
         };
         /** MessageCreate */
         MessageCreate: {
             /** Text */
             text?: string | null;
-            /** Actor Id */
-            actor_id?: number | null;
+            /** Collection Id */
+            collection_id?: number | null;
+            /** Issue Id */
+            issue_id?: number | null;
             /**
              * Files
              * @default []
              */
             files: string[];
-            /**
-             * Tag Ids
-             * @default []
-             */
-            tag_ids: number[];
+            /** Tag Ids */
+            tag_ids?: number[] | null;
         };
         /** MessageCreateFromClient */
         MessageCreateFromClient: {
@@ -759,8 +1995,10 @@ export interface components {
             id: number;
             /** Text */
             text?: string | null;
-            /** Actor Id */
-            actor_id?: number | null;
+            /** Collection Id */
+            collection_id?: number | null;
+            /** Issue Id */
+            issue_id?: number | null;
             /** Created At */
             created_at?: string | null;
             /**
@@ -807,10 +2045,14 @@ export interface components {
             id: number;
             /** Text */
             text?: string | null;
-            /** Actor Id */
-            actor_id?: number | null;
-            /** Actor Name */
-            actor_name?: string | null;
+            /** Collection Id */
+            collection_id?: number | null;
+            /** Collection Name */
+            collection_name?: string | null;
+            /** Issue Id */
+            issue_id?: number | null;
+            /** Issue Title */
+            issue_title?: string | null;
             /** Media Count */
             media_count: number;
             /**
@@ -828,10 +2070,29 @@ export interface components {
         };
         /** MessageMediaItem */
         MessageMediaItem: {
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
             /** Id */
             id: number;
+            /**
+             * Repo Id
+             * @default
+             */
+            repo_id: string;
             /** File Path */
             file_path: string;
+            /**
+             * Local File Path
+             * @default
+             */
+            local_file_path: string;
+            /**
+             * Local Thumb Path
+             * @default
+             */
+            local_thumb_path: string;
             /**
              * File Url
              * @default
@@ -876,10 +2137,14 @@ export interface components {
             id: number;
             /** Text */
             text?: string | null;
-            /** Actor Id */
-            actor_id?: number | null;
-            /** Actor Name */
-            actor_name?: string | null;
+            /** Collection Id */
+            collection_id?: number | null;
+            /** Collection Name */
+            collection_name?: string | null;
+            /** Issue Id */
+            issue_id?: number | null;
+            /** Issue Title */
+            issue_title?: string | null;
             /** Media Count */
             media_count: number;
             /**
@@ -888,12 +2153,77 @@ export interface components {
              */
             starred: boolean;
         };
-        /** MessageSyncMediaItem */
-        MessageSyncMediaItem: {
+        /** MessageSearchCursorResponse */
+        MessageSearchCursorResponse: {
+            /** Items */
+            items: components["schemas"]["MessageSearchItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Has More */
+            has_more: boolean;
+        };
+        /** MessageSearchItem */
+        MessageSearchItem: {
             /** Id */
             id: number;
+            /** Created At */
+            created_at: string;
+            /** Snippet */
+            snippet: string;
+            /** Collection Id */
+            collection_id?: number | null;
+            /** Collection Name */
+            collection_name?: string | null;
+            /** Issue Id */
+            issue_id?: number | null;
+            /** Issue Title */
+            issue_title?: string | null;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: string[];
+            /**
+             * Media Count
+             * @default 0
+             */
+            media_count: number;
+            /**
+             * Starred
+             * @default false
+             */
+            starred: boolean;
+        };
+        /** MessageSplit */
+        MessageSplit: {
+            /** Media Ids */
+            media_ids: number[];
+        };
+        /** MessageSyncMediaItem */
+        MessageSyncMediaItem: {
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Id */
+            id: number;
+            /**
+             * Repo Id
+             * @default
+             */
+            repo_id: string;
             /** File Path */
             file_path: string;
+            /**
+             * Local File Path
+             * @default
+             */
+            local_file_path: string;
+            /**
+             * Local Thumb Path
+             * @default
+             */
+            local_thumb_path: string;
             /**
              * File Url
              * @default
@@ -918,6 +2248,11 @@ export interface components {
              */
             starred: boolean;
             /**
+             * Tags
+             * @default []
+             */
+            tags: components["schemas"]["MessageTagItem"][];
+            /**
              * File Hash
              * @default
              */
@@ -934,6 +2269,14 @@ export interface components {
              * @default 0
              */
             position: number;
+            /** Video Media Id */
+            video_media_id?: number | null;
+            /** Frame Ms */
+            frame_ms?: number | null;
+            /** Start Ms */
+            start_ms?: number | null;
+            /** End Ms */
+            end_ms?: number | null;
         };
         /** MessageSyncResponse */
         MessageSyncResponse: {
@@ -945,10 +2288,14 @@ export interface components {
             id: number;
             /** Text */
             text?: string | null;
-            /** Actor Id */
-            actor_id?: number | null;
-            /** Actor Name */
-            actor_name?: string | null;
+            /** Collection Id */
+            collection_id?: number | null;
+            /** Collection Name */
+            collection_name?: string | null;
+            /** Issue Id */
+            issue_id?: number | null;
+            /** Issue Title */
+            issue_title?: string | null;
             /** Media Count */
             media_count: number;
             /**
@@ -977,14 +2324,150 @@ export interface components {
         MessageUpdate: {
             /** Text */
             text?: string | null;
-            /** Actor Id */
-            actor_id?: number | null;
+            /** Collection Id */
+            collection_id?: number | null;
+            /** Issue Id */
+            issue_id?: number | null;
             /** Starred */
             starred?: boolean | null;
             /** Created At */
             created_at?: string | null;
             /** Media Order */
             media_order?: number[] | null;
+            /** Tag Ids */
+            tag_ids?: number[] | null;
+        };
+        /**
+         * MonthBucket
+         * @description 有数据的月份(用于前端月份选择器)。
+         */
+        MonthBucket: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Count */
+            count: number;
+            /** Total Expense */
+            total_expense: number;
+        };
+        /** MonthlySummary */
+        MonthlySummary: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Total */
+            total: number;
+            /** By Category */
+            by_category: {
+                [key: string]: components["schemas"]["CategorySlot"];
+            };
+        };
+        /** PeopleRequest */
+        PeopleRequest: {
+            /** Person Ids */
+            person_ids: number[];
+        };
+        /** PersonCreate */
+        PersonCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** PersonResponse */
+        PersonResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Cover Path */
+            cover_path?: string | null;
+            /**
+             * Cover Url
+             * @default
+             */
+            cover_url: string;
+            /**
+             * Cover Abs Path
+             * @default
+             */
+            cover_abs_path: string;
+            /**
+             * Media Count
+             * @default 0
+             */
+            media_count: number;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** PersonUpdate */
+        PersonUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+        };
+        /**
+         * RangeSummary
+         * @description 月份范围 [from, to] 闭区间的支出汇总。
+         */
+        RangeSummary: {
+            /** From Year */
+            from_year: number;
+            /** From Month */
+            from_month: number;
+            /** To Year */
+            to_year: number;
+            /** To Month */
+            to_month: number;
+            /** Total */
+            total: number;
+            /** By Category */
+            by_category: {
+                [key: string]: components["schemas"]["CategorySlot"];
+            };
+        };
+        /** RebuildRequest */
+        RebuildRequest: {
+            /** Media Ids */
+            media_ids?: number[] | null;
+        };
+        /** RotateRequest */
+        RotateRequest: {
+            /**
+             * Degrees
+             * @enum {integer}
+             */
+            degrees: 90 | 180 | 270;
+        };
+        /** ScanStatusResponse */
+        ScanStatusResponse: {
+            /** Total */
+            total: number;
+            /** Pending */
+            pending: number;
+            /** Done */
+            done: number;
+            /** Failed */
+            failed: number;
+            /** Running */
+            running: boolean;
+        };
+        /** SuggestRequest */
+        SuggestRequest: {
+            /** Media Id */
+            media_id: number;
+            /**
+             * Top K
+             * @default 10
+             */
+            top_k: number;
         };
         /** SyncApplyItem */
         SyncApplyItem: {
@@ -1047,6 +2530,13 @@ export interface components {
             /** Server Time */
             server_time: string;
         };
+        /** TagCreate */
+        TagCreate: {
+            /** Name */
+            name: string;
+            /** Category */
+            category?: string | null;
+        };
         /** TagResponse */
         TagResponse: {
             /** Id */
@@ -1061,6 +2551,99 @@ export interface components {
              */
             message_count: number;
         };
+        /** TagSuggestion */
+        TagSuggestion: {
+            /** Tag Id */
+            tag_id: number;
+            /** Name */
+            name: string;
+            /** Category */
+            category?: string | null;
+            /** Score */
+            score: number;
+        };
+        /** TagUpdate */
+        TagUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Category */
+            category?: string | null;
+        };
+        /** TagsRequest */
+        TagsRequest: {
+            /** Tag Ids */
+            tag_ids: number[];
+        };
+        /** TimelineItem */
+        TimelineItem: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Day */
+            day: number;
+            /** Count */
+            count: number;
+        };
+        /** TransactionListResponse */
+        TransactionListResponse: {
+            /** Items */
+            items: components["schemas"]["TransactionOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Has More */
+            has_more: boolean;
+        };
+        /** TransactionOut */
+        TransactionOut: {
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
+            /** Biz No */
+            biz_no: string;
+            /**
+             * Txn Time
+             * Format: date-time
+             */
+            txn_time: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "expense" | "income" | "neutral";
+            /** Amount */
+            amount: number;
+            /** Counterparty */
+            counterparty?: string | null;
+            /** Product */
+            product?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Raw Type */
+            raw_type?: string | null;
+            /** Raw Origin */
+            raw_origin?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Excluded */
+            excluded: number;
+        };
+        /**
+         * TransactionUpdate
+         * @description 部分更新:只有显式提供的字段才会写。所有字段都是用户可改的「展示/分类」语义,
+         *     不允许通过 PATCH 改 amount / txn_time / source / biz_no 这些原始记录字段。
+         */
+        TransactionUpdate: {
+            /** Category */
+            category?: string | null;
+            /** Excluded */
+            excluded?: number | null;
+            /** Counterparty */
+            counterparty?: string | null;
+            /** Product */
+            product?: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1069,6 +2652,69 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VideoPreviewCreate */
+        VideoPreviewCreate: {
+            /** Preview Media Id */
+            preview_media_id: number;
+            /** Frame Ms */
+            frame_ms: number;
+            /** Start Ms */
+            start_ms?: number | null;
+            /** End Ms */
+            end_ms?: number | null;
+        };
+        /**
+         * VideoPreviewItem
+         * @description 视频预览（章节）条目。继承 MediaUrlMixin 自动获得 6 个 path/URL 字段。
+         */
+        VideoPreviewItem: {
+            /** Id */
+            id: number;
+            /**
+             * Repo Id
+             * @default
+             */
+            repo_id: string;
+            /** File Path */
+            file_path: string;
+            /**
+             * Local File Path
+             * @default
+             */
+            local_file_path: string;
+            /**
+             * Local Thumb Path
+             * @default
+             */
+            local_thumb_path: string;
+            /**
+             * File Url
+             * @default
+             */
+            file_url: string;
+            /**
+             * Thumb Url
+             * @default
+             */
+            thumb_url: string;
+            /** Mime Type */
+            mime_type?: string | null;
+            /** Frame Ms */
+            frame_ms: number;
+            /** Start Ms */
+            start_ms?: number | null;
+            /** End Ms */
+            end_ms?: number | null;
+        };
+        /** VideoPreviewUpdate */
+        VideoPreviewUpdate: {
+            /** Frame Ms */
+            frame_ms?: number | null;
+            /** Start Ms */
+            start_ms?: number | null;
+            /** End Ms */
+            end_ms?: number | null;
         };
     };
     responses: never;
@@ -1079,7 +2725,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    sync_actors_actors_sync_get: {
+    sync_collections_collections_sync_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1094,12 +2740,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ActorSyncResponse"][];
+                    "application/json": components["schemas"]["CollectionSyncResponse"][];
                 };
             };
         };
     };
-    get_actors_actors_get: {
+    get_collections_collections_get: {
         parameters: {
             query?: {
                 name?: string | null;
@@ -1116,8 +2762,234 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ActorResponse"][];
+                    "application/json": components["schemas"]["CollectionListResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_collection_collections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_collection_collections__collection_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collection_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_collection_collections__collection_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collection_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_people_people_get: {
+        parameters: {
+            query?: {
+                /** @description 按名称模糊搜索 */
+                name?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_person_people_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_person_people__person_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_person_people__person_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -1136,7 +3008,8 @@ export interface operations {
                 /** @description 游标，ISO 格式的 created_at */
                 cursor?: string | null;
                 limit?: number;
-                actor_id?: number | null;
+                collection_id?: number | null;
+                issue_id?: number | null;
                 starred?: boolean | null;
             };
             header?: never;
@@ -1203,7 +3076,8 @@ export interface operations {
             query: {
                 year: number;
                 month: number;
-                actor_id?: number | null;
+                collection_id?: number | null;
+                issue_id?: number | null;
                 query_text?: string | null;
                 media_id?: number | null;
                 tag_id?: number | null;
@@ -1261,8 +3135,11 @@ export interface operations {
                 cursor?: string | null;
                 /** @description 分页方向: 'forward' 加载更新的消息（cursor 之后） */
                 direction?: string | null;
+                /** @description 是否包含 cursor 本身（用 <= / >= 而非 < / >），用于位置恢复 */
+                inclusive?: boolean;
                 limit?: number;
-                actor_id?: number | null;
+                collection_id?: number | null;
+                issue_id?: number | null;
                 /** @description 搜索文本，匹配 message.text */
                 query_text?: string | null;
                 /** @description 媒体 ID，查询包含该媒体的所有消息 */
@@ -1285,6 +3162,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageDetailCursorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_messages_fts_messages_search_get: {
+        parameters: {
+            query: {
+                /** @description 搜索关键词（FTS5），多词之间隐式 AND */
+                q: string;
+                collection_id?: number | null;
+                issue_id?: number | null;
+                tag_id?: number | null;
+                starred?: boolean | null;
+                limit?: number;
+                /** @description 游标，格式 '{rank}|{id}' */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageSearchCursorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1459,6 +3375,108 @@ export interface operations {
             };
         };
     };
+    split_message_messages__message_id__split_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageSplit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_media_to_message_messages__message_id__media_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": string[];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_media_from_message_messages__message_id__media__media_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: number;
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_media_media_get: {
         parameters: {
             query?: {
@@ -1468,9 +3486,15 @@ export interface operations {
                 direction?: string | null;
                 limit?: number;
                 message_id?: number | null;
+                /** @description 按多条 message 取并集过滤 */
+                message_ids?: number[] | null;
                 starred?: boolean | null;
                 /** @description 媒体类型: 'video' 或 'image' */
                 type?: string | null;
+                /** @description 标签 ID */
+                tag_id?: number | null;
+                /** @description 合集 ID */
+                collection_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -1498,6 +3522,41 @@ export interface operations {
             };
         };
     };
+    get_media_timeline_media_timeline_get: {
+        parameters: {
+            query?: {
+                starred?: boolean | null;
+                /** @description 媒体类型: 'video' 或 'image' */
+                type?: string | null;
+                tag_id?: number | null;
+                collection_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_media_feed_media_feed_get: {
         parameters: {
             query?: {
@@ -1505,7 +3564,7 @@ export interface operations {
                 cursor?: number | null;
                 limit?: number;
                 tag_id?: number | null;
-                actor_id?: number | null;
+                collection_id?: number | null;
                 starred?: boolean | null;
             };
             header?: never;
@@ -1521,6 +3580,137 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MediaCursorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_preview_media_previews__preview_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preview_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_preview_media_previews__preview_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preview_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoPreviewUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoPreviewItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_media_by_id_media__media_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_media_media__media_id__delete: {
+        parameters: {
+            query?: {
+                /** @description 是否同时删除源文件 */
+                delete_source?: boolean;
+                /** @description 来源消息ID，传入时仅在无其他关联时才删除媒体本身 */
+                message_id?: number | null;
+            };
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -1579,6 +3769,282 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_media_endpoint_media__media_id__rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RotateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_media_endpoint_media__media_id__replace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_replace_media_endpoint_media__media_id__replace_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_media_tags_media__media_id__tags_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_media_people_media__media_id__people_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeopleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_previews_media__media_id__previews_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoPreviewItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_preview_media__media_id__previews_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoPreviewCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoPreviewItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_preview_from_screenshot_media__media_id__previews_screenshot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_preview_from_screenshot_media__media_id__previews_screenshot_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoPreviewItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_video_cover_media__media_id__cover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_set_video_cover_media__media_id__cover_post"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -1829,6 +4295,8 @@ export interface operations {
             query?: {
                 /** @description 按名称模糊搜索 */
                 name?: string | null;
+                /** @description 只返回关联了媒体的标签 */
+                has_media?: boolean;
             };
             header?: never;
             path?: never;
@@ -1843,6 +4311,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TagResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_tag_tags_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_tag_tags__tag_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tag_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_tag_tags__tag_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tag_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1924,7 +4489,7 @@ export interface operations {
             };
         };
     };
-    sync_events_sync_events_get: {
+    get_stats_admin_stats_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1955,6 +4520,781 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stats_api_dashboard_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardStats"];
+                };
+            };
+        };
+    };
+    get_heatmap_api_dashboard_heatmap_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeatmapResponse"];
+                };
+            };
+        };
+    };
+    get_board_issues_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueBoard"];
+                };
+            };
+        };
+    };
+    create_issues_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_issues_issues_list_get: {
+        parameters: {
+            query?: {
+                status?: ("doing" | "done" | "archived" | "abandoned") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_one_issues__issue_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issue_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_issues__issue_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issue_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_issues__issue_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issue_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_issues__issue_id__move_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issue_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    health_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    smart_status_smart_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    suggest_tags_smart_tags_suggest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagSuggestion"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_tags_smart_tags_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    similar_media_smart_similar__media_id__get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaCursorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_media_smart_search_get: {
+        parameters: {
+            query: {
+                /** @description 自然语言/标签关键词 */
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaCursorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rebuild_embeddings_smart_embeddings_rebuild_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RebuildRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_transactions_transactions_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+                year?: number | null;
+                month?: number | null;
+                from_year?: number | null;
+                from_month?: number | null;
+                to_year?: number | null;
+                to_month?: number | null;
+                category?: string | null;
+                direction?: string | null;
+                excluded?: number | null;
+                sort?: "time" | "amount";
+                order?: "asc" | "desc";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    monthly_transactions_summary_monthly_get: {
+        parameters: {
+            query: {
+                year: number;
+                month: number;
+                direction?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlySummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    range_summary_transactions_summary_range_get: {
+        parameters: {
+            query: {
+                from_year: number;
+                from_month: number;
+                to_year: number;
+                to_month: number;
+                direction?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RangeSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_months_transactions_months_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthBucket"][];
+                };
+            };
+        };
+    };
+    list_categories_transactions_categories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+        };
+    };
+    update_transaction_transactions__txn_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txn_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransactionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scan_scan_get: {
+        parameters: {
+            query?: {
+                sort?: "mtime" | "size" | "name";
+                order?: "asc" | "desc";
+                type?: ("video" | "image") | null;
+                repo_id?: string | null;
+                /** @description 复合游标 '{sort_value}|{id}' */
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FsEntryCursorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trigger_rescan_scan_rescan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    scan_status_scan_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanStatusResponse"];
+                };
+            };
+        };
+    };
+    list_repos_scan_repos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    delete_scan_entry_scan__fs_entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fs_entry_id: number;
+            };
             cookie?: never;
         };
         requestBody?: never;

@@ -10,6 +10,8 @@ export type MessageMediaItem = components['schemas']['MessageMediaItem'] & {
   local_file_path?: string
   local_thumb_path?: string
   source_message_id?: number | null
+  // 后端 MediaResponse 带 people（媒体上标注的人物）；MessageMediaItem schema 未含，手动扩展
+  people?: components['schemas']['MediaPersonItem'][]
 }
 type _Message = components['schemas']['MessageResponse']
 type _MessageDetail = components['schemas']['MessageDetailResponse']
@@ -24,10 +26,12 @@ export type MessageDetail = _MessageDetail & {
   issue_title?: string | null
 }
 
-// 演员相关 —— 后端额外返回 avatar_abs_path（Electron file:// 用），OpenAPI 未重新生成
-export type Actor = components['schemas']['ActorResponse'] & {
-  avatar_abs_path?: string
-}
+// 合集相关 —— CollectionResponse 自带 cover_abs_path（Electron file:// 用）
+export type Collection = components['schemas']['CollectionResponse']
+
+// 人物相关（类 Mac 照片「人物」，标注在 media 上，多对多）
+export type Person = components['schemas']['PersonResponse']
+export type MediaPersonItem = components['schemas']['MediaPersonItem']
 // 媒体相关 —— 后端新增 local_file_path / local_thumb_path 两个绝对本地路径字段
 // (Electron 走 file:// 直读),OpenAPI 尚未重新生成,手动扩展。
 // `*_url` 字段是相对 URL,客户端拼自己的 backend baseUrl 后走 HTTP fallback。
@@ -149,7 +153,7 @@ export interface AdminStats {
   recent_messages: Array<{
     id: number
     text: string | null
-    actor_id: number | null
+    collection_id: number | null
     created_at: string | null
   }>
 }

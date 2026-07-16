@@ -22,7 +22,7 @@ export interface MediaFilters {
   starred?: boolean
   type?: string
   tag_id?: number | null
-  actor_id?: number | null
+  collection_id?: number | null
 }
 
 export interface BucketLayout {
@@ -198,7 +198,7 @@ export function useVirtualGrid(opts: Options) {
       starred: f.starred || undefined,
       type: f.type || undefined,
       tag_id: f.tag_id ?? undefined,
-      actor_id: f.actor_id ?? undefined,
+      collection_id: f.collection_id ?? undefined,
     }
   }
 

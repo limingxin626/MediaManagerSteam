@@ -35,36 +35,59 @@ media_tag = Table(
     Column('tag_id', Integer, ForeignKey('tag.id'), primary_key=True)
 )
 
+media_person = Table(
+    'media_person',
+    Base.metadata,
+    Column('media_id', Integer, ForeignKey('media.id'), primary_key=True),
+    Column('person_id', Integer, ForeignKey('person.id'), primary_key=True)
+)
+
 class Message(Base):
     __tablename__ = "message"
 
     id = Column(Integer, primary_key=True, index=True)
     text = Column(Text, nullable=True)
-    actor_id = Column(Integer, ForeignKey("actor.id"), nullable=True, index=True)
+    collection_id = Column(Integer, ForeignKey("collection.id"), nullable=True, index=True)
     issue_id = Column(Integer, ForeignKey("issue.id", ondelete="SET NULL"), nullable=True, index=True)
     starred = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
-    actor = relationship("Actor", back_populates="messages")
+    collection = relationship("Collection", back_populates="messages")
     issue = relationship("Issue", back_populates="messages")
     message_media = relationship("MessageMedia", back_populates="message", cascade="all, delete-orphan")
     tags = relationship("Tag", secondary=message_tag, back_populates="messages")
 
-class Actor(Base):
-    __tablename__ = "actor"
+class Collection(Base):
+    __tablename__ = "collection"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(256), nullable=False, index=True)
     description = Column(Text, nullable=True)
-    avatar_path = Column(String(1024), nullable=True)
+    cover_path = Column(String(1024), nullable=True)
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
-    messages = relationship("Message", back_populates="actor")
+    messages = relationship("Message", back_populates="collection")
 
     __table_args__ = (
-        UniqueConstraint("name", name="uq_actor_name"),
+        UniqueConstraint("name", name="uq_collection_name"),
+    )
+
+class Person(Base):
+    __tablename__ = "person"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(256), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    cover_path = Column(String(1024), nullable=True)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    media_items = relationship("Media", secondary=media_person, back_populates="people")
+
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_person_name"),
     )
 
 class Tag(Base):
@@ -122,6 +145,7 @@ class Media(Base):
 
     message_media = relationship("MessageMedia", back_populates="media")
     tags = relationship("Tag", secondary=media_tag, back_populates="media_items")
+    people = relationship("Person", secondary=media_person, back_populates="media_items")
     video = relationship(
         "Media",
         remote_side="Media.id",
@@ -169,7 +193,7 @@ class SyncLog(Base):
     __tablename__ = "sync_log"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    entity_type = Column(String(32), nullable=False)   # MESSAGE | ACTOR | MEDIA | TAG | ISSUE
+    entity_type = Column(String(32), nullable=False)   # MESSAGE | COLLECTION | MEDIA | TAG | PERSON | ISSUE
     entity_id = Column(Integer, nullable=False)
     operation = Column(String(16), nullable=False)      # UPSERT | DELETE
     timestamp = Column(DateTime, default=datetime.now, nullable=False)

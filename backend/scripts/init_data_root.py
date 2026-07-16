@@ -22,7 +22,7 @@ import os
 import sys
 
 REPOSITORIES_FILENAME = "repositories.json"
-SUBDIRS = ("thumbs", "preview", "actor_cover")
+SUBDIRS = ("thumbs", "preview", "collection_cover", "person_cover")
 
 
 def platform_key() -> str:

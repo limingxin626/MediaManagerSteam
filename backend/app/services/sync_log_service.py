@@ -1,7 +1,7 @@
 """
 SyncLog 变更追踪服务
 
-SQLAlchemy 事件监听器：自动记录 Message, Actor, Media, Tag 的增删改。
+SQLAlchemy 事件监听器：自动记录 Message, Collection, Media, Tag, Person 的增删改。
 """
 import logging
 import threading
@@ -10,15 +10,16 @@ from datetime import datetime
 from sqlalchemy import event, insert
 from sqlalchemy.orm import Session
 
-from app.models import Message, Actor, Media, Tag, SyncLog, Issue
+from app.models import Message, Collection, Media, Tag, Person, SyncLog, Issue
 
 logger = logging.getLogger(__name__)
 
 _TRACKED_MODELS = {
     Message: "MESSAGE",
-    Actor: "ACTOR",
+    Collection: "COLLECTION",
     Media: "MEDIA",
     Tag: "TAG",
+    Person: "PERSON",
     Issue: "ISSUE",
 }
 
@@ -89,5 +90,7 @@ def register_sync_listeners() -> None:
     event.listen(Message.tags, "remove", _bump_updated_at)
     event.listen(Media.tags, "append", _bump_updated_at)
     event.listen(Media.tags, "remove", _bump_updated_at)
+    event.listen(Media.people, "append", _bump_updated_at)
+    event.listen(Media.people, "remove", _bump_updated_at)
 
     logger.info("SyncLog 事件监听器已注册")

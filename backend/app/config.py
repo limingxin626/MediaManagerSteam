@@ -193,7 +193,7 @@ class AppConfig:
     _REPOSITORIES: Dict[str, str] = {}
     _DEFAULT_REPO_ID: str = ""
 
-    # DATA_ROOT 在 FastAPI 上的固定 URL 前缀(thumbs / actor_cover 都挂在这下面)
+    # DATA_ROOT 在 FastAPI 上的固定 URL 前缀(thumbs / collection_cover / person_cover 都挂在这下面)
     DATA_URL_PREFIX: str = "/data"
 
     @classmethod
@@ -227,7 +227,7 @@ class AppConfig:
     def get_static_mounts(cls) -> Dict[str, str]:
         """{url_prefix: system_path}。
 
-        - DATA_ROOT 永远挂在 `/data`(thumbs/actor_cover 子目录由前端拼)
+        - DATA_ROOT 永远挂在 `/data`(thumbs/collection_cover/person_cover 子目录由前端拼)
         - 每个 repository 按 `/{repo_id}` 挂载,直接以 repo_id 小写作为 URL 段
         """
         mounts: Dict[str, str] = {cls.DATA_URL_PREFIX: cls.DATA_ROOT}
@@ -279,7 +279,7 @@ class AppConfig:
 
     @classmethod
     def get_thumbs_dir(cls) -> str:
-        # 与 Mac 端 (Models.swift localThumbURL) 一致:thumbs/preview/actor_cover
+        # 与 Mac 端 (Models.swift localThumbURL) 一致:thumbs/preview/collection_cover
         # 都直接在 DATA_ROOT 根下,跟 `/data` URL mount 的根对齐
         # (`/data` → DATA_ROOT,所以 URL `/data/thumbs/x.webp` 物理就是 `DATA_ROOT/thumbs/x.webp`)。
         return os.path.join(cls.DATA_ROOT, "thumbs")
@@ -319,20 +319,32 @@ class AppConfig:
         return os.path.join(cls.get_preview_dir(), f"{media_id}.mp4")
 
     @classmethod
-    def get_actor_cover_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "actor_cover")
+    def get_collection_cover_dir(cls) -> str:
+        return os.path.join(cls.DATA_ROOT, "collection_cover")
 
     @classmethod
-    def get_actor_avatar_path(cls, actor_id: int) -> str:
-        return os.path.join(cls.get_actor_cover_dir(), f"{actor_id}.webp")
+    def get_collection_cover_path(cls, collection_id: int) -> str:
+        return os.path.join(cls.get_collection_cover_dir(), f"{collection_id}.webp")
+
+    @classmethod
+    def get_person_cover_dir(cls) -> str:
+        return os.path.join(cls.DATA_ROOT, "person_cover")
+
+    @classmethod
+    def get_person_cover_path(cls, person_id: int) -> str:
+        return os.path.join(cls.get_person_cover_dir(), f"{person_id}.webp")
 
     @classmethod
     def get_thumbnail_url(cls, media_id: int) -> str:
         return f"{cls.DATA_URL_PREFIX}/thumbs/{media_id}.webp"
 
     @classmethod
-    def get_actor_avatar_url(cls, actor_id: int) -> str:
-        return f"{cls.DATA_URL_PREFIX}/actor_cover/{actor_id}.webp"
+    def get_collection_cover_url(cls, collection_id: int) -> str:
+        return f"{cls.DATA_URL_PREFIX}/collection_cover/{collection_id}.webp"
+
+    @classmethod
+    def get_person_cover_url(cls, person_id: int) -> str:
+        return f"{cls.DATA_URL_PREFIX}/person_cover/{person_id}.webp"
 
     # ── 磁盘扫描缩略图(scan_thumbs/{fs_entry_id}.webp)────────────
     # 与 Media 的 thumbs/ 平级,直接在 DATA_ROOT 根下,所以同样由

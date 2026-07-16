@@ -169,7 +169,7 @@ interface Props {
   initialTags?: TagItem[]
   allTags?: TagWithCount[]
   tagId?: number | null
-  actorId?: number | null
+  collectionId?: number | null
   issueId?: number | null
 }
 
@@ -316,7 +316,7 @@ const handleSubmit = async () => {
       const result = await api.post<MessageDetail>('/messages', {
         text: text.value || null,
         files: allFiles,
-        actor_id: props.actorId ?? undefined,
+        collection_id: props.collectionId ?? undefined,
         issue_id: props.issueId ?? undefined,
         tag_ids: selectedTags.value.map(t => t.id),
       })

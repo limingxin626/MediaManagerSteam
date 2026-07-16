@@ -39,6 +39,16 @@ const routes = [
     component: () => import('../views/Scan.vue')
   },
   {
+    path: '/collection',
+    name: 'Collection',
+    component: () => import('../views/Collection.vue')
+  },
+  {
+    path: '/people',
+    name: 'People',
+    component: () => import('../views/People.vue')
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('../views/NotFound.vue')

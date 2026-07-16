@@ -10,11 +10,11 @@
           </svg>
           <span class="text-sm">返回</span>
         </button>
-        <div v-if="message?.actor_name" class="flex items-center gap-2 min-w-0 pl-2 border-l border-[var(--border-color)]">
+        <div v-if="message?.collection_name" class="flex items-center gap-2 min-w-0 pl-2 border-l border-[var(--border-color)]">
           <div class="w-8 h-8 rounded-full bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] flex items-center justify-center font-semibold shrink-0">
-            {{ actorInitial }}
+            {{ collectionInitial }}
           </div>
-          <span class="text-sm font-semibold text-[var(--text-primary)] truncate">{{ message.actor_name }}</span>
+          <span class="text-sm font-semibold text-[var(--text-primary)] truncate">{{ message.collection_name }}</span>
         </div>
       </div>
       <p class="shrink-0 text-xs text-[var(--text-muted)]">{{ message ? formatDate(message.created_at) : '' }}</p>
@@ -180,8 +180,8 @@ const isLoading = ref(true)
 
 const mediaItems = computed<MessageMediaItem[]>(() => message.value?.media_items ?? [])
 
-const actorInitial = computed(() => {
-  const name = message.value?.actor_name || ''
+const collectionInitial = computed(() => {
+  const name = message.value?.collection_name || ''
   return name ? name.charAt(0).toUpperCase() : ''
 })
 
