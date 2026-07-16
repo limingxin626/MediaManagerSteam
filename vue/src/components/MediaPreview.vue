@@ -716,6 +716,8 @@ const handleKeydown = (e: KeyboardEvent) => {
   
   switch (e.key) {
     case 'Escape':
+      // 阻止同在 window 上监听的详情面板 handler 也触发,避免 Esc 连详情一起关掉
+      e.stopImmediatePropagation()
       close()
       break
     case 'ArrowLeft':

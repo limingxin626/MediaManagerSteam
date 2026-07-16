@@ -244,8 +244,9 @@
 
       <!-- Message 详情面板(右侧滑入) -->
       <MessageDetailPanel v-if="detailMessageId !== null" :message-id="detailMessageId" :all-tags="tags"
+        :preview-open="previewOpen"
         @close="detailMessageId = null" @edit="(id) => { detailMessageId = null; openEditDialog(id) }"
-        @media-click="(index) => handleMediaClick(detailMessageId!, index)"
+        @media-click="(items, index) => handlePanelPreview({ items, index })"
         @toggle-star="handleToggleStar" @tags-changed="handleDetailTagsChanged" />
 
     </div>

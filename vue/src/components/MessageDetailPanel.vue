@@ -38,7 +38,7 @@
             <!-- 单媒体:大图铺满,保留原始比例 -->
             <div v-if="mediaItems.length === 1"
               class="relative overflow-hidden rounded-[var(--radius-lg)] bg-[var(--bg-secondary)] cursor-pointer group flex items-center justify-center"
-              @click="emit('media-click', 0)">
+              @click="emit('media-click', mediaItems, 0)">
               <img :src="resolveThumb(mediaItems[0])" alt="Media"
                 class="max-w-full max-h-[70vh] object-contain transition-transform duration-200 group-hover:scale-[1.01]" />
               <div v-if="isVideo(mediaItems[0].mime_type)"
@@ -59,7 +59,7 @@
               :class="mediaItems.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'">
               <div v-for="(media, index) in mediaItems" :key="media.id"
                 class="relative overflow-hidden rounded-[var(--radius-md)] bg-[var(--bg-secondary)] cursor-pointer group aspect-square"
-                @click="emit('media-click', index)">
+                @click="emit('media-click', mediaItems, index)">
                 <img :src="resolveThumb(media)" :alt="`Media ${index + 1}`"
                   class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" />
                 <div v-if="isVideo(media.mime_type)"
@@ -163,11 +163,12 @@ import TagPickerPopover from './TagPickerPopover.vue'
 const props = defineProps<{
   messageId: number
   allTags: TagWithCount[]
+  previewOpen?: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
-  'media-click': [index: number]
+  'media-click': [items: MessageMediaItem[], index: number]
   edit: [id: number]
   'toggle-star': [id: number]
   'tags-changed': [messageId: number, tags: { id: number; name: string; category?: string | null }[]]
@@ -231,6 +232,8 @@ const close = () => emit('close')
 
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
+    // preview 打开时,Esc 交给 MediaPreview 处理,不要连详情一起关掉
+    if (props.previewOpen) return
     e.preventDefault()
     close()
   }
