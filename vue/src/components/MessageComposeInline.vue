@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-3xl mx-auto">
+  <div class="max-w-6xl mx-auto">
     <!-- Selected tags -->
     <div v-if="selectedTags.length > 0" class="flex flex-wrap gap-1.5 mb-2 px-10">
       <span v-for="t in selectedTags" :key="t.id"
@@ -37,7 +37,7 @@
               d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
           </svg>
         </button>
-        <VditorEditor ref="editorRef" v-model="text" placeholder="写点什么... (输入 # 选择标签)"
+        <PlainTextEditor ref="editorRef" v-model="text" placeholder="写点什么... (输入 # 选择标签)"
           class="flex-1 min-w-0 max-h-[40vh] overflow-y-auto text-sm"
           @update="tag.onUpdate" @ready="onEditorReady" />
       </div>
@@ -73,7 +73,7 @@ import type { MessageDetail, TagItem } from '../types'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useTagAutocompleteEditor } from '../composables/useTagAutocompleteEditor'
-import VditorEditor from './VditorEditor.vue'
+import PlainTextEditor from './PlainTextEditor.vue'
 
 interface Props {
   allTags?: TagItem[]
@@ -95,7 +95,7 @@ const files = ref<string[]>([])
 const submitting = ref(false)
 const selectedTags = ref<TagItem[]>([])
 
-const editorRef = ref<InstanceType<typeof VditorEditor> | null>(null)
+const editorRef = ref<InstanceType<typeof PlainTextEditor> | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const tagSuggestionListEl = ref<HTMLElement | null>(null)
 

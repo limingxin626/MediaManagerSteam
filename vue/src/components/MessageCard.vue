@@ -6,15 +6,6 @@
     <div class="px-4">
       <!-- Actor Info -->
       <div class="flex items-center justify-between gap-3">
-        <!-- Selection checkbox -->
-        <div v-if="props.selectable" @click.stop="emit('toggle-select', props.message.id)"
-          class="shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors" :class="props.selected
-            ? 'bg-[var(--color-primary-600)] border-[var(--color-primary-600)] text-white'
-            : 'border-gray-600 hover:border-[var(--color-primary-500)]'">
-          <svg v-if="props.selected" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
         <div v-if="message.actor_name"
           class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold">
           {{ actorInitial }}
@@ -332,14 +323,26 @@
         </div>
     </div>
   </div>
-    <!-- Detail arrow button (Telegram-style) -->
-    <button @click="handleClick"
-      class="shrink-0 w-8 h-8 mb-1 rounded-full bg-[var(--color-primary-600)] hover:bg-[var(--color-primary-500)] text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
-      title="查看详情">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-      </svg>
-    </button>
+    <!-- Right column: selection checkbox (above) + detail arrow button -->
+    <div class="shrink-0 flex flex-col items-center gap-2 mb-1">
+      <!-- Selection checkbox -->
+      <div v-if="props.selectable" @click.stop="emit('toggle-select', props.message.id)"
+        class="w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors cursor-pointer" :class="props.selected
+          ? 'bg-[var(--color-primary-600)] border-[var(--color-primary-600)] text-white'
+          : 'border-gray-600 hover:border-[var(--color-primary-500)]'">
+        <svg v-if="props.selected" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <!-- Detail arrow button (Telegram-style) -->
+      <button @click="handleClick"
+        class="w-8 h-8 rounded-full bg-[var(--color-primary-600)] hover:bg-[var(--color-primary-500)] text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+        title="查看详情">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
   </div>
 
 </template>
