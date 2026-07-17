@@ -69,14 +69,11 @@ import ScanDetailModal from '../components/ScanDetailModal.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api, useInfiniteScroll } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import { useConfirm } from '../composables/useConfirm'
-import { basename } from '../utils/media'
 import type { FsEntry, ScanStatus, CursorResponse, MessageMediaItem } from '../types'
 
 defineOptions({ name: 'Scan' })
 
 const toast = useToast()
-const { confirm } = useConfirm()
 
 const sort = ref('mtime')
 const order = ref('desc')
@@ -134,15 +131,9 @@ async function loadMoreForPreview() {
   await load()
 }
 
-// 删除一条扫描条目(连同磁盘源文件)。MediaPreview 监听 items 变化自动 clamp/关闭。
+// 删除一条扫描条目(连同磁盘源文件)。确认已在 MediaPreview 精简模式内完成(Del/Enter/Esc)。
+// MediaPreview 监听 items 变化自动 clamp/关闭。
 async function deleteEntry(it: FsEntry) {
-  const ok = await confirm({
-    title: '删除文件',
-    message: `确定删除「${basename(it.rel_path)}」吗？\n会同时删除磁盘上的源文件,不可恢复。`,
-    confirmText: '删除',
-    danger: true,
-  })
-  if (!ok) return
   try {
     await api.del(`/scan/${it.id}`)
     const idx = items.value.findIndex((x) => x.id === it.id)

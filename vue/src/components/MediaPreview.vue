@@ -119,9 +119,9 @@
             <!-- 精简模式:删除(含源文件,宿主确认) -->
             <button
               v-if="minimal && currentItem"
-              @click="emit('delete', currentItem)"
+              @click="minimalDeleteConfirm = true"
               class="p-2 text-white/70 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors"
-              title="删除(含源文件)"
+              title="删除(含源文件) · Del"
             >
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -354,6 +354,33 @@
       </div>
     </div>
   </Transition>
+  <!-- 精简模式(Scan)键盘删除确认:Enter 确认 / Esc 取消 -->
+  <Transition name="fade">
+    <div v-if="minimal && minimalDeleteConfirm" class="fixed inset-0 z-[200] flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="minimalDeleteConfirm = false"></div>
+      <div class="relative bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
+        <h3 class="text-xl font-semibold text-white mb-4">删除文件</h3>
+        <p class="text-gray-300 mb-6">
+          确定删除此文件吗？会同时删除磁盘上的源文件,不可恢复。
+        </p>
+        <div class="flex gap-3 justify-end">
+          <button
+            @click="minimalDeleteConfirm = false"
+            class="px-4 py-2 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+          >
+            取消 (Esc)
+          </button>
+          <button
+            @click="confirmMinimalDelete"
+            class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
+          >
+            删除 (Enter)
+          </button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
   <!-- Smart tag suggestion drawer -->
   <TagSuggestDrawer
     :is-open="suggestDrawerOpen"
@@ -435,6 +462,8 @@ const transitionName = ref<'slide-left' | 'slide-right'>('slide-left')
 const THUMB_WINDOW = 5
 const previewStarBounce = ref(false)
 const showDeleteConfirm = ref(false)
+// 精简模式(Scan)下删除源文件的键盘确认弹层
+const minimalDeleteConfirm = ref(false)
 const deleteSourceFile = ref(false)
 const rotationDegrees = ref(0)
 const isRotating = ref(false)
@@ -501,6 +530,12 @@ async function confirmDelete() {
   }
   showDeleteConfirm.value = false
   deleteSourceFile.value = false
+}
+
+function confirmMinimalDelete() {
+  if (!currentItem.value) return
+  emit('delete', currentItem.value)
+  minimalDeleteConfirm.value = false
 }
 
 function openDetailPage() {
@@ -798,7 +833,27 @@ const thumbStripWidth = computed(() => {
 
 const handleKeydown = (e: KeyboardEvent) => {
   if (!props.isOpen) return
-  
+
+  // 精简模式(Scan)下的键盘删除流程:Del 触发确认,Enter 确认,Esc 取消。
+  if (props.minimal && minimalDeleteConfirm.value) {
+    if (e.key === 'Enter') {
+      e.stopImmediatePropagation()
+      e.preventDefault()
+      confirmMinimalDelete()
+    } else if (e.key === 'Escape') {
+      e.stopImmediatePropagation()
+      e.preventDefault()
+      minimalDeleteConfirm.value = false
+    }
+    return
+  }
+  if (props.minimal && (e.key === 'Delete' || e.key === 'Backspace') && currentItem.value) {
+    e.stopImmediatePropagation()
+    e.preventDefault()
+    minimalDeleteConfirm.value = true
+    return
+  }
+
   switch (e.key) {
     case 'Escape':
       // 阻止同在 window 上监听的详情面板 handler 也触发,避免 Esc 连详情一起关掉
