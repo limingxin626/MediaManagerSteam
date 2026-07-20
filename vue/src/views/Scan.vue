@@ -34,12 +34,24 @@
         没有扫描到媒体文件。点击「刷新」扫描注册目录。
       </div>
       <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-1.5">
-        <ScanCell
-          v-for="(it, idx) in items"
-          :key="it.id"
-          :item="it"
-          @open="openPreview(idx)"
-        />
+        <template v-for="row in rows" :key="row.kind === 'folder' ? row.key : `m:${row.item.id}`">
+          <!-- 名称排序时的文件夹分隔行(占满整行) -->
+          <div
+            v-if="row.kind === 'folder'"
+            class="col-span-full flex items-center gap-1.5 px-1 pt-3 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400 truncate"
+          >
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+            </svg>
+            <span class="truncate">{{ row.dir || '(根目录)' }}</span>
+            <span class="shrink-0 text-gray-400 dark:text-gray-500">· {{ row.count }}</span>
+          </div>
+          <ScanCell
+            v-else
+            :item="row.item"
+            @open="openPreview(row.idx)"
+          />
+        </template>
       </div>
       <div ref="sentinel" class="h-10"></div>
       <div v-if="loading" class="text-center text-gray-400 py-4 text-sm">加载中…</div>
@@ -62,13 +74,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import FilterSelect from '../components/FilterSelect.vue'
 import ScanCell from '../components/ScanCell.vue'
 import ScanDetailModal from '../components/ScanDetailModal.vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api, useInfiniteScroll } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
+import { dirname } from '../utils/media'
 import type { FsEntry, ScanStatus, CursorResponse, MessageMediaItem } from '../types'
 
 defineOptions({ name: 'Scan' })
@@ -84,6 +97,7 @@ const sortOptions = [
   { value: 'mtime', label: '修改时间' },
   { value: 'size', label: '大小' },
   { value: 'name', label: '名称' },
+  { value: 'folder_count', label: '文件夹数量' },
 ]
 const orderOptions = [
   { value: 'desc', label: '降序' },
@@ -105,12 +119,13 @@ const scanning = ref(false)
 const previewOpen = ref(false)
 const previewStartIndex = ref(0)
 
-const { items, loading, hasMore, load, reset, setupObserver } = useInfiniteScroll<FsEntry>({
+const { items, loading, hasMore, load, reset, setupObserver, seedItems } = useInfiniteScroll<FsEntry>({
   sentinel,
   limit: 60,
   rootMargin: '300px',
   fetchFn: ({ cursor, limit }) =>
     api.get<CursorResponse<FsEntry>>('/scan', {
+      // folder_count 是纯前端排序,后端不认;此模式走 loadByFolderCount 全量加载,不经此 fetchFn
       sort: sort.value,
       order: order.value,
       type: type.value || undefined,
@@ -120,10 +135,84 @@ const { items, loading, hasMore, load, reset, setupObserver } = useInfiniteScrol
     }),
 })
 
+// folder_count 模式:后端不支持该排序键。以 name 序全量拉取(同文件夹天然连续),
+// 前端按「文件夹内 media 数」对文件夹分组重排,再 seed 回列表。放弃无限滚动(库不大时可接受)。
+async function loadByFolderCount() {
+  if (loading.value) return
+  loading.value = true
+  // 先清空:避免 await 期间 rows 用「旧排序的 items」按分组布局渲染,切出错误/重复的文件夹分隔行
+  seedItems([], null, false)
+  try {
+    const all: FsEntry[] = []
+    let cursor: string | null = null
+    // 以 name 升序全量翻页,拿到所有条目
+    do {
+      const data: CursorResponse<FsEntry> = await api.get<CursorResponse<FsEntry>>('/scan', {
+        sort: 'name',
+        order: 'asc',
+        type: type.value || undefined,
+        repo_id: repoId.value || undefined,
+        cursor: cursor || undefined,
+        limit: 200,
+      })
+      all.push(...data.items)
+      cursor = data.has_more ? data.next_cursor : null
+    } while (cursor)
+
+    // 按目录分组,组内保持 name 升序
+    const groups = new Map<string, FsEntry[]>()
+    for (const it of all) {
+      const dir = dirname(it.rel_path)
+      const g = groups.get(dir)
+      if (g) g.push(it)
+      else groups.set(dir, [it])
+    }
+    // 文件夹按 media 数排序;desc = 多的在前。数量相同按目录名稳定排序
+    const dirs = [...groups.keys()].sort((a, b) => {
+      const d = (groups.get(b)!.length - groups.get(a)!.length)
+      const signed = order.value === 'desc' ? d : -d
+      return signed !== 0 ? signed : a.localeCompare(b)
+    })
+    const ordered = dirs.flatMap((d) => groups.get(d)!)
+    seedItems(ordered, null, false)  // 无 cursor、无更多:一次性全量
+  } finally {
+    loading.value = false
+  }
+}
+
 function openPreview(idx: number) {
   previewStartIndex.value = idx
   previewOpen.value = true
 }
+
+// 渲染行:按名称 / 文件夹数量排序时,于每个文件夹的第一条前插入分隔行。
+// item 行携带其在 items 中的原始索引,供 openPreview / MediaPreview 使用。
+type Row =
+  | { kind: 'folder'; dir: string; count: number; key: string }
+  | { kind: 'item'; item: FsEntry; idx: number }
+
+const groupByFolder = computed(() => sort.value === 'name' || sort.value === 'folder_count')
+
+const rows = computed<Row[]>(() => {
+  if (!groupByFolder.value) {
+    return items.value.map((item, idx) => ({ kind: 'item', item, idx }))
+  }
+  const out: Row[] = []
+  let header: { kind: 'folder'; dir: string; count: number; key: string } | null = null
+  let lastDir: string | null = null
+  items.value.forEach((item, idx) => {
+    const dir = dirname(item.rel_path)
+    if (dir !== lastDir) {
+      // key 用首个成员的 id,保证唯一(dir 字符串可能因数据未连续而重复出现)
+      header = { kind: 'folder', dir, count: 0, key: `d:${item.id}` }
+      out.push(header)
+      lastDir = dir
+    }
+    header!.count++
+    out.push({ kind: 'item', item, idx })
+  })
+  return out
+})
 
 // 预览翻到已加载列表末尾时,追加下一页;MediaPreview 监听 items 增长后即可继续 next。
 async function loadMoreForPreview() {
@@ -145,7 +234,16 @@ async function deleteEntry(it: FsEntry) {
   }
 }
 
-watch([sort, order, type, repoId], () => reset())
+watch([sort, order, type, repoId], () => reload())
+
+// 统一入口:folder_count 走前端全量重排,其余走后端 keyset 分页
+async function reload() {
+  if (sort.value === 'folder_count') {
+    await loadByFolderCount()
+  } else {
+    await reset()
+  }
+}
 
 let pollTimer: number | undefined
 async function pollStatus() {
@@ -156,7 +254,7 @@ async function pollStatus() {
   // 还有 pending(worker 在补缩略图/metadata)→ 3s 后刷新 grid + 再轮询
   if ((status.value?.pending ?? 0) > 0 || status.value?.running) {
     pollTimer = window.setTimeout(() => {
-      reset()
+      reload()
       pollStatus()
     }, 3000)
   }
@@ -166,7 +264,7 @@ async function refresh() {
   scanning.value = true
   try {
     await api.post('/scan/rescan')
-    await reset()
+    await reload()
     pollStatus()
   } catch (e: any) {
     toast.error(e?.message || '扫描失败')
@@ -184,7 +282,7 @@ onMounted(async () => {
     ]
   } catch { /* ignore */ }
   setupObserver()
-  reset()
+  reload()
   pollStatus()
 })
 

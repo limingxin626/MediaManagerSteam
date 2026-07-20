@@ -42,6 +42,12 @@ export function basename(p: string): string {
   return p.split('/').pop() ?? p
 }
 
+/** forward-slash 路径取所在目录(根目录返回空串) */
+export function dirname(p: string): string {
+  const i = p.lastIndexOf('/')
+  return i === -1 ? '' : p.slice(0, i)
+}
+
 /** Resolve a backend-relative path to a full absolute path */
 export function resolveUrl(path: string): string {
   if (IS_ELECTRON) {
