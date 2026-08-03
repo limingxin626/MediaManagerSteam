@@ -242,9 +242,11 @@ def get_media_feed(
     )
 
     if tag_id is not None:
-        msg_with_tag = db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
+        msg_with_tag = db.query(message_tag.c.message_id.label("message_id")).filter(
+            message_tag.c.tag_id == tag_id
+        )
         media_with_tag = (
-            db.query(MessageMedia.message_id)
+            db.query(MessageMedia.message_id.label("message_id"))
             .join(media_tag, MessageMedia.media_id == media_tag.c.media_id)
             .filter(media_tag.c.tag_id == tag_id)
         )

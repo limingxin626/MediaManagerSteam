@@ -79,6 +79,17 @@
               </button>
               <!-- Search -->
               <SearchInput v-model="searchQuery" placeholder="搜索消息..." @search="onSearch" />
+              <!-- Media panel toggle -->
+              <button @click="toggleMediaPanel"
+                class="p-1.5 rounded-[var(--radius-sm)] transition-colors" :class="showMediaPanel
+                  ? 'text-[var(--color-primary-600)] bg-[var(--color-primary-600)]/10'
+                  : 'text-[var(--text-muted)] hover:text-[var(--color-primary-600)] hover:bg-[var(--bg-secondary)]'"
+                :title="showMediaPanel ? '隐藏媒体网格' : '显示媒体网格'">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zm0 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -228,8 +239,8 @@
         </div>
       </div>
 
-      <!-- Right Tag Media Panel (常驻) -->
-      <TagMediaPanel :tag-id="selectedTagId" :tag-name="selectedTagName ?? undefined"
+      <!-- Right Tag Media Panel (可切换显示/隐藏) -->
+      <TagMediaPanel v-if="showMediaPanel" :tag-id="selectedTagId" :tag-name="selectedTagName ?? undefined"
         @preview="handlePanelPreview" @jump="handlePanelJump" />
 
       <MessageComposeDialog :visible="dialogVisible" :mode="dialogMode" :message-id="dialogMessageId"
@@ -624,6 +635,13 @@ const hasMoreData = ref(true)
 const nextCursor = ref<string | null>(null)
 const activeMediaFilter = ref<number | null>(null)
 const starredFilter = ref(false)
+
+// 右侧媒体网格默认隐藏,持久化到 localStorage
+const showMediaPanel = ref(localStorage.getItem('message_show_media_panel') === '1')
+function toggleMediaPanel() {
+  showMediaPanel.value = !showMediaPanel.value
+  localStorage.setItem('message_show_media_panel', showMediaPanel.value ? '1' : '0')
+}
 
 const scrollContainer = ref<HTMLElement | null>(null)
 
