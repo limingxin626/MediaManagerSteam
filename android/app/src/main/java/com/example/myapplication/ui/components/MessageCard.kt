@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -77,8 +76,7 @@ fun MessageCard(
     onMediaClick: (mediaId: Long, mediaList: List<Media>) -> Unit = { _, _ -> },
     onEditClick: (Long) -> Unit = {},
     onDeleteClick: (Long) -> Unit = {},
-    onToggleStarred: (Long) -> Unit = {},
-    onRetrySync: ((Long) -> Unit)? = null
+    onToggleStarred: (Long) -> Unit = {}
 ) {
     val message = messageWithDetails.message
     val mediaList = messageWithDetails.mediaListOrdered
@@ -202,112 +200,32 @@ fun MessageCard(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 左侧：根据 sendStatus 显示不同内容
-                            when (message.sendStatus) {
-                                Message.MSG_STATUS_PUSHING -> {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(12.dp),
-                                            strokeWidth = 1.5.dp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            text = "同步中...",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextSecondary,
-                                            fontSize = 12.sp
-                                        )
-                                    }
+                            // 左侧：演员名 + 时间(同步改手动触发,不再显示 per-feed 同步状态)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (collection != null) {
+                                    Text(
+                                        text = collection.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = "·",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
+                                    )
                                 }
-
-                                Message.MSG_STATUS_PUSH_FAILED -> {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(
-                                            text = "同步失败",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error,
-                                            fontSize = 12.sp
-                                        )
-                                        if (onRetrySync != null) {
-                                            Text(
-                                                text = "· 重试",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = FontWeight.SemiBold
-                                                ),
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontSize = 12.sp,
-                                                modifier = Modifier.clickable { onRetrySync(message.id) }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Message.MSG_STATUS_PENDING_SYNC -> {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.tertiary)
-                                        )
-                                        Text(
-                                            text = "待同步",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.tertiary,
-                                            fontSize = 12.sp
-                                        )
-                                        if (onRetrySync != null) {
-                                            Text(
-                                                text = "· 重试",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = FontWeight.SemiBold
-                                                ),
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontSize = 12.sp,
-                                                modifier = Modifier.clickable { onRetrySync(message.id) }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                else -> {
-                                    // SYNCED: 正常显示演员名 + 时间
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        if (collection != null) {
-                                            Text(
-                                                text = collection.name,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.Medium,
-                                                fontSize = 12.sp
-                                            )
-                                            Text(
-                                                text = "·",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = TextSecondary,
-                                                fontSize = 12.sp
-                                            )
-                                        }
-                                        Text(
-                                            text = formattedTime,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextSecondary,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = formattedTime,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp
+                                )
                             }
 
                             // 右侧：收藏图标

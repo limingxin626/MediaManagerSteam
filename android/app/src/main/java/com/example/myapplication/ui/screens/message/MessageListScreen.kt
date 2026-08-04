@@ -298,7 +298,6 @@ fun MessageListScreen(
                                     onEditClick = { onEditMessage(it) },
                                     onDeleteClick = { viewModel.deleteMessage(it) },
                                     onToggleStarred = { viewModel.toggleStarred(it) },
-                                    onRetrySync = { viewModel.retrySync(it) },
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
