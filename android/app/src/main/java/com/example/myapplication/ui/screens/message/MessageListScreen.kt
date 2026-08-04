@@ -337,15 +337,15 @@ fun MessageListScreen(
 
             // 输入栏固定在 Box 底部，与消息流叠加
             MessageComposeBar(
-                onSendMessage = { text, mediaList, tagIds ->
+                onSendMessage = { text, mediaList, tagIds, splitPerMedia ->
                     viewModel.sendMessage(
                         text = text,
                         mediaList = mediaList,
                         tagIds = tagIds,
-                        databaseManager = databaseManager,
                         context = context,
                         onSuccess = { },
-                        onError = { }
+                        onError = { },
+                        splitPerMedia = splitPerMedia
                     )
                     // 立即滚动到占位卡片
                     coroutineScope.launch { listState.animateScrollToItem(0) }

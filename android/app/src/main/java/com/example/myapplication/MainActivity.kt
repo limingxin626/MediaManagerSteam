@@ -152,7 +152,7 @@ class MainActivity : ComponentActivity() {
         object : ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return MessageViewModel(databaseManager.messageRepository, databaseManager.networkMonitor) as T
+                return MessageViewModel(databaseManager.messageRepository) as T
             }
         }
     }

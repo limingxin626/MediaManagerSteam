@@ -9,7 +9,6 @@ import com.example.myapplication.data.repository.MessageRepository
 import com.example.myapplication.data.repository.PersonRepository
 import com.example.myapplication.data.repository.SyncOutboxRepository
 import com.example.myapplication.data.repository.TagRepository
-import com.example.myapplication.data.service.NetworkMonitor
 import com.example.myapplication.data.service.SyncPreferences
 
 /**
@@ -32,13 +31,11 @@ class DatabaseManager private constructor(context: Context) {
     private val syncOutboxDao = database.syncOutboxDao()
     private val messageDao = database.messageDao()
 
-    // 网络监听
     // 同步偏好
     val syncPreferences = SyncPreferences(appContext)
-    val networkMonitor = NetworkMonitor(appContext)
 
     // Repository实例
-    val syncOutboxRepository = SyncOutboxRepository(syncOutboxDao, networkMonitor)
+    val syncOutboxRepository = SyncOutboxRepository(syncOutboxDao)
 
     val collectionRepository = CollectionRepository(collectionDao, syncOutboxRepository)
     val personRepository = PersonRepository(personDao, syncOutboxRepository)

@@ -5,14 +5,12 @@ import com.example.myapplication.data.database.dao.SyncOutboxDao
 import com.example.myapplication.data.database.entities.SyncOutboxItem
 import com.example.myapplication.data.model.PushSyncResult
 import com.example.myapplication.data.service.ApplySyncChangesRequest
-import com.example.myapplication.data.service.NetworkMonitor
 import com.example.myapplication.data.service.SyncChangeRequest
 import com.example.myapplication.data.service.SyncNetwork
 import com.google.gson.JsonParser
 
 class SyncOutboxRepository(
-    private val dao: SyncOutboxDao,
-    private val networkMonitor: NetworkMonitor? = null
+    private val dao: SyncOutboxDao
 ) {
 
     suspend fun enqueueUpsert(entityType: String, entityId: Long, payloadJson: String) {
@@ -57,13 +55,6 @@ class SyncOutboxRepository(
     }
 
     suspend fun syncToServer(limit: Int = 200): PushSyncResult {
-        // 后端不可达时跳过，避免离线场景每次写操作都等 socket 超时
-        // 由 NetworkMonitor 30s 探活循环 + WorkManager 在恢复后批量重试
-        if (networkMonitor?.isBackendReachable?.value == false) {
-            Log.d(TAG, "syncToServer 跳过：后端不可达")
-            return PushSyncResult.Skipped
-        }
-
         // 在 try 之前捕获 pending 列表，确保 catch 也能使用同一快照
         val pending = dao.getByStatus(SyncOutboxItem.STATUS_PENDING, limit)
         if (pending.isEmpty()) {

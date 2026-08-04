@@ -141,7 +141,6 @@ class SettingsViewModel(
                 _syncState.value = SyncUiState.Error("上传失败: ${r.message}")
                 false
             }
-            is PushSyncResult.Skipped -> true
         }
     }
 

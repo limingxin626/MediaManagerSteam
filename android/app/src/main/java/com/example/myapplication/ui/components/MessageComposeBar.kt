@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,11 +51,12 @@ import com.example.myapplication.utils.rememberMultipleMediaFilePicker
  */
 @Composable
 fun MessageComposeBar(
-    onSendMessage: (text: String, mediaList: List<MediaFileInfo>, tagIds: List<Long>) -> Unit,
+    onSendMessage: (text: String, mediaList: List<MediaFileInfo>, tagIds: List<Long>, splitPerMedia: Boolean) -> Unit,
     isSending: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var text by remember { mutableStateOf("") }
+    var splitPerMedia by remember { mutableStateOf(false) }
     val selectedMedia = remember { mutableStateListOf<MediaFileInfo>() }
 
     val mediaPickerLauncher = rememberMultipleMediaFilePicker(maxItems = 10) { mediaFiles ->
@@ -88,6 +90,28 @@ fun MessageComposeBar(
                             onRemove = { selectedMedia.removeAt(index) }
                         )
                     }
+                }
+            }
+
+            // 拆分发送开关（仅多选时出现）
+            if (selectedMedia.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = splitPerMedia,
+                        onCheckedChange = { splitPerMedia = it },
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = "分开发送（${selectedMedia.size} 条消息）",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
                 }
             }
 
@@ -147,9 +171,10 @@ fun MessageComposeBar(
                 IconButton(
                     onClick = {
                         if (canSend) {
-                            onSendMessage(text, selectedMedia.toList(), emptyList())
+                            onSendMessage(text, selectedMedia.toList(), emptyList(), splitPerMedia)
                             text = ""
                             selectedMedia.clear()
+                            splitPerMedia = false
                         }
                     },
                     enabled = canSend,

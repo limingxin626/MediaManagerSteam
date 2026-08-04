@@ -8,7 +8,6 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.database.entities.Message
 import com.example.myapplication.data.database.entities.MessageWithDetails
@@ -16,7 +15,6 @@ import com.example.myapplication.data.model.ProgressRequestBody
 import com.example.myapplication.data.repository.MessageRepository
 import com.example.myapplication.data.service.ClientMediaFile
 import com.example.myapplication.data.service.MessageSyncRequest
-import com.example.myapplication.data.service.NetworkMonitor
 import com.example.myapplication.data.service.SyncNetwork
 import com.example.myapplication.utils.MediaFileInfo
 import com.example.myapplication.utils.MediaFilePicker
@@ -46,7 +44,6 @@ import java.time.format.DateTimeFormatter
  */
 class MessageViewModel(
     private val messageRepository: MessageRepository,
-    private val networkMonitor: NetworkMonitor,
 ) : ViewModel() {
     // 搜索查询
     private val _searchQuery = MutableStateFlow("")
@@ -142,16 +139,22 @@ class MessageViewModel(
      * 发送消息（文本 + 媒体附件）
      * Android 直接创建完整 Message 记录（sendStatus=PUSHING），立刻进入 paging。
      * 后台上传文件并推送给后端，后端接受客户端 ID。
+     *
+     * @param splitPerMedia true 时每个媒体各自组成一条消息（文本只挂在第一条）
      */
     fun sendMessage(
         text: String,
         mediaList: List<MediaFileInfo>,
         tagIds: List<Long>,
-        databaseManager: DatabaseManager,
         context: Context,
         onSuccess: () -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        splitPerMedia: Boolean = false
     ) {
+        if (splitPerMedia && mediaList.size > 1) {
+            sendSplitMessages(text, mediaList, tagIds, context)
+            return
+        }
         viewModelScope.launch {
             _isSending.value = true
             val filePicker = MediaFilePicker(context)
@@ -165,53 +168,29 @@ class MessageViewModel(
             )
 
             val preparedList = withContext(Dispatchers.IO) {
-                mediaList.mapIndexed { _, mediaFileInfo ->
-                    val localPath =
-                        filePicker.copyFileToAppStorage(mediaFileInfo.uri, mediaFileInfo.fileName)
-                    val fileHash = filePicker.computeBlake2bHash(mediaFileInfo.uri)
-                        ?: mediaFileInfo.uri.toString()
-                    val resolution = filePicker.getMediaResolution(mediaFileInfo.uri)
-                    val isVideo = mediaFileInfo.mimeType?.startsWith("video/") == true
-                    val durationMs = if (isVideo) filePicker.getVideoDuration(mediaFileInfo.uri)
-                        ?.let { it * 1000 } else null
-                    val thumbnailPath =
-                        localPath?.let { thumbnailGenerator.generateThumbnail(it, isVideo) }
+                mediaList.map { mediaFileInfo ->
+                    val entity = prepareMedia(mediaFileInfo, filePicker, thumbnailGenerator)
                     PreparedMedia(
                         info = mediaFileInfo,
-                        localPath = localPath,
-                        entity = Media(
-                            fileHash = fileHash,
-                            localMediaPath = localPath,
-                            localThumbnailPath = thumbnailPath,
-                            mimeType = mediaFileInfo.mimeType,
-                            fileSize = mediaFileInfo.size,
-                            width = resolution?.split("x")?.getOrNull(0)?.toIntOrNull(),
-                            height = resolution?.split("x")?.getOrNull(1)?.toIntOrNull(),
-                            durationMs = durationMs
-                        )
+                        localPath = entity.localMediaPath,
+                        entity = entity
                     )
                 }
             }
 
-            // Step 2: 判断是否在线，决定初始状态
-            val isOnline = databaseManager.networkMonitor.isOnline.value
-            val initialStatus =
-                if (isOnline) Message.MSG_STATUS_PUSHING else Message.MSG_STATUS_PENDING_SYNC
-
-            // 单事务写入 Message + 所有 Media + junctions + tags → PagingData 只刷新一次
+            // Step 2: 单事务写入 Message + 所有 Media + junctions + tags → PagingData 只刷新一次
             val (localMessageId, mediaIds) = messageRepository.createMessageWithMedia(
-                message = Message(text = text.ifBlank { null }, sendStatus = initialStatus),
+                message = Message(
+                    text = text.ifBlank { null },
+                    sendStatus = Message.MSG_STATUS_PUSHING
+                ),
                 mediaEntities = preparedList.map { it.entity },
                 tagIds = tagIds
             )
             // ↑ 至此消息已在 paging 中完整可见（带全部本地缩略图）
             _isSending.value = false
 
-            // Step 3: 后台上传 + 推送（离线时跳过，由 WorkManager/retrySync 重试）
-            if (!isOnline) {
-                Log.d(TAG, "sendMessage 跳过上传：离线模式或后端不可达，消息已本地保存为 PENDING_SYNC")
-                return@launch
-            }
+            // Step 3: 后台上传 + 推送（失败则留 PENDING_SYNC，等用户手动同步）
             try {
                 val uploadResults = coroutineScope {
                     preparedList.mapIndexed { index, prepared ->
@@ -254,7 +233,7 @@ class MessageViewModel(
                 messageRepository.applyRemoteUrls(localMessageId, response)
                 onSuccess()
             } catch (e: IOException) {
-                Log.w(TAG, "sendMessage 网络异常，标记 PENDING_SYNC 等待自动重试: ${e.message}")
+                Log.w(TAG, "sendMessage 网络异常，标记 PENDING_SYNC 等待手动重试: ${e.message}")
                 messageRepository.updateSendStatus(localMessageId, Message.MSG_STATUS_PENDING_SYNC)
             } catch (e: Exception) {
                 Log.e(TAG, "sendMessage 同步失败（业务异常）: ${e.message}", e)
@@ -264,16 +243,73 @@ class MessageViewModel(
     }
 
     /**
+     * 拆分发送：每个媒体各自组成一条消息（文本只挂在第一条）。
+     * 先把 N 条消息全部落库（立刻在 paging 中可见），再逐条走 retrySync 上传推送。
+     */
+    private fun sendSplitMessages(
+        text: String,
+        mediaList: List<MediaFileInfo>,
+        tagIds: List<Long>,
+        context: Context
+    ) {
+        viewModelScope.launch {
+            _isSending.value = true
+            val filePicker = MediaFilePicker(context)
+            val thumbnailGenerator = ThumbnailGenerator(context)
+
+            val entities = withContext(Dispatchers.IO) {
+                mediaList.map { info -> prepareMedia(info, filePicker, thumbnailGenerator) }
+            }
+
+            val messageIds = entities.mapIndexed { index, entity ->
+                val (id, _) = messageRepository.createMessageWithMedia(
+                    message = Message(
+                        text = if (index == 0) text.ifBlank { null } else null,
+                        sendStatus = Message.MSG_STATUS_PUSHING
+                    ),
+                    mediaEntities = listOf(entity),
+                    tagIds = tagIds
+                )
+                id
+            }
+            _isSending.value = false
+
+            messageIds.forEach { retrySync(it) }
+        }
+    }
+
+    /**
+     * 预处理单个媒体文件：复制到应用存储、计算哈希、生成缩略图。必须在 IO 线程调用。
+     */
+    private suspend fun prepareMedia(
+        info: MediaFileInfo,
+        filePicker: MediaFilePicker,
+        thumbnailGenerator: ThumbnailGenerator
+    ): Media {
+        val localPath = filePicker.copyFileToAppStorage(info.uri, info.fileName)
+        val fileHash = filePicker.computeBlake2bHash(info.uri) ?: info.uri.toString()
+        val resolution = filePicker.getMediaResolution(info.uri)
+        val isVideo = info.mimeType?.startsWith("video/") == true
+        val durationMs =
+            if (isVideo) filePicker.getVideoDuration(info.uri)?.let { it * 1000 } else null
+        val thumbnailPath = localPath?.let { thumbnailGenerator.generateThumbnail(it, isVideo) }
+        return Media(
+            fileHash = fileHash,
+            localMediaPath = localPath,
+            localThumbnailPath = thumbnailPath,
+            mimeType = info.mimeType,
+            fileSize = info.size,
+            width = resolution?.split("x")?.getOrNull(0)?.toIntOrNull(),
+            height = resolution?.split("x")?.getOrNull(1)?.toIntOrNull(),
+            durationMs = durationMs
+        )
+    }
+
+    /**
      * 重试推送失败的消息（重新上传所有本地媒体并调用 create-from-client）
      */
     fun retrySync(messageId: Long) {
         viewModelScope.launch {
-            // 离线时不浪费时间走网络（否则会卡 5-15 秒在「同步中」转圈）
-            if (!networkMonitor.isOnline.value) {
-                Log.d(TAG, "retrySync 跳过：当前离线，保持 PENDING_SYNC")
-                messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PENDING_SYNC)
-                return@launch
-            }
             messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PUSHING)
             try {
                 val mediaList = messageRepository.getMediaByMessageId(messageId)
@@ -316,24 +352,6 @@ class MessageViewModel(
                 Log.e(TAG, "retrySync 失败: ${e.message}", e)
                 messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PUSH_FAILED)
             }
-        }
-    }
-
-    /**
-     * 扫描所有 PENDING_SYNC 消息并尝试重推（App 启动 / 网络恢复时调用）。
-     * 复用 retrySync 的幂等逻辑：后端按客户端 id 去重。
-     */
-    fun retryAllPending() {
-        viewModelScope.launch {
-            if (!networkMonitor.isOnline.value) {
-                Log.d(TAG, "retryAllPending 跳过：当前离线")
-                return@launch
-            }
-            val pending =
-                messageRepository.getMessagesBySendStatus(Message.MSG_STATUS_PENDING_SYNC)
-            if (pending.isEmpty()) return@launch
-            Log.i(TAG, "retryAllPending 发现 ${pending.size} 条待同步消息，开始重推")
-            pending.forEach { retrySync(it.id) }
         }
     }
 
