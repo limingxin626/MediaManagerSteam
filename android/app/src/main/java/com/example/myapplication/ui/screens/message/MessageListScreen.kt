@@ -98,6 +98,7 @@ fun MessageListScreen(
     val tagFilter by viewModel.tagId.collectAsState(initial = null)
     val collectionFilter by viewModel.collectionId.collectAsState(initial = null)
     val isSending by viewModel.isSending.collectAsState()
+    val thumbnailMode by databaseManager.syncPreferences.thumbnailMode.collectAsState()
 
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -285,6 +286,7 @@ fun MessageListScreen(
                                 // 所以先放 MessageCard，再放 DateSeparator，日期才会出现在消息上方
                                 MessageCard(
                                     messageWithDetails = item,
+                                    thumbnailMode = thumbnailMode,
                                     onMediaClick = { mediaId, mediaList ->
                                         onMediaClick(
                                             mediaId,

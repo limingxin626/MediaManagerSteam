@@ -16,6 +16,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -23,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.myapplication.data.service.ThumbnailDisplayMode
 import com.example.myapplication.ui.viewmodel.SettingsViewModel
 import com.example.myapplication.ui.viewmodel.SyncUiState
 
@@ -31,6 +35,7 @@ import com.example.myapplication.ui.viewmodel.SyncUiState
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val syncState by viewModel.syncState.collectAsState()
     val hasCursor by viewModel.hasCursor.collectAsState()
+    val thumbnailMode by viewModel.thumbnailMode.collectAsState()
 
     Scaffold(
         topBar = {
@@ -44,6 +49,40 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // 显示设置卡片
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "缩略图布局",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "马赛克：按图片比例动态拼接（Telegram 风格）。\n网格：等分正方形，按数量显示 2 或 3 列。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    val modes = listOf(
+                        ThumbnailDisplayMode.MOSAIC to "马赛克",
+                        ThumbnailDisplayMode.GRID to "网格"
+                    )
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        modes.forEachIndexed { index, (mode, label) ->
+                            SegmentedButton(
+                                selected = thumbnailMode == mode,
+                                onClick = { viewModel.setThumbnailMode(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(index, modes.size)
+                            ) {
+                                Text(label)
+                            }
+                        }
+                    }
+                }
+            }
+
             // 同步卡片
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(

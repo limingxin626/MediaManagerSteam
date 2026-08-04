@@ -6,6 +6,7 @@ import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.model.PushSyncResult
 import com.example.myapplication.data.model.SyncResult
 import com.example.myapplication.data.service.SyncPreferences
+import com.example.myapplication.data.service.ThumbnailDisplayMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -22,6 +23,13 @@ class SettingsViewModel(
     /** 是否已做过全量初始化（存在增量游标）。UI 据此提示是否需要先初始化。 */
     private val _hasCursor = MutableStateFlow(syncPreferences.getSyncCursor() != null)
     val hasCursor: StateFlow<Boolean> = _hasCursor
+
+    /** 缩略图显示模式(马赛克 / 等分网格)。 */
+    val thumbnailMode: StateFlow<ThumbnailDisplayMode> = syncPreferences.thumbnailMode
+
+    fun setThumbnailMode(mode: ThumbnailDisplayMode) {
+        syncPreferences.setThumbnailMode(mode)
+    }
 
     /**
      * 增量同步：先推 outbox，再从上次游标拉取变更日志。
