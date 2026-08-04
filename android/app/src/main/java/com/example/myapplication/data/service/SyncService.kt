@@ -1,15 +1,15 @@
 package com.example.myapplication.data.service
 
-import com.example.myapplication.data.model.RemoteActor
 import com.example.myapplication.data.model.RemoteChangesResponse
+import com.example.myapplication.data.model.RemoteCollection
 import com.example.myapplication.data.model.RemoteMessage
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Query
 
 interface SyncService {
-    @GET("actors/sync")
-    suspend fun getActors(): List<RemoteActor>
+    @GET("collection/sync")
+    suspend fun getCollections(): List<RemoteCollection>
 
     @GET("messages/sync")
     suspend fun getMessages(): List<RemoteMessage>

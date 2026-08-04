@@ -62,8 +62,8 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getMessageById(id: Long): Message?
 
-    @Query("SELECT * FROM messages WHERE actorId = :actorId ORDER BY createdAt DESC")
-    fun getMessagesByActorId(actorId: Long): Flow<List<Message>>
+    @Query("SELECT * FROM messages WHERE collectionId = :collectionId ORDER BY createdAt DESC")
+    fun getMessagesByCollectionId(collectionId: Long): Flow<List<Message>>
 
     @Query("SELECT * FROM messages WHERE starred = 1 ORDER BY createdAt DESC")
     fun getStarredMessages(): Flow<List<Message>>
@@ -232,15 +232,15 @@ interface MessageDao {
     @Query(
         """
         SELECT id FROM messages m
-        WHERE m.actorId = :actorId
+        WHERE m.collectionId = :collectionId
           AND m.createdAt < :anchorCreatedAt
           AND (:query = '' OR m.text LIKE '%' || :query || '%')
           AND EXISTS (SELECT 1 FROM message_media WHERE messageId = m.id)
         ORDER BY m.createdAt DESC LIMIT 1
         """
     )
-    suspend fun getNextMessageIdWithMediaByActor(
-        actorId: Long,
+    suspend fun getNextMessageIdWithMediaByCollection(
+        collectionId: Long,
         anchorCreatedAt: Long,
         query: String
     ): Long?
@@ -248,15 +248,15 @@ interface MessageDao {
     @Query(
         """
         SELECT id FROM messages m
-        WHERE m.actorId = :actorId
+        WHERE m.collectionId = :collectionId
           AND m.createdAt > :anchorCreatedAt
           AND (:query = '' OR m.text LIKE '%' || :query || '%')
           AND EXISTS (SELECT 1 FROM message_media WHERE messageId = m.id)
         ORDER BY m.createdAt ASC LIMIT 1
         """
     )
-    suspend fun getPrevMessageIdWithMediaByActor(
-        actorId: Long,
+    suspend fun getPrevMessageIdWithMediaByCollection(
+        collectionId: Long,
         anchorCreatedAt: Long,
         query: String
     ): Long?
@@ -295,23 +295,23 @@ interface MessageDao {
     @Query("DELETE FROM message_tag WHERE messageId = :messageId AND tagId = :tagId")
     suspend fun deleteMessageTag(messageId: Long, tagId: Long)
 
-    // ==================== Actor-filtered Paging 查询 ====================
+    // ==================== Collection-filtered Paging 查询 ====================
 
     @Transaction
-    @Query("SELECT * FROM messages WHERE actorId = :actorId ORDER BY createdAt DESC")
-    fun getMessagesByActorPaged(actorId: Long): PagingSource<Int, MessageWithDetails>
+    @Query("SELECT * FROM messages WHERE collectionId = :collectionId ORDER BY createdAt DESC")
+    fun getMessagesByCollectionPaged(collectionId: Long): PagingSource<Int, MessageWithDetails>
 
     @Transaction
-    @Query("SELECT * FROM messages WHERE actorId = :actorId AND text LIKE '%' || :query || '%' ORDER BY createdAt DESC")
-    fun searchMessagesByActorPaged(
-        actorId: Long,
+    @Query("SELECT * FROM messages WHERE collectionId = :collectionId AND text LIKE '%' || :query || '%' ORDER BY createdAt DESC")
+    fun searchMessagesByCollectionPaged(
+        collectionId: Long,
         query: String
     ): PagingSource<Int, MessageWithDetails>
 
-    @Query("SELECT COUNT(*) FROM messages WHERE actorId = :actorId")
-    suspend fun getMessageCountByActor(actorId: Long): Int
+    @Query("SELECT COUNT(*) FROM messages WHERE collectionId = :collectionId")
+    suspend fun getMessageCountByCollection(collectionId: Long): Int
 
     @Transaction
-    @Query("SELECT * FROM messages WHERE actorId = :actorId ORDER BY createdAt DESC LIMIT 1")
-    suspend fun getLastMessageByActor(actorId: Long): MessageWithDetails?
+    @Query("SELECT * FROM messages WHERE collectionId = :collectionId ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getLastMessageByCollection(collectionId: Long): MessageWithDetails?
 }

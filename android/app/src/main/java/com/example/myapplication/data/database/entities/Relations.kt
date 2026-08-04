@@ -39,15 +39,15 @@ data class MessageWithTags(
 )
 
 /**
- * 消息完整信息（含媒体、标签、演员）
+ * 消息完整信息(含媒体、标签、合集)
  */
 data class MessageWithDetails(
     @Embedded val message: Message,
     @Relation(
-        parentColumn = "actorId",
+        parentColumn = "collectionId",
         entityColumn = "id"
     )
-    val actor: Actor? = null,
+    val collection: Collection? = null,
     @Relation(
         parentColumn = "id",
         entityColumn = "id",
@@ -88,13 +88,30 @@ data class MessageWithDetails(
 }
 
 /**
- * 演员及其消息列表
+ * 合集及其消息列表
  */
-data class ActorWithMessages(
-    @Embedded val actor: Actor,
+data class CollectionWithMessages(
+    @Embedded val collection: Collection,
     @Relation(
         parentColumn = "id",
-        entityColumn = "actorId"
+        entityColumn = "collectionId"
     )
     val messages: List<Message> = emptyList()
+)
+
+/**
+ * 媒体及其关联人物列表(通过 media_people junction)
+ */
+data class MediaWithPeople(
+    @Embedded val media: Media,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "id",
+        associateBy = Junction(
+            value = MediaPerson::class,
+            parentColumn = "mediaId",
+            entityColumn = "personId"
+        )
+    )
+    val people: List<Person> = emptyList()
 )

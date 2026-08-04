@@ -8,7 +8,8 @@ import com.example.myapplication.data.database.entities.Media
 object Routes {
     // 主要页面
     const val HOME = "home"
-    const val ACTOR_LIST = "actors"
+    const val COLLECTION_LIST = "collections"
+    const val PERSON_LIST = "people"
     const val MEDIA_LIST = "media"
     const val GROUP_LIST = "groups"
     const val SYSTEM_GALLERY = "system_gallery"
@@ -20,15 +21,15 @@ object Routes {
     const val FOLDER_DETAIL = "folder_detail/{folderName}"
     const val SYSTEM_MEDIA_PICKER = "system_media_picker/{groupId}"
 
-    // 演员相关
-    const val ACTOR_DETAIL = "actor/{actorId}"
-    const val ACTOR_EDIT = "actor/edit?actorId={actorId}"
-    const val ACTOR_ADD = "actor/add"
+    // 合集相关
+    const val COLLECTION_DETAIL = "collection/{collectionId}"
+    const val COLLECTION_EDIT = "collection/edit?collectionId={collectionId}"
+    const val COLLECTION_ADD = "collection/add"
 
     // 媒体相关
     const val MEDIA_DETAIL = "media/{mediaId}"
     const val MEDIA_FULLSCREEN =
-        "media/fullscreen/{mediaId}?mediaIdListJson={mediaIdListJson}&messageId={messageId}&filterTagId={filterTagId}&filterActorId={filterActorId}&filterQuery={filterQuery}"
+        "media/fullscreen/{mediaId}?mediaIdListJson={mediaIdListJson}&messageId={messageId}&filterTagId={filterTagId}&filterCollectionId={filterCollectionId}&filterQuery={filterQuery}"
     const val MEDIA_EDIT = "media/edit?mediaId={mediaId}"
 
     // 标签相关
@@ -42,7 +43,7 @@ object Routes {
 
     // 消息相关
     const val MESSAGE_LIST = "messages?tagId={tagId}"
-    const val MESSAGE_LIST_BY_ACTOR = "messages_by_actor?actorId={actorId}"
+    const val MESSAGE_LIST_BY_COLLECTION = "messages_by_collection?collectionId={collectionId}"
     const val MESSAGE_DETAIL = "message/{messageId}"
     const val MESSAGE_EDIT = "message/edit?messageId={messageId}"
     const val MESSAGE_ADD = "message/add"
@@ -55,19 +56,19 @@ object Routes {
     }
 
     /**
-     * 构建按演员过滤的消息列表路由
+     * 构建按合集过滤的消息列表路由
      */
-    fun messageListByActor(actorId: Long) = "messages_by_actor?actorId=$actorId"
+    fun messageListByCollection(collectionId: Long) = "messages_by_collection?collectionId=$collectionId"
 
     /**
-     * 构建带参数的演员详情路由
+     * 构建带参数的合集详情路由
      */
-    fun actorDetail(actorId: Long) = "actor/$actorId"
+    fun collectionDetail(collectionId: Long) = "collection/$collectionId"
 
     /**
-     * 构建带参数的演员编辑路由
+     * 构建带参数的合集编辑路由
      */
-    fun actorEdit(actorId: Long) = "actor/edit?actorId=$actorId"
+    fun collectionEdit(collectionId: Long) = "collection/edit?collectionId=$collectionId"
 
     /**
      * 构建带参数的媒体详情路由
@@ -131,7 +132,7 @@ fun androidx.navigation.NavController.navigateToMediaFullscreen(
     mediaList: List<Media>,
     messageId: Long = -1L,
     filterTagId: Long? = null,
-    filterActorId: Long? = null,
+    filterCollectionId: Long? = null,
     filterQuery: String = ""
 ) {
     // 只传递 ID 列表，避免序列化整个 Media 对象导致 URL 过长
@@ -141,14 +142,14 @@ fun androidx.navigation.NavController.navigateToMediaFullscreen(
         "UTF-8"
     )
     val tagArg = filterTagId ?: -1L
-    val actorArg = filterActorId ?: -1L
+    val collectionArg = filterCollectionId ?: -1L
     val queryArg = java.net.URLEncoder.encode(filterQuery, "UTF-8")
     navigate(
         "media/fullscreen/$mediaId" +
                 "?mediaIdListJson=$mediaIdListJson" +
                 "&messageId=$messageId" +
                 "&filterTagId=$tagArg" +
-                "&filterActorId=$actorArg" +
+                "&filterCollectionId=$collectionArg" +
                 "&filterQuery=$queryArg"
     )
 }
@@ -162,7 +163,8 @@ fun androidx.navigation.NavController.navigateToMediaFullscreen(mediaId: Long) {
  */
 enum class BottomNavDestination(val route: String) {
     HOME(Routes.HOME),
-    ACTORS(Routes.ACTOR_LIST),
+    COLLECTIONS(Routes.COLLECTION_LIST),
+    PEOPLE(Routes.PERSON_LIST),
     MEDIA(Routes.MEDIA_LIST),
     MESSAGES(Routes.MESSAGE_LIST),
     SYSTEM_GALLERY(Routes.SYSTEM_GALLERY),

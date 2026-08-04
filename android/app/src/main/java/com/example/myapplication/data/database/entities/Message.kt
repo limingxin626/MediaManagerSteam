@@ -13,14 +13,14 @@ import androidx.room.PrimaryKey
     tableName = "messages",
     foreignKeys = [
         ForeignKey(
-            entity = Actor::class,
+            entity = Collection::class,
             parentColumns = ["id"],
-            childColumns = ["actorId"],
+            childColumns = ["collectionId"],
             onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
-        Index(value = ["actorId"]),
+        Index(value = ["collectionId"]),
         Index(value = ["createdAt"])
     ]
 )
@@ -29,7 +29,7 @@ data class Message(
     val id: Long = 0,
 
     val text: String? = null,
-    val actorId: Long? = null,
+    val collectionId: Long? = null,
     val starred: Boolean = false,
     val source: String? = null,
     val createdAt: Long = System.currentTimeMillis(),

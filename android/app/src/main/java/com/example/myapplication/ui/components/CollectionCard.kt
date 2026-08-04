@@ -32,24 +32,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.myapplication.data.database.entities.Actor
+import com.example.myapplication.data.database.entities.Collection
 import com.example.myapplication.ui.theme.InstagramGradientEnd
 import com.example.myapplication.ui.theme.InstagramGradientMiddle
 import com.example.myapplication.ui.theme.InstagramGradientStart
 import java.io.File
 
 /**
- * Instagram 风格演员卡片组件 - 横向布局
+ * Instagram 风格合集卡片组件 - 横向布局
  * 类似 Instagram 的用户列表项设计
  */
 @Composable
-fun ActorCard(
-    actor: Actor, onClick: () -> Unit, modifier: Modifier = Modifier
+fun CollectionCard(
+    collection: Collection, onClick: () -> Unit, modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
 
     // 缓存计算结果
-    val displayName = remember(actor.name) { actor.name }
+    val displayName = remember(collection.name) { collection.name }
 
     // Instagram 渐变色
     val instagramGradient = Brush.linearGradient(
@@ -72,7 +72,7 @@ fun ActorCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 圆形头像 with Instagram 渐变边框
+            // 圆形封面 with Instagram 渐变边框
             Box(
                 modifier = Modifier.size(64.dp), contentAlignment = Alignment.Center
             ) {
@@ -90,19 +90,19 @@ fun ActorCard(
                             .background(MaterialTheme.colorScheme.surface, CircleShape)
                             .padding(2.dp), contentAlignment = Alignment.Center
                     ) {
-                        // 头像内容
-                        if (!actor.avatarPath.isNullOrBlank() && File(actor.avatarPath).exists()) {
+                        // 封面内容
+                        if (!collection.coverPath.isNullOrBlank() && File(collection.coverPath).exists()) {
                             AsyncImage(
-                                model = ImageRequest.Builder(context).data(File(actor.avatarPath))
+                                model = ImageRequest.Builder(context).data(File(collection.coverPath))
                                     .crossfade(true).build(),
-                                contentDescription = "演员头像",
+                                contentDescription = "合集封面",
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clip(CircleShape),
                                 contentScale = ContentScale.Crop
                             )
                         } else {
-                            // 占位头像
+                            // 占位封面
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -112,7 +112,7 @@ fun ActorCard(
                             ) {
                                 Icon(
                                     Icons.Default.Person,
-                                    contentDescription = "默认头像",
+                                    contentDescription = "默认封面",
                                     modifier = Modifier.size(32.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -122,11 +122,11 @@ fun ActorCard(
                 }
             }
 
-            // 演员信息
+            // 合集信息
             Column(
                 modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                // 演员姓名 - 加粗
+                // 合集名称 - 加粗
                 Text(
                     text = displayName,
                     style = MaterialTheme.typography.bodyLarge.copy(
@@ -140,4 +140,3 @@ fun ActorCard(
         }
     }
 }
-

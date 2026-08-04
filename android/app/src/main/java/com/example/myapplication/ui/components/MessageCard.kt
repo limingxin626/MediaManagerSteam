@@ -82,7 +82,7 @@ fun MessageCard(
 ) {
     val message = messageWithDetails.message
     val mediaList = messageWithDetails.mediaListOrdered
-    val actor = messageWithDetails.actor
+    val collection = messageWithDetails.collection
 
     val dateFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val formattedTime = remember(message.createdAt) {
@@ -285,9 +285,9 @@ fun MessageCard(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        if (actor != null) {
+                                        if (collection != null) {
                                             Text(
-                                                text = actor.name,
+                                                text = collection.name,
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.primary,
                                                 fontWeight = FontWeight.Medium,

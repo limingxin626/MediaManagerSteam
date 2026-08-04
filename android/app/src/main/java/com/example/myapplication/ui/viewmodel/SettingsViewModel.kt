@@ -35,12 +35,12 @@ class SettingsViewModel(
 
             val results = mutableListOf<String>()
 
-            // 同步 Actor（必须先成功，Message 依赖 Actor 外键）
+            // 同步 Collection（必须先成功，Message 依赖 Collection 外键）
             when (val r =
-                databaseManager.actorRepository.syncFromRemote(databaseManager.appContext)) {
-                is SyncResult.Success -> results.add("演员: +${r.insertedCount} ~${r.updatedCount}")
+                databaseManager.collectionRepository.syncFromRemote(databaseManager.appContext)) {
+                is SyncResult.Success -> results.add("合集: +${r.insertedCount} ~${r.updatedCount}")
                 is SyncResult.Error -> {
-                    _syncState.value = SyncUiState.Error("演员同步失败: ${r.message}")
+                    _syncState.value = SyncUiState.Error("合集同步失败: ${r.message}")
                     return@launch
                 }
 

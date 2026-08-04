@@ -22,11 +22,11 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun CreateGroupDialog(
     onDismiss: () -> Unit,
-    onConfirm: (actorId: Long, name: String, description: String, score: Float) -> Unit,
-    defaultActorId: Long = 1L,
+    onConfirm: (collectionId: Long, name: String, description: String, score: Float) -> Unit,
+    defaultCollectionId: Long = 1L,
     modifier: Modifier = Modifier
 ) {
-    var actorId by remember { mutableStateOf(defaultActorId.toString()) }
+    var collectionId by remember { mutableStateOf(defaultCollectionId.toString()) }
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var score by remember { mutableStateOf("0.0") }
@@ -39,10 +39,10 @@ fun CreateGroupDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 OutlinedTextField(
-                    value = actorId,
-                    onValueChange = { actorId = it },
-                    label = { Text("演员ID") },
-                    placeholder = { Text("请输入演员ID") },
+                    value = collectionId,
+                    onValueChange = { collectionId = it },
+                    label = { Text("合集ID") },
+                    placeholder = { Text("请输入合集ID") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -78,14 +78,14 @@ fun CreateGroupDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    val actorIdLong = actorId.toLongOrNull()
+                    val collectionIdLong = collectionId.toLongOrNull()
                     val scoreFloat = score.toFloatOrNull() ?: 0.0f
 
-                    if (actorIdLong != null && name.isNotBlank()) {
-                        onConfirm(actorIdLong, name, description, scoreFloat)
+                    if (collectionIdLong != null && name.isNotBlank()) {
+                        onConfirm(collectionIdLong, name, description, scoreFloat)
                     }
                 },
-                enabled = actorId.toLongOrNull() != null && name.isNotBlank()
+                enabled = collectionId.toLongOrNull() != null && name.isNotBlank()
             ) {
                 Text("创建")
             }

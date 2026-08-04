@@ -35,7 +35,8 @@ data class SyncOutboxItem(
         const val OP_UPSERT = "UPSERT"
         const val OP_DELETE = "DELETE"
 
-        const val ENTITY_ACTOR = "ACTOR"
+        const val ENTITY_COLLECTION = "COLLECTION"
+        const val ENTITY_PERSON = "PERSON"
         const val ENTITY_MEDIA = "MEDIA"
         const val ENTITY_MESSAGE = "MESSAGE"
         const val ENTITY_TAG = "TAG"

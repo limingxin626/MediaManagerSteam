@@ -113,9 +113,9 @@ private fun GroupListItem(
     } ?: ""
 
     val previewText = group.lastMessage?.let { msg ->
-        val actorName = msg.actor?.name
+        val collectionName = msg.collection?.name
         val text = msg.message.text ?: if (msg.mediaList.isNotEmpty()) "[媒体]" else ""
-        if (actorName != null) "$actorName: $text" else text
+        if (collectionName != null) "$collectionName: $text" else text
     } ?: "暂无消息"
 
     val avatarColor = group.color?.let { parseColor(it) }

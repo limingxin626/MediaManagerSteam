@@ -88,7 +88,7 @@ fun MessageListScreen(
     databaseManager: DatabaseManager,
     onMessageClick: (Long) -> Unit = { },
     onEditMessage: (Long) -> Unit = { },
-    onMediaClick: (mediaId: Long, messageId: Long, mediaList: List<Media>, filterTagId: Long?, filterActorId: Long?, filterQuery: String) -> Unit = { _, _, _, _, _, _ -> },
+    onMediaClick: (mediaId: Long, messageId: Long, mediaList: List<Media>, filterTagId: Long?, filterCollectionId: Long?, filterQuery: String) -> Unit = { _, _, _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -96,7 +96,7 @@ fun MessageListScreen(
     val pagingItems = viewModel.messagesPaged.collectAsLazyPagingItems()
     val searchQuery by viewModel.searchQuery.collectAsState(initial = "")
     val tagFilter by viewModel.tagId.collectAsState(initial = null)
-    val actorFilter by viewModel.actorId.collectAsState(initial = null)
+    val collectionFilter by viewModel.collectionId.collectAsState(initial = null)
     val isSending by viewModel.isSending.collectAsState()
 
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
@@ -296,7 +296,7 @@ fun MessageListScreen(
                                             item.message.id,
                                             mediaList,
                                             tagFilter,
-                                            actorFilter,
+                                            collectionFilter,
                                             searchQuery
                                         )
                                     },

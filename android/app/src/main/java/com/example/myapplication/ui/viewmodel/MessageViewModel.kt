@@ -60,21 +60,21 @@ class MessageViewModel(
     private val _tagId = MutableStateFlow<Long?>(null)
     val tagId: StateFlow<Long?> = _tagId.asStateFlow()
 
-    // 演员过滤
-    private val _actorId = MutableStateFlow<Long?>(null)
-    val actorId: StateFlow<Long?> = _actorId.asStateFlow()
+    // 合集过滤
+    private val _collectionId = MutableStateFlow<Long?>(null)
+    val collectionId: StateFlow<Long?> = _collectionId.asStateFlow()
 
     // 分页消息列表
     @OptIn(ExperimentalCoroutinesApi::class)
     val messagesPaged: Flow<PagingData<MessageWithDetails>> =
-        combine(_searchQuery, _tagId, _actorId) { query, tagId, actorId ->
-            Triple(query, tagId, actorId)
-        }.flatMapLatest { (query, tagId, actorId) ->
+        combine(_searchQuery, _tagId, _collectionId) { query, tagId, collectionId ->
+            Triple(query, tagId, collectionId)
+        }.flatMapLatest { (query, tagId, collectionId) ->
             Pager(
                 config = PagingConfig(pageSize = 30, prefetchDistance = 10),
                 pagingSourceFactory = {
                     when {
-                        actorId != null -> messageRepository.getMessagesByActorPaged(actorId, query)
+                        collectionId != null -> messageRepository.getMessagesByCollectionPaged(collectionId, query)
                         tagId != null -> messageRepository.getMessagesByTagPaged(tagId, query)
                         else -> messageRepository.getMessagesPaged(query)
                     }
@@ -98,8 +98,8 @@ class MessageViewModel(
         _tagId.value = tagId
     }
 
-    fun setActorId(actorId: Long?) {
-        _actorId.value = actorId
+    fun setCollectionId(collectionId: Long?) {
+        _collectionId.value = collectionId
     }
 
     fun refreshMessages() {
@@ -244,7 +244,7 @@ class MessageViewModel(
                     MessageSyncRequest(
                         id = localMessageId,
                         text = text.ifBlank { null },
-                        actor_id = null,
+                        collection_id = null,
                         tag_ids = tagIds,
                         created_at = createdAtIso,
                         files = uploadResults.filterNotNull()
@@ -302,7 +302,7 @@ class MessageViewModel(
                     MessageSyncRequest(
                         id = messageId,
                         text = msg?.text,
-                        actor_id = msg?.actorId,
+                        collection_id = msg?.collectionId,
                         tag_ids = tagIds,
                         created_at = createdAtIso,
                         files = uploadResults.filterNotNull()

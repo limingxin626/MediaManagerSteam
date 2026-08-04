@@ -54,8 +54,8 @@ Repositories write data locally via DAOs **and** enqueue a `SyncOutboxItem` for 
 The message list (`MessageListScreen`) uses a **Telegram-style reverse-chronological chat layout**:
 - **Paging3** for infinite scroll: `MessageDao.getMessagesPaged()` returns `PagingSource<Int, MessageWithDetails>`, consumed via `Pager` → `Flow<PagingData>` → `collectAsLazyPagingItems()`
 - **`reverseLayout = true`** on `LazyColumn` — newest messages at the bottom, scroll up for history
-- **`MessageWithDetails`** (Room `@Relation` entity from `Relations.kt`) carries `message`, `actor`, `mediaList`, `tagList` in a single query
-- **`MessageCard`** renders a Telegram-style card: media thumbnail grid (1–4+ images with "+N" overlay, video play icons/duration) + text (3 lines max) + actor name · time · star
+- **`MessageWithDetails`** (Room `@Relation` entity from `Relations.kt`) carries `message`, `collection`, `mediaList`, `tagList` in a single query
+- **`MessageCard`** renders a Telegram-style card: media thumbnail grid (1–4+ images with "+N" overlay, video play icons/duration) + text (3 lines max) + collection name · time · star
 - **Date separators** inserted between messages on different days
 - **`onMessageClick`** signature is `(Long) -> Unit` (passes messageId, not the entity)
 - Sort/filter bottom sheet removed — messages are always ordered by `createdAt DESC`
@@ -63,7 +63,7 @@ The message list (`MessageListScreen`) uses a **Telegram-style reverse-chronolog
 ### Key Entities & Relationships
 
 8 Room entities with many-to-many relationships via junction tables:
-- **Actor** → Message (one-to-many via foreignKey, `SET_NULL` on delete)
+- **Collection** → Message (one-to-many via foreignKey, `SET_NULL` on delete)
 - **Message** ↔ Media (many-to-many via `MessageMedia`, composite PK)
 - **Message** ↔ Tag (many-to-many via `MessageTag`, composite PK)
 - **Media** ↔ Tag (many-to-many via `MediaTag`, composite PK)
@@ -71,9 +71,11 @@ The message list (`MessageListScreen`) uses a **Telegram-style reverse-chronolog
 
 #### Entity Fields
 
-**Actor**: `id`, `name`, `description?`, `avatarPath?`, `createdAt`, `updatedAt`
+**Collection** (原 Actor): `id`, `name`, `description?`, `coverPath?`, `createdAt`, `updatedAt`
 
-**Message**: `id`, `text?`, `actorId?` (FK→Actor), `starred` (Boolean), `source?`, `createdAt`, `updatedAt`
+**Person** (照片人物,与 Media 多对多 via `media_people`): `id`, `name`, `description?`, `coverPath?`, `createdAt`, `updatedAt`
+
+**Message**: `id`, `text?`, `collectionId?` (FK→Collection), `starred` (Boolean), `source?`, `createdAt`, `updatedAt`
 
 **Media**: `id`, `remoteMediaUrl?`, `remoteThumbnailUrl?`, `localMediaPath?`, `localThumbnailPath?`, `isDownloaded`, `downloadedAt?`, `fileHash` (unique, non-null), `fileSize?` (Long), `mimeType?`, `width?`, `height?`, `durationMs?` (Long, milliseconds), `rating` (Int 0-5), `starred` (Boolean), `viewCount`, `lastViewedAt?`, `createdAt`, `updatedAt`
 
@@ -89,7 +91,7 @@ Manual singleton pattern via `DatabaseManager` (not Hilt, despite Hilt being in 
 
 ### Database
 
-- Room database at **version 27** (`AppDatabase.kt`)
+- Room database at **version 32** (`AppDatabase.kt`)
 - Migration strategy: **fallback to destructive migration** (`DatabaseMigrations.kt`)
 - KSP is used for Room annotation processing
 
@@ -113,5 +115,5 @@ Manual singleton pattern via `DatabaseManager` (not Hilt, despite Hilt being in 
 - Message list uses **Telegram-style** chat layout — reverse chronological, Paging3, bottom-anchored
 - Bottom nav visibility controlled via `CompositionLocal` (`LocalBottomBarVisible`)
 - Screen transitions use custom slide/fade animations (`NavigationAnimations.kt`)
-- Sync entity types: `ACTOR`, `MEDIA`, `MESSAGE`, `TAG`; operations: `UPSERT`, `DELETE`
+- Sync entity types: `COLLECTION`, `PERSON`, `MEDIA`, `MESSAGE`, `TAG`; operations: `UPSERT`, `DELETE`
 - Backend sync contract documented in `docs/sync-apply-prompt.md`

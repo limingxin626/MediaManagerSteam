@@ -4,21 +4,26 @@ import android.util.Log
 import androidx.paging.PagingSource
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
-import com.example.myapplication.data.database.dao.ActorDao
+import com.example.myapplication.data.database.dao.CollectionDao
 import com.example.myapplication.data.database.dao.MediaDao
 import com.example.myapplication.data.database.dao.MessageDao
+import com.example.myapplication.data.database.dao.PersonDao
 import com.example.myapplication.data.database.dao.TagDao
 import com.example.myapplication.data.database.entities.Media
+import com.example.myapplication.data.database.entities.MediaPerson
 import com.example.myapplication.data.database.entities.Message
 import com.example.myapplication.data.database.entities.MessageMedia
 import com.example.myapplication.data.database.entities.MessageTag
 import com.example.myapplication.data.database.entities.MessageWithDetails
+import com.example.myapplication.data.database.entities.Person
 import com.example.myapplication.data.database.entities.SyncOutboxItem
 import com.example.myapplication.data.database.entities.Tag
 import com.example.myapplication.data.model.MessageSortBy
-import com.example.myapplication.data.model.RemoteActor
+import com.example.myapplication.data.model.RemoteCollection
 import com.example.myapplication.data.model.RemoteMediaItem
 import com.example.myapplication.data.model.RemoteMessage
+import com.example.myapplication.data.model.RemotePerson
+import com.example.myapplication.data.model.RemotePersonRef
 import com.example.myapplication.data.model.RemoteTagItem
 import com.example.myapplication.data.model.SyncResult
 import com.example.myapplication.data.service.MessageSyncResponse
@@ -45,7 +50,8 @@ class MessageRepository(
     private val messageDao: MessageDao,
     private val mediaDao: MediaDao,
     private val tagDao: TagDao,
-    private val actorDao: ActorDao,
+    private val collectionDao: CollectionDao,
+    private val personDao: PersonDao,
     private val outboxRepository: SyncOutboxRepository? = null,
     private val database: RoomDatabase? = null,
     private val appScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -150,31 +156,31 @@ class MessageRepository(
     }
 
     /**
-     * 获取按演员过滤的分页消息列表
+     * 获取按合集过滤的分页消息列表
      */
-    fun getMessagesByActorPaged(
-        actorId: Long,
+    fun getMessagesByCollectionPaged(
+        collectionId: Long,
         query: String
     ): PagingSource<Int, MessageWithDetails> {
         return if (query.isBlank()) {
-            messageDao.getMessagesByActorPaged(actorId)
+            messageDao.getMessagesByCollectionPaged(collectionId)
         } else {
-            messageDao.searchMessagesByActorPaged(actorId, query)
+            messageDao.searchMessagesByCollectionPaged(collectionId, query)
         }
     }
 
     /**
-     * 获取指定演员的消息数量
+     * 获取指定合集的消息数量
      */
-    suspend fun getMessageCountByActor(actorId: Long): Int {
-        return messageDao.getMessageCountByActor(actorId)
+    suspend fun getMessageCountByCollection(collectionId: Long): Int {
+        return messageDao.getMessageCountByCollection(collectionId)
     }
 
     /**
-     * 获取指定演员的最新消息（用于 group 预览）
+     * 获取指定合集的最新消息（用于 group 预览）
      */
-    suspend fun getLastMessageByActor(actorId: Long): MessageWithDetails? {
-        return messageDao.getLastMessageByActor(actorId)
+    suspend fun getLastMessageByCollection(collectionId: Long): MessageWithDetails? {
+        return messageDao.getLastMessageByCollection(collectionId)
     }
 
     /**
@@ -386,7 +392,7 @@ class MessageRepository(
      */
     data class MediaViewerFilter(
         val tagId: Long? = null,
-        val actorId: Long? = null,
+        val collectionId: Long? = null,
         val searchQuery: String = ""
     )
 
@@ -405,12 +411,12 @@ class MessageRepository(
         val anchorCreatedAt = anchor.createdAt
         val q = filter.searchQuery
         return when {
-            filter.actorId != null -> when (direction) {
-                AdjacentDirection.NEXT -> messageDao.getNextMessageIdWithMediaByActor(
-                    filter.actorId, anchorCreatedAt, q
+            filter.collectionId != null -> when (direction) {
+                AdjacentDirection.NEXT -> messageDao.getNextMessageIdWithMediaByCollection(
+                    filter.collectionId, anchorCreatedAt, q
                 )
-                AdjacentDirection.PREV -> messageDao.getPrevMessageIdWithMediaByActor(
-                    filter.actorId, anchorCreatedAt, q
+                AdjacentDirection.PREV -> messageDao.getPrevMessageIdWithMediaByCollection(
+                    filter.collectionId, anchorCreatedAt, q
                 )
             }
             filter.tagId != null -> when (direction) {
@@ -479,7 +485,7 @@ class MessageRepository(
             Log.d(TAG, "获取到 ${remoteMessages.size} 条远程消息数据")
 
             val existingIds = messageDao.getAllMessageIdsSync().toSet()
-            val validActorIds = actorDao.getAllActorIdsSync().toSet()
+            val validCollectionIds = collectionDao.getAllCollectionIdsSync().toSet()
             var insertedCount = 0
             var updatedCount = 0
 
@@ -524,6 +530,8 @@ class MessageRepository(
                                 // 已存在，更新元数据
                                 mediaDao.updateMedia(media)
                             }
+                            // 关联人物(media_people 全量替换)
+                            applyMediaPeople(rm)
                         }
 
                         // 3) Upsert Message
@@ -540,13 +548,13 @@ class MessageRepository(
                             System.currentTimeMillis()
                         }
 
-                        val safeActorId =
-                            if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
+                        val safeCollectionId =
+                            if (remote.collection_id != null && remote.collection_id in validCollectionIds) remote.collection_id else null
 
                         val message = Message(
                             id = remote.id,
                             text = remote.text,
-                            actorId = safeActorId,
+                            collectionId = safeCollectionId,
                             starred = remote.starred,
                             createdAt = createdAtMs,
                             updatedAt = updatedAtMs,
@@ -576,7 +584,7 @@ class MessageRepository(
                         if (remote.id in existingIds) updatedCount++ else insertedCount++
                     } catch (e: Exception) {
                         Log.e(
-                            TAG, "同步消息 id=${remote.id} 失败, actorId=${remote.actor_id}, " +
+                            TAG, "同步消息 id=${remote.id} 失败, collectionId=${remote.collection_id}, " +
                                     "mediaIds=${remote.media_items.map { it.id }}, " +
                                     "tagIds=${remote.tags.map { it.id }}: ${e.message}"
                         )
@@ -631,7 +639,7 @@ class MessageRepository(
             }
 
             val body = response.body() ?: return@withContext SyncResult.Error("响应体为空")
-            val validActorIds = actorDao.getAllActorIdsSync().toSet()
+            val validCollectionIds = collectionDao.getAllCollectionIdsSync().toSet()
 
             val applyChanges: suspend () -> Unit = {
                 for (change in body.changes) {
@@ -645,7 +653,8 @@ class MessageRepository(
                                         messageDao.deleteMessage(change.entity_id)
                                     }
 
-                                    "ACTOR" -> actorDao.deleteActorById(change.entity_id)
+                                    "COLLECTION" -> collectionDao.deleteCollectionById(change.entity_id)
+                                    "PERSON" -> personDao.deletePersonById(change.entity_id)
                                     "MEDIA" -> mediaDao.deleteMediaById(change.entity_id)
                                     "TAG" -> tagDao.deleteTagById(change.entity_id)
                                 }
@@ -659,15 +668,23 @@ class MessageRepository(
                                         "MESSAGE" -> {
                                             val remote = parseRemoteMessage(data)
                                             if (remote != null) {
-                                                applyRemoteMessage(remote, validActorIds)
+                                                applyRemoteMessage(remote, validCollectionIds)
                                                 totalInserted++
                                             }
                                         }
 
-                                        "ACTOR" -> {
-                                            val actor = parseRemoteActor(data)
-                                            if (actor != null) {
-                                                actorDao.insertActor(actor.toLocalActor())
+                                        "COLLECTION" -> {
+                                            val collection = parseRemoteCollection(data)
+                                            if (collection != null) {
+                                                collectionDao.insertCollection(collection.toLocalCollection())
+                                                totalInserted++
+                                            }
+                                        }
+
+                                        "PERSON" -> {
+                                            val person = parseRemotePerson(data)
+                                            if (person != null) {
+                                                personDao.insertPerson(person.toLocalPerson())
                                                 totalInserted++
                                             }
                                         }
@@ -726,6 +743,8 @@ class MessageRepository(
                                                 )
                                                 val inserted = mediaDao.insertMediaIgnore(media)
                                                 if (inserted == -1L) mediaDao.updateMedia(media)
+                                                // 关联人物(media_people 全量替换)
+                                                applyMediaPeople(rm)
                                                 totalInserted++
                                             }
                                         }
@@ -765,15 +784,15 @@ class MessageRepository(
         SyncResult.Success(totalInserted, totalUpdated, totalDeleted, serverTime = lastServerTime, serverCursorId = 0L)
     }
 
-    private suspend fun applyRemoteMessage(remote: RemoteMessage, validActorIds: Set<Long>) {
+    private suspend fun applyRemoteMessage(remote: RemoteMessage, validCollectionIds: Set<Long>) {
         val createdAtMs = parseIsoToMs(remote.created_at)
         val updatedAtMs = parseIsoToMs(remote.updated_at)
-        val safeActorId =
-            if (remote.actor_id != null && remote.actor_id in validActorIds) remote.actor_id else null
+        val safeCollectionId =
+            if (remote.collection_id != null && remote.collection_id in validCollectionIds) remote.collection_id else null
         val message = Message(
             id = remote.id,
             text = remote.text,
-            actorId = safeActorId,
+            collectionId = safeCollectionId,
             starred = remote.starred,
             createdAt = createdAtMs,
             updatedAt = updatedAtMs,
@@ -788,11 +807,31 @@ class MessageRepository(
                     position = rm.position
                 )
             )
+            // 消息内嵌 media 快照也带 people[],一并落库
+            applyMediaPeople(rm)
         }
         messageDao.deleteMessageTagsByMessageId(remote.id)
         for (rt in remote.tags) {
             messageDao.insertMessageTag(MessageTag(messageId = remote.id, tagId = rt.id))
         }
+    }
+
+    /**
+     * 将 media 快照里的 people[] 落到 media_people junction(按 mediaId 全量替换)。
+     * people 为 null 时(旧后端/非人物 media)不动关联。
+     */
+    private suspend fun applyMediaPeople(rm: RemoteMediaItem) {
+        val people = rm.people ?: return
+        // 确保人物行存在(media 快照只给 id+name,description/cover 留待 PERSON 变更补全)
+        for (p in people) {
+            if (personDao.getPersonById(p.id) == null) {
+                personDao.insertPerson(Person(id = p.id, name = p.name))
+            }
+        }
+        personDao.replaceMediaPeople(
+            mediaId = rm.id,
+            refs = people.map { MediaPerson(mediaId = rm.id, personId = it.id) }
+        )
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -806,8 +845,8 @@ class MessageRepository(
             RemoteMessage(
                 id = id,
                 text = data["text"] as? String,
-                actor_id = (data["actor_id"] as? Double)?.toLong(),
-                actor_name = data["actor_name"] as? String,
+                collection_id = (data["collection_id"] as? Double)?.toLong(),
+                collection_name = data["collection_name"] as? String,
                 starred = data["starred"] as? Boolean ?: false,
                 created_at = createdAt,
                 updated_at = updatedAt,
@@ -843,6 +882,11 @@ class MessageRepository(
                 end_ms = (data["end_ms"] as? Double)?.toInt(),
                 created_at = data["created_at"] as? String,
                 updated_at = data["updated_at"] as? String,
+                people = (data["people"] as? List<Map<String, Any?>>)?.mapNotNull { pm ->
+                    val pid = (pm["id"] as? Double)?.toLong() ?: return@mapNotNull null
+                    val pname = pm["name"] as? String ?: return@mapNotNull null
+                    RemotePersonRef(id = pid, name = pname)
+                },
             )
         } catch (e: Exception) {
             null
@@ -850,15 +894,31 @@ class MessageRepository(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun parseRemoteActor(data: Map<String, Any?>): RemoteActor? {
+    private fun parseRemoteCollection(data: Map<String, Any?>): RemoteCollection? {
         return try {
             val id = (data["id"] as? Double)?.toLong() ?: return null
             val name = data["name"] as? String ?: return null
-            RemoteActor(
+            RemoteCollection(
                 id = id,
                 name = name,
                 description = data["description"] as? String,
-                avatar = data["avatar"] as? String,
+                cover = data["cover"] as? String,
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseRemotePerson(data: Map<String, Any?>): RemotePerson? {
+        return try {
+            val id = (data["id"] as? Double)?.toLong() ?: return null
+            val name = data["name"] as? String ?: return null
+            RemotePerson(
+                id = id,
+                name = name,
+                description = data["description"] as? String,
+                cover = data["cover"] as? String,
             )
         } catch (e: Exception) {
             null

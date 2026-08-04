@@ -9,74 +9,74 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-data class ActorGroupItem(
-    val actorId: Long?,
+data class CollectionGroupItem(
+    val collectionId: Long?,
     val name: String,
     val messageCount: Int,
     val lastMessage: MessageWithDetails?,
-    val avatarPath: String?
+    val coverPath: String?
 )
 
 /**
- * 演员分组页面的ViewModel
+ * 合集分组页面的ViewModel
  */
-class ActorViewModel(private val databaseManager: DatabaseManager) : ViewModel() {
+class CollectionViewModel(private val databaseManager: DatabaseManager) : ViewModel() {
 
-    private val _groups = MutableStateFlow<List<ActorGroupItem>>(emptyList())
-    val groups: StateFlow<List<ActorGroupItem>> = _groups.asStateFlow()
+    private val _groups = MutableStateFlow<List<CollectionGroupItem>>(emptyList())
+    val groups: StateFlow<List<CollectionGroupItem>> = _groups.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _uiState = MutableStateFlow(ActorUiState())
-    val uiState: StateFlow<ActorUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(CollectionUiState())
+    val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
-            databaseManager.actorRepository.getAllActors().collect { actors ->
-                loadGroups(actors)
+            databaseManager.collectionRepository.getAllCollections().collect { collections ->
+                loadGroups(collections)
             }
         }
     }
 
-    private suspend fun loadGroups(actors: List<com.example.myapplication.data.database.entities.Actor>) {
+    private suspend fun loadGroups(collections: List<com.example.myapplication.data.database.entities.Collection>) {
         _isLoading.value = true
         val messageRepository = databaseManager.messageRepository
-        val groups = mutableListOf<ActorGroupItem>()
+        val groups = mutableListOf<CollectionGroupItem>()
 
         // "全部" group
         val totalCount = messageRepository.getTotalMessageCount()
         val lastMessage = messageRepository.getLastMessage()
         groups.add(
-            ActorGroupItem(
-                actorId = null,
+            CollectionGroupItem(
+                collectionId = null,
                 name = "全部",
                 messageCount = totalCount,
                 lastMessage = lastMessage,
-                avatarPath = null
+                coverPath = null
             )
         )
 
-        // Each actor as a group
-        for (actor in actors) {
-            val count = messageRepository.getMessageCountByActor(actor.id)
-            val actorLastMessage =
-                if (count > 0) messageRepository.getLastMessageByActor(actor.id) else null
+        // Each collection as a group
+        for (collection in collections) {
+            val count = messageRepository.getMessageCountByCollection(collection.id)
+            val collectionLastMessage =
+                if (count > 0) messageRepository.getLastMessageByCollection(collection.id) else null
             groups.add(
-                ActorGroupItem(
-                    actorId = actor.id,
-                    name = actor.name,
+                CollectionGroupItem(
+                    collectionId = collection.id,
+                    name = collection.name,
                     messageCount = count,
-                    lastMessage = actorLastMessage,
-                    avatarPath = actor.avatarPath
+                    lastMessage = collectionLastMessage,
+                    coverPath = collection.coverPath
                 )
             )
         }
 
         // "全部" stays first, rest sorted by message count descending
         val allGroup = groups.first()
-        val actorGroups = groups.drop(1).sortedByDescending { it.messageCount }
-        _groups.value = listOf(allGroup) + actorGroups
+        val collectionGroups = groups.drop(1).sortedByDescending { it.messageCount }
+        _groups.value = listOf(allGroup) + collectionGroups
         _isLoading.value = false
     }
 
@@ -90,9 +90,9 @@ class ActorViewModel(private val databaseManager: DatabaseManager) : ViewModel()
 }
 
 /**
- * 演员页面UI状态
+ * 合集页面UI状态
  */
-data class ActorUiState(
+data class CollectionUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val message: String? = null

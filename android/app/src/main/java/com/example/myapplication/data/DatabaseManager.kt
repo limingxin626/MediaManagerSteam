@@ -3,9 +3,10 @@ package com.example.myapplication.data
 
 import android.content.Context
 import com.example.myapplication.data.database.AppDatabase
-import com.example.myapplication.data.repository.ActorRepository
+import com.example.myapplication.data.repository.CollectionRepository
 import com.example.myapplication.data.repository.MediaRepository
 import com.example.myapplication.data.repository.MessageRepository
+import com.example.myapplication.data.repository.PersonRepository
 import com.example.myapplication.data.repository.SyncOutboxRepository
 import com.example.myapplication.data.repository.TagRepository
 import com.example.myapplication.data.service.NetworkMonitor
@@ -24,7 +25,8 @@ class DatabaseManager private constructor(context: Context) {
     private val database = AppDatabase.getDatabase(context)
 
     // DAO实例
-    private val actorDao = database.actorDao()
+    private val collectionDao = database.collectionDao()
+    private val personDao = database.personDao()
     private val mediaDao = database.mediaDao()
     private val tagDao = database.tagDao()
     private val syncOutboxDao = database.syncOutboxDao()
@@ -38,11 +40,12 @@ class DatabaseManager private constructor(context: Context) {
     // Repository实例
     val syncOutboxRepository = SyncOutboxRepository(syncOutboxDao, networkMonitor, syncPreferences)
 
-    val actorRepository = ActorRepository(actorDao, syncOutboxRepository)
+    val collectionRepository = CollectionRepository(collectionDao, syncOutboxRepository)
+    val personRepository = PersonRepository(personDao, syncOutboxRepository)
     val mediaRepository = MediaRepository(mediaDao, syncOutboxRepository)
     val tagRepository = TagRepository(tagDao)
     val messageRepository =
-        MessageRepository(messageDao, mediaDao, tagDao, actorDao, syncOutboxRepository, database)
+        MessageRepository(messageDao, mediaDao, tagDao, collectionDao, personDao, syncOutboxRepository, database)
 
     companion object {
         @Volatile

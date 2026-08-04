@@ -64,7 +64,7 @@ data class ClientMediaFile(
 data class MessageSyncRequest(
     val id: Long,
     val text: String?,
-    val actor_id: Long?,
+    val collection_id: Long?,
     val tag_ids: List<Long>?,
     val created_at: String?,
     val files: List<ClientMediaFile>
@@ -73,8 +73,8 @@ data class MessageSyncRequest(
 data class MessageSyncResponse(
     val id: Long,
     val text: String? = null,
-    val actor_id: Long? = null,
-    val actor_name: String? = null,
+    val collection_id: Long? = null,
+    val collection_name: String? = null,
     val starred: Boolean = false,
     val created_at: String? = null,
     val updated_at: String? = null,

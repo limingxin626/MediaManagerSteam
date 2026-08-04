@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.data.DatabaseManager
-import com.example.myapplication.data.database.entities.Actor
+import com.example.myapplication.data.database.entities.Collection
 
 /**
  * 创建消息对话框
@@ -31,11 +31,11 @@ fun CreateMessageDialog(
     onDismiss: () -> Unit,
     onConfirm: (Long?, String) -> Unit,
     databaseManager: DatabaseManager? = null,
-    defaultActorId: Long? = null
+    defaultCollectionId: Long? = null
 ) {
     var text by remember { mutableStateOf("") }
-    var selectedActorId by remember { mutableStateOf(defaultActorId) }
-    var actors by remember { mutableStateOf<List<Actor>>(emptyList()) }
+    var selectedCollectionId by remember { mutableStateOf(defaultCollectionId) }
+    var collections by remember { mutableStateOf<List<Collection>>(emptyList()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -62,11 +62,11 @@ fun CreateMessageDialog(
                     maxLines = 4
                 )
 
-                // 演员选择
-                if (actors.isNotEmpty()) {
+                // 合集选择
+                if (collections.isNotEmpty()) {
                     Column {
                         Text(
-                            text = "选择演员",
+                            text = "选择合集",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Medium
                             ),
@@ -77,11 +77,11 @@ fun CreateMessageDialog(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            actors.forEach { actor ->
+                            collections.forEach { collection ->
                                 FilterChip(
-                                    selected = selectedActorId == actor.id,
-                                    onClick = { selectedActorId = actor.id },
-                                    label = { Text(actor.name) },
+                                    selected = selectedCollectionId == collection.id,
+                                    onClick = { selectedCollectionId = collection.id },
+                                    label = { Text(collection.name) },
                                     modifier = Modifier
                                 )
                             }
@@ -93,7 +93,7 @@ fun CreateMessageDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    onConfirm(selectedActorId, text)
+                    onConfirm(selectedCollectionId, text)
                 },
                 enabled = text.isNotBlank()
             ) {

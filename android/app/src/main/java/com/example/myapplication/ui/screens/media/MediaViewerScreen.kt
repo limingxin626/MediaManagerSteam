@@ -78,7 +78,7 @@ fun MediaViewerScreen(
     databaseManager: DatabaseManager,
     navController: NavController,
     filterTagId: Long? = null,
-    filterActorId: Long? = null,
+    filterCollectionId: Long? = null,
     filterQuery: String = ""
 ) {
     val bottomBarVisible = LocalBottomBarVisible.current
@@ -100,7 +100,7 @@ fun MediaViewerScreen(
                 initialMediaIdList = mediaIdList,
                 filter = MessageRepository.MediaViewerFilter(
                     tagId = filterTagId,
-                    actorId = filterActorId,
+                    collectionId = filterCollectionId,
                     searchQuery = filterQuery
                 ),
                 databaseManager = databaseManager,

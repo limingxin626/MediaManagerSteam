@@ -65,12 +65,13 @@ import com.example.myapplication.data.service.SyncWorker
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.navigation.navigateToMediaFullscreen
 import com.example.myapplication.ui.navigation.NavigationAnimations
-import com.example.myapplication.ui.screens.actor.ActorListScreen
+import com.example.myapplication.ui.screens.collection.CollectionListScreen
 import com.example.myapplication.ui.screens.home.HomeScreen
 import com.example.myapplication.ui.screens.media.MediaListScreen
 import com.example.myapplication.ui.screens.media.MediaViewerScreen
 import com.example.myapplication.ui.screens.message.MessageEditScreen
 import com.example.myapplication.ui.screens.message.MessageListScreen
+import com.example.myapplication.ui.screens.person.PersonListScreen
 import com.example.myapplication.ui.screens.settings.SettingsScreen
 import com.example.myapplication.ui.screens.system.FolderDetailScreen
 import com.example.myapplication.ui.screens.system.SystemFolderViewScreen
@@ -80,10 +81,11 @@ import com.example.myapplication.ui.screens.system.SystemMediaEditScreen
 import com.example.myapplication.ui.screens.tag.TagEditScreen
 import com.example.myapplication.ui.screens.tag.TagListScreen
 import com.example.myapplication.ui.theme.MyApplicationTheme
-import com.example.myapplication.ui.viewmodel.ActorViewModel
+import com.example.myapplication.ui.viewmodel.CollectionViewModel
 import com.example.myapplication.ui.viewmodel.HomeViewModel
 import com.example.myapplication.ui.viewmodel.MediaViewModel
 import com.example.myapplication.ui.viewmodel.MessageViewModel
+import com.example.myapplication.ui.viewmodel.PersonViewModel
 import com.example.myapplication.ui.viewmodel.SettingsViewModel
 import com.example.myapplication.ui.viewmodel.SystemGalleryViewModel
 import com.example.myapplication.ui.viewmodel.TagViewModel
@@ -103,11 +105,20 @@ class MainActivity : ComponentActivity() {
     private lateinit var databaseManager: DatabaseManager
 
     // 使用 viewModels() 委托来管理 ViewModel 生命周期
-    private val actorViewModel: ActorViewModel by viewModels {
+    private val collectionViewModel: CollectionViewModel by viewModels {
         object : ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return ActorViewModel(databaseManager) as T
+                return CollectionViewModel(databaseManager) as T
+            }
+        }
+    }
+
+    private val personViewModel: PersonViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return PersonViewModel(databaseManager) as T
             }
         }
     }
@@ -197,7 +208,8 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 MyApplicationApp(
                     databaseManager,
-                    actorViewModel,
+                    collectionViewModel,
+                    personViewModel,
                     mediaViewModel,
                     tagViewModel,
                     systemGalleryViewModel,
@@ -213,7 +225,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MyApplicationApp(
     databaseManager: DatabaseManager,
-    actorViewModel: ActorViewModel? = null,
+    collectionViewModel: CollectionViewModel? = null,
+    personViewModel: PersonViewModel? = null,
     mediaViewModel: MediaViewModel? = null,
     tagViewModel: TagViewModel? = null,
     systemGalleryViewModel: SystemGalleryViewModel? = null,
@@ -232,7 +245,8 @@ fun MyApplicationApp(
     // 判断当前路由是否在底部导航栏中
     val showBottomBar = currentRoute in listOf(
         Routes.HOME,
-        Routes.ACTOR_LIST,
+        Routes.COLLECTION_LIST,
+        Routes.PERSON_LIST,
         Routes.MEDIA_LIST,
         Routes.SETTINGS
     )
@@ -250,7 +264,8 @@ fun MyApplicationApp(
                 AppNavHost(
                     navController = navController,
                     databaseManager = databaseManager,
-                    actorViewModel = actorViewModel,
+                    collectionViewModel = collectionViewModel,
+                    personViewModel = personViewModel,
                     mediaViewModel = mediaViewModel,
                     tagViewModel = tagViewModel,
                     systemGalleryViewModel = systemGalleryViewModel,
@@ -295,7 +310,8 @@ fun MyApplicationApp(
 fun AppNavHost(
     navController: NavHostController,
     databaseManager: DatabaseManager,
-    actorViewModel: ActorViewModel?,
+    collectionViewModel: CollectionViewModel?,
+    personViewModel: PersonViewModel?,
     mediaViewModel: MediaViewModel?,
     tagViewModel: TagViewModel?,
     systemGalleryViewModel: SystemGalleryViewModel?,
@@ -361,9 +377,9 @@ fun AppNavHost(
             )
         }
 
-        // 演员列表 - 底部导航方向感知滑动
+        // 合集列表 - 底部导航方向感知滑动
         composable(
-            Routes.ACTOR_LIST,
+            Routes.COLLECTION_LIST,
             enterTransition = {
                 val from =
                     AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
@@ -401,12 +417,57 @@ fun AppNavHost(
                 else NavigationAnimations.noExitAnimation()
             }
         ) {
-            ActorListScreen(
-                viewModel = actorViewModel!!,
-                onNavigateToMessages = { actorId ->
-                    if (actorId == null) navController.navigate(Routes.messageList(null))
-                    else navController.navigate(Routes.messageListByActor(actorId))
+            CollectionListScreen(
+                viewModel = collectionViewModel!!,
+                onNavigateToMessages = { collectionId ->
+                    if (collectionId == null) navController.navigate(Routes.messageList(null))
+                    else navController.navigate(Routes.messageListByCollection(collectionId))
                 }
+            )
+        }
+
+        // 人物列表 - 底部导航方向感知滑动
+        composable(
+            Routes.PERSON_LIST,
+            enterTransition = {
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else NavigationAnimations.noAnimation()
+            },
+            exitTransition = {
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else NavigationAnimations.noExitAnimation()
+            },
+            popEnterTransition = {
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideInFromLeft()
+                else if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideInFromRight()
+                else NavigationAnimations.noAnimation()
+            },
+            popExitTransition = {
+                val from =
+                    AppDestinations.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to =
+                    AppDestinations.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from != -1 && to != -1 && to > from) NavigationAnimations.tabSlideOutToLeft()
+                else if (from != -1 && to != -1 && to < from) NavigationAnimations.tabSlideOutToRight()
+                else NavigationAnimations.noExitAnimation()
+            }
+        ) {
+            PersonListScreen(
+                viewModel = personViewModel!!
             )
         }
 
@@ -496,24 +557,24 @@ fun AppNavHost(
                 onEditMessage = { messageId ->
                     navController.navigate(Routes.messageEdit(messageId))
                 },
-                onMediaClick = { mediaId, messageId, mediaList, filterTagId, filterActorId, filterQuery ->
+                onMediaClick = { mediaId, messageId, mediaList, filterTagId, filterCollectionId, filterQuery ->
                     navController.navigateToMediaFullscreen(
                         mediaId,
                         mediaList,
                         messageId,
                         filterTagId,
-                        filterActorId,
+                        filterCollectionId,
                         filterQuery
                     )
                 }
             )
         }
 
-        // 按演员过滤的消息列表 - 从右侧滑入
+        // 按合集过滤的消息列表 - 从右侧滑入
         composable(
-            Routes.MESSAGE_LIST_BY_ACTOR,
+            Routes.MESSAGE_LIST_BY_COLLECTION,
             arguments = listOf(
-                navArgument("actorId") {
+                navArgument("collectionId") {
                     type = NavType.LongType
                     defaultValue = -1L
                 }
@@ -523,16 +584,16 @@ fun AppNavHost(
             popEnterTransition = { EnterTransition.None },
             popExitTransition = { NavigationAnimations.slideOutToRight() }
         ) { backStackEntry ->
-            val actorId = backStackEntry.arguments?.getLong("actorId") ?: -1L
-            val effectiveActorId = if (actorId == -1L) null else actorId
+            val collectionId = backStackEntry.arguments?.getLong("collectionId") ?: -1L
+            val effectiveCollectionId = if (collectionId == -1L) null else collectionId
 
-            LaunchedEffect(effectiveActorId) {
-                messageViewModel!!.setActorId(effectiveActorId)
+            LaunchedEffect(effectiveCollectionId) {
+                messageViewModel!!.setCollectionId(effectiveCollectionId)
             }
 
             DisposableEffect(Unit) {
                 onDispose {
-                    messageViewModel!!.setActorId(null)
+                    messageViewModel!!.setCollectionId(null)
                 }
             }
 
@@ -545,13 +606,13 @@ fun AppNavHost(
                 onEditMessage = { messageId ->
                     navController.navigate(Routes.messageEdit(messageId))
                 },
-                onMediaClick = { mediaId, messageId, mediaList, filterTagId, filterActorId, filterQuery ->
+                onMediaClick = { mediaId, messageId, mediaList, filterTagId, filterCollectionId, filterQuery ->
                     navController.navigateToMediaFullscreen(
                         mediaId,
                         mediaList,
                         messageId,
                         filterTagId,
-                        filterActorId,
+                        filterCollectionId,
                         filterQuery
                     )
                 }
@@ -598,7 +659,7 @@ fun AppNavHost(
                     type = NavType.LongType
                     defaultValue = -1L
                 },
-                navArgument("filterActorId") {
+                navArgument("filterCollectionId") {
                     type = NavType.LongType
                     defaultValue = -1L
                 },
@@ -613,7 +674,7 @@ fun AppNavHost(
             val mediaIdListJson = backStackEntry.arguments?.getString("mediaIdListJson")
             val messageId = backStackEntry.arguments?.getLong("messageId") ?: -1L
             val filterTagIdRaw = backStackEntry.arguments?.getLong("filterTagId") ?: -1L
-            val filterActorIdRaw = backStackEntry.arguments?.getLong("filterActorId") ?: -1L
+            val filterCollectionIdRaw = backStackEntry.arguments?.getLong("filterCollectionId") ?: -1L
             val filterQueryRaw = backStackEntry.arguments?.getString("filterQuery") ?: ""
             val filterQuery = remember(filterQueryRaw) {
                 try {
@@ -642,7 +703,7 @@ fun AppNavHost(
                 messageId = messageId,
                 mediaIdList = mediaIdList,
                 filterTagId = if (filterTagIdRaw == -1L) null else filterTagIdRaw,
-                filterActorId = if (filterActorIdRaw == -1L) null else filterActorIdRaw,
+                filterCollectionId = if (filterCollectionIdRaw == -1L) null else filterCollectionIdRaw,
                 filterQuery = filterQuery,
                 databaseManager = databaseManager,
                 navController = navController
@@ -909,7 +970,8 @@ enum class AppDestinations(
     val route: String
 ) {
     HOME("主页", Icons.Default.Home, Routes.HOME),
-    ACTORS("演员", Icons.Default.Person, Routes.ACTOR_LIST),
+    COLLECTIONS("合集", Icons.Default.Person, Routes.COLLECTION_LIST),
+    PEOPLE("人物", Icons.Default.Person, Routes.PERSON_LIST),
     MEDIA("媒体", Icons.Default.PlayArrow, Routes.MEDIA_LIST),
     SETTINGS("设置", Icons.Default.Settings, Routes.SETTINGS),
 }

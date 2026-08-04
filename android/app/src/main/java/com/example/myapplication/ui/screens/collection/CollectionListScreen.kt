@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.screens.actor
+package com.example.myapplication.ui.screens.collection
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,16 +37,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.myapplication.ui.viewmodel.ActorGroupItem
-import com.example.myapplication.ui.viewmodel.ActorViewModel
+import com.example.myapplication.ui.viewmodel.CollectionGroupItem
+import com.example.myapplication.ui.viewmodel.CollectionViewModel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun ActorListScreen(
-    viewModel: ActorViewModel,
+fun CollectionListScreen(
+    viewModel: CollectionViewModel,
     onNavigateToMessages: (Long?) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -75,10 +75,10 @@ fun ActorListScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                items(groups, key = { it.actorId ?: -1L }) { group ->
-                    ActorGroupListItem(
+                items(groups, key = { it.collectionId ?: -1L }) { group ->
+                    CollectionGroupListItem(
                         group = group,
-                        onClick = { onNavigateToMessages(group.actorId) }
+                        onClick = { onNavigateToMessages(group.collectionId) }
                     )
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 72.dp),
@@ -96,8 +96,8 @@ fun ActorListScreen(
 }
 
 @Composable
-private fun ActorGroupListItem(
-    group: ActorGroupItem,
+private fun CollectionGroupListItem(
+    group: CollectionGroupItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -116,12 +116,12 @@ private fun ActorGroupListItem(
     } ?: ""
 
     val previewText = group.lastMessage?.let { msg ->
-        val actorName = msg.actor?.name
+        val collectionName = msg.collection?.name
         val text = msg.message.text ?: if (msg.mediaList.isNotEmpty()) "[媒体]" else ""
-        if (actorName != null) "$actorName: $text" else text
+        if (collectionName != null) "$collectionName: $text" else text
     } ?: "暂无消息"
 
-    val avatarColor = if (group.actorId == null) MaterialTheme.colorScheme.primary
+    val coverColor = if (group.collectionId == null) MaterialTheme.colorScheme.primary
     else generateColorFromName(group.name)
 
     Row(
@@ -131,24 +131,24 @@ private fun ActorGroupListItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
+        // Cover
         Box(
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .background(avatarColor),
+                .background(coverColor),
             contentAlignment = Alignment.Center
         ) {
-            if (group.actorId == null) {
+            if (group.collectionId == null) {
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(24.dp)
                 )
-            } else if (group.avatarPath != null) {
+            } else if (group.coverPath != null) {
                 AsyncImage(
-                    model = File(group.avatarPath),
+                    model = File(group.coverPath),
                     contentDescription = group.name,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -210,7 +210,7 @@ private fun ActorGroupListItem(
                 )
                 if (group.messageCount > 0) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    ActorBadge(count = group.messageCount)
+                    CollectionBadge(count = group.messageCount)
                 }
             }
         }
@@ -218,7 +218,7 @@ private fun ActorGroupListItem(
 }
 
 @Composable
-private fun ActorBadge(count: Int) {
+private fun CollectionBadge(count: Int) {
     val text = if (count > 999) "999+" else count.toString()
     Box(
         modifier = Modifier
