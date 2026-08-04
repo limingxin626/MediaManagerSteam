@@ -52,7 +52,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -61,7 +60,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myapplication.data.DatabaseManager
-import com.example.myapplication.data.service.SyncWorker
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.navigation.navigateToMediaFullscreen
 import com.example.myapplication.ui.navigation.NavigationAnimations
@@ -188,21 +186,7 @@ class MainActivity : ComponentActivity() {
         // 初始化数据库
         databaseManager = DatabaseManager.getInstance(this)
 
-        // 调度后台定期同步（15 分钟，WiFi 下执行）
-        SyncWorker.schedulePeriodicSync(this)
-
-        // 后端可达性 false→true 边沿：立即触发 Outbox 推送 + 重推 PENDING_SYNC 消息
-        val networkMonitor = databaseManager.networkMonitor
-        var wasOnline = networkMonitor.isOnline.value
-        lifecycleScope.launch {
-            networkMonitor.isOnline.collect { online ->
-                if (online && !wasOnline) {
-                    SyncWorker.scheduleImmediateSync(this@MainActivity)
-                    messageViewModel.retryAllPending()
-                }
-                wasOnline = online
-            }
-        }
+        // 同步已改为手动触发（设置页「开始同步」），不再自动调度后台/网络恢复同步。
 
         setContent {
             MyApplicationTheme {

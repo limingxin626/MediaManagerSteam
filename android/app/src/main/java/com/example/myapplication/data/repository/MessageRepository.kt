@@ -948,6 +948,13 @@ class MessageRepository(
     private val DB_DATETIME_FORMATTER = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS")
     private val DB_DATETIME_T_FORMATTER = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
 
+    /**
+     * 生成一个可作为增量游标起点的 ISO 时间戳，格式对齐后端 `datetime.utcnow().isoformat()`
+     * （naive UTC，无时区后缀）。全量初始化后用它 seed 游标，后续增量从此刻开始拉。
+     */
+    fun currentServerCursorSeed(): String =
+        LocalDateTime.now(ZoneOffset.UTC).format(ISO_FORMATTER_MICROS)
+
     private fun parseIsoToMs(iso: String): Long {
         val input = iso.trim()
         return try {
@@ -983,19 +990,12 @@ class MessageRepository(
         fireAndForgetSync()
     }
 
-    /** Fire-and-forget 推送，使用注入的 appScope 并加 mutex 防止并发 */
+    /**
+     * 同步已改为手动触发（设置页「开始同步」）。
+     * 写操作只入队 outbox，不再自动推送；此处保留为 no-op 以不影响现有调用点。
+     */
     private fun fireAndForgetSync() {
-        outboxRepository?.let { repo ->
-            appScope.launch {
-                syncMutex.withLock {
-                    try {
-                        repo.syncToServer()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "立即推送失败，将由后台任务重试: ${e.message}")
-                    }
-                }
-            }
-        }
+        // no-op
     }
 
     companion object {

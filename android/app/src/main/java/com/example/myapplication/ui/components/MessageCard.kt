@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -61,6 +60,7 @@ import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.database.entities.Message
 import com.example.myapplication.data.database.entities.MessageWithDetails
 import com.example.myapplication.data.database.entities.Tag
+import com.example.myapplication.data.service.ThumbnailDisplayMode
 import com.example.myapplication.ui.theme.TextSecondary
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -74,11 +74,11 @@ import java.util.Locale
 fun MessageCard(
     messageWithDetails: MessageWithDetails,
     modifier: Modifier = Modifier,
+    thumbnailMode: ThumbnailDisplayMode = ThumbnailDisplayMode.MOSAIC,
     onMediaClick: (mediaId: Long, mediaList: List<Media>) -> Unit = { _, _ -> },
     onEditClick: (Long) -> Unit = {},
     onDeleteClick: (Long) -> Unit = {},
-    onToggleStarred: (Long) -> Unit = {},
-    onRetrySync: ((Long) -> Unit)? = null
+    onToggleStarred: (Long) -> Unit = {}
 ) {
     val message = messageWithDetails.message
     val mediaList = messageWithDetails.mediaListOrdered
@@ -97,7 +97,7 @@ fun MessageCard(
     val maxCardWidth = screenWidthDp * 0.9f
     val singleImageMaxHeight = 360.dp
 
-    val cardWidthModifier = if (mediaList.size == 1) {
+    val cardWidthModifier = if (mediaList.size == 1 && thumbnailMode == ThumbnailDisplayMode.MOSAIC) {
         val media0 = mediaList[0]
         val aspectRatio =
             if (media0.width != null && media0.height != null && media0.width > 0 && media0.height > 0) {
@@ -130,6 +130,7 @@ fun MessageCard(
                         MediaThumbnailGrid(
                             mediaList = mediaList,
                             messageId = message.id,
+                            displayMode = thumbnailMode,
                             onMediaClick = { mediaId -> onMediaClick(mediaId, mediaList) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -202,112 +203,32 @@ fun MessageCard(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 左侧：根据 sendStatus 显示不同内容
-                            when (message.sendStatus) {
-                                Message.MSG_STATUS_PUSHING -> {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(12.dp),
-                                            strokeWidth = 1.5.dp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            text = "同步中...",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextSecondary,
-                                            fontSize = 12.sp
-                                        )
-                                    }
+                            // 左侧：演员名 + 时间(同步改手动触发,不再显示 per-feed 同步状态)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (collection != null) {
+                                    Text(
+                                        text = collection.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = "·",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
+                                    )
                                 }
-
-                                Message.MSG_STATUS_PUSH_FAILED -> {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(
-                                            text = "同步失败",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error,
-                                            fontSize = 12.sp
-                                        )
-                                        if (onRetrySync != null) {
-                                            Text(
-                                                text = "· 重试",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = FontWeight.SemiBold
-                                                ),
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontSize = 12.sp,
-                                                modifier = Modifier.clickable { onRetrySync(message.id) }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Message.MSG_STATUS_PENDING_SYNC -> {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.tertiary)
-                                        )
-                                        Text(
-                                            text = "待同步",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.tertiary,
-                                            fontSize = 12.sp
-                                        )
-                                        if (onRetrySync != null) {
-                                            Text(
-                                                text = "· 重试",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = FontWeight.SemiBold
-                                                ),
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontSize = 12.sp,
-                                                modifier = Modifier.clickable { onRetrySync(message.id) }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                else -> {
-                                    // SYNCED: 正常显示演员名 + 时间
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        if (collection != null) {
-                                            Text(
-                                                text = collection.name,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.Medium,
-                                                fontSize = 12.sp
-                                            )
-                                            Text(
-                                                text = "·",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = TextSecondary,
-                                                fontSize = 12.sp
-                                            )
-                                        }
-                                        Text(
-                                            text = formattedTime,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextSecondary,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = formattedTime,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp
+                                )
                             }
 
                             // 右侧：收藏图标
@@ -391,10 +312,23 @@ private fun MediaThumbnailGrid(
     mediaList: List<Media>,
     messageId: Long,
     onMediaClick: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    displayMode: ThumbnailDisplayMode = ThumbnailDisplayMode.MOSAIC
 ) {
     val displayMedia = mediaList.take(10)
     val extraCount = (mediaList.size - 10).coerceAtLeast(0)
+
+    // 等分正方形网格模式：按数量决定 2 或 3 列
+    if (displayMode == ThumbnailDisplayMode.GRID) {
+        UniformThumbnailGrid(
+            displayMedia = displayMedia,
+            extraCount = extraCount,
+            messageId = messageId,
+            onMediaClick = onMediaClick,
+            modifier = modifier
+        )
+        return
+    }
 
     if (displayMedia.size == 1) {
         // 单图：保持原始比例，高度不超过 360dp
@@ -491,6 +425,71 @@ private fun MediaThumbnailGrid(
                     onMediaClick = onMediaClick,
                     modifier = Modifier.height(totalHeightDpVal)
                 )
+            }
+        }
+    }
+}
+
+/**
+ * 等分正方形网格渲染 — 每格严格 1:1,按图片数量决定列数(≤4 → 2 列,否则 3 列)。
+ * 复用 MediaThumbnailItem / OverflowCell,保留视频/收藏/时长/「+N」叠层。
+ *
+ * 说明:外层卡片 Row 用 IntrinsicSize.Min 测高,aspectRatio 在其中无法解析出正方形,
+ * 所以这里改为测量容器宽度 → 反推每格 dp 边长 → 用固定 height 保证 1:1。
+ */
+@Composable
+private fun UniformThumbnailGrid(
+    displayMedia: List<Media>,
+    extraCount: Int,
+    messageId: Long,
+    onMediaClick: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (displayMedia.isEmpty()) return
+    val columns = if (displayMedia.size <= 4) 2 else 3
+    val rows = displayMedia.chunked(columns)
+
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var containerWidthPx by remember { mutableStateOf(0) }
+    val gapPx = with(density) { 2.dp.toPx() }
+    // 每格边长(px)= (容器宽 - 列间隙) / 列数;再转 dp 供固定 height 使用
+    val cellSizeDp = if (containerWidthPx <= 0) 0.dp else with(density) {
+        ((containerWidthPx - gapPx * (columns - 1)) / columns).coerceAtLeast(0f).toDp()
+    }
+
+    Column(modifier = modifier.onGloballyPositioned { containerWidthPx = it.size.width }) {
+        rows.forEachIndexed { rowIndex, rowItems ->
+            if (rowIndex > 0) Spacer(modifier = Modifier.height(2.dp))
+            Row(modifier = Modifier.fillMaxWidth().height(cellSizeDp)) {
+                for (col in 0 until columns) {
+                    if (col > 0) Spacer(modifier = Modifier.width(2.dp))
+                    val media = rowItems.getOrNull(col)
+                    if (media == null) {
+                        // 补齐末行空位,保持等分对齐
+                        Spacer(modifier = Modifier.weight(1f))
+                    } else {
+                        val cellModifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                        val isLast = media.id == displayMedia.last().id && extraCount > 0
+                        if (isLast) {
+                            OverflowCell(
+                                media = media,
+                                extraCount = extraCount,
+                                messageId = messageId,
+                                onMediaClick = onMediaClick,
+                                modifier = cellModifier
+                            )
+                        } else {
+                            MediaThumbnailItem(
+                                media = media,
+                                messageId = messageId,
+                                onClick = { onMediaClick(media.id) },
+                                modifier = cellModifier
+                            )
+                        }
+                    }
+                }
             }
         }
     }

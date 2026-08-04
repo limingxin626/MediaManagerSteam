@@ -35,10 +35,10 @@ class DatabaseManager private constructor(context: Context) {
     // 网络监听
     // 同步偏好
     val syncPreferences = SyncPreferences(appContext)
-    val networkMonitor = NetworkMonitor(appContext, syncPreferences)
+    val networkMonitor = NetworkMonitor(appContext)
 
     // Repository实例
-    val syncOutboxRepository = SyncOutboxRepository(syncOutboxDao, networkMonitor, syncPreferences)
+    val syncOutboxRepository = SyncOutboxRepository(syncOutboxDao, networkMonitor)
 
     val collectionRepository = CollectionRepository(collectionDao, syncOutboxRepository)
     val personRepository = PersonRepository(personDao, syncOutboxRepository)

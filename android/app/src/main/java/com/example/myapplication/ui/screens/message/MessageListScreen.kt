@@ -98,6 +98,7 @@ fun MessageListScreen(
     val tagFilter by viewModel.tagId.collectAsState(initial = null)
     val collectionFilter by viewModel.collectionId.collectAsState(initial = null)
     val isSending by viewModel.isSending.collectAsState()
+    val thumbnailMode by databaseManager.syncPreferences.thumbnailMode.collectAsState()
 
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -195,11 +196,6 @@ fun MessageListScreen(
         }
     }
 
-    // 进入页面时扫描 PENDING_SYNC 消息：覆盖「冷启动且后端已可达」场景
-    LaunchedEffect(Unit) {
-        viewModel.retryAllPending()
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -290,6 +286,7 @@ fun MessageListScreen(
                                 // 所以先放 MessageCard，再放 DateSeparator，日期才会出现在消息上方
                                 MessageCard(
                                     messageWithDetails = item,
+                                    thumbnailMode = thumbnailMode,
                                     onMediaClick = { mediaId, mediaList ->
                                         onMediaClick(
                                             mediaId,
@@ -303,7 +300,6 @@ fun MessageListScreen(
                                     onEditClick = { onEditMessage(it) },
                                     onDeleteClick = { viewModel.deleteMessage(it) },
                                     onToggleStarred = { viewModel.toggleStarred(it) },
-                                    onRetrySync = { viewModel.retrySync(it) },
                                     modifier = Modifier.fillMaxWidth()
                                 )
 

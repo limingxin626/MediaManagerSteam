@@ -13,9 +13,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -26,11 +23,10 @@ import java.util.concurrent.TimeUnit
  * 监听网络状态 + 后端可达性。
  * - [isWifiConnected]：系统层 WiFi 连接状态
  * - [isBackendReachable]：周期性 GET /health 的结果
- * - [isOnline]：手动离线模式 OFF + 后端可达 = 真正可同步
+ * - [isOnline]：后端可达即视为在线（同步全部手动触发，不再有离线模式开关）
  */
 class NetworkMonitor(
     context: Context,
-    private val syncPreferences: SyncPreferences,
 ) {
     private val TAG = "NetworkMonitor"
 
@@ -51,11 +47,8 @@ class NetworkMonitor(
     private val _isBackendReachable = MutableStateFlow(false)
     val isBackendReachable: StateFlow<Boolean> = _isBackendReachable.asStateFlow()
 
-    val isOnline: StateFlow<Boolean> = combine(
-        syncPreferences.isOfflineMode,
-        _isBackendReachable,
-    ) { offline, reachable -> !offline && reachable }
-        .stateIn(scope, SharingStarted.Eagerly, false)
+    /** 后端可达即在线（同步全部手动触发，无离线模式开关）。 */
+    val isOnline: StateFlow<Boolean> = _isBackendReachable.asStateFlow()
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
