@@ -2,26 +2,14 @@ package com.example.myapplication.data.service
 
 import android.content.Context
 import android.content.SharedPreferences
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 同步相关偏好设置。
- * [isOfflineMode]：手动离线模式开关，开启后跳过所有即时同步和 WorkManager 后台同步。
+ * 同步相关偏好设置：增量游标 + 消息列表滚动锚点。
  */
 class SyncPreferences(context: Context) {
 
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-    private val _isOfflineMode = MutableStateFlow(prefs.getBoolean(KEY_OFFLINE_MODE, false))
-    val isOfflineMode: StateFlow<Boolean> = _isOfflineMode.asStateFlow()
-
-    fun setOfflineMode(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_OFFLINE_MODE, enabled).apply()
-        _isOfflineMode.value = enabled
-    }
 
     fun getMessageScrollAnchor(): Pair<Long, Int>? {
         val id = prefs.getLong(KEY_MSG_SCROLL_ID, -1L)
@@ -44,10 +32,34 @@ class SyncPreferences(context: Context) {
             .apply()
     }
 
+    /**
+     * 增量同步游标 (server_time, since_id)。
+     * 为空表示尚未做过全量初始化 —— 增量同步应提示用户先「初始化」。
+     */
+    fun getSyncCursor(): Pair<String, Long>? {
+        val time = prefs.getString(KEY_LAST_SYNC_TIME, null) ?: return null
+        return time to prefs.getLong(KEY_LAST_SYNC_ID, 0L)
+    }
+
+    fun setSyncCursor(serverTime: String, sinceId: Long) {
+        prefs.edit()
+            .putString(KEY_LAST_SYNC_TIME, serverTime)
+            .putLong(KEY_LAST_SYNC_ID, sinceId)
+            .apply()
+    }
+
+    fun clearSyncCursor() {
+        prefs.edit()
+            .remove(KEY_LAST_SYNC_TIME)
+            .remove(KEY_LAST_SYNC_ID)
+            .apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "sync_preferences"
-        private const val KEY_OFFLINE_MODE = "offline_mode"
         private const val KEY_MSG_SCROLL_ID = "message_scroll_anchor_id"
         private const val KEY_MSG_SCROLL_OFFSET = "message_scroll_anchor_offset"
+        private const val KEY_LAST_SYNC_TIME = "last_sync_time"
+        private const val KEY_LAST_SYNC_ID = "last_sync_id"
     }
 }

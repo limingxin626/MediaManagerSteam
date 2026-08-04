@@ -67,11 +67,6 @@ class MediaRepository(
                 entityId = insertedId,
                 payloadJson = gson.toJson(payload)
             )
-            try {
-                outboxRepository?.syncToServer()
-            } catch (e: Exception) {
-                Log.w(TAG, "insertMedia 立即推送失败，将由后台任务重试: ${e.message}")
-            }
         }
 
         return insertedId
@@ -90,11 +85,6 @@ class MediaRepository(
                 )
             }
         }
-        try {
-            outboxRepository?.syncToServer()
-        } catch (e: Exception) {
-            Log.w(TAG, "insertMediaList 立即推送失败，将由后台任务重试: ${e.message}")
-        }
 
         return ids
     }
@@ -110,11 +100,6 @@ class MediaRepository(
                 entityId = updatedMedia.id,
                 payloadJson = gson.toJson(updatedMedia)
             )
-            try {
-                outboxRepository?.syncToServer()
-            } catch (e: Exception) {
-                Log.w(TAG, "updateMedia 立即推送失败，将由后台任务重试: ${e.message}")
-            }
         }
     }
 
@@ -127,11 +112,6 @@ class MediaRepository(
                 entityType = SyncOutboxItem.ENTITY_MEDIA,
                 entityId = media.id
             )
-            try {
-                outboxRepository?.syncToServer()
-            } catch (e: Exception) {
-                Log.w(TAG, "deleteMedia 立即推送失败，将由后台任务重试: ${e.message}")
-            }
         }
     }
 
@@ -143,11 +123,6 @@ class MediaRepository(
                 entityType = SyncOutboxItem.ENTITY_MEDIA,
                 entityId = id
             )
-            try {
-                outboxRepository?.syncToServer()
-            } catch (e: Exception) {
-                Log.w(TAG, "deleteMediaById 立即推送失败，将由后台任务重试: ${e.message}")
-            }
         }
     }
 
@@ -162,11 +137,6 @@ class MediaRepository(
                     entityId = media.id
                 )
             }
-        }
-        try {
-            outboxRepository?.syncToServer()
-        } catch (e: Exception) {
-            Log.w(TAG, "deleteAllMedia 立即推送失败，将由后台任务重试: ${e.message}")
         }
     }
 
@@ -184,11 +154,6 @@ class MediaRepository(
                 entityId = updated.id,
                 payloadJson = gson.toJson(updated)
             )
-            try {
-                outboxRepository?.syncToServer()
-            } catch (e: Exception) {
-                Log.w(TAG, "toggleMediaStarred 立即推送失败，将由后台任务重试: ${e.message}")
-            }
         }
     }
 
@@ -207,11 +172,6 @@ class MediaRepository(
                     entityId = updatedMedia.id,
                     payloadJson = gson.toJson(updatedMedia)
                 )
-                try {
-                    outboxRepository?.syncToServer()
-                } catch (e: Exception) {
-                    Log.w(TAG, "updateMediaRating 立即推送失败，将由后台任务重试: ${e.message}")
-                }
             }
         }
     }

@@ -8,13 +8,11 @@ import com.example.myapplication.data.service.ApplySyncChangesRequest
 import com.example.myapplication.data.service.NetworkMonitor
 import com.example.myapplication.data.service.SyncChangeRequest
 import com.example.myapplication.data.service.SyncNetwork
-import com.example.myapplication.data.service.SyncPreferences
 import com.google.gson.JsonParser
 
 class SyncOutboxRepository(
     private val dao: SyncOutboxDao,
-    private val networkMonitor: NetworkMonitor? = null,
-    private val syncPreferences: SyncPreferences? = null
+    private val networkMonitor: NetworkMonitor? = null
 ) {
 
     suspend fun enqueueUpsert(entityType: String, entityId: Long, payloadJson: String) {
@@ -59,12 +57,6 @@ class SyncOutboxRepository(
     }
 
     suspend fun syncToServer(limit: Int = 200): PushSyncResult {
-        // 手动离线模式时跳过
-        if (syncPreferences?.isOfflineMode?.value == true) {
-            Log.d(TAG, "syncToServer 跳过：已开启离线模式")
-            return PushSyncResult.Skipped
-        }
-
         // 后端不可达时跳过，避免离线场景每次写操作都等 socket 超时
         // 由 NetworkMonitor 30s 探活循环 + WorkManager 在恢复后批量重试
         if (networkMonitor?.isBackendReachable?.value == false) {

@@ -2,7 +2,6 @@ package com.example.myapplication.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,14 +14,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.ui.viewmodel.SettingsViewModel
@@ -32,8 +30,7 @@ import com.example.myapplication.ui.viewmodel.SyncUiState
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val syncState by viewModel.syncState.collectAsState()
-    val isOfflineMode by viewModel.isOfflineMode.collectAsState()
-    val isWifiConnected by viewModel.isWifiConnected.collectAsState()
+    val hasCursor by viewModel.hasCursor.collectAsState()
 
     Scaffold(
         topBar = {
@@ -47,40 +44,6 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 离线模式卡片
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "离线模式",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = if (isOfflineMode) "已开启，不会尝试同步"
-                                else if (!isWifiConnected) "WiFi 未连接，自动跳过同步"
-                                else "已关闭，正常同步",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isOfflineMode || !isWifiConnected)
-                                    MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = isOfflineMode,
-                            onCheckedChange = { viewModel.setOfflineMode(it) }
-                        )
-                    }
-                }
-            }
-
             // 同步卡片
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -92,17 +55,22 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        text = "从服务器拉取全量数据（演员、消息、媒体、标签）",
+                        text = if (hasCursor)
+                            "增量同步：拉取上次之后的变更。首次或游标失效时请先「初始化」。"
+                        else "尚未初始化，请先执行「初始化全量同步」拉取全量数据（合集、消息、媒体、标签）。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
+                    val isSyncing = syncState is SyncUiState.Syncing
+
+                    // 增量同步（日常，主按钮）
                     Button(
-                        onClick = { viewModel.syncAll() },
-                        enabled = syncState !is SyncUiState.Syncing,
+                        onClick = { viewModel.syncIncremental() },
+                        enabled = !isSyncing && hasCursor,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        if (syncState is SyncUiState.Syncing) {
+                        if (isSyncing) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
@@ -111,8 +79,17 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             Spacer(Modifier.width(8.dp))
                             Text("同步中...")
                         } else {
-                            Text("开始同步")
+                            Text("增量同步")
                         }
+                    }
+
+                    // 初始化全量同步（次按钮）
+                    OutlinedButton(
+                        onClick = { viewModel.syncFull() },
+                        enabled = !isSyncing,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (hasCursor) "重新初始化（全量同步）" else "初始化全量同步")
                     }
 
                     // 结果展示
