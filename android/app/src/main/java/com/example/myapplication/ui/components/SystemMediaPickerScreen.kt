@@ -234,7 +234,7 @@ fun SystemMediaPickerScreen(
                     ) {
                         items(
                             items = mediaList,
-                            key = { media -> media.id }
+                            key = { media -> media.stableKey }
                         ) { media ->
                             SystemMediaCard(
                                 media = media,

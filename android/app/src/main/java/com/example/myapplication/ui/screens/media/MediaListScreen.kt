@@ -1,328 +1,192 @@
 package com.example.myapplication.ui.screens.media
 
-import android.util.Log
-import androidx.compose.foundation.background
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.myapplication.LocalBottomBarVisible
-import com.example.myapplication.data.DatabaseManager
-import com.example.myapplication.data.database.entities.Media
-import com.example.myapplication.ui.components.EmptyState
-import com.example.myapplication.ui.components.InstagramFilterButton
-import com.example.myapplication.ui.components.LoadingIndicator
-import com.example.myapplication.ui.components.MediaCard
-import com.example.myapplication.ui.components.SearchBar
-import com.example.myapplication.ui.theme.InstagramGradientEnd
-import com.example.myapplication.ui.theme.InstagramGradientMiddle
-import com.example.myapplication.ui.theme.InstagramGradientStart
+import com.example.myapplication.data.model.SystemMedia
+import com.example.myapplication.ui.components.SystemMediaCard
 import com.example.myapplication.ui.viewmodel.MediaViewModel
-import androidx.compose.foundation.lazy.grid.items as gridItems
 
-/**
- * Instagram/Pinterest 风格媒体列表页面 - 两列瀑布流
- */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MediaListScreen(
     viewModel: MediaViewModel,
-    databaseManager: DatabaseManager,
-    onMediaClick: (Media, List<Media>) -> Unit = { _, _ -> },
+    onMediaClick: (SystemMedia) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // 优化状态收集
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val uiState by viewModel.uiState.collectAsState()
     val mediaList by viewModel.mediaList.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-
-    // 打印前10个媒体信息调试
-    LaunchedEffect(mediaList) {
-        if (mediaList.isNotEmpty()) {
-            val sb = StringBuilder("MediaListScreen: 前10个媒体\n")
-            mediaList.take(10).forEachIndexed { index, media ->
-                sb.append("[$index] id=${media.id}, createdAt=${media.createdAt}, fileHash=${media.fileHash.take(8)}...\n")
-            }
-            Log.d("MediaListScreen", sb.toString())
-        }
-    }
-
-    // 局部搜索输入状态
-    var localSearchQuery by remember { mutableStateOf("") }
-
-    LaunchedEffect(searchQuery) {
-        localSearchQuery = searchQuery
-    }
-
-    // 底部筛选面板状态
-    var showFilterSheet by remember { mutableStateOf(false) }
-
-
-    val isListEmpty by remember {
-        derivedStateOf<Boolean> { mediaList.isEmpty() }
-    }
-
-    val hasFilters by remember {
-        derivedStateOf<Boolean> { searchQuery.isNotBlank() }
-    }
-
     val gridState = rememberLazyGridState()
 
-    val snackbarHostState = remember { SnackbarHostState() }
+    fun currentPermissions(): Pair<Boolean, Boolean> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+            return granted to granted
+        }
+        val images = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_MEDIA_IMAGES
+        ) == PackageManager.PERMISSION_GRANTED
+        val videos = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_MEDIA_VIDEO
+        ) == PackageManager.PERMISSION_GRANTED
+        val selected = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            ) == PackageManager.PERMISSION_GRANTED
+        return (images || selected) to (videos || selected)
+    }
 
-    // 顶部栏高度状态
-    var topBarHeightPx by remember { mutableFloatStateOf(0f) }
-    val topBarHeightDp = with(LocalDensity.current) { topBarHeightPx.toDp() }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        val (images, videos) = currentPermissions()
+        viewModel.updatePermissions(images, videos)
+    }
 
-    // 底部导航栏控制
+    val requestPermissions = {
+        permissionLauncher.launch(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                arrayOf(
+                    Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.READ_MEDIA_VIDEO,
+                    Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+            } else {
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        )
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val (images, videos) = currentPermissions()
+                viewModel.updatePermissions(images, videos)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val bottomBarVisible = LocalBottomBarVisible.current
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // 底部栏逻辑
-                if (available.y < -5f) {
-                    bottomBarVisible.value = false
-                } else if (available.y > 5f) {
-                    bottomBarVisible.value = true
-                }
-
+                if (available.y < -5f) bottomBarVisible.value = false
+                else if (available.y > 5f) bottomBarVisible.value = true
                 return Offset.Zero
             }
         }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(nestedScrollConnection),
+        modifier = modifier.fillMaxSize().nestedScroll(nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surface
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = paddingValues.calculateBottomPadding())
         ) {
-            // 内容区域 (Layer 1)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-            ) {
+            Text(
+                text = "媒体",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+
+            Box(modifier = Modifier.fillMaxSize()) {
                 when {
-                    uiState.isLoading -> {
-                        LoadingIndicator()
-                    }
-
-                    isListEmpty -> {
-                        Box(modifier = Modifier.padding(top = topBarHeightDp)) {
-                            EmptyState(
-                                message = if (hasFilters) {
-                                    "没有找到符合条件的媒体"
-                                } else {
-                                    "暂无媒体数据\n点击下方按钮添加媒体"
-                                }
-                            )
-                        }
-                    }
-
-                    else -> {
-                        // 固定3列网格，1:1比例
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(3),
-                            state = gridState,
-                            contentPadding = PaddingValues(
-                                top = topBarHeightDp + 4.dp,
-                                start = 2.dp,
-                                end = 2.dp,
-                                bottom = 88.dp
-                            ),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            gridItems(
-                                items = mediaList,
-                                key = { it.id }
-                            ) { media ->
-                                val onClickCallback =
-                                    remember(media.id, mediaList) {
-                                        {
-                                            onMediaClick(
-                                                media,
-                                                mediaList
-                                            )
-                                        }
-                                    }
-
-                                MediaCard(
-                                    media = media,
-                                    onClick = onClickCallback,
-                                    useAspectRatio = true,
-                                    thumbnailOnly = true
-                                )
-                            }
-
-                            // 底部间距
-                            item {
-                                Spacer(modifier = Modifier.height(100.dp))
-                            }
-                        }
-                    }
-                }
-
-            }
-
-            // Instagram 风格搜索和筛选栏 (Layer 2 - Header)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onGloballyPositioned { coordinates ->
-                        topBarHeightPx = coordinates.size.height.toFloat()
-                    }
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
-                    .statusBarsPadding()
-                    .zIndex(1f)
-            ) {
-                // Instagram 风格搜索和筛选栏
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SearchBar(
-                        query = localSearchQuery,
-                        onQueryChanged = { localSearchQuery = it },
-                        onSearch = { viewModel.searchMedia(it) },
-                        placeholder = "搜索媒体...",
-                        modifier = Modifier.weight(1f)
+                    uiState.permissionDenied -> MediaPageState(
+                        message = "需要照片或视频访问权限",
+                        actionLabel = "授权访问",
+                        onAction = requestPermissions
                     )
 
-                    InstagramFilterButton(
-                        hasActiveFilters = false,
-                        onClick = { showFilterSheet = true }
+                    uiState.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+
+                    uiState.error != null -> MediaPageState(
+                        message = uiState.error ?: "加载失败",
+                        actionLabel = "重试",
+                        onAction = viewModel::refreshMedia
                     )
 
-                    val starredFilter by viewModel.starredFilter.collectAsState()
-                    Surface(
-                        modifier = Modifier.height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (starredFilter) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        onClick = { viewModel.toggleStarredFilter() }
+                    mediaList.isEmpty() -> MediaPageState(message = "没有可访问的系统媒体")
+
+                    else -> LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        state = gridState,
+                        contentPadding = PaddingValues(start = 2.dp, end = 2.dp, bottom = 88.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Box(
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = "收藏筛选",
-                                modifier = Modifier.size(20.dp),
-                                tint = if (starredFilter) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        items(mediaList, key = { it.stableKey }) { media ->
+                            SystemMediaCard(media = media, onMediaClick = onMediaClick)
                         }
                     }
                 }
-
-
             }
         }
     }
-
-    // 错误消息处理
-    uiState.error?.let { error ->
-        LaunchedEffect(error) {
-            viewModel.clearError()
-        }
-    }
-
-    // 成功消息处理
-    uiState.message?.let { message ->
-        LaunchedEffect(message) {
-            viewModel.clearMessage()
-        }
-    }
-
-
 }
 
-/**
- * 媒体激活筛选标签
- */
 @Composable
-private fun MediaActiveFilterChip(
-    label: String,
-    modifier: Modifier = Modifier
+private fun MediaPageState(
+    message: String,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {}
 ) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        color = InstagramGradientMiddle.copy(alpha = 0.1f)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                color = InstagramGradientMiddle,
-                fontWeight = FontWeight.Medium
-            )
-            Icon(
-                imageVector = Icons.Outlined.Close,
-                contentDescription = "移除",
-                modifier = Modifier.size(14.dp),
-                tint = InstagramGradientMiddle
-            )
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (actionLabel != null) Button(onClick = onAction) { Text(actionLabel) }
         }
     }
 }

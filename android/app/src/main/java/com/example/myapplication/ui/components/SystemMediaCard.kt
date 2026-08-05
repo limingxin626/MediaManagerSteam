@@ -56,11 +56,10 @@ private fun SystemThumbnailImage(
     contentScale: ContentScale = ContentScale.Crop
 ) {
     val context = LocalContext.current
-    // 使用媒体ID作为缓存键，避免重复加载
-    var thumbnailBitmap by remember(media.id) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var isLoading by remember(media.id) { mutableStateOf(true) }
+    var thumbnailBitmap by remember(media.stableKey) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var isLoading by remember(media.stableKey) { mutableStateOf(true) }
 
-    LaunchedEffect(media.id) {
+    LaunchedEffect(media.stableKey) {
         withContext(Dispatchers.IO) {
             try {
                 val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -111,8 +110,8 @@ private fun SystemThumbnailImage(
                     .data(media.uri)
                     .size(300, 300)
                     .crossfade(200) // 减少交叉淡入时间
-                    .memoryCacheKey(media.id.toString()) // 使用媒体ID作为缓存键
-                    .diskCacheKey(media.id.toString()) // 磁盘缓存键
+                    .memoryCacheKey(media.stableKey) // 使用媒体ID作为缓存键
+                    .diskCacheKey(media.stableKey) // 磁盘缓存键
                     .build(),
                 contentDescription = media.displayName,
                 modifier = modifier,

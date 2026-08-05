@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.myapplication.LocalBottomBarVisible
+import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.components.SystemMediaCard
 import com.example.myapplication.ui.viewmodel.MediaFilterType
 import com.example.myapplication.ui.viewmodel.SystemGalleryViewModel
@@ -230,7 +231,7 @@ fun SystemGalleryScreen(
                     ) {
                         items(
                             items = mediaList,
-                            key = { it.id }
+                            key = { it.stableKey }
                         ) { media ->
                             SystemMediaCard(
                                 media = media,
@@ -238,7 +239,7 @@ fun SystemGalleryScreen(
                                 isSelectionMode = false,
                                 onMediaClick = { clickedMedia ->
                                     // 跳转到系统媒体详情页面
-                                    navController.navigate("system_media_detail/${clickedMedia.id}")
+                                    navController.navigate(Routes.systemMediaDetail(clickedMedia))
                                 },
                                 onMediaLongClick = { }
                             )

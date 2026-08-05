@@ -2,6 +2,9 @@ package com.example.myapplication.data.model
 
 import android.net.Uri
 
+fun systemMediaStableKey(id: Long, mimeType: String): String =
+    "${if (mimeType.startsWith("video/")) "video" else "image"}:$id"
+
 /**
  * 系统媒体文件数据模型
  */
@@ -31,6 +34,10 @@ data class SystemMedia(
      */
     val isVideo: Boolean
         get() = mimeType.startsWith("video/")
+
+    /** 图片和视频的 MediaStore ID 可能相同，URI 可作为跨 collection 的稳定身份。 */
+    val stableKey: String
+        get() = systemMediaStableKey(id, mimeType)
 
     /**
      * 获取分辨率字符串

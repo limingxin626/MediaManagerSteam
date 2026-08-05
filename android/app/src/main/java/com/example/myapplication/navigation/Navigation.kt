@@ -1,6 +1,8 @@
 package com.example.myapplication.navigation
 
+import android.net.Uri
 import com.example.myapplication.data.database.entities.Media
+import com.example.myapplication.data.model.SystemMedia
 
 /**
  * 应用导航路由定义
@@ -16,7 +18,7 @@ object Routes {
     const val SYSTEM_FOLDER_VIEW = "system_folder_view"
 
     // 系统媒体相关
-    const val SYSTEM_MEDIA_DETAIL = "system_media_detail/{mediaId}"
+    const val SYSTEM_MEDIA_DETAIL = "system_media_detail?uri={uri}"
     const val SYSTEM_MEDIA_EDIT = "system_media_edit/{mediaId}"
     const val FOLDER_DETAIL = "folder_detail/{folderName}"
     const val SYSTEM_MEDIA_PICKER = "system_media_picker/{groupId}"
@@ -94,7 +96,8 @@ object Routes {
     /**
      * 构建带参数的系统媒体详情路由
      */
-    fun systemMediaDetail(mediaId: Long) = "system_media_detail/$mediaId"
+    fun systemMediaDetail(media: SystemMedia) =
+        "system_media_detail?uri=${Uri.encode(media.uri.toString())}"
 
     /**
      * 构建带参数的系统媒体编辑路由

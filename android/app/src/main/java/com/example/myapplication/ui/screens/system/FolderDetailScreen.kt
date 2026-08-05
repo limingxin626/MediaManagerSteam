@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.components.SystemMediaCard
 import com.example.myapplication.ui.viewmodel.MediaFilterType
 import com.example.myapplication.ui.viewmodel.SystemGalleryViewModel
@@ -171,7 +172,7 @@ fun FolderDetailScreen(
                     ) {
                         items(
                             items = currentFolderMedia,
-                            key = { media -> media.id }
+                            key = { media -> media.stableKey }
                         ) { media ->
                             SystemMediaCard(
                                 media = media,
@@ -182,7 +183,7 @@ fun FolderDetailScreen(
                                         viewModel.toggleMediaSelection(clickedMedia)
                                     } else {
                                         // 跳转到系统媒体详情页面
-                                        navController.navigate("system_media_detail/${clickedMedia.id}")
+                                        navController.navigate(Routes.systemMediaDetail(clickedMedia))
                                     }
                                 },
                                 onMediaLongClick = { longClickedMedia ->

@@ -22,38 +22,35 @@ class SystemMediaRepository(private val context: Context) {
     /**
      * 获取所有系统媒体（图片+视频）
      */
-    fun getAllSystemMedia(): Flow<List<SystemMedia>> = flow {
-        val mediaList = mutableListOf<SystemMedia>()
+    fun getAllSystemMedia(): Flow<List<SystemMedia>> =
+        getAccessibleSystemMedia(canReadImages = true, canReadVideos = true)
 
-        // 查询图片
-        val images = queryImages()
-        mediaList.addAll(images)
-
-        // 查询视频
-        val videos = queryVideos()
-        mediaList.addAll(videos)
-
-        // 按时间倒序排列（最新的在前面）
-        val sortedMedia = mediaList.sortedByDescending { it.dateModified }
-        emit(sortedMedia)
+    /**
+     * 仅查询已经获得读取权限的媒体 collection。
+     */
+    fun getAccessibleSystemMedia(
+        canReadImages: Boolean,
+        canReadVideos: Boolean
+    ): Flow<List<SystemMedia>> = flow {
+        val mediaList = buildList {
+            if (canReadImages) addAll(queryImages())
+            if (canReadVideos) addAll(queryVideos())
+        }
+        emit(sortMedia(mediaList))
     }.flowOn(Dispatchers.IO)
 
     /**
      * 仅获取图片
      */
     fun getImages(): Flow<List<SystemMedia>> = flow {
-        val images = queryImages()
-        val sortedImages = images.sortedByDescending { it.dateModified }
-        emit(sortedImages)
+        emit(sortMedia(queryImages()))
     }.flowOn(Dispatchers.IO)
 
     /**
      * 仅获取视频
      */
     fun getVideos(): Flow<List<SystemMedia>> = flow {
-        val videos = queryVideos()
-        val sortedVideos = videos.sortedByDescending { it.dateModified }
-        emit(sortedVideos)
+        emit(sortMedia(queryVideos()))
     }.flowOn(Dispatchers.IO)
 
     /**
@@ -64,8 +61,7 @@ class SystemMediaRepository(private val context: Context) {
         allMedia.addAll(queryImages())
         allMedia.addAll(queryVideos())
 
-        val groupedMedia = allMedia
-            .sortedByDescending { it.dateModified }
+        val groupedMedia = sortMedia(allMedia)
             .groupBy { it.bucketDisplayName ?: "其他" }
 
         emit(groupedMedia)
@@ -74,7 +70,7 @@ class SystemMediaRepository(private val context: Context) {
     /**
      * 查询图片
      */
-    private fun queryImages(): List<SystemMedia> {
+    private fun queryImages(id: Long? = null): List<SystemMedia> {
         val images = mutableListOf<SystemMedia>()
 
         val projection = arrayOf(
@@ -96,8 +92,8 @@ class SystemMediaRepository(private val context: Context) {
         val cursor: Cursor? = contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             projection,
-            null,
-            null,
+            id?.let { "${MediaStore.Images.Media._ID} = ?" },
+            id?.let { arrayOf(it.toString()) },
             sortOrder
         )
 
@@ -147,7 +143,7 @@ class SystemMediaRepository(private val context: Context) {
     /**
      * 查询视频
      */
-    private fun queryVideos(): List<SystemMedia> {
+    private fun queryVideos(id: Long? = null): List<SystemMedia> {
         val videos = mutableListOf<SystemMedia>()
 
         val projection = arrayOf(
@@ -170,8 +166,8 @@ class SystemMediaRepository(private val context: Context) {
         val cursor: Cursor? = contentResolver.query(
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
             projection,
-            null,
-            null,
+            id?.let { "${MediaStore.Video.Media._ID} = ?" },
+            id?.let { arrayOf(it.toString()) },
             sortOrder
         )
 
@@ -219,17 +215,28 @@ class SystemMediaRepository(private val context: Context) {
     }
 
     /**
-     * 根据ID获取单个媒体文件
+     * 根据 collection 类型和 ID 获取单个媒体文件。
      */
-    suspend fun getMediaById(id: Long, isVideo: Boolean = false): SystemMedia? {
-        val uri = if (isVideo) {
-            Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id.toString())
-        } else {
-            Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
-        }
+    suspend fun getMediaById(id: Long, isVideo: Boolean = false): SystemMedia? =
+        if (isVideo) queryVideos(id).firstOrNull() else queryImages(id).firstOrNull()
 
-        // 这里可以实现单个文件的详细查询
-        // 暂时返回 null，后续可以根据需要实现
-        return null
+    suspend fun getMediaByUri(uri: Uri): SystemMedia? {
+        val id = uri.lastPathSegment?.toLongOrNull() ?: return null
+        return when {
+            uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) ->
+                getMediaById(id, isVideo = true)
+
+            uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) ->
+                getMediaById(id, isVideo = false)
+
+            else -> null
+        }
     }
+
+    private fun sortMedia(media: List<SystemMedia>): List<SystemMedia> =
+        media.sortedWith(
+            compareByDescending<SystemMedia> { it.dateModified }
+                .thenByDescending { it.dateAdded }
+                .thenBy { it.stableKey }
+        )
 }

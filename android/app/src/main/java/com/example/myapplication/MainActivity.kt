@@ -1,5 +1,6 @@
 package com.example.myapplication
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -125,7 +126,7 @@ class MainActivity : ComponentActivity() {
         object : ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return MediaViewModel(databaseManager) as T
+                return MediaViewModel(this@MainActivity, databaseManager) as T
             }
         }
     }
@@ -498,9 +499,8 @@ fun AppNavHost(
         ) {
             MediaListScreen(
                 viewModel = mediaViewModel!!,
-                databaseManager = databaseManager,
-                onMediaClick = { media, filteredMediaList ->
-                    navController.navigateToMediaFullscreen(media.id, filteredMediaList)
+                onMediaClick = { media ->
+                    navController.navigate(Routes.systemMediaDetail(media))
                 }
             )
         }
@@ -710,18 +710,20 @@ fun AppNavHost(
 
         // 系统媒体详情 - 滑入滑出动画
         composable(
-            "system_media_detail/{mediaId}",
-            arguments = listOf(navArgument("mediaId") { type = NavType.LongType }),
+            Routes.SYSTEM_MEDIA_DETAIL,
+            arguments = listOf(navArgument("uri") { type = NavType.StringType }),
             enterTransition = { NavigationAnimations.slideInFromRight() },
             exitTransition = { NavigationAnimations.slideOutToLeft() },
             popEnterTransition = { NavigationAnimations.slideInFromLeft() },
             popExitTransition = { NavigationAnimations.slideOutToRight() }
         ) { backStackEntry ->
-            val mediaId = backStackEntry.arguments?.getLong("mediaId") ?: 0L
+            val mediaUri = Uri.decode(backStackEntry.arguments?.getString("uri").orEmpty())
             SystemMediaDetailScreen(
-                mediaId = mediaId,
-                navController = navController,
-                viewModel = systemGalleryViewModel!!
+                mediaUri = mediaUri,
+                mediaList = mediaViewModel?.mediaList?.value.orEmpty().ifEmpty {
+                    systemGalleryViewModel?.mediaList?.value.orEmpty()
+                },
+                navController = navController
             )
         }
 
