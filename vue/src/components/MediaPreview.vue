@@ -8,7 +8,6 @@
             {{ currentIndex + 1 }} / {{ totalItems }}
           </div>
           <div class="flex items-center gap-2">
-            <template v-if="!minimal">
             <button
               v-if="currentItem"
               @click="handleStarClick()"
@@ -103,30 +102,6 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
               </svg>
             </button>
-            </template>
-
-            <!-- 精简模式:详情(metadata) -->
-            <button
-              v-if="minimal && currentItem"
-              @click="emit('info', currentItem)"
-              class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
-              title="详情"
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            <!-- 精简模式:删除(含源文件,宿主确认) -->
-            <button
-              v-if="minimal && currentItem"
-              @click="minimalDeleteConfirm = true"
-              class="p-2 text-white/70 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors"
-              title="删除(含源文件) · Del"
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
             <button
               v-if="currentItem"
               @click="openFileLocation"
@@ -202,7 +177,7 @@
             </Transition>
 
             <!-- Media tags -->
-            <div v-if="currentItem && !minimal" class="flex items-center gap-1.5 flex-wrap justify-center">
+            <div v-if="currentItem" class="flex items-center gap-1.5 flex-wrap justify-center">
               <span
                 v-for="tag in (currentItem.tags || [])"
                 :key="tag.id"
@@ -220,7 +195,7 @@
             </div>
 
             <!-- Media people (标注人物) -->
-            <div v-if="currentItem && !minimal" class="flex items-center gap-1.5 flex-wrap justify-center">
+            <div v-if="currentItem" class="flex items-center gap-1.5 flex-wrap justify-center">
               <span
                 v-for="person in (currentItem.people || [])"
                 :key="'p-' + person.id"
@@ -354,33 +329,6 @@
       </div>
     </div>
   </Transition>
-  <!-- 精简模式(Scan)键盘删除确认:Enter 确认 / Esc 取消 -->
-  <Transition name="fade">
-    <div v-if="minimal && minimalDeleteConfirm" class="fixed inset-0 z-[200] flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="minimalDeleteConfirm = false"></div>
-      <div class="relative bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
-        <h3 class="text-xl font-semibold text-white mb-4">删除文件</h3>
-        <p class="text-gray-300 mb-6">
-          确定删除此文件吗？会同时删除磁盘上的源文件,不可恢复。
-        </p>
-        <div class="flex gap-3 justify-end">
-          <button
-            @click="minimalDeleteConfirm = false"
-            class="px-4 py-2 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-colors"
-          >
-            取消 (Esc)
-          </button>
-          <button
-            @click="confirmMinimalDelete"
-            class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
-          >
-            删除 (Enter)
-          </button>
-        </div>
-      </div>
-    </div>
-  </Transition>
-
   <!-- Smart tag suggestion drawer -->
   <TagSuggestDrawer
     :is-open="suggestDrawerOpen"
@@ -422,18 +370,11 @@ interface Props {
   allTags?: TagWithCount[]
   prevPeekItems?: MessageMediaItem[]
   nextPeekItems?: MessageMediaItem[]
-  /**
-   * 精简模式:隐藏所有针对 Media 资产的操作(收藏/删除/旋转/替换/智能 tag/找相似/详情页/标签编辑),
-   * 只保留 导航 + 预览 + 打开文件位置 + 关闭。用于 Scan 这类基于 fs_entry 的只读浏览
-   * —— 此时 item.id 是 fs_entry id 而非 media id,打 /media 接口是错的。
-   */
-  minimal?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   startIndex: 0,
   starred: false,
-  minimal: false,
   allTags: () => [],
   prevPeekItems: () => [],
   nextPeekItems: () => [],
@@ -449,10 +390,6 @@ const emit = defineEmits<{
   'media-replaced': [mediaId: number]
   'media-tags-changed': [mediaId: number, tags: TagItem[]]
   'find-similar': [mediaId: number]
-  /** 精简模式下点「详情」按钮 —— 宿主自行决定展示什么(如 ScanDetailModal) */
-  info: [item: MessageMediaItem]
-  /** 精简模式下点「删除」按钮 —— 宿主自行确认 + 调用对应删除接口(如 /scan/{id}) */
-  delete: [item: MessageMediaItem]
 }>()
 
 const currentIndex = ref(props.startIndex)
@@ -462,8 +399,6 @@ const transitionName = ref<'slide-left' | 'slide-right'>('slide-left')
 const THUMB_WINDOW = 5
 const previewStarBounce = ref(false)
 const showDeleteConfirm = ref(false)
-// 精简模式(Scan)下删除源文件的键盘确认弹层
-const minimalDeleteConfirm = ref(false)
 const deleteSourceFile = ref(false)
 const rotationDegrees = ref(0)
 const isRotating = ref(false)
@@ -530,12 +465,6 @@ async function confirmDelete() {
   }
   showDeleteConfirm.value = false
   deleteSourceFile.value = false
-}
-
-function confirmMinimalDelete() {
-  if (!currentItem.value) return
-  emit('delete', currentItem.value)
-  minimalDeleteConfirm.value = false
 }
 
 function openDetailPage() {
@@ -833,26 +762,6 @@ const thumbStripWidth = computed(() => {
 
 const handleKeydown = (e: KeyboardEvent) => {
   if (!props.isOpen) return
-
-  // 精简模式(Scan)下的键盘删除流程:Del 触发确认,Enter 确认,Esc 取消。
-  if (props.minimal && minimalDeleteConfirm.value) {
-    if (e.key === 'Enter') {
-      e.stopImmediatePropagation()
-      e.preventDefault()
-      confirmMinimalDelete()
-    } else if (e.key === 'Escape') {
-      e.stopImmediatePropagation()
-      e.preventDefault()
-      minimalDeleteConfirm.value = false
-    }
-    return
-  }
-  if (props.minimal && (e.key === 'Delete' || e.key === 'Backspace') && currentItem.value) {
-    e.stopImmediatePropagation()
-    e.preventDefault()
-    minimalDeleteConfirm.value = true
-    return
-  }
 
   switch (e.key) {
     case 'Escape':

@@ -1,3 +1,6 @@
+from contextlib import asynccontextmanager
+import threading
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -30,11 +33,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Own catalog background services for the complete application lifetime."""
+    from app.services.repository_watcher import start_watcher, stop_watcher
+    from app.services.repository_materializer import start_worker, stop_worker
+
+    start_worker()
+    start_watcher()
+    # Build the catalog after migrations without blocking API startup. The watcher
+    # also scans repositories as they become available later.
+    from app.services import repository_catalog
+    threading.Thread(target=repository_catalog.rescan, name="catalog-bootstrap", daemon=True).start()
+    try:
+        yield
+    finally:
+        stop_watcher()
+        stop_worker()
+
+
 # 创建FastAPI应用
 app = FastAPI(
     title="媒体信息管理系统API",
     description="用于管理人员、分组、媒体资源和标签的后端接口",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # 配置CORS
@@ -83,7 +106,3 @@ register_sync_listeners()
 
 # 检查 ffmpeg/ffprobe 路径
 config.check_paths()
-
-# 启动磁盘扫描后台 worker(逐个补 fs_entry 的 metadata + 缩略图)
-from app.services.scan_worker import start_worker
-start_worker()

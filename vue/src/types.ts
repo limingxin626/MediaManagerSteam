@@ -86,17 +86,14 @@ export interface CursorResponse<T> {
   has_more_before?: boolean
 }
 
-// ---------------------------------------------------------------------------
-// Scan(磁盘扫描视图 / fs_entry)—— 后端无 OpenAPI 生成,手写
-// 反映磁盘物理真相,与 Media(去重资产库)正交。详见后端 app/models/fs_entry.py。
-// ---------------------------------------------------------------------------
+// --- Repository catalog（物理仓库目录） ---
 
-export type ScanProcStatus = 'pending' | 'reused' | 'done' | 'failed'
-
-export interface FsEntry {
+export interface RepositoryFile {
   id: number
   repo_id: string
+  folder_id: number
   rel_path: string
+  name: string
   file_path: string
   file_url: string
   thumb_url: string
@@ -108,8 +105,8 @@ export interface FsEntry {
   mtime: number               // epoch 秒
   scanned_at: string
   media_id: number | null
-  meta_status: ScanProcStatus
-  thumb_status: ScanProcStatus
+  materialize_status: 'pending' | 'done' | 'failed'
+  materialize_error: string | null
   width: number | null
   height: number | null
   duration_ms: number | null
@@ -129,12 +126,28 @@ export interface FsEntry {
   color_transfer: string | null
 }
 
-export interface ScanStatus {
-  total: number
-  pending: number
-  done: number
-  failed: number
-  running: boolean
+export interface RepositoryFolder {
+  id: number
+  repo_id: string
+  rel_path: string
+  name: string
+  parent_id: number | null
+}
+
+export interface RepositorySummary {
+  repo_id: string
+  root_path: string
+  online: boolean
+  folder_count: number
+  file_count: number
+  pending_count: number
+}
+
+export interface RepositoryBrowseResponse {
+  repository: RepositorySummary
+  folder: RepositoryFolder
+  folders: RepositoryFolder[]
+  files: RepositoryFile[]
 }
 
 // --- 纯前端类型（后端无对应 schema） ---
