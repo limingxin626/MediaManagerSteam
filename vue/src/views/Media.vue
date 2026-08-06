@@ -1,6 +1,7 @@
 <template>
   <div class="h-screen flex transition-colors">
     <FilterSidebar
+      v-if="viewMode === 'timeline'"
       :tags="tags"
       :collections="collections"
       :no-collection-count="noCollectionCount"
@@ -17,6 +18,20 @@
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div class="flex items-center gap-3 max-w-4xl mx-auto">
         <h2 class="text-lg font-bold text-gray-900 dark:text-white shrink-0">媒体</h2>
+        <div class="flex rounded-lg bg-gray-100 dark:bg-white/10 p-0.5 shrink-0">
+          <button
+            v-for="option in viewModeOptions"
+            :key="option.value"
+            class="px-3 py-1 rounded-md text-sm transition-colors"
+            :class="viewMode === option.value
+              ? 'bg-white dark:bg-white/20 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-gray-300'"
+            @click="viewMode = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <template v-if="viewMode === 'timeline'">
         <!-- Refresh -->
         <button
           @click="handleRefresh"
@@ -76,12 +91,15 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
           </svg>
         </button>
+        </template>
         </div>
       </div>
     </div>
 
+    <RepositoryBrowser v-if="viewMode === 'folder'" class="flex-1 min-h-0" />
+
     <!-- Scrollable Content Area -->
-    <div class="flex-1 min-h-0 relative">
+    <div v-else class="flex-1 min-h-0 relative">
 
     <!-- Smart mode grid (search / similar) -->
     <div v-if="smartActive" class="absolute inset-0 overflow-y-auto">
@@ -205,6 +223,7 @@ import MediaPreview from '../components/MediaPreview.vue'
 import DateScrubber from '../components/DateScrubber.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
 import MediaCell from '../components/MediaCell.vue'
+import RepositoryBrowser from '../components/RepositoryBrowser.vue'
 import type { Media, TagWithCount, Collection, CursorResponse, MessageMediaItem } from '../types'
 import { api } from '../composables/useApi'
 import { useVirtualGrid } from '../composables/useVirtualGrid'
@@ -214,6 +233,12 @@ import { useToast } from '../composables/useToast'
 const toast = useToast()
 
 defineOptions({ name: 'Media' })
+
+const viewModeOptions = [
+  { value: 'timeline' as const, label: '时间线' },
+  { value: 'folder' as const, label: '文件夹' },
+]
+const viewMode = ref<'timeline' | 'folder'>('timeline')
 
 const typeOptions = [
   { value: '', label: '全部' },

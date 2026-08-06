@@ -393,6 +393,8 @@ class MediaInfoUtils:
             "camera_make": None,
             "camera_model": None,
             "lens": None,
+            "is_hdr": None,
+            "color_transfer": None,
         }
 
         ext = os.path.splitext(file_path)[1].lower()
@@ -407,6 +409,10 @@ class MediaInfoUtils:
                         info["width"] = stream.get('width')
                         info["height"] = stream.get('height')
                         info["video_codec"] = stream.get('codec_name')
+                        transfer = stream.get('color_transfer')
+                        info["color_transfer"] = transfer
+                        if transfer:
+                            info["is_hdr"] = 1 if transfer.lower() in {"smpte2084", "arib-std-b67"} else 0
                         r_frame_rate = stream.get('r_frame_rate', '')
                         if '/' in r_frame_rate:
                             num, den = r_frame_rate.split('/')

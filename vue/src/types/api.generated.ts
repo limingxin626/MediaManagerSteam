@@ -1278,15 +1278,15 @@ export interface paths {
         patch: operations["update_transaction_transactions__txn_id__patch"];
         trace?: never;
     };
-    "/scan": {
+    "/repositories": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Scan */
-        get: operations["list_scan_scan_get"];
+        /** List Repositories */
+        get: operations["list_repositories_repositories_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1295,7 +1295,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/scan/rescan": {
+    "/repositories/{repo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Repository Detail */
+        get: operations["repository_detail_repositories__repo_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/repositories/{repo_id}/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Browse Repository */
+        get: operations["browse_repository_repositories__repo_id__browse_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/repositories/{repo_id}/scan": {
         parameters: {
             query?: never;
             header?: never;
@@ -1304,67 +1338,9 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Trigger Rescan
-         * @description 触发增量扫描。阻塞到 stat-walk + sweep 完成(十万秒级),
-         *     metadata/缩略图继续后台异步。已有扫描在跑则 409。
-         */
-        post: operations["trigger_rescan_scan_rescan_post"];
+        /** Scan Repository */
+        post: operations["scan_repository_repositories__repo_id__scan_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/scan/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Scan Status */
-        get: operations["scan_status_scan_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/scan/repos": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Repos */
-        get: operations["list_repos_scan_repos_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/scan/{fs_entry_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete Scan Entry
-         * @description 删除一条扫描条目 **并删除其磁盘源文件**。不级联删 media 表。
-         */
-        delete: operations["delete_scan_entry_scan__fs_entry_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1556,102 +1532,6 @@ export interface components {
             message: string;
             /** Path */
             path: string;
-        };
-        /** FsEntryCursorResponse */
-        FsEntryCursorResponse: {
-            /** Items */
-            items: components["schemas"]["FsEntryResponse"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-            /** Has More */
-            has_more: boolean;
-        };
-        /** FsEntryResponse */
-        FsEntryResponse: {
-            /** Id */
-            id: number;
-            /**
-             * Repo Id
-             * @default
-             */
-            repo_id: string;
-            /** Rel Path */
-            rel_path: string;
-            /**
-             * File Path
-             * @default
-             */
-            file_path: string;
-            /** Mime Type */
-            mime_type?: string | null;
-            /** Media Type */
-            media_type: string;
-            /** File Size */
-            file_size?: number | null;
-            /** Mtime */
-            mtime: number;
-            /** Scanned At */
-            scanned_at: string;
-            /** Media Id */
-            media_id?: number | null;
-            /** Meta Status */
-            meta_status: string;
-            /** Thumb Status */
-            thumb_status: string;
-            /** Width */
-            width?: number | null;
-            /** Height */
-            height?: number | null;
-            /** Duration Ms */
-            duration_ms?: number | null;
-            /** Fps */
-            fps?: number | null;
-            /** Bitrate */
-            bitrate?: number | null;
-            /** Video Codec */
-            video_codec?: string | null;
-            /** Audio Codec */
-            audio_codec?: string | null;
-            /** Has Audio */
-            has_audio?: number | null;
-            /** Taken At */
-            taken_at?: string | null;
-            /** Gps Lat */
-            gps_lat?: number | null;
-            /** Gps Lng */
-            gps_lng?: number | null;
-            /** Orientation */
-            orientation?: number | null;
-            /** Camera Make */
-            camera_make?: string | null;
-            /** Camera Model */
-            camera_model?: string | null;
-            /** Lens */
-            lens?: string | null;
-            /** Is Hdr */
-            is_hdr?: number | null;
-            /** Color Transfer */
-            color_transfer?: string | null;
-            /**
-             * File Url
-             * @default
-             */
-            file_url: string;
-            /**
-             * Thumb Url
-             * @default
-             */
-            thumb_url: string;
-            /**
-             * Local File Path
-             * @default
-             */
-            local_file_path: string;
-            /**
-             * Local Thumb Path
-             * @default
-             */
-            local_thumb_path: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2438,6 +2318,131 @@ export interface components {
             /** Media Ids */
             media_ids?: number[] | null;
         };
+        /** RepositoryBrowseResponse */
+        RepositoryBrowseResponse: {
+            repository: components["schemas"]["RepositorySummaryResponse"];
+            folder: components["schemas"]["RepositoryFolderResponse"];
+            /** Folders */
+            folders: components["schemas"]["RepositoryFolderResponse"][];
+            /** Files */
+            files: components["schemas"]["RepositoryFileResponse"][];
+        };
+        /** RepositoryFileResponse */
+        RepositoryFileResponse: {
+            /** Id */
+            id: number;
+            /** Repo Id */
+            repo_id: string;
+            /** Folder Id */
+            folder_id: number;
+            /** Rel Path */
+            rel_path: string;
+            /** Name */
+            name: string;
+            /**
+             * File Path
+             * @default
+             */
+            file_path: string;
+            /** Mime Type */
+            mime_type?: string | null;
+            /** Media Type */
+            media_type: string;
+            /** File Size */
+            file_size?: number | null;
+            /** Mtime */
+            mtime: number;
+            /** Scanned At */
+            scanned_at: string;
+            /** Media Id */
+            media_id?: number | null;
+            /** Materialize Status */
+            materialize_status: string;
+            /** Materialize Error */
+            materialize_error?: string | null;
+            /**
+             * File Url
+             * @default
+             */
+            file_url: string;
+            /**
+             * Thumb Url
+             * @default
+             */
+            thumb_url: string;
+            /**
+             * Local File Path
+             * @default
+             */
+            local_file_path: string;
+            /**
+             * Local Thumb Path
+             * @default
+             */
+            local_thumb_path: string;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Fps */
+            fps?: number | null;
+            /** Bitrate */
+            bitrate?: number | null;
+            /** Video Codec */
+            video_codec?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Has Audio */
+            has_audio?: number | null;
+            /** Taken At */
+            taken_at?: string | null;
+            /** Gps Lat */
+            gps_lat?: number | null;
+            /** Gps Lng */
+            gps_lng?: number | null;
+            /** Orientation */
+            orientation?: number | null;
+            /** Camera Make */
+            camera_make?: string | null;
+            /** Camera Model */
+            camera_model?: string | null;
+            /** Lens */
+            lens?: string | null;
+            /** Is Hdr */
+            is_hdr?: number | null;
+            /** Color Transfer */
+            color_transfer?: string | null;
+        };
+        /** RepositoryFolderResponse */
+        RepositoryFolderResponse: {
+            /** Id */
+            id: number;
+            /** Repo Id */
+            repo_id: string;
+            /** Rel Path */
+            rel_path: string;
+            /** Name */
+            name: string;
+            /** Parent Id */
+            parent_id?: number | null;
+        };
+        /** RepositorySummaryResponse */
+        RepositorySummaryResponse: {
+            /** Repo Id */
+            repo_id: string;
+            /** Root Path */
+            root_path: string;
+            /** Online */
+            online: boolean;
+            /** Folder Count */
+            folder_count: number;
+            /** File Count */
+            file_count: number;
+            /** Pending Count */
+            pending_count: number;
+        };
         /** RotateRequest */
         RotateRequest: {
             /**
@@ -2445,19 +2450,6 @@ export interface components {
              * @enum {integer}
              */
             degrees: 90 | 180 | 270;
-        };
-        /** ScanStatusResponse */
-        ScanStatusResponse: {
-            /** Total */
-            total: number;
-            /** Pending */
-            pending: number;
-            /** Done */
-            done: number;
-            /** Failed */
-            failed: number;
-            /** Running */
-            running: boolean;
         };
         /** SuggestRequest */
         SuggestRequest: {
@@ -5191,17 +5183,9 @@ export interface operations {
             };
         };
     };
-    list_scan_scan_get: {
+    list_repositories_repositories_get: {
         parameters: {
-            query?: {
-                sort?: "mtime" | "size" | "name";
-                order?: "asc" | "desc";
-                type?: ("video" | "image") | null;
-                repo_id?: string | null;
-                /** @description 复合游标 '{sort_value}|{id}' */
-                cursor?: string | null;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -5214,7 +5198,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FsEntryCursorResponse"];
+                    "application/json": components["schemas"]["RepositorySummaryResponse"][];
+                };
+            };
+        };
+    };
+    repository_detail_repositories__repo_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositorySummaryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5228,11 +5234,15 @@ export interface operations {
             };
         };
     };
-    trigger_rescan_scan_rescan_post: {
+    browse_repository_repositories__repo_id__browse_get: {
         parameters: {
-            query?: never;
+            query?: {
+                path?: string;
+            };
             header?: never;
-            path?: never;
+            path: {
+                repo_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -5243,57 +5253,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["RepositoryBrowseResponse"];
                 };
             };
-        };
-    };
-    scan_status_scan_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScanStatusResponse"];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
     };
-    list_repos_scan_repos_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    delete_scan_entry_scan__fs_entry_id__delete: {
+    scan_repository_repositories__repo_id__scan_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                fs_entry_id: number;
+                repo_id: string;
             };
             cookie?: never;
         };

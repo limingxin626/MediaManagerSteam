@@ -22,9 +22,11 @@ dependencies = [
     "telethon>=1.36",
     "tokenizers>=0.20",
     "uvicorn>=0.40.0",
+    "watchdog>=6.0.0",
 ]
 
 [dependency-groups]
 dev = [
     "opencv-python>=4.10.0",
+    "pytest>=8.4.0",
 ]

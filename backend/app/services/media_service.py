@@ -70,6 +70,9 @@ def process_file(
         logger.warning(f"Unsupported media type, skipping: {file_path}")
         return None
 
+    # Probe before dedup so catalog callers can retain path-specific metadata such
+    # as HDR transfer characteristics even when the logical Media is reused.
+    media_info = MediaInfoUtils.get_media_info(file_path, media_type, config.FFPROBE_PATH)
     file_hash = calculate_file_hash(file_path)
     if file_hash is None:
         logger.error(f"Failed to calculate hash, skipping: {file_path}")
@@ -78,7 +81,7 @@ def process_file(
     if not skip_dedup:
         existing_media = db.query(Media).filter(Media.file_hash == file_hash).first()
         if existing_media:
-            return {"media": existing_media, "is_new": False}
+            return {"media": existing_media, "is_new": False, "media_info": media_info}
 
     # 在拷贝前记下原始路径 —— cover sidecar 只能在原始目录找(uploads/ 里没拷贝)。
     original_file_path = file_path
@@ -103,7 +106,6 @@ def process_file(
 
     file_size = os.path.getsize(file_path)
     mime_type, _ = mimetypes.guess_type(file_path)
-    media_info = MediaInfoUtils.get_media_info(file_path, media_type, config.FFPROBE_PATH)
 
     media_kwargs = dict(
         file_path=rel_path,
@@ -162,7 +164,7 @@ def process_file(
     if commit:
         db.commit()
         db.refresh(media)
-    return {"media": media, "is_new": True}
+    return {"media": media, "is_new": True, "media_info": media_info}
 
 
 def create_preview_media(db: Session, file_path: str, commit: bool = True) -> Media:
