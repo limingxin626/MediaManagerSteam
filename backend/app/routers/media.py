@@ -32,7 +32,7 @@ router = APIRouter(prefix="/media", tags=["media"])
 
 @router.get("", response_model=MediaCursorResponse)
 def get_media(
-    cursor: Optional[str] = Query(None, description="游标，格式为'created_at|position'"),
+    cursor: Optional[str] = Query(None, description="游标，格式为'media_time|id'"),
     direction: Optional[str] = Query(None, description="分页方向: 'forward' 加载更新的媒体"),
     limit: int = Query(20, ge=1, le=100),
     message_id: Optional[int] = None,
@@ -95,7 +95,10 @@ def get_media(
             )
             query = query.filter(Media.id.in_(media_ids_collection))
 
-        # 游标格式："{created_at}|{id}"
+        # 优先按媒体拍摄/创建时间排序；缺失时退回入库时间。
+        media_time = func.coalesce(Media.taken_at, Media.created_at)
+
+        # 游标格式："{media_time}|{id}"
         if cursor:
             try:
                 parts = cursor.split('|')
@@ -105,14 +108,14 @@ def get_media(
                 if direction == 'around':
                     half = limit // 2
                     q_before = query.filter(
-                        (Media.created_at > cursor_time) |
-                        ((Media.created_at == cursor_time) & (Media.id >= cursor_id))
-                    ).order_by(Media.created_at.asc(), Media.id.asc()).limit(half + 1).all()
+                        (media_time > cursor_time) |
+                        ((media_time == cursor_time) & (Media.id >= cursor_id))
+                    ).order_by(media_time.asc(), Media.id.asc()).limit(half + 1).all()
 
                     q_after = query.filter(
-                        (Media.created_at < cursor_time) |
-                        ((Media.created_at == cursor_time) & (Media.id < cursor_id))
-                    ).order_by(Media.created_at.desc(), Media.id.desc()).limit(limit - half + 1).all()
+                        (media_time < cursor_time) |
+                        ((media_time == cursor_time) & (Media.id < cursor_id))
+                    ).order_by(media_time.desc(), Media.id.desc()).limit(limit - half + 1).all()
 
                     has_more_before = len(q_before) > half
                     before_items = q_before[:half]
@@ -126,10 +129,10 @@ def get_media(
                     prev_cursor = None
                     if has_more and items:
                         last = items[-1]
-                        next_cursor = f"{last.created_at.isoformat()}|{last.id}"
+                        next_cursor = f"{(last.taken_at or last.created_at).isoformat()}|{last.id}"
                     if has_more_before and items:
                         first = items[0]
-                        prev_cursor = f"{first.created_at.isoformat()}|{first.id}"
+                        prev_cursor = f"{(first.taken_at or first.created_at).isoformat()}|{first.id}"
 
                     result = [MediaResponse.model_validate(item) for item in items]
                     return MediaCursorResponse(
@@ -142,20 +145,20 @@ def get_media(
 
                 elif direction == 'forward':
                     query = query.filter(
-                        (Media.created_at > cursor_time) |
-                        ((Media.created_at == cursor_time) & (Media.id > cursor_id))
+                        (media_time > cursor_time) |
+                        ((media_time == cursor_time) & (Media.id > cursor_id))
                     )
-                    query = query.order_by(Media.created_at.asc(), Media.id.asc())
+                    query = query.order_by(media_time.asc(), Media.id.asc())
                 else:
                     query = query.filter(
-                        (Media.created_at < cursor_time) |
-                        ((Media.created_at == cursor_time) & (Media.id < cursor_id))
+                        (media_time < cursor_time) |
+                        ((media_time == cursor_time) & (Media.id < cursor_id))
                     )
-                    query = query.order_by(Media.created_at.desc(), Media.id.desc())
+                    query = query.order_by(media_time.desc(), Media.id.desc())
             except (ValueError, IndexError):
                 raise HTTPException(status_code=400, detail="Invalid cursor format")
         else:
-            query = query.order_by(Media.created_at.desc(), Media.id.desc())
+            query = query.order_by(media_time.desc(), Media.id.desc())
 
         media_items = query.limit(limit + 1).all()
 
@@ -165,7 +168,7 @@ def get_media(
         next_cursor = None
         if has_more and items:
             last = items[-1]
-            next_cursor = f"{last.created_at.isoformat()}|{last.id}"
+            next_cursor = f"{(last.taken_at or last.created_at).isoformat()}|{last.id}"
 
         result = [MediaResponse.model_validate(item) for item in items]
 
@@ -185,9 +188,10 @@ def get_media_timeline(
     collection_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    year_col = func.cast(func.strftime('%Y', Media.created_at), Integer)
-    month_col = func.cast(func.strftime('%m', Media.created_at), Integer)
-    day_col = func.cast(func.strftime('%d', Media.created_at), Integer)
+    media_time = func.coalesce(Media.taken_at, Media.created_at)
+    year_col = func.cast(func.strftime('%Y', media_time), Integer)
+    month_col = func.cast(func.strftime('%m', media_time), Integer)
+    day_col = func.cast(func.strftime('%d', media_time), Integer)
 
     query = db.query(
         year_col.label('year'),
