@@ -202,7 +202,7 @@
       :is-open="previewOpen"
       :items="previewItems"
       :start-index="previewStartIndex"
-      :all-tags="tags"
+      :all-tags="allTags"
       :prev-peek-items="previewPrevPeekItems"
       :next-peek-items="previewNextPeekItems"
       @close="previewOpen = false"
@@ -440,12 +440,16 @@ function starWithBounce(item: Media) {
 
 // --- Tag & Collection sidebar data ---
 const tags = ref<TagWithCount[]>([])
+const allTags = ref<TagWithCount[]>([])
 const collections = ref<Collection[]>([])
 const noCollectionCount = ref(0)
 
 async function fetchTags() {
   try {
-    tags.value = await api.get<TagWithCount[]>('/tags?has_media=true')
+    ;[tags.value, allTags.value] = await Promise.all([
+      api.get<TagWithCount[]>('/tags?has_media=true'),
+      api.get<TagWithCount[]>('/tags'),
+    ])
   } catch {}
 }
 
@@ -550,10 +554,46 @@ const handleMediaTagsChanged = (
   mediaId: number,
   newTags: { id: number; name: string; category?: string | null }[],
 ) => {
+  const found = vg.findItemBucketAndIndex(mediaId)
+  const cachedItem = found ? vg.cache.value.get(found.key)?.items[found.idx] : undefined
+  const smartIdx = smartItems.value.findIndex((m) => m.id === mediaId)
+  const oldTags = cachedItem?.tags ?? (smartIdx !== -1 ? smartItems.value[smartIdx].tags : [])
+  const oldTagIds = new Set((oldTags || []).map((tag) => tag.id))
+  const newTagIds = new Set(newTags.map((tag) => tag.id))
+
+  for (const tag of newTags) {
+    if (oldTagIds.has(tag.id)) continue
+    const existing = tags.value.find((item) => item.id === tag.id)
+    if (existing) {
+      tags.value = tags.value.map((item) => item.id === tag.id
+        ? { ...item, message_count: item.message_count + 1 }
+        : item)
+    } else {
+      tags.value = [...tags.value, { ...tag, message_count: 1 }]
+    }
+    const allTag = allTags.value.find((item) => item.id === tag.id)
+    allTags.value = allTag
+      ? allTags.value.map((item) => item.id === tag.id
+        ? { ...item, message_count: item.message_count + 1 }
+        : item)
+      : [...allTags.value, { ...tag, message_count: 1 }]
+  }
+
+  for (const tag of oldTags || []) {
+    if (newTagIds.has(tag.id)) continue
+    tags.value = tags.value
+      .map((item) => item.id === tag.id
+        ? { ...item, message_count: item.message_count - 1 }
+        : item)
+      .filter((item) => item.message_count > 0)
+    allTags.value = allTags.value.map((item) => item.id === tag.id
+      ? { ...item, message_count: Math.max(0, item.message_count - 1) }
+      : item)
+  }
+
   vg.updateItem(mediaId, (item) => {
     item.tags = newTags
   })
-  const smartIdx = smartItems.value.findIndex((m) => m.id === mediaId)
   if (smartIdx !== -1) {
     smartItems.value[smartIdx] = { ...smartItems.value[smartIdx], tags: newTags }
   }
