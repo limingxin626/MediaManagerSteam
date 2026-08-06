@@ -431,7 +431,9 @@ export function useVirtualGrid(opts: Options) {
     const found = findItemBucketAndIndex(id)
     if (!found) return
     const entry = cacheRef.value.get(found.key)!
-    mutator(entry.items[found.idx])
+    const updatedItem = { ...entry.items[found.idx] }
+    mutator(updatedItem)
+    entry.items[found.idx] = updatedItem
     bumpCache()
   }
 

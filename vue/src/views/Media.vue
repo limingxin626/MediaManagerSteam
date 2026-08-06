@@ -514,10 +514,18 @@ function openPreview(bucketKey: string, idx: number) {
 }
 
 async function handlePreviewToggleStar(mediaId: number) {
-  const found = vg.findItemBucketAndIndex(mediaId)
-  if (!found) return
-  const item = vg.cache.value.get(found.key)!.items[found.idx]
-  await toggleMediaStar(item)
+  const previewItem = previewItems.value.find((item) => item.id === mediaId)
+  if (!previewItem) return
+
+  await toggleMediaStar(previewItem)
+  const starred = previewItem.starred
+
+  vg.updateItem(mediaId, (item) => {
+    item.starred = starred
+  })
+
+  const smartItem = smartItems.value.find((item) => item.id === mediaId)
+  if (smartItem) smartItem.starred = starred
 }
 
 function handleMediaDeleted(mediaId: number) {
