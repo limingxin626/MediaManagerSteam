@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.models import Media, MessageMedia, media_tag
 from app.utils import calculate_file_hash, ThumbnailUtils, MediaInfoUtils
+from app.utils.media_dates import get_file_created_at
 from app.config import config
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,7 @@ def process_file(
     # Probe before dedup so catalog callers can retain path-specific metadata such
     # as HDR transfer characteristics even when the logical Media is reused.
     media_info = MediaInfoUtils.get_media_info(file_path, media_type, config.FFPROBE_PATH)
+    file_created_at = get_file_created_at(file_path)
     file_hash = calculate_file_hash(file_path)
     if file_hash is None:
         logger.error(f"Failed to calculate hash, skipping: {file_path}")
@@ -117,6 +119,7 @@ def process_file(
         height=media_info["height"],
         duration_ms=media_info["duration_ms"],
         taken_at=media_info.get("taken_at"),
+        file_created_at=file_created_at,
         gps_lat=media_info.get("gps_lat"),
         gps_lng=media_info.get("gps_lng"),
         orientation=media_info.get("orientation"),
@@ -261,6 +264,7 @@ def replace_media_file(db: Session, media_id: int, src_path: str, commit: bool =
     if media_type is None:
         raise ValueError("Unsupported media type")
 
+    file_created_at = get_file_created_at(src_path)
     new_hash = calculate_file_hash(src_path)
     if new_hash is None:
         raise RuntimeError("Failed to calculate hash for new file")
@@ -313,6 +317,7 @@ def replace_media_file(db: Session, media_id: int, src_path: str, commit: bool =
     media.height = media_info["height"]
     media.duration_ms = media_info["duration_ms"]
     media.taken_at = media_info.get("taken_at")
+    media.file_created_at = file_created_at
     media.gps_lat = media_info.get("gps_lat")
     media.gps_lng = media_info.get("gps_lng")
     media.orientation = media_info.get("orientation")

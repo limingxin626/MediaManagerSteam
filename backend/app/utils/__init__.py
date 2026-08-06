@@ -4,6 +4,7 @@ import hashlib
 import logging
 import subprocess
 from app.config import config
+from app.utils.media_dates import clean_taken_at
 
 logger = logging.getLogger(__name__)
 
@@ -494,4 +495,5 @@ class MediaInfoUtils:
             except Exception as e:
                 logger.error(f"Failed to get image properties for {file_path}: {e}")
 
+        info["taken_at"] = clean_taken_at(info["taken_at"])
         return info

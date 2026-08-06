@@ -30,6 +30,13 @@ from app.utils import ThumbnailUtils
 
 router = APIRouter(prefix="/media", tags=["media"])
 
+_MEDIA_TIME_SENTINEL = datetime.min
+
+
+def _media_cursor(item: Media) -> str:
+    media_time = item.taken_at or item.file_created_at or _MEDIA_TIME_SENTINEL
+    return f"{media_time.isoformat()}|{item.id}"
+
 @router.get("", response_model=MediaCursorResponse)
 def get_media(
     cursor: Optional[str] = Query(None, description="游标，格式为'media_time|id'"),
@@ -95,8 +102,8 @@ def get_media(
             )
             query = query.filter(Media.id.in_(media_ids_collection))
 
-        # 优先按媒体拍摄/创建时间排序；缺失时退回入库时间。
-        media_time = func.coalesce(Media.taken_at, Media.created_at)
+        # 拍摄时间优先，其次使用真实文件创建时间；无日期媒体固定排在最后。
+        media_time = func.coalesce(Media.taken_at, Media.file_created_at, _MEDIA_TIME_SENTINEL)
 
         # 游标格式："{media_time}|{id}"
         if cursor:
@@ -129,10 +136,10 @@ def get_media(
                     prev_cursor = None
                     if has_more and items:
                         last = items[-1]
-                        next_cursor = f"{(last.taken_at or last.created_at).isoformat()}|{last.id}"
+                        next_cursor = _media_cursor(last)
                     if has_more_before and items:
                         first = items[0]
-                        prev_cursor = f"{(first.taken_at or first.created_at).isoformat()}|{first.id}"
+                        prev_cursor = _media_cursor(first)
 
                     result = [MediaResponse.model_validate(item) for item in items]
                     return MediaCursorResponse(
@@ -168,7 +175,7 @@ def get_media(
         next_cursor = None
         if has_more and items:
             last = items[-1]
-            next_cursor = f"{(last.taken_at or last.created_at).isoformat()}|{last.id}"
+            next_cursor = _media_cursor(last)
 
         result = [MediaResponse.model_validate(item) for item in items]
 
@@ -188,7 +195,7 @@ def get_media_timeline(
     collection_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    media_time = func.coalesce(Media.taken_at, Media.created_at)
+    media_time = func.coalesce(Media.taken_at, Media.file_created_at)
     year_col = func.cast(func.strftime('%Y', media_time), Integer)
     month_col = func.cast(func.strftime('%m', media_time), Integer)
     day_col = func.cast(func.strftime('%d', media_time), Integer)
@@ -198,7 +205,10 @@ def get_media_timeline(
         month_col.label('month'),
         day_col.label('day'),
         func.count().label('count'),
-    ).filter(Media.video_media_id.is_(None))
+    ).filter(
+        Media.video_media_id.is_(None),
+        media_time.is_not(None),
+    )
 
     if starred is not None:
         query = query.filter(Media.starred == (1 if starred else 0))

@@ -119,6 +119,7 @@ class Media(Base):
     duration_ms = Column(Integer, nullable=True)
 
     taken_at = Column(DateTime, nullable=True, index=True)
+    file_created_at = Column(DateTime, nullable=True, index=True)
     gps_lat = Column(Float, nullable=True)
     gps_lng = Column(Float, nullable=True)
     orientation = Column(Integer, nullable=True)
