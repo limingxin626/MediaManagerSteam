@@ -12,23 +12,40 @@ def test_clean_taken_at_discards_epoch_day_only():
     assert media_dates.clean_taken_at(after) is after
 
 
-def test_windows_uses_ctime(monkeypatch):
-    monkeypatch.setattr(media_dates.os, "stat", lambda _: SimpleNamespace(st_ctime=1234))
-    assert media_dates.get_file_created_at("x", platform="win32") == datetime.fromtimestamp(1234)
-
-
-def test_macos_uses_birthtime(monkeypatch):
+def test_windows_uses_earlier_creation_or_modification_time(monkeypatch):
     monkeypatch.setattr(
         media_dates.os,
         "stat",
-        lambda _: SimpleNamespace(st_ctime=9999, st_birthtime=2345),
+        lambda _: SimpleNamespace(st_ctime=2000, st_mtime=1234),
+    )
+    assert media_dates.get_file_created_at("x", platform="win32") == datetime.fromtimestamp(1234)
+
+
+def test_macos_uses_earlier_birth_or_modification_time(monkeypatch):
+    monkeypatch.setattr(
+        media_dates.os,
+        "stat",
+        lambda _: SimpleNamespace(st_birthtime=2345, st_mtime=3456),
     )
     assert media_dates.get_file_created_at("x", platform="darwin") == datetime.fromtimestamp(2345)
 
 
-def test_unsupported_platform_does_not_use_ctime(monkeypatch):
-    monkeypatch.setattr(media_dates.os, "stat", lambda _: SimpleNamespace(st_ctime=1234))
-    assert media_dates.get_file_created_at("x", platform="linux") is None
+def test_linux_uses_modification_time_without_ctime(monkeypatch):
+    monkeypatch.setattr(
+        media_dates.os,
+        "stat",
+        lambda _: SimpleNamespace(st_ctime=1234, st_mtime=2345),
+    )
+    assert media_dates.get_file_created_at("x", platform="linux") == datetime.fromtimestamp(2345)
+
+
+def test_invalid_creation_time_falls_back_to_modification_time(monkeypatch):
+    monkeypatch.setattr(
+        media_dates.os,
+        "stat",
+        lambda _: SimpleNamespace(st_ctime="invalid", st_mtime=2345),
+    )
+    assert media_dates.get_file_created_at("x", platform="win32") == datetime.fromtimestamp(2345)
 
 
 def test_missing_file_returns_none(monkeypatch):

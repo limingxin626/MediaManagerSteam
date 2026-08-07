@@ -6,8 +6,9 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, Integer
+from sqlalchemy import exists, func, Integer
 from app.models import get_db, Media, MessageMedia, Message, Tag, Person, message_tag, media_tag
+from app.models.repository_catalog import RepositoryFile
 from typing import Optional, List, Literal
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,17 @@ def _media_cursor(item: Media) -> str:
     media_time = item.taken_at or item.file_created_at or _MEDIA_TIME_SENTINEL
     return f"{media_time.isoformat()}|{item.id}"
 
+
+def _filter_physical_file(query, has_physical_file: Optional[bool]):
+    if has_physical_file is None:
+        return query
+    physical_file_exists = exists().where(
+        RepositoryFile.media_id == Media.id,
+        RepositoryFile.materialize_status == "done",
+    )
+    return query.filter(physical_file_exists if has_physical_file else ~physical_file_exists)
+
+
 @router.get("", response_model=MediaCursorResponse)
 def get_media(
     cursor: Optional[str] = Query(None, description="游标，格式为'media_time|id'"),
@@ -48,6 +60,7 @@ def get_media(
     type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
     tag_id: Optional[int] = Query(None, description="标签 ID"),
     collection_id: Optional[int] = Query(None, description="合集 ID"),
+    has_physical_file: Optional[bool] = Query(None, description="是否存在已物化的物理文件"),
     db: Session = Depends(get_db)
 ):
     """获取媒体列表（游标分页，显示所有媒体）"""
@@ -59,7 +72,8 @@ def get_media(
         ).order_by(MessageMedia.position).all()
         
         media_ids = [relation.media_id for relation in media_relations]
-        media = db.query(Media).filter(Media.id.in_(media_ids)).all()
+        query = db.query(Media).filter(Media.id.in_(media_ids))
+        media = _filter_physical_file(query, has_physical_file).all()
         
         # 对于固定message_id的情况，返回简单的列表
         result = [MediaResponse.model_validate(item) for item in media]
@@ -72,6 +86,7 @@ def get_media(
     else:
         # 直接查 Media 表，显示所有媒体（包括孤立媒体），但隐藏作为视频预览的 Media
         query = db.query(Media).filter(Media.video_media_id.is_(None))
+        query = _filter_physical_file(query, has_physical_file)
 
         if starred is not None:
             query = query.filter(Media.starred == (1 if starred else 0))
@@ -193,6 +208,7 @@ def get_media_timeline(
     type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
     tag_id: Optional[int] = Query(None),
     collection_id: Optional[int] = Query(None),
+    has_physical_file: Optional[bool] = Query(None, description="是否存在已物化的物理文件"),
     db: Session = Depends(get_db)
 ):
     media_time = func.coalesce(Media.taken_at, Media.file_created_at)
@@ -209,6 +225,7 @@ def get_media_timeline(
         Media.video_media_id.is_(None),
         media_time.is_not(None),
     )
+    query = _filter_physical_file(query, has_physical_file)
 
     if starred is not None:
         query = query.filter(Media.starred == (1 if starred else 0))

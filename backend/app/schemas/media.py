@@ -27,6 +27,7 @@ class MediaResponse(MediaUrlMixin, TimestampMixin):
     start_ms: int | None = None
     end_ms: int | None = None
     taken_at: datetime | None = None
+    file_created_at: datetime | None = None
     gps_lat: float | None = None
     gps_lng: float | None = None
     orientation: int | None = None
