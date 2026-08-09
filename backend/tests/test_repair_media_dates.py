@@ -31,7 +31,11 @@ def test_repair_dry_run_does_not_write_and_apply_repairs(catalog_env, monkeypatc
         apply=False,
         session_factory=session_factory,
     )
+    assert dry_run["taken_at_present"] == 1
+    assert dry_run["taken_at_missing"] == 0
     assert dry_run["epoch_taken_at"] == 1
+    assert dry_run["file_created_at_present"] == 0
+    assert dry_run["file_created_at_missing"] == 1
     assert dry_run["file_created_at_filled"] == 1
     with session_factory() as db:
         media = db.get(Media, 1)
@@ -68,6 +72,8 @@ def test_default_mode_preserves_existing_value(catalog_env, monkeypatch):
         session_factory=session_factory,
     )
     assert called is False
+    assert stats["file_created_at_present"] == 1
+    assert stats["file_created_at_missing"] == 0
     assert stats["file_created_at_corrected"] == 0
     with session_factory() as db:
         assert db.get(Media, 1).file_created_at == old_value

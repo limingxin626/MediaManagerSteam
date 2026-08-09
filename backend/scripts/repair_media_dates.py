@@ -37,7 +37,11 @@ def repair_media_dates(
 ) -> dict:
     stats = {
         "total": 0,
+        "taken_at_present": 0,
+        "taken_at_missing": 0,
         "epoch_taken_at": 0,
+        "file_created_at_present": 0,
+        "file_created_at_missing": 0,
         "file_created_at": 0,
         "file_created_at_filled": 0,
         "file_created_at_corrected": 0,
@@ -88,6 +92,10 @@ def repair_media_dates(
 
             for media in media_rows:
                 stats["total"] += 1
+                if media.taken_at is None:
+                    stats["taken_at_missing"] += 1
+                else:
+                    stats["taken_at_present"] += 1
                 if media.taken_at is not None and clean_taken_at(media.taken_at) is None:
                     stats["epoch_taken_at"] += 1
                     if len(stats["epoch_sample_ids"]) < 10:
@@ -95,6 +103,10 @@ def repair_media_dates(
                     if apply:
                         media.taken_at = None
 
+                if media.file_created_at is None:
+                    stats["file_created_at_missing"] += 1
+                else:
+                    stats["file_created_at_present"] += 1
                 if media.file_created_at is not None and not overwrite_existing:
                     continue
                 absolute_path = config.resolve_to_absolute(media.repo_id, media.file_path)
@@ -193,6 +205,7 @@ def main() -> None:
         backup_path = backup_database(config.get_db_path())
         print(f"backup={backup_path}")
 
+    print(f"database={config.get_db_path()}")
     stats = repair_media_dates(
         apply=args.apply,
         batch_size=args.batch_size,
@@ -201,11 +214,15 @@ def main() -> None:
     mode = "APPLY" if args.apply else "DRY-RUN"
     print(f"[{mode}] total={stats['total']} overwrite_existing={args.overwrite_existing}")
     print(
+        f"taken_at_present={stats['taken_at_present']} "
+        f"taken_at_missing={stats['taken_at_missing']} "
         f"epoch_taken_at={stats['epoch_taken_at']} "
         f"sample_ids={stats['epoch_sample_ids']}"
     )
     print(
-        f"file_created_at_changed={stats['file_created_at']} "
+        f"file_created_at_present={stats['file_created_at_present']} "
+        f"file_created_at_missing={stats['file_created_at_missing']} "
+        f"changed={stats['file_created_at']} "
         f"filled={stats['file_created_at_filled']} "
         f"corrected={stats['file_created_at_corrected']} "
         f"unchanged={stats['file_created_at_unchanged']} "
