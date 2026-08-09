@@ -23,6 +23,7 @@ export interface MediaFilters {
   type?: string
   tag_id?: number | null
   collection_id?: number | null
+  has_physical_file?: boolean
 }
 
 export interface BucketLayout {
@@ -199,6 +200,7 @@ export function useVirtualGrid(opts: Options) {
       type: f.type || undefined,
       tag_id: f.tag_id ?? undefined,
       collection_id: f.collection_id ?? undefined,
+      has_physical_file: f.has_physical_file ?? undefined,
     }
   }
 
@@ -275,7 +277,8 @@ export function useVirtualGrid(opts: Options) {
       const inDay: Media[] = []
       let spilled = false
       for (const m of data.items) {
-        if (m.created_at >= dayStart) inDay.push(m)
+        const mediaTime = m.taken_at ?? m.file_created_at
+        if (mediaTime && mediaTime >= dayStart) inDay.push(m)
         else {
           spilled = true
           break

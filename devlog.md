@@ -1,5 +1,39 @@
 # 开发日志
 
+## 2026-08-09
+
+### 修复重复文件页面无法滚动
+
+重复文件管理页改为视口高度内独立纵向滚动，适配 `App.vue` 根容器的 `overflow-hidden` 布局，长列表现在可以正常滚动到底部。
+
+涉及文件：`vue/src/views/DuplicatePhysicalFiles.vue`。
+
+## 2026-08-07
+
+### 重复物理文件管理页面
+
+重复文件维护从 Media 浏览页中独立出来，在 Admin 增加专门入口。页面按逻辑 Media 分组展示多条已物化物理路径，可勾选任意副本或整组删除；删除主路径但仍有副本时会自动切换 canonical path，删除全部副本时仍保留逻辑 Media、缩略图和关联数据。后端新增分组游标 API、批量删除接口及 repository root 越界防护。
+
+涉及文件：`backend/app/routers/repositories.py`、`backend/app/schemas/repositories.py`、`backend/app/services/duplicate_file_service.py`、`backend/tests/test_duplicate_physical_files.py`、`vue/src/views/DuplicatePhysicalFiles.vue`、`vue/src/views/Admin.vue`、`vue/src/router/index.ts`、`vue/src/composables/useApi.ts`。后端相关测试 9 项通过，Vue `pnpm build` 通过。
+
+### Vue Media 卡片收藏标记改为只读
+
+Media 页面卡片现在仅在媒体已收藏时显示实心收藏图标；未收藏媒体不显示图标，卡片上的图标不再响应点击或切换收藏状态。预览页中的收藏操作保持不变。
+
+涉及文件：`vue/src/components/MediaCell.vue`、`vue/src/views/Media.vue`。
+
+### Vue Media Preview 显示文件路径
+
+Media 预览窗口在媒体内容下方显示其 repository 相对路径 `file_path`；过长路径会截断，悬停可查看完整内容。
+
+涉及文件：`vue/src/components/MediaPreview.vue`。
+
+### Vue Media Preview 统一媒体显示区域
+
+Media Preview 的媒体容器固定为视口宽度 90%、高度 70%；图片、视频及缩略图 fallback 均使用 `object-contain` 填充该区域，低分辨率媒体也会按比例放大显示。
+
+涉及文件：`vue/src/components/MediaPreview.vue`。
+
 ## 2026-07-16
 
 ### Vue 前端视觉层重做（Hallmark · modern-minimal）

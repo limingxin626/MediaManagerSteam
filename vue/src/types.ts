@@ -39,6 +39,7 @@ export type Media = components['schemas']['MediaResponse'] & {
   repo_id?: string
   local_file_path?: string
   local_thumb_path?: string
+  file_created_at?: string | null
   messages?: { id: number }[]
 }
 

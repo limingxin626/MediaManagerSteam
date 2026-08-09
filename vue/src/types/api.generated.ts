@@ -1718,6 +1718,8 @@ export interface components {
             end_ms?: number | null;
             /** Taken At */
             taken_at?: string | null;
+            /** File Created At */
+            file_created_at?: string | null;
             /** Gps Lat */
             gps_lat?: number | null;
             /** Gps Lng */
@@ -1828,6 +1830,8 @@ export interface components {
             end_ms?: number | null;
             /** Taken At */
             taken_at?: string | null;
+            /** File Created At */
+            file_created_at?: string | null;
             /** Gps Lat */
             gps_lat?: number | null;
             /** Gps Lng */
@@ -3472,7 +3476,7 @@ export interface operations {
     get_media_media_get: {
         parameters: {
             query?: {
-                /** @description 游标，格式为'created_at|position' */
+                /** @description 游标，格式为'media_time|id' */
                 cursor?: string | null;
                 /** @description 分页方向: 'forward' 加载更新的媒体 */
                 direction?: string | null;
@@ -3487,6 +3491,8 @@ export interface operations {
                 tag_id?: number | null;
                 /** @description 合集 ID */
                 collection_id?: number | null;
+                /** @description 是否存在已物化的物理文件 */
+                has_physical_file?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -3522,6 +3528,8 @@ export interface operations {
                 type?: string | null;
                 tag_id?: number | null;
                 collection_id?: number | null;
+                /** @description 是否存在已物化的物理文件 */
+                has_physical_file?: boolean | null;
             };
             header?: never;
             path?: never;

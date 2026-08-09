@@ -94,6 +94,9 @@ export const api = {
   del<T = null>(path: string, params?: Params) {
     return request<T>('DELETE', path, undefined, params)
   },
+  delWithBody<T = null>(path: string, body: unknown) {
+    return request<T>('DELETE', path, body)
+  },
 }
 
 // ---------------------------------------------------------------------------

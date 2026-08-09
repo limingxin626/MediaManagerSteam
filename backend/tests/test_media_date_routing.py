@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.models import Media
+from app.models.repository_catalog import RepositoryFile, RepositoryFolder
 from app.routers.media import get_media, get_media_timeline
 
 
@@ -33,6 +34,7 @@ def list_media(db, **kwargs):
         type=None,
         tag_id=None,
         collection_id=None,
+        has_physical_file=kwargs.get("has_physical_file"),
         db=db,
     )
 
@@ -80,8 +82,78 @@ def test_timeline_uses_file_created_fallback_and_excludes_undated(catalog_env):
         add_media(db, 3)
         db.commit()
 
-        rows = get_media_timeline(starred=None, type=None, tag_id=None, collection_id=None, db=db)
+        rows = get_media_timeline(
+            starred=None,
+            type=None,
+            tag_id=None,
+            collection_id=None,
+            has_physical_file=None,
+            db=db,
+        )
         assert [(row.year, row.month, row.day, row.count) for row in rows] == [
             (2024, 2, 3, 1),
             (2023, 1, 1, 1),
+        ]
+
+
+def add_repository_file(db, folder, file_id, media_id, *, status="done"):
+    db.add(RepositoryFile(
+        id=file_id,
+        repo_id="test",
+        folder_id=folder.id,
+        rel_path=f"physical-{file_id}.jpg",
+        name=f"physical-{file_id}.jpg",
+        media_type="image",
+        file_size=1,
+        mtime=1,
+        media_id=media_id,
+        materialize_status=status,
+    ))
+    db.flush()
+
+
+def test_physical_file_filter_uses_completed_catalog_links_without_duplicates(catalog_env):
+    _, session_factory = catalog_env
+    media_time = datetime(2024, 2, 3)
+    with session_factory() as db:
+        folder = RepositoryFolder(repo_id="test", rel_path="", name="test")
+        db.add(folder)
+        db.flush()
+        add_media(db, 1, file_created_at=media_time)
+        add_media(db, 2, file_created_at=media_time)
+        add_media(db, 3, file_created_at=media_time)
+        add_repository_file(db, folder, 1, 1)
+        add_repository_file(db, folder, 2, 1)
+        add_repository_file(db, folder, 3, 2, status="pending")
+        db.commit()
+
+        all_items = list_media(db)
+        existing = list_media(db, has_physical_file=True)
+        missing = list_media(db, has_physical_file=False)
+
+        assert {item.id for item in all_items.items} == {1, 2, 3}
+        assert [item.id for item in existing.items] == [1]
+        assert {item.id for item in missing.items} == {2, 3}
+
+        existing_timeline = get_media_timeline(
+            starred=None,
+            type=None,
+            tag_id=None,
+            collection_id=None,
+            has_physical_file=True,
+            db=db,
+        )
+        missing_timeline = get_media_timeline(
+            starred=None,
+            type=None,
+            tag_id=None,
+            collection_id=None,
+            has_physical_file=False,
+            db=db,
+        )
+        assert [(row.year, row.month, row.day, row.count) for row in existing_timeline] == [
+            (2024, 2, 3, 1),
+        ]
+        assert [(row.year, row.month, row.day, row.count) for row in missing_timeline] == [
+            (2024, 2, 3, 2),
         ]

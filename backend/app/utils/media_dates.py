@@ -12,23 +12,25 @@ def clean_taken_at(value: Optional[datetime]) -> Optional[datetime]:
 
 
 def get_file_created_at(file_path: str, platform: Optional[str] = None) -> Optional[datetime]:
-    """Return a real filesystem creation/birth time when the platform exposes one."""
+    """Return the earliest valid filesystem creation/birth or modification time."""
     try:
         stat_result = os.stat(file_path)
     except OSError:
         return None
 
     current_platform = platform or sys.platform
+    timestamps = [getattr(stat_result, "st_mtime", None)]
     if current_platform == "win32":
-        timestamp = stat_result.st_ctime
+        timestamps.append(getattr(stat_result, "st_ctime", None))
     elif current_platform == "darwin" or "bsd" in current_platform:
-        timestamp = getattr(stat_result, "st_birthtime", None)
-        if timestamp is None:
-            return None
-    else:
-        return None
+        timestamps.append(getattr(stat_result, "st_birthtime", None))
 
-    try:
-        return datetime.fromtimestamp(timestamp)
-    except (OSError, OverflowError, ValueError):
-        return None
+    values = []
+    for timestamp in timestamps:
+        if timestamp is None:
+            continue
+        try:
+            values.append(datetime.fromtimestamp(timestamp))
+        except (OSError, OverflowError, TypeError, ValueError):
+            continue
+    return min(values) if values else None

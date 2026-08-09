@@ -57,8 +57,25 @@
             ]"
           >{{ opt.label }}</button>
         </div>
+        <!-- Physical File Filter -->
+        <div
+          class="flex rounded-lg bg-gray-100 dark:bg-white/10 p-0.5 shrink-0"
+          title="按仓库扫描记录判断；离线仓库中的文件仍视为存在"
+        >
+          <button
+            v-for="opt in physicalFileOptions"
+            :key="opt.label"
+            class="px-2.5 py-1 rounded-md text-xs transition-colors"
+            :class="physicalFileFilter === opt.value
+              ? 'bg-white dark:bg-white/20 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-gray-300'"
+            @click="physicalFileFilter = opt.value"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
         <!-- Smart search -->
-        <div class="relative flex-1 max-w-xs">
+        <div v-if="viewMode === 'timeline'" class="relative flex-1 max-w-xs">
           <input
             v-model="searchInput"
             @keydown.enter="commitSearch"
@@ -126,9 +143,7 @@
           >
             <MediaCell
               :item="item"
-              :bouncing="mediaBounceId === item.id"
               @open="openSmartPreview(idx)"
-              @star="starWithBounce(item)"
             />
           </div>
         </div>
@@ -158,9 +173,7 @@
           <template v-if="vg.loadedItem(cell.bucket, cell.idx) as Media | undefined">
             <MediaCell
               :item="(vg.loadedItem(cell.bucket, cell.idx) as Media)"
-              :bouncing="mediaBounceId === (vg.loadedItem(cell.bucket, cell.idx) as Media).id"
               @open="openPreview(cell.bucket.key, cell.idx)"
-              @star="starWithBounce(vg.loadedItem(cell.bucket, cell.idx) as Media)"
             />
           </template>
         </div>
@@ -245,8 +258,14 @@ const typeOptions = [
   { value: 'video', label: '视频' },
   { value: 'image', label: '图片' },
 ]
+const physicalFileOptions = [
+  { value: null, label: '全部' },
+  { value: true, label: '文件存在' },
+  { value: false, label: '文件缺失' },
+]
 
 const selectedType = ref('')
+const physicalFileFilter = ref<boolean | null>(null)
 const starredFilter = ref(false)
 const selectedTagId = ref<number | null>(null)
 const selectedCollectionId = ref<number | null>(null)
@@ -259,6 +278,7 @@ const filters = computed(() => ({
   type: selectedType.value || undefined,
   tag_id: selectedTagId.value ?? undefined,
   collection_id: selectedCollectionId.value ?? undefined,
+  has_physical_file: physicalFileFilter.value ?? undefined,
 }))
 
 const vg = useVirtualGrid({
@@ -271,7 +291,6 @@ const previewOpen = ref(false)
 const previewItems = ref<any[]>([])
 const previewStartIndex = ref(0)
 const previewBucketKey = ref<string | null>(null)
-const mediaBounceId = ref<number | null>(null)
 const refreshing = ref(false)
 
 const PEEK_COUNT = 5
@@ -430,12 +449,6 @@ function openSmartPreview(idx: number) {
   }))
   previewStartIndex.value = idx
   previewOpen.value = true
-}
-
-function starWithBounce(item: Media) {
-  mediaBounceId.value = item.id
-  setTimeout(() => (mediaBounceId.value = null), 300)
-  toggleMediaStar(item)
 }
 
 // --- Tag & Collection sidebar data ---
