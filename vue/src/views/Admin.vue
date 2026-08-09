@@ -8,7 +8,7 @@
         <button
           v-for="tab in tabs"
           :key="tab.key"
-          @click="activeTab = tab.key"
+          @click="selectTab(tab.key)"
           :class="[
             'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
             activeTab === tab.key
@@ -29,13 +29,24 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AdminDashboard from '../components/admin/AdminDashboard.vue'
 import TableBrowser from '../components/admin/TableBrowser.vue'
 
 const tabs = [
   { key: 'overview', label: '概览' },
   { key: 'tables', label: '表浏览' },
+  { key: 'duplicate-files', label: '重复文件' },
 ]
 
 const activeTab = ref('overview')
+const router = useRouter()
+
+function selectTab(key: string) {
+  if (key === 'duplicate-files') {
+    router.push('/admin/duplicate-files')
+    return
+  }
+  activeTab.value = key
+}
 </script>

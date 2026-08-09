@@ -75,7 +75,7 @@
           </button>
         </div>
         <!-- Smart search -->
-        <div class="relative flex-1 max-w-xs">
+        <div v-if="viewMode === 'timeline'" class="relative flex-1 max-w-xs">
           <input
             v-model="searchInput"
             @keydown.enter="commitSearch"
@@ -143,9 +143,7 @@
           >
             <MediaCell
               :item="item"
-              :bouncing="mediaBounceId === item.id"
               @open="openSmartPreview(idx)"
-              @star="starWithBounce(item)"
             />
           </div>
         </div>
@@ -175,9 +173,7 @@
           <template v-if="vg.loadedItem(cell.bucket, cell.idx) as Media | undefined">
             <MediaCell
               :item="(vg.loadedItem(cell.bucket, cell.idx) as Media)"
-              :bouncing="mediaBounceId === (vg.loadedItem(cell.bucket, cell.idx) as Media).id"
               @open="openPreview(cell.bucket.key, cell.idx)"
-              @star="starWithBounce(vg.loadedItem(cell.bucket, cell.idx) as Media)"
             />
           </template>
         </div>
@@ -295,7 +291,6 @@ const previewOpen = ref(false)
 const previewItems = ref<any[]>([])
 const previewStartIndex = ref(0)
 const previewBucketKey = ref<string | null>(null)
-const mediaBounceId = ref<number | null>(null)
 const refreshing = ref(false)
 
 const PEEK_COUNT = 5
@@ -454,12 +449,6 @@ function openSmartPreview(idx: number) {
   }))
   previewStartIndex.value = idx
   previewOpen.value = true
-}
-
-function starWithBounce(item: Media) {
-  mediaBounceId.value = item.id
-  setTimeout(() => (mediaBounceId.value = null), 300)
-  toggleMediaStar(item)
 }
 
 // --- Tag & Collection sidebar data ---

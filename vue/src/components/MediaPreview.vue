@@ -138,12 +138,12 @@
 
           <div class="flex flex-col items-center gap-2 max-w-[90vw] max-h-[80vh]">
             <Transition :name="transitionName" mode="out-in">
-              <div class="relative" :key="currentItem?.id ?? -1">
+              <div class="relative w-[90vw] h-[70vh]" :key="currentItem?.id ?? -1">
                 <video
                   v-if="currentItem && isVideo(currentItem.mime_type) && !showFallback"
                   ref="videoRef"
                   :src="getMediaUrl(currentItem)"
-                  class="max-w-[90vw] max-h-[70vh] rounded-lg shadow-2xl"
+                  class="w-full h-full object-contain rounded-lg shadow-2xl"
                   :style="mediaTransformStyle"
                   controls
                   playsinline
@@ -156,17 +156,17 @@
                   v-else-if="currentItem && isImage(currentItem.mime_type) && !showFallback"
                   :src="getMediaUrl(currentItem)"
                   :alt="`Media ${currentIndex + 1}`"
-                  class="max-w-[90vw] max-h-[70vh] object-contain rounded-lg shadow-2xl"
+                  class="w-full h-full object-contain rounded-lg shadow-2xl"
                   :style="mediaTransformStyle"
                   @error="handleMediaError"
                 />
 
                 <!-- 文件无法访问时,展示缩略图 -->
-                <div v-else-if="currentItem && showFallback" class="relative">
+                <div v-else-if="currentItem && showFallback" class="relative w-full h-full">
                   <img
                     :src="resolveThumb(currentItem)"
                     :alt="`Media ${currentIndex + 1} (缩略图)`"
-                    class="max-w-[90vw] max-h-[70vh] object-contain rounded-lg shadow-2xl"
+                    class="w-full h-full object-contain rounded-lg shadow-2xl"
                     :style="mediaTransformStyle"
                   />
                   <div class="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 text-white/90 text-xs rounded-full backdrop-blur-sm">
@@ -175,6 +175,14 @@
                 </div>
               </div>
             </Transition>
+
+            <div
+              v-if="currentItem?.file_path"
+              class="max-w-[90vw] truncate text-xs text-white/60"
+              :title="currentItem.file_path"
+            >
+              {{ currentItem.file_path }}
+            </div>
 
             <!-- Media tags -->
             <div v-if="currentItem" class="flex items-center gap-1.5 flex-wrap justify-center">

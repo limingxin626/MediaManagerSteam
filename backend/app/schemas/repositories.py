@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.config import config
 from app.schemas.base import OrmBase
@@ -85,3 +85,51 @@ class RepositoryBrowseResponse(OrmBase):
     folder: RepositoryFolderResponse
     folders: List[RepositoryFolderResponse]
     files: List[RepositoryFileResponse]
+
+
+class DuplicatePhysicalFileItem(BaseModel):
+    id: int
+    repo_id: str
+    rel_path: str
+    local_file_path: str
+    file_size: Optional[int] = None
+    mtime: float
+    is_canonical: bool
+
+
+class DuplicateFileGroup(BaseModel):
+    media_id: int
+    repo_id: str
+    file_path: str
+    mime_type: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    duration_ms: Optional[int] = None
+    thumb_url: str
+    local_thumb_path: str
+    files: List[DuplicatePhysicalFileItem]
+
+
+class DuplicateFileCursorResponse(BaseModel):
+    items: List[DuplicateFileGroup]
+    next_cursor: Optional[int] = None
+    has_more: bool
+
+
+class DuplicateFileDeleteRequest(BaseModel):
+    repository_file_ids: List[int] = Field(min_length=1, max_length=100)
+
+
+class DuplicateFileDeleteFailure(BaseModel):
+    id: int
+    message: str
+
+
+class DuplicateFileDeleteResponse(BaseModel):
+    deleted_ids: List[int]
+    missing_ids: List[int]
+    failures: List[DuplicateFileDeleteFailure]
+    remaining_count: int
+    canonical_available: bool
+    canonical_repo_id: str
+    canonical_file_path: str
