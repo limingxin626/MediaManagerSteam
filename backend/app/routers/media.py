@@ -103,11 +103,8 @@ def get_media(
             query = query.filter(Media.id.in_(media_ids_msgs))
 
         if tag_id is not None:
-            msg_ids = db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
-            media_ids_msg = db.query(MessageMedia.media_id.label('mid')).filter(MessageMedia.message_id.in_(msg_ids))
-            media_ids_direct = db.query(media_tag.c.media_id.label('mid')).filter(media_tag.c.tag_id == tag_id)
-            combined = media_ids_msg.union(media_ids_direct).subquery()
-            query = query.filter(Media.id.in_(db.query(combined.c.mid)))
+            media_ids = db.query(media_tag.c.media_id).filter(media_tag.c.tag_id == tag_id)
+            query = query.filter(Media.id.in_(media_ids))
 
         if collection_id is not None:
             media_ids_collection = (
@@ -235,11 +232,8 @@ def get_media_timeline(
         query = query.filter(Media.mime_type.like('image/%'))
 
     if tag_id is not None:
-        msg_ids = db.query(message_tag.c.message_id).filter(message_tag.c.tag_id == tag_id)
-        media_ids_msg = db.query(MessageMedia.media_id.label('mid')).filter(MessageMedia.message_id.in_(msg_ids))
-        media_ids_direct = db.query(media_tag.c.media_id.label('mid')).filter(media_tag.c.tag_id == tag_id)
-        combined = media_ids_msg.union(media_ids_direct).subquery()
-        query = query.filter(Media.id.in_(db.query(combined.c.mid)))
+        media_ids = db.query(media_tag.c.media_id).filter(media_tag.c.tag_id == tag_id)
+        query = query.filter(Media.id.in_(media_ids))
 
     if collection_id is not None:
         media_ids_collection = (

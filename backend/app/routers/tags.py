@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.models import get_db, Tag, message_tag, media_tag, MessageMedia
+from app.models import get_db, Tag, Media, message_tag, media_tag
 from app.schemas.tag import TagResponse, TagCreate, TagUpdate
 from typing import List, Optional
 
@@ -16,22 +16,20 @@ def get_tags(
 ):
     """获取所有标签，支持按名称搜索，附带每个标签的关联数量。"""
     if has_media:
-        msg_media_count_sub = (
-            db.query(message_tag.c.tag_id, func.count(func.distinct(MessageMedia.media_id)).label("cnt"))
-            .join(MessageMedia, MessageMedia.message_id == message_tag.c.message_id)
-            .group_by(message_tag.c.tag_id)
-            .subquery()
-        )
-        direct_media_count_sub = (
+        media_count_sub = (
             db.query(media_tag.c.tag_id, func.count().label("cnt"))
+            .join(Media, Media.id == media_tag.c.media_id)
+            .filter(
+                Media.video_media_id.is_(None),
+                func.coalesce(Media.taken_at, Media.file_created_at).is_not(None),
+            )
             .group_by(media_tag.c.tag_id)
             .subquery()
         )
-        total = (func.coalesce(msg_media_count_sub.c.cnt, 0) + func.coalesce(direct_media_count_sub.c.cnt, 0)).label("message_count")
+        total = func.coalesce(media_count_sub.c.cnt, 0).label("message_count")
         query = (
             db.query(Tag, total)
-            .outerjoin(msg_media_count_sub, Tag.id == msg_media_count_sub.c.tag_id)
-            .outerjoin(direct_media_count_sub, Tag.id == direct_media_count_sub.c.tag_id)
+            .outerjoin(media_count_sub, Tag.id == media_count_sub.c.tag_id)
         )
     else:
         msg_count_sub = (
