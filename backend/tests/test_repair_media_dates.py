@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime
 
-from app.models import Media
+from app.models import Media, RepositoryFile, RepositoryFolder
 from scripts import repair_media_dates
 
 
@@ -117,6 +117,45 @@ def test_overwrite_reports_missing_file(catalog_env):
     )
     assert stats["missing_file"] == 1
     assert stats["missing_file_samples"][0]["id"] == 1
+
+
+def test_stale_canonical_path_falls_back_to_completed_physical_copy(catalog_env, monkeypatch):
+    repo, session_factory = catalog_env
+    physical_path = repo / "available.jpg"
+    physical_path.write_bytes(b"image")
+    expected_created_at = datetime(2021, 2, 3, 4, 5, 6)
+    monkeypatch.setattr(repair_media_dates, "get_file_created_at", lambda _: expected_created_at)
+    add_media(session_factory, file_path="stale.jpg")
+    with session_factory() as db:
+        folder = RepositoryFolder(repo_id="test", rel_path="", name="test")
+        db.add(folder)
+        db.flush()
+        db.add(RepositoryFile(
+            repo_id="test",
+            folder_id=folder.id,
+            rel_path="available.jpg",
+            name="available.jpg",
+            media_type="image",
+            file_size=5,
+            mtime=1,
+            media_id=1,
+            materialize_status="done",
+        ))
+        db.commit()
+
+    stats = repair_media_dates.repair_media_dates(
+        apply=True,
+        session_factory=session_factory,
+    )
+
+    assert stats["physical_copy_fallback"] == 1
+    assert stats["missing_file"] == 0
+    assert stats["file_created_at_filled"] == 1
+    assert stats["physical_copy_fallback_samples"][0]["physical_path"] == str(physical_path)
+    with session_factory() as db:
+        media = db.get(Media, 1)
+        assert media.file_created_at == expected_created_at
+        assert media.file_path == "stale.jpg"
 
 
 def test_backup_database_creates_valid_copy(tmp_path):

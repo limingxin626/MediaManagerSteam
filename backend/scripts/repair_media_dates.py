@@ -10,7 +10,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.config import config
-from app.models import Media, SessionLocal
+from app.models import Media, RepositoryFile, SessionLocal
 from app.utils.media_dates import clean_taken_at, get_file_created_at
 
 
@@ -42,12 +42,14 @@ def repair_media_dates(
         "file_created_at_filled": 0,
         "file_created_at_corrected": 0,
         "file_created_at_unchanged": 0,
+        "physical_copy_fallback": 0,
         "missing_file": 0,
         "unresolved_repo": 0,
         "unsupported_creation_time": 0,
         "epoch_sample_ids": [],
         "backfill_sample_ids": [],
         "correction_samples": [],
+        "physical_copy_fallback_samples": [],
         "missing_file_samples": [],
         "unresolved_repo_samples": [],
     }
@@ -65,6 +67,25 @@ def repair_media_dates(
             if not media_rows:
                 break
 
+            media_ids = [media.id for media in media_rows]
+            completed_files = (
+                db.query(RepositoryFile)
+                .filter(
+                    RepositoryFile.media_id.in_(media_ids),
+                    RepositoryFile.materialize_status == "done",
+                )
+                .order_by(
+                    RepositoryFile.media_id,
+                    RepositoryFile.repo_id,
+                    RepositoryFile.rel_path,
+                    RepositoryFile.id,
+                )
+                .all()
+            )
+            files_by_media: dict[int, list[RepositoryFile]] = {}
+            for row in completed_files:
+                files_by_media.setdefault(row.media_id, []).append(row)
+
             for media in media_rows:
                 stats["total"] += 1
                 if media.taken_at is not None and clean_taken_at(media.taken_at) is None:
@@ -77,7 +98,27 @@ def repair_media_dates(
                 if media.file_created_at is not None and not overwrite_existing:
                     continue
                 absolute_path = config.resolve_to_absolute(media.repo_id, media.file_path)
-                if absolute_path is None:
+                canonical_path = absolute_path
+                if absolute_path is None or not os.path.isfile(absolute_path):
+                    absolute_path = next(
+                        (
+                            candidate
+                            for row in files_by_media.get(media.id, [])
+                            if (candidate := config.resolve_to_absolute(row.repo_id, row.rel_path))
+                            and os.path.isfile(candidate)
+                        ),
+                        None,
+                    )
+                    if absolute_path is not None:
+                        stats["physical_copy_fallback"] += 1
+                        if len(stats["physical_copy_fallback_samples"]) < 10:
+                            stats["physical_copy_fallback_samples"].append({
+                                "id": media.id,
+                                "canonical_path": canonical_path,
+                                "physical_path": absolute_path,
+                            })
+
+                if absolute_path is None and canonical_path is None:
                     stats["unresolved_repo"] += 1
                     if len(stats["unresolved_repo_samples"]) < 10:
                         stats["unresolved_repo_samples"].append({
@@ -86,12 +127,12 @@ def repair_media_dates(
                             "file_path": media.file_path,
                         })
                     continue
-                if not os.path.exists(absolute_path):
+                if absolute_path is None:
                     stats["missing_file"] += 1
                     if len(stats["missing_file_samples"]) < 10:
                         stats["missing_file_samples"].append({
                             "id": media.id,
-                            "path": absolute_path,
+                            "path": canonical_path,
                         })
                     continue
                 created_at = get_file_created_at(absolute_path)
@@ -171,6 +212,10 @@ def main() -> None:
         f"filled_sample_ids={stats['backfill_sample_ids']}"
     )
     print(f"correction_samples={stats['correction_samples']}")
+    print(
+        f"physical_copy_fallback={stats['physical_copy_fallback']} "
+        f"samples={stats['physical_copy_fallback_samples']}"
+    )
     print(
         f"missing_file={stats['missing_file']} "
         f"unresolved_repo={stats['unresolved_repo']} "
