@@ -50,11 +50,6 @@ const routes = [
     ]
   },
   {
-    path: '/admin/duplicate-files',
-    name: 'DuplicatePhysicalFiles',
-    component: () => import('../views/DuplicatePhysicalFiles.vue')
-  },
-  {
     path: '/transactions',
     name: 'Transactions',
     component: () => import('../views/Transactions.vue')
