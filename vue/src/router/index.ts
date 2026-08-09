@@ -25,8 +25,29 @@ const routes = [
   },
   {
     path: '/admin',
-    name: 'Admin',
-    component: () => import('../views/Admin.vue')
+    component: () => import('../views/Admin.vue'),
+    children: [
+      {
+        path: '',
+        name: 'Admin',
+        component: () => import('../components/admin/AdminDashboard.vue')
+      },
+      {
+        path: 'tables',
+        name: 'AdminTables',
+        component: () => import('../components/admin/TableBrowser.vue')
+      },
+      {
+        path: 'missing-files',
+        name: 'MissingPhysicalFiles',
+        component: () => import('../views/MissingPhysicalFiles.vue')
+      },
+      {
+        path: 'duplicate-files',
+        name: 'DuplicatePhysicalFiles',
+        component: () => import('../views/DuplicatePhysicalFiles.vue')
+      }
+    ]
   },
   {
     path: '/admin/duplicate-files',

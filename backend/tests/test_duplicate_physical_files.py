@@ -5,6 +5,7 @@ from fastapi import HTTPException
 
 from app.models import Media
 from app.models.repository_catalog import RepositoryFile, RepositoryFolder
+from app.routers.media import get_media
 from app.routers.repositories import list_duplicate_files
 from app.services.duplicate_file_service import _safe_repository_path, delete_physical_files
 
@@ -99,6 +100,21 @@ def test_delete_all_copies_keeps_media_and_historical_canonical(catalog_env):
         assert result["canonical_available"] is False
         assert media.file_path == "1-a.jpg"
         assert db.query(RepositoryFile).filter_by(media_id=media.id).count() == 0
+
+        missing = get_media(
+            cursor=None,
+            direction=None,
+            limit=20,
+            message_id=None,
+            message_ids=None,
+            starred=None,
+            type=None,
+            tag_id=None,
+            collection_id=None,
+            has_physical_file=False,
+            db=db,
+        )
+        assert [item.id for item in missing.items] == [media.id]
 
 
 def test_missing_file_cleans_catalog_row(catalog_env):

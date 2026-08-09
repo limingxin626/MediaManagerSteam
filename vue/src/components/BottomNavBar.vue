@@ -63,7 +63,7 @@ const navigateTo = (path: string) => {
 }
 
 const isActive = (path: string) => {
-  return route.path === path
+  return path === '/admin' ? route.path.startsWith(path) : route.path === path
 }
 </script>
 

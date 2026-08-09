@@ -1,52 +1,44 @@
 <template>
-  <div class="min-h-screen pl-0 md:pl-16 pb-24 md:pb-0">
-    <div class="max-w-7xl mx-auto px-4 py-6">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">数据库管理</h1>
+  <div class="h-screen pl-0 md:pl-16 pb-24 md:pb-0 overflow-hidden">
+    <div class="h-full max-w-7xl mx-auto px-4 py-6 flex flex-col min-h-0">
+      <h1 class="shrink-0 text-2xl font-bold text-gray-900 dark:text-white mb-6">数据库管理</h1>
 
-      <!-- Tab 切换 -->
-      <div class="flex gap-1 mb-6 border-b border-[var(--border-color)]">
-        <button
+      <div class="shrink-0 flex gap-1 mb-6 border-b border-[var(--border-color)] overflow-x-auto overflow-y-hidden">
+        <RouterLink
           v-for="tab in tabs"
-          :key="tab.key"
-          @click="selectTab(tab.key)"
+          :key="tab.to"
+          :to="tab.to"
           :class="[
-            'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
-            activeTab === tab.key
+            'shrink-0 px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+            isActive(tab.to)
               ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
               : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
           ]"
         >
           {{ tab.label }}
-        </button>
+        </RouterLink>
       </div>
 
-      <!-- Tab 内容 -->
-      <AdminDashboard v-if="activeTab === 'overview'" />
-      <TableBrowser v-else-if="activeTab === 'tables'" />
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <RouterView />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import AdminDashboard from '../components/admin/AdminDashboard.vue'
-import TableBrowser from '../components/admin/TableBrowser.vue'
+import { useRoute } from 'vue-router'
 
 const tabs = [
-  { key: 'overview', label: '概览' },
-  { key: 'tables', label: '表浏览' },
-  { key: 'duplicate-files', label: '重复文件' },
+  { to: '/admin', label: '概览' },
+  { to: '/admin/tables', label: '表浏览' },
+  { to: '/admin/missing-files', label: '文件缺失' },
+  { to: '/admin/duplicate-files', label: '重复文件' },
 ]
 
-const activeTab = ref('overview')
-const router = useRouter()
+const route = useRoute()
 
-function selectTab(key: string) {
-  if (key === 'duplicate-files') {
-    router.push('/admin/duplicate-files')
-    return
-  }
-  activeTab.value = key
+function isActive(path: string) {
+  return path === '/admin' ? route.path === path : route.path.startsWith(path)
 }
 </script>

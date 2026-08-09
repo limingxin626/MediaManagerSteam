@@ -74,6 +74,40 @@ def test_media_same_time_paginates_by_id_and_undated_uses_stable_cursor(catalog_
         assert second.next_cursor == f"{same_time.isoformat()}|1"
 
 
+def test_media_filters_by_completed_physical_file(catalog_env):
+    _, session_factory = catalog_env
+    with session_factory() as db:
+        folder = RepositoryFolder(repo_id="test", rel_path="", name="test")
+        db.add(folder)
+        db.flush()
+        add_media(db, 1, file_created_at=datetime(2024, 1, 1))
+        add_media(db, 2, file_created_at=datetime(2024, 1, 2))
+        add_media(db, 3, file_created_at=datetime(2024, 1, 3))
+        db.add_all([
+            RepositoryFile(
+                repo_id="test", folder_id=folder.id, rel_path="1-a.jpg", name="1-a.jpg",
+                media_type="image", file_size=1, mtime=1, media_id=1, materialize_status="done",
+            ),
+            RepositoryFile(
+                repo_id="test", folder_id=folder.id, rel_path="1-b.jpg", name="1-b.jpg",
+                media_type="image", file_size=1, mtime=1, media_id=1, materialize_status="done",
+            ),
+            RepositoryFile(
+                repo_id="test", folder_id=folder.id, rel_path="2.jpg", name="2.jpg",
+                media_type="image", file_size=1, mtime=1, media_id=2, materialize_status="pending",
+            ),
+        ])
+        db.commit()
+
+        existing = list_media(db, has_physical_file=True)
+        missing = list_media(db, has_physical_file=False)
+        all_media = list_media(db)
+
+        assert [item.id for item in existing.items] == [1]
+        assert [item.id for item in missing.items] == [3, 2]
+        assert [item.id for item in all_media.items] == [3, 2, 1]
+
+
 def test_timeline_uses_file_created_fallback_and_excludes_undated(catalog_env):
     _, session_factory = catalog_env
     with session_factory() as db:
