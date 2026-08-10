@@ -24,6 +24,16 @@ export type Message = _Message & {
 export type MessageDetail = _MessageDetail & {
   issue_id?: number | null
   issue_title?: string | null
+  folder_count?: number
+  primary_repo_id?: string | null
+  primary_folder_path?: string | null
+  folders?: {
+    id: number
+    repo_id: string
+    rel_path: string
+    name: string
+    role: 'PRIMARY' | 'MIRROR' | string
+  }[]
 }
 
 // 合集相关 —— CollectionResponse 自带 cover_abs_path（Electron file:// 用）

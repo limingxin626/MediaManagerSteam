@@ -52,6 +52,14 @@ class MessageTagItem(OrmBase):
     category: str | None = None
 
 
+class MessageFolderItem(BaseModel):
+    id: int
+    repo_id: str
+    rel_path: str
+    name: str
+    role: str
+
+
 class MessageResponse(TimestampMixin):
     id: int
     text: str | None = None
@@ -61,11 +69,15 @@ class MessageResponse(TimestampMixin):
     issue_title: str | None = None
     media_count: int
     starred: bool = False
+    folder_count: int = 0
+    primary_repo_id: str | None = None
+    primary_folder_path: str | None = None
 
 
 class MessageDetailResponse(MessageResponse):
     media_items: List[MessageMediaItem]
     tags: List[MessageTagItem] = []
+    folders: List[MessageFolderItem] = []
 
 
 class CursorResponse(BaseModel):

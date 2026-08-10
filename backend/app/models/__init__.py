@@ -56,6 +56,7 @@ class Message(Base):
     collection = relationship("Collection", back_populates="messages")
     issue = relationship("Issue", back_populates="messages")
     message_media = relationship("MessageMedia", back_populates="message", cascade="all, delete-orphan")
+    folder_links = relationship("MessageFolder", back_populates="message", cascade="all, delete-orphan")
     tags = relationship("Tag", secondary=message_tag, back_populates="messages")
 
 class Collection(Base):
@@ -218,4 +219,4 @@ from app.models.todo import Todo  # noqa: E402,F401
 from app.models.issue import Issue  # noqa: E402,F401
 from app.models.transaction import Transaction, TxnCategoryRule  # noqa: E402,F401
 from app.models.telegram import TelegramSyncState, RemoteMediaReference  # noqa: E402,F401
-from app.models.repository_catalog import RepositoryFile, RepositoryFolder  # noqa: E402,F401
+from app.models.repository_catalog import MessageFolder, RepositoryFile, RepositoryFolder  # noqa: E402,F401

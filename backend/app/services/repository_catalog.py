@@ -13,7 +13,7 @@ from pathlib import PurePosixPath
 from typing import Optional
 
 from app.config import config
-from app.models import Media, RepositoryFile, RepositoryFolder, SessionLocal
+from app.models import Media, Message, MessageFolder, RepositoryFile, RepositoryFolder, SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -39,26 +39,37 @@ def _normalize_rel(path: str) -> str:
     return "" if path in ("", ".") else str(PurePosixPath(path))
 
 
+def _filesystem_id(path: str) -> Optional[str]:
+    try:
+        stat = os.stat(path, follow_symlinks=False)
+    except OSError:
+        return None
+    if not stat.st_ino:
+        return None
+    return f"{stat.st_dev}:{stat.st_ino}"
+
+
 def _walk_repository(root: str, other_repo_roots: set[str]):
     """Return (folders, files, complete); complete=False suppresses sweep."""
     root = os.path.abspath(root)
-    folders: list[tuple[str, str]] = [("", "")]
+    folders: list[tuple[str, str, Optional[str]]] = []
     files: list[tuple[str, str, int, float]] = []
-    stack = [root]
+    stack = [(root, "", "")]
     complete = True
     while stack:
-        directory = stack.pop()
+        directory, directory_rel, directory_name = stack.pop()
+        has_entries = False
         try:
             with os.scandir(directory) as entries:
                 for entry in entries:
+                    has_entries = True
                     try:
                         if entry.is_dir(follow_symlinks=False):
                             absolute = os.path.abspath(entry.path)
                             if os.path.normcase(absolute) in other_repo_roots:
                                 continue
                             rel = _normalize_rel(os.path.relpath(absolute, root))
-                            folders.append((rel, entry.name))
-                            stack.append(absolute)
+                            stack.append((absolute, rel, entry.name))
                         elif entry.is_file(follow_symlinks=False) and scan_media_type(entry.name):
                             stat = entry.stat(follow_symlinks=False)
                             rel = _normalize_rel(os.path.relpath(entry.path, root))
@@ -69,6 +80,8 @@ def _walk_repository(root: str, other_repo_roots: set[str]):
         except OSError as exc:
             complete = False
             logger.warning("[catalog] cannot read directory %s: %s", directory, exc)
+        if directory_rel == "" or has_entries:
+            folders.append((directory_rel, directory_name, _filesystem_id(directory)))
     return folders, files, complete
 
 
@@ -108,20 +121,31 @@ def _scan_repository(repo_id: str, root: str, other_roots: set[str]) -> Optional
     db = SessionLocal()
     inserted = updated = unchanged = matched = pending = 0
     try:
-        existing_folders = {row.rel_path: row for row in db.query(RepositoryFolder).filter_by(repo_id=repo_id)}
+        folder_rows = db.query(RepositoryFolder).filter_by(repo_id=repo_id).all()
+        existing_folders = {row.rel_path: row for row in folder_rows}
+        folders_by_identity = {row.filesystem_id: row for row in folder_rows if row.filesystem_id}
         # Parents are always encountered before children after sorting by depth.
-        for rel, name in sorted(folders, key=lambda item: (item[0].count("/"), item[0])):
-            row = existing_folders.get(rel)
+        for rel, name, filesystem_id in sorted(folders, key=lambda item: (item[0].count("/"), item[0])):
+            row = folders_by_identity.get(filesystem_id) if filesystem_id else None
+            if row is None:
+                row = existing_folders.get(rel)
             parent_rel = _normalize_rel(str(PurePosixPath(rel).parent)) if rel else None
             parent = existing_folders.get(parent_rel) if parent_rel is not None else None
             if row is None:
-                row = RepositoryFolder(repo_id=repo_id, rel_path=rel, name=name,
+                row = RepositoryFolder(repo_id=repo_id, filesystem_id=filesystem_id, rel_path=rel, name=name,
                                        parent_id=parent.id if parent else None, scanned_at=token)
                 db.add(row)
                 db.flush()
                 existing_folders[rel] = row
+                if filesystem_id:
+                    folders_by_identity[filesystem_id] = row
                 inserted += 1
             else:
+                if row.rel_path != rel:
+                    existing_folders.pop(row.rel_path, None)
+                    existing_folders[rel] = row
+                row.filesystem_id = filesystem_id
+                row.rel_path = rel
                 row.name = name
                 row.parent_id = parent.id if parent else None
                 row.scanned_at = token
@@ -173,6 +197,7 @@ def _scan_repository(repo_id: str, root: str, other_roots: set[str]) -> Optional
         # Otherwise every existing row still looks stale on repeat scans.
         db.flush()
         deleted = 0
+        removed_folder_message_ids: set[int] = set()
         if complete:
             stale_files = db.query(RepositoryFile).filter(
                 RepositoryFile.repo_id == repo_id, RepositoryFile.scanned_at < token).all()
@@ -184,9 +209,21 @@ def _scan_repository(repo_id: str, root: str, other_roots: set[str]) -> Optional
             ).order_by(RepositoryFolder.rel_path.desc()).all()
             deleted += len(stale_folders)
             for row in stale_folders:
+                if row.message_link is not None:
+                    removed_folder_message_ids.add(row.message_link.message_id)
                 db.delete(row)
         else:
             logger.warning("[catalog] repository %s scan incomplete; sweep skipped", repo_id)
+        db.flush()
+        for message_id in removed_folder_message_ids:
+            if db.query(MessageFolder.id).filter_by(message_id=message_id).first() is None:
+                message = db.get(Message, message_id)
+                if message is not None:
+                    db.delete(message)
+        db.flush()
+        from app.services.folder_message_service import ensure_folder_messages, reconcile_folder_messages
+        message_ids = ensure_folder_messages(db, repo_id)
+        reconcile_folder_messages(db, message_ids)
         db.commit()
         return {"scanned": len(folders) + len(files), "inserted": inserted, "updated": updated,
                 "unchanged": unchanged, "deleted": deleted, "matched": matched, "pending": pending}

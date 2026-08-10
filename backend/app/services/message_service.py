@@ -2,8 +2,16 @@ from datetime import datetime, timedelta
 from typing import Callable, List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.models import Message, Tag, MessageMedia, message_tag, media_tag
+from app.models import Message, MessageFolder, Tag, MessageMedia, message_tag, media_tag
 from app.services.media_service import process_file
+
+
+FOLDER_BACKED_MESSAGE_ERROR = "Folder-backed message media is managed by its repository folders"
+
+
+def _require_direct_media_writes(db: Session, message_id: int) -> None:
+    if db.query(MessageFolder.id).filter_by(message_id=message_id).first() is not None:
+        raise ValueError(FOLDER_BACKED_MESSAGE_ERROR)
 
 
 def cleanup_orphan_tags(db: Session, commit: bool = True) -> int:
@@ -166,6 +174,7 @@ def update_message_service(
         message.created_at = created_at
 
     if media_order is not None:
+        _require_direct_media_writes(db, message_id)
         if not reorder_message_media(db, message_id, media_order, commit=False):
             raise ValueError("media_order 包含不属于该消息的 media_id")
 
@@ -184,6 +193,7 @@ def delete_message_service(
     message = db.query(Message).filter(Message.id == message_id).first()
     if message is None:
         return False
+    _require_direct_media_writes(db, message_id)
 
     db.delete(message)
     cleanup_orphan_tags(db, commit=False)
@@ -221,6 +231,8 @@ def merge_messages_service(
     )
     if len(msgs) != len(message_ids):
         raise ValueError("部分消息不存在")
+    if db.query(MessageFolder.id).filter(MessageFolder.message_id.in_(message_ids)).first() is not None:
+        raise ValueError(FOLDER_BACKED_MESSAGE_ERROR)
 
     target = msgs[0]
     others = msgs[1:]
@@ -288,6 +300,7 @@ def split_message_service(
     source = db.query(Message).filter(Message.id == source_message_id).first()
     if not source:
         raise ValueError("Message not found")
+    _require_direct_media_writes(db, source_message_id)
 
     media_ids_set = set(media_ids)
     relations = (
@@ -359,6 +372,7 @@ def add_media_to_message_service(
     """
     if not db.query(Message).filter(Message.id == message_id).first():
         raise ValueError("Message not found")
+    _require_direct_media_writes(db, message_id)
 
     max_pos = (
         db.query(func.coalesce(func.max(MessageMedia.position), -1))
@@ -396,6 +410,7 @@ def remove_media_from_message_service(
     """
     if not db.query(Message).filter(Message.id == message_id).first():
         raise ValueError("Message not found")
+    _require_direct_media_writes(db, message_id)
 
     relation = (
         db.query(MessageMedia)

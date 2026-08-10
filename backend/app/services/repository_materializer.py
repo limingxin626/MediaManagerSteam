@@ -118,11 +118,19 @@ def _process_row(db, row: RepositoryFile) -> bool:
 
         media = result["media"]
         media_info = result.get("media_info") or {}
+        canonical = config.resolve_to_absolute(media.repo_id, media.file_path)
+        if not canonical or not os.path.isfile(canonical):
+            media.repo_id = row.repo_id
+            media.file_path = row.rel_path
         row.media_id = media.id
         row.materialize_status = "done"
         row.materialize_error = None
         row.is_hdr = media_info.get("is_hdr")
         row.color_transfer = media_info.get("color_transfer")
+        db.flush()
+        if row.folder.message_link is not None:
+            from app.services.folder_message_service import reconcile_message_media
+            reconcile_message_media(db, row.folder.message_link.message_id)
         db.commit()
         logger.info(
             "[catalog-worker] %s Media id=%s for %s",

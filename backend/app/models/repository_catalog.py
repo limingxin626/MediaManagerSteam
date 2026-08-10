@@ -1,11 +1,11 @@
 """Repository filesystem catalog models.
 
 The catalog records physical paths independently from Media's deduplicated logical
-assets. Folders are first-class rows so empty directories remain browsable.
+assets. Physically empty directories are intentionally omitted.
 """
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 
 from app.models import Base
@@ -16,6 +16,7 @@ class RepositoryFolder(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     repo_id = Column(String(64), nullable=False)
+    filesystem_id = Column(String(128), nullable=True)
     rel_path = Column(String(1024), nullable=False)  # "" is the repository root
     name = Column(String(255), nullable=False)
     parent_id = Column(Integer, ForeignKey("repository_folder.id", ondelete="CASCADE"), nullable=True, index=True)
@@ -26,10 +27,40 @@ class RepositoryFolder(Base):
     parent = relationship("RepositoryFolder", remote_side="RepositoryFolder.id", back_populates="children")
     children = relationship("RepositoryFolder", back_populates="parent", cascade="all, delete-orphan", passive_deletes=True)
     files = relationship("RepositoryFile", back_populates="folder", cascade="all, delete-orphan", passive_deletes=True)
+    message_link = relationship("MessageFolder", back_populates="folder", cascade="all, delete-orphan", uselist=False)
 
     __table_args__ = (
         UniqueConstraint("repo_id", "rel_path", name="uq_repository_folder_repo_path"),
+        UniqueConstraint("repo_id", "filesystem_id", name="uq_repository_folder_repo_filesystem_id"),
         Index("ix_repository_folder_repo_parent", "repo_id", "parent_id"),
+    )
+
+
+class MessageFolder(Base):
+    __tablename__ = "message_folder"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(Integer, ForeignKey("message.id", ondelete="CASCADE"), nullable=False, index=True)
+    repository_folder_id = Column(
+        Integer,
+        ForeignKey("repository_folder.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    role = Column(String(16), nullable=False, default="PRIMARY", server_default="PRIMARY")
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    message = relationship("Message", back_populates="folder_links")
+    folder = relationship("RepositoryFolder", back_populates="message_link")
+
+    __table_args__ = (
+        Index(
+            "uq_message_folder_primary",
+            "message_id",
+            unique=True,
+            sqlite_where=text("role = 'PRIMARY'"),
+        ),
     )
 
 

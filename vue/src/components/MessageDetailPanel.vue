@@ -78,6 +78,24 @@
 
           <!-- 右:标签 + 基本信息 -->
           <div class="w-full lg:w-72 shrink-0 lg:sticky lg:top-0 lg:self-start space-y-6">
+            <!-- 物理文件夹 -->
+            <div v-if="message.folders?.length"
+              class="rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-secondary)]/40 p-4">
+              <h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">文件夹</h4>
+              <div class="space-y-3">
+                <div v-for="folder in message.folders" :key="folder.id" class="min-w-0">
+                  <div class="flex items-center justify-between gap-2 mb-1">
+                    <span class="text-xs font-medium text-[var(--text-secondary)] truncate">{{ folder.repo_id }}</span>
+                    <span v-if="folder.role === 'PRIMARY'"
+                      class="shrink-0 text-[10px] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]">主目录</span>
+                  </div>
+                  <p class="text-sm text-[var(--text-primary)] break-all leading-5" :title="folder.rel_path">
+                    {{ folder.rel_path }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <!-- 标签 -->
             <div class="rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-secondary)]/40 p-4">
               <div class="flex items-center justify-between mb-3">

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -8,13 +8,14 @@ from app.models import get_db, Message, MessageMedia, Tag, message_tag, media_ta
 from app.schemas.message import (
     MessageCreate, MessageCreateFromClient, MessageUpdate, MessageMerge, MessageSplit,
     MessageResponse, MessageDetailResponse,
-    MessageMediaItem, MessageTagItem,
+    MessageFolderItem, MessageMediaItem, MessageTagItem,
     CursorResponse, MessageDetailCursorResponse,
     MessageSearchItem, MessageSearchCursorResponse,
     MessageDateCount, MessageDatesResponse,
     MessageSyncMediaItem, MessageSyncResponse,
     MEDIA_PREVIEW_LIMIT,
 )
+from app.schemas.file import FileUploadResponse
 from app.services.message_service import (
     reorder_message_media, cleanup_orphan_tags, link_media_to_message,
     create_message_service, update_message_service, delete_message_service,
@@ -46,6 +47,28 @@ def _aggregate_tags_raw(msg: Message) -> list:
             for t in mm.media.tags:
                 tag_map.setdefault(t.id, t)
     return list(tag_map.values())
+
+
+def _folder_fields(msg: Message) -> dict:
+    primary = next((link.folder for link in msg.folder_links if link.role == "PRIMARY"), None)
+    return {
+        "folder_count": len(msg.folder_links),
+        "primary_repo_id": primary.repo_id if primary else None,
+        "primary_folder_path": primary.rel_path if primary else None,
+    }
+
+
+def _folder_items(msg: Message) -> list[MessageFolderItem]:
+    return [
+        MessageFolderItem(
+            id=link.folder.id,
+            repo_id=link.folder.repo_id,
+            rel_path=link.folder.rel_path,
+            name=link.folder.name,
+            role=link.role,
+        )
+        for link in sorted(msg.folder_links, key=lambda item: (item.role != "PRIMARY", item.folder.id))
+    ]
 
 
 def _parse_cursor(cursor: Optional[str]) -> Optional[datetime]:
@@ -189,8 +212,10 @@ def _build_detail_response(
         starred=bool(msg.starred),
         media_items=media_items,
         tags=tags,
+        folders=_folder_items(msg),
         created_at=msg.created_at.isoformat(),
         updated_at=msg.updated_at.isoformat(),
+        **_folder_fields(msg),
     )
 
 
@@ -227,6 +252,7 @@ def _build_sync_response(db: Session, db_message: Message) -> MessageSyncRespons
         media_items=media_items,
         media_count=len(media_items),
         tags=tags,
+        **_folder_fields(db_message),
     )
 
 
@@ -269,6 +295,7 @@ def get_messages(
             starred=bool(msg.starred),
             created_at=msg.created_at.isoformat(),
             updated_at=msg.updated_at.isoformat(),
+            **_folder_fields(msg),
         )
         for msg in items
     ]
@@ -361,6 +388,7 @@ def sync_messages(db: Session = Depends(get_db)):
             updated_at=msg.updated_at.isoformat(),
             media_items=media_items,
             tags=tags,
+            **_folder_fields(msg),
         ))
     return results
 
@@ -679,6 +707,11 @@ def create_message(
     db: Session = Depends(get_db),
 ):
     """创建新消息"""
+    if message_data.files:
+        raise HTTPException(
+            status_code=409,
+            detail="Media must be uploaded through a folder-backed message",
+        )
     db_message = create_message_service(
         db,
         text=message_data.text,
@@ -699,6 +732,11 @@ def create_message_from_client(
     db: Session = Depends(get_db),
 ):
     """客户端主导创建消息：接受客户端提供的 ID，幂等"""
+    if message_data.files:
+        raise HTTPException(
+            status_code=409,
+            detail="Media must be uploaded through a folder-backed message",
+        )
     # 解析 created_at
     created_at = None
     if message_data.created_at:
@@ -772,6 +810,8 @@ def merge_messages(
         target = merge_messages_service(db, merge_data.message_ids, commit=False)
     except ValueError as e:
         msg = str(e)
+        if "Folder-backed" in msg:
+            raise HTTPException(status_code=409, detail=msg)
         if "不存在" in msg:
             raise HTTPException(status_code=404, detail=msg)
         raise HTTPException(status_code=422, detail=msg)
@@ -802,6 +842,8 @@ def split_message(
         )
     except ValueError as e:
         msg = str(e)
+        if "Folder-backed" in msg:
+            raise HTTPException(status_code=409, detail=msg)
         if "not found" in msg.lower() or "找不到" in msg:
             raise HTTPException(status_code=404, detail=msg)
         raise HTTPException(status_code=422, detail=msg)
@@ -824,12 +866,42 @@ def add_media_to_message(
     try:
         add_media_to_message_service(db, message_id, file_paths, commit=False)
     except ValueError as e:
+        if "Folder-backed" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
         raise HTTPException(status_code=404, detail=str(e))
 
     message = db.query(Message).filter(Message.id == message_id).first()
     db.commit()
     db.refresh(message)
     return _build_detail_response(db, message, media_limit=None)
+
+
+@router.post("/{message_id}/files", response_model=FileUploadResponse, status_code=202)
+async def upload_file_to_message(
+    message_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Write a media file to the message's primary folder; catalog owns all links."""
+    from app.services.folder_message_service import store_file_in_primary_folder
+    from app.services import repository_catalog
+
+    try:
+        repo_id, destination = store_file_in_primary_folder(
+            db,
+            message_id,
+            file.filename or "",
+            file.file,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    finally:
+        await file.close()
+
+    repository_catalog.rescan(repo_id)
+    return FileUploadResponse(message="上传成功，等待媒体处理", path=destination)
 
 
 @router.delete("/{message_id}/media/{media_id}", response_model=MessageDetailResponse)
@@ -842,6 +914,8 @@ def remove_media_from_message(
     try:
         removed = remove_media_from_message_service(db, message_id, media_id, commit=False)
     except ValueError as e:
+        if "Folder-backed" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
         raise HTTPException(status_code=404, detail=str(e))
 
     if not removed:
@@ -859,6 +933,9 @@ def delete_message(
     db: Session = Depends(get_db),
 ):
     """删除消息"""
-    if not delete_message_service(db, message_id, commit=False):
-        raise HTTPException(status_code=404, detail="Message not found")
+    try:
+        if not delete_message_service(db, message_id, commit=False):
+            raise HTTPException(status_code=404, detail="Message not found")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     db.commit()

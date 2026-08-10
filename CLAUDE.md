@@ -31,6 +31,7 @@ Routers (registered via `backend/app/routers/__init__.py:all_routers`): `collect
 Services:
 - `media_service.py` — file hashing (Blake2b), deduplication, ffprobe info extraction, thumbnail generation. `process_file()` returns `{"media": Media, "is_new": bool}` — calls `db.flush()` (not commit) to get IDs; router commits. **Video cover sidecar 通用约定**:视频 `foo.mp4` 同目录如果有 `foo.cover.{jpg,jpeg,png,webp}`(case-insensitive),会被自动用作 thumb,优先于 ffmpeg 抽帧;失败时 fallback 抽帧。这是后端的通用接口 —— 任何批量导入(bilibili / youtube / 本地相册 / …)只要把 cover 放在视频旁边即可,无需写脚本覆盖缩略图。见 `_find_video_cover_sidecar`。
 - `message_service.py` — tags are set explicitly via `tag_ids` on create/update; no auto-extraction from text. Also handles media position reordering.
+- `repository_catalog.py` + `folder_message_service.py` — `RepositoryFolder`/`RepositoryFile` 是文件系统事实来源；每个非空、非根 folder 自动拥有一个 folder-backed `Message`，物理空目录不写入 catalog，也不创建 message；已注册目录变空时同时清理其 folder 和受管 message，但保留核心 `Media`。`MessageMedia` 只由 folder 下已物化的 `RepositoryFile.media_id` 派生，可全量重建，folder-backed message 禁止直接增删/排序 media。上传使用 `POST /messages/{id}/files` 原子写入 PRIMARY folder，再由 scan → materializer → reconcile 自动出现。folder 以 `(repo_id, filesystem_id)` 保持改名/同盘移动后的身份；路径失效时 materializer 会把可用物理路径提升为 `Media` canonical path。纯文本 message 没有 `MessageFolder`。
 - `base.py` — static CRUD methods (`get_all`, `get_by_id`, `create`, `update`, `delete`) accepting SQLAlchemy model type.
 
 DB session: `get_db()` generator in `models/__init__.py`, injected via `Depends(get_db)`. Configured with `autocommit=False`, `autoflush=False`.
