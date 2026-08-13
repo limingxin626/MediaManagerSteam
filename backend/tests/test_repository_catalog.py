@@ -28,6 +28,44 @@ def test_scan_skips_empty_folders_and_only_catalogs_supported_files(catalog_env)
         assert db.query(MessageFolder).count() == 0
 
 
+def test_non_media_folder_does_not_create_message(catalog_env):
+    repo, session_factory = catalog_env
+    notes = repo / "notes"
+    notes.mkdir()
+    (notes / "readme.txt").write_text("not media", encoding="utf-8")
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        assert db.query(RepositoryFolder).filter_by(rel_path="notes").count() == 1
+        assert db.query(RepositoryFile).count() == 0
+        assert db.query(MessageFolder).count() == 0
+        assert db.query(Message).count() == 0
+
+
+def test_removing_last_media_deletes_generated_message_when_other_files_remain(catalog_env):
+    repo, session_factory = catalog_env
+    album = repo / "album"
+    album.mkdir()
+    media_file = album / "photo.jpg"
+    media_file.write_bytes(b"image")
+    (album / "readme.txt").write_text("keep folder cataloged", encoding="utf-8")
+
+    repository_catalog.rescan("test")
+    with session_factory() as db:
+        assert db.query(Message).count() == 1
+        assert db.query(MessageFolder).count() == 1
+
+    media_file.unlink()
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        assert db.query(RepositoryFolder).filter_by(rel_path="album").count() == 1
+        assert db.query(RepositoryFile).count() == 0
+        assert db.query(MessageFolder).count() == 0
+        assert db.query(Message).count() == 0
+
+
 def test_changed_path_detaches_old_media_and_requeues(catalog_env):
     repo, session_factory = catalog_env
     source = repo / "photo.jpg"

@@ -248,12 +248,15 @@ const thumbStripWidth = computed(() => {
 
 function onKeydown(event: KeyboardEvent) {
   if (!props.isOpen) return
+  if (event.key.startsWith('Arrow')) {
+    event.preventDefault()
+  }
   if (event.key === 'Escape') {
     event.stopImmediatePropagation()
     close()
-  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+  } else if (event.key === 'ArrowLeft') {
     previous()
-  } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+  } else if (event.key === 'ArrowRight') {
     next()
   }
 }

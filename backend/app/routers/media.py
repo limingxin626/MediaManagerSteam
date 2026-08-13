@@ -1,5 +1,6 @@
 import os
 import shutil
+import tempfile
 import time
 from datetime import datetime
 import logging
@@ -624,34 +625,34 @@ def set_video_cover(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    """把上传的图片设为视频封面。
-
-    落地策略遵循既有 sidecar 约定:`<stem>.cover.jpg` 写在视频同目录,
-    并立刻基于这张 sidecar 重生成 `DATA_ROOT/thumbs/{id}.webp`。
-    下次 re-import / replace 同一路径时,sidecar 仍会被自动识别,封面不会丢。
-    """
+    """把上传的图片设为当前视频缩略图。"""
     media = _require_video(db, media_id)
 
     abs_path = AppConfig.resolve_to_absolute(media.repo_id, media.file_path)
     if not abs_path or not os.path.exists(abs_path):
         raise HTTPException(status_code=404, detail="Video file not found on disk")
 
-    folder, name = os.path.split(abs_path)
-    stem = os.path.splitext(name)[0]
-    sidecar_path = os.path.join(folder, f"{stem}.cover.jpg")
-
+    suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
+    temp_path = None
     try:
-        with open(sidecar_path, "wb") as f:
-            shutil.copyfileobj(file.file, f, length=1024 * 1024)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_path = temp_file.name
+            shutil.copyfileobj(file.file, temp_file, length=1024 * 1024)
+        thumb_path = AppConfig.get_thumbnail_path(media.id)
+        ok = ThumbnailUtils.generate_image_thumbnail(temp_path, thumb_path)
     except Exception as e:
-        logger.error(f"Failed to write cover sidecar for media id={media_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to write cover: {e}")
+        logger.error(f"Failed to update cover for media id={media_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update cover: {e}")
+    finally:
+        if temp_path:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                logger.warning(f"Failed to remove temporary cover file: {temp_path}")
 
-    thumb_path = AppConfig.get_thumbnail_path(media.id)
-    ok = ThumbnailUtils.generate_image_thumbnail(sidecar_path, thumb_path)
     if not ok:
-        logger.warning(f"Sidecar written but thumbnail regen failed for media id={media_id}")
+        logger.warning(f"Thumbnail regeneration failed for media id={media_id}")
 
-    return {"message": "Cover updated", "sidecar": sidecar_path, "ok": ok}
+    return {"message": "Cover updated", "ok": ok}
 
 

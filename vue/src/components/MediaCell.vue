@@ -6,7 +6,8 @@
     <img
       :src="resolveThumb(item)"
       :alt="String(item.id)"
-      class="w-full h-full object-cover"
+      class="w-full h-full"
+      :class="fit === 'contain' ? 'object-contain' : 'object-cover'"
       loading="lazy"
     />
     <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 pointer-events-none"></div>
@@ -32,6 +33,8 @@
 import type { Media } from '../types'
 import { isVideo, formatDuration, resolveThumb } from '../utils/media'
 
-defineProps<{ item: Media }>()
+withDefaults(defineProps<{ item: Media; fit?: 'cover' | 'contain' }>(), {
+  fit: 'cover',
+})
 const emit = defineEmits<{ open: [] }>()
 </script>

@@ -24,12 +24,12 @@ Key env vars:
 - `DATA_ROOT` — data directory (required, no default), contains SQLite DB (`db.sqlite3`), uploads, thumbnails
 - `FFMPEG_PATH` / `FFPROBE_PATH` — paths to ffmpeg binaries
 
-**配置来源 / 切 instance**:`app/config.py` 在 import 时 `load_dotenv(backend/.env, override=False)`,优先级 高→低 = 真实环境变量 / `python api.py --data-root <path>` > `backend/.env`。因为 `app.models → app.config`,**所有**走 `from app.*` 的入口(api.py / alembic / `scripts/*` 如 import_bilibili)都自动跟随同一份 `.env`,无需各自配。一个 instance == 一个 `DATA_ROOT`(各自独立的 db/repositories.json/thumbs);日常切 instance 只改 `backend/.env` 里 `DATA_ROOT` 那行(注释切换)再重启。`backend/.env` 已 gitignored,模板见 `backend/.env.example`(复制即用)。`DB_NAME` 已废弃。
+**配置来源 / 切 instance**:`app/config.py` 在 import 时 `load_dotenv(backend/.env, override=False)`,优先级 高→低 = 真实环境变量 / `python api.py --data-root <path>` > `backend/.env`。因为 `app.models → app.config`,**所有**走 `from app.*` 的入口(api.py / alembic / `scripts/*`)都自动跟随同一份 `.env`,无需各自配。一个 instance == 一个 `DATA_ROOT`(各自独立的 db/repositories.json/thumbs);日常切 instance 只改 `backend/.env` 里 `DATA_ROOT` 那行(注释切换)再重启。`backend/.env` 已 gitignored,模板见 `backend/.env.example`(复制即用)。`DB_NAME` 已废弃。
 
 Routers (registered via `backend/app/routers/__init__.py:all_routers`): `collection`, `person`, `message`, `media`, `files`, `tags`, `sync`, `admin`, `dashboard`, `todos`.
 
 Services:
-- `media_service.py` — file hashing (Blake2b), deduplication, ffprobe info extraction, thumbnail generation. `process_file()` returns `{"media": Media, "is_new": bool}` — calls `db.flush()` (not commit) to get IDs; router commits. **Video cover sidecar 通用约定**:视频 `foo.mp4` 同目录如果有 `foo.cover.{jpg,jpeg,png,webp}`(case-insensitive),会被自动用作 thumb,优先于 ffmpeg 抽帧;失败时 fallback 抽帧。这是后端的通用接口 —— 任何批量导入(bilibili / youtube / 本地相册 / …)只要把 cover 放在视频旁边即可,无需写脚本覆盖缩略图。见 `_find_video_cover_sidecar`。
+- `media_service.py` — file hashing (Blake2b), deduplication, ffprobe info extraction, thumbnail generation. `process_file()` returns `{"media": Media, "is_new": bool}` — calls `db.flush()` (not commit) to get IDs; router commits.
 - `message_service.py` — tags are set explicitly via `tag_ids` on create/update; no auto-extraction from text. Also handles media position reordering.
 - `repository_catalog.py` + `folder_message_service.py` — `RepositoryFolder`/`RepositoryFile` 是文件系统事实来源；每个非空、非根 folder 自动拥有一个 folder-backed `Message`，物理空目录不写入 catalog，也不创建 message；已注册目录变空时同时清理其 folder 和受管 message，但保留核心 `Media`。`MessageMedia` 只由 folder 下已物化的 `RepositoryFile.media_id` 派生，可全量重建，folder-backed message 禁止直接增删/排序 media。上传使用 `POST /messages/{id}/files` 原子写入 PRIMARY folder，再由 scan → materializer → reconcile 自动出现。folder 以 `(repo_id, filesystem_id)` 保持改名/同盘移动后的身份；路径失效时 materializer 会把可用物理路径提升为 `Media` canonical path。纯文本 message 没有 `MessageFolder`。
 - `base.py` — static CRUD methods (`get_all`, `get_by_id`, `create`, `update`, `delete`) accepting SQLAlchemy model type.

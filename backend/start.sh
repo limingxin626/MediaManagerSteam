@@ -29,6 +29,4 @@ if [ ! -f "$DATA_ROOT/repositories.json" ]; then
     exit 1
 fi
 
-# uv run scripts/import_bilibili.py
-
 uv run api.py

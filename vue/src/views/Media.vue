@@ -32,6 +32,14 @@
           </button>
         </div>
         <template v-if="viewMode === 'timeline'">
+        <!-- Thumbnail fit: container dimensions remain unchanged. -->
+        <button
+          @click="toggleThumbnailFit"
+          class="px-2.5 py-1.5 rounded-md text-sm transition-colors text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20"
+          :title="thumbnailFit === 'cover' ? '切换为完整显示（Contain）' : '切换为填充显示（Cover）'"
+        >
+          图片：{{ thumbnailFit === 'cover' ? '填充' : '完整' }}
+        </button>
         <!-- Refresh -->
         <button
           @click="handleRefresh"
@@ -122,10 +130,11 @@
           <div
             v-for="(item, idx) in smartItems"
             :key="item.id"
-            class="aspect-square rounded overflow-hidden bg-gray-200 dark:bg-gray-900"
+            class="aspect-square rounded overflow-hidden"
           >
             <MediaCell
               :item="item"
+              :fit="thumbnailFit"
               @open="openSmartPreview(idx)"
             />
           </div>
@@ -151,11 +160,12 @@
           v-for="cell in vg.visibleCells.value"
           :key="cell.bucket.key + '-' + cell.idx"
           :style="{ top: cell.top + 'px', left: cell.left + 'px', width: cell.size + 'px', height: cell.size + 'px' }"
-          class="absolute rounded overflow-hidden bg-gray-200 dark:bg-gray-900"
+          class="absolute rounded overflow-hidden"
         >
           <template v-if="vg.loadedItem(cell.bucket, cell.idx) as Media | undefined">
             <MediaCell
               :item="(vg.loadedItem(cell.bucket, cell.idx) as Media)"
+              :fit="thumbnailFit"
               @open="openPreview(cell.bucket.key, cell.idx)"
             />
           </template>
@@ -235,6 +245,13 @@ const viewModeOptions = [
   { value: 'folder' as const, label: '文件夹' },
 ]
 const viewMode = ref<'timeline' | 'folder'>('timeline')
+const THUMBNAIL_FIT_STORAGE_KEY = 'media_thumbnail_fit'
+const thumbnailFit = ref<'cover' | 'contain'>('cover')
+
+function toggleThumbnailFit() {
+  thumbnailFit.value = thumbnailFit.value === 'cover' ? 'contain' : 'cover'
+  localStorage.setItem(THUMBNAIL_FIT_STORAGE_KEY, thumbnailFit.value)
+}
 
 const typeOptions = [
   { value: '', label: '全部' },
@@ -589,6 +606,10 @@ const handleMediaTagsChanged = (
 }
 
 onMounted(() => {
+  const savedFit = localStorage.getItem(THUMBNAIL_FIT_STORAGE_KEY)
+  if (savedFit === 'cover' || savedFit === 'contain') {
+    thumbnailFit.value = savedFit
+  }
   fetchTags()
   fetchCollections()
 })

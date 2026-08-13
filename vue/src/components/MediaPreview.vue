@@ -136,9 +136,9 @@
             </svg>
           </button>
 
-          <div class="flex flex-col items-center gap-2 max-w-[90vw] max-h-[80vh]">
+          <div class="relative flex flex-col items-center max-w-[90vw] max-h-[86vh]">
             <Transition :name="transitionName" mode="out-in">
-              <div class="relative w-[90vw] h-[70vh]" :key="currentItem?.id ?? -1">
+              <div class="relative w-[90vw] h-[80vh]" :key="currentItem?.id ?? -1">
                 <video
                   v-if="currentItem && isVideo(currentItem.mime_type) && !showFallback"
                   ref="videoRef"
@@ -176,16 +176,21 @@
               </div>
             </Transition>
 
+            <!-- Media metadata floats over the bottom of the preview. -->
             <div
-              v-if="currentItem?.file_path"
-              class="max-w-[90vw] truncate text-xs text-white/60"
-              :title="currentItem.file_path"
+              v-if="currentItem"
+              class="absolute z-20 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[90vw] px-4 pt-12 pb-3 flex flex-col items-center gap-2 rounded-b-lg bg-gradient-to-t from-black/80 via-black/45 to-transparent pointer-events-none"
             >
-              {{ currentItem.file_path }}
-            </div>
+              <div
+                v-if="currentItem.file_path"
+                class="w-full max-w-3xl truncate text-center text-xs text-white/70 drop-shadow pointer-events-auto"
+                :title="currentItem.file_path"
+              >
+                {{ currentItem.file_path }}
+              </div>
 
-            <!-- Media tags -->
-            <div v-if="currentItem" class="flex items-center gap-1.5 flex-wrap justify-center">
+              <!-- Media tags -->
+              <div class="flex items-center gap-1.5 flex-wrap justify-center pointer-events-auto">
               <span
                 v-for="tag in (currentItem.tags || [])"
                 :key="tag.id"
@@ -200,10 +205,10 @@
                 :message-tags="currentItem.tags || []"
                 @select="addMediaTag"
               />
-            </div>
+              </div>
 
-            <!-- Media people (标注人物) -->
-            <div v-if="currentItem" class="flex items-center gap-1.5 flex-wrap justify-center">
+              <!-- Media people (标注人物) -->
+              <div class="flex items-center gap-1.5 flex-wrap justify-center pointer-events-auto">
               <span
                 v-for="person in (currentItem.people || [])"
                 :key="'p-' + person.id"
@@ -237,6 +242,7 @@
                     </svg>
                   </button>
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -771,6 +777,10 @@ const thumbStripWidth = computed(() => {
 const handleKeydown = (e: KeyboardEvent) => {
   if (!props.isOpen) return
 
+  if (e.key.startsWith('Arrow')) {
+    e.preventDefault()
+  }
+
   switch (e.key) {
     case 'Escape':
       // 阻止同在 window 上监听的详情面板 handler 也触发,避免 Esc 连详情一起关掉
@@ -778,11 +788,9 @@ const handleKeydown = (e: KeyboardEvent) => {
       close()
       break
     case 'ArrowLeft':
-    case 'ArrowUp':
       prev()
       break
     case 'ArrowRight':
-    case 'ArrowDown':
       next()
       break
   }

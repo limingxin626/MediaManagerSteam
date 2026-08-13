@@ -212,13 +212,34 @@ def backfill_existing_folder_messages(
 
 
 def ensure_folder_messages(db: Session, repo_id: str) -> set[int]:
-    """Create one independently backed message for each non-root folder."""
+    """Create generated messages only for folders containing supported media files."""
     folders = db.query(RepositoryFolder).filter(
         RepositoryFolder.repo_id == repo_id,
         RepositoryFolder.rel_path != "",
     ).all()
     message_ids: set[int] = set()
     for folder in folders:
+        has_media_files = db.query(RepositoryFile.id).filter(
+            RepositoryFile.folder_id == folder.id,
+        ).first() is not None
+        if not has_media_files:
+            link = folder.message_link
+            if link is not None and _is_disposable_generated_message(link.message):
+                message = link.message
+                other_link = db.query(MessageFolder.id).filter(
+                    MessageFolder.message_id == message.id,
+                    MessageFolder.id != link.id,
+                ).first()
+                if other_link is None:
+                    db.delete(message)
+                else:
+                    db.delete(link)
+                db.flush()
+            elif link is not None:
+                # Preserve user-edited or explicitly bound messages even when their
+                # backing folder temporarily has no supported files.
+                message_ids.add(link.message_id)
+            continue
         if folder.message_link is None:
             message = Message()
             db.add(message)
