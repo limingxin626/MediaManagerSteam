@@ -67,6 +67,7 @@ interface Options {
   container: Ref<HTMLElement | null>
   measureEl: Ref<HTMLElement | null>
   filters: Ref<MediaFilters>
+  gridSize: Ref<'small' | 'medium' | 'large'>
 }
 
 function pad(n: number) {
@@ -91,7 +92,7 @@ function bucketStartCursor(year: number, month: number, day: number) {
 }
 
 export function useVirtualGrid(opts: Options) {
-  const { container, measureEl, filters } = opts
+  const { container, measureEl, filters, gridSize } = opts
 
   const timeline = ref<TimelineEntry[]>([])
   const loadingTimeline = ref(false)
@@ -103,6 +104,7 @@ export function useVirtualGrid(opts: Options) {
 
   const cacheRef = shallowRef(new Map<string, BucketCacheEntry>())
   const dispatchPaused = ref(false)
+  let requestGeneration = 0
 
   function bumpCache() {
     triggerRef(cacheRef)
@@ -213,12 +215,14 @@ export function useVirtualGrid(opts: Options) {
     return e
   }
 
-  async function loadTimeline() {
+  async function loadTimeline(generation = requestGeneration) {
     loadingTimeline.value = true
     try {
-      timeline.value = await api.get<TimelineEntry[]>('/media/timeline', paramsObj())
+      const result = await api.get<TimelineEntry[]>('/media/timeline', paramsObj())
+      if (generation !== requestGeneration) return
+      timeline.value = result
     } finally {
-      loadingTimeline.value = false
+      if (generation === requestGeneration) loadingTimeline.value = false
     }
   }
 
@@ -260,6 +264,7 @@ export function useVirtualGrid(opts: Options) {
   }
 
   async function runLoad(key: string) {
+    const generation = requestGeneration
     const entry = getOrInit(key)
     const b = buckets.value.find((x) => x.key === key)
     if (!b) return
@@ -273,6 +278,7 @@ export function useVirtualGrid(opts: Options) {
         limit: PAGE_LIMIT,
         ...paramsObj(),
       })
+      if (generation !== requestGeneration) return
       const dayStart = dayStartIso(b.year, b.month, b.day)
       const inDay: Media[] = []
       let spilled = false
@@ -295,10 +301,12 @@ export function useVirtualGrid(opts: Options) {
         entry.nextCursor = data.next_cursor
       }
     } catch {
-      entry.status = 'error'
+      if (generation === requestGeneration) entry.status = 'error'
     } finally {
       inFlight--
-      bumpCache()
+      if (generation === requestGeneration) bumpCache()
+      // Old requests can still occupy concurrency slots after a reset. Once
+      // they settle, allow the current generation's queue to continue.
       pumpQueue()
     }
   }
@@ -404,14 +412,16 @@ export function useVirtualGrid(opts: Options) {
     return arr[arr.length - 1] ?? null
   }
 
-  function resetAll() {
+  async function resetAll() {
+    const generation = ++requestGeneration
     cacheRef.value = new Map()
     timeline.value = []
     for (const t of dwellTimers.values()) clearTimeout(t)
     dwellTimers.clear()
     queue.length = 0
     if (container.value) container.value.scrollTop = 0
-    void loadTimeline()
+    await loadTimeline(generation)
+    if (generation === requestGeneration) dispatchFetches()
   }
 
   function onScroll() {
@@ -450,7 +460,8 @@ export function useVirtualGrid(opts: Options) {
     if (tlIdx !== -1) {
       const t = timeline.value[tlIdx]
       if (t.count > 0) {
-        timeline.value.splice(tlIdx, 1, { ...t, count: t.count - 1 })
+        if (t.count === 1) timeline.value.splice(tlIdx, 1)
+        else timeline.value.splice(tlIdx, 1, { ...t, count: t.count - 1 })
       }
     }
     bumpCache()
@@ -459,17 +470,21 @@ export function useVirtualGrid(opts: Options) {
   let resizeObserver: ResizeObserver | null = null
   let measuredHeader = false
 
-  const TARGET_CELL = 220
-  const MIN_COLS_MOBILE = 3
-  const MIN_COLS_DESKTOP = 4
+  const TARGET_CELL = { small: 110, medium: 220, large: 440 } as const
+  const MIN_COLS = {
+    small: { mobile: 6, desktop: 8 },
+    medium: { mobile: 3, desktop: 4 },
+    large: { mobile: 1, desktop: 2 },
+  } as const
 
   function recomputeCellSize() {
     const el = measureEl.value
     if (!el) return
     const w = el.clientWidth
     if (w <= 0) return
-    const minCols = window.innerWidth >= 640 ? MIN_COLS_DESKTOP : MIN_COLS_MOBILE
-    const newCols = Math.max(minCols, Math.round(w / TARGET_CELL))
+    const size = gridSize.value
+    const viewport = window.innerWidth >= 640 ? 'desktop' : 'mobile'
+    const newCols = Math.max(MIN_COLS[size][viewport], Math.round(w / TARGET_CELL[size]))
     if (newCols !== cols.value) cols.value = newCols
     const c = cols.value
     cellSize.value = Math.max(1, Math.floor((w - (c - 1) * GAP) / c))
@@ -496,6 +511,7 @@ export function useVirtualGrid(opts: Options) {
   }
 
   watch(filters, () => resetAll(), { deep: true })
+  watch(gridSize, recomputeCellSize)
 
   watch(visibleBuckets, () => dispatchFetches())
 
@@ -516,6 +532,7 @@ export function useVirtualGrid(opts: Options) {
   })
 
   onUnmounted(() => {
+    requestGeneration++
     resizeObserver?.disconnect()
     resizeObserver = null
     window.removeEventListener('resize', onWindowResize)

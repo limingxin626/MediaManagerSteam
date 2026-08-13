@@ -32,6 +32,20 @@
           </button>
         </div>
         <template v-if="viewMode === 'timeline'">
+        <div class="flex rounded-lg bg-gray-100 dark:bg-white/10 p-0.5 shrink-0" aria-label="网格大小">
+          <button
+            v-for="option in gridSizeOptions"
+            :key="option.value"
+            class="px-2.5 py-1 rounded-md text-sm transition-colors"
+            :class="gridSize === option.value
+              ? 'bg-white dark:bg-white/20 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-gray-300'"
+            :title="`${option.label}网格`"
+            @click="setGridSize(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
         <!-- Thumbnail fit: container dimensions remain unchanged. -->
         <button
           @click="toggleThumbnailFit"
@@ -126,7 +140,7 @@
         <div v-if="!smartLoading && !smartItems.length" class="py-20 text-center text-sm text-[var(--text-muted)]">
           无结果
         </div>
-        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5">
+        <div class="grid gap-1.5" :style="{ gridTemplateColumns: `repeat(${vg.cols.value}, minmax(0, 1fr))` }">
           <div
             v-for="(item, idx) in smartItems"
             :key="item.id"
@@ -246,11 +260,23 @@ const viewModeOptions = [
 ]
 const viewMode = ref<'timeline' | 'folder'>('timeline')
 const THUMBNAIL_FIT_STORAGE_KEY = 'media_thumbnail_fit'
+const GRID_SIZE_STORAGE_KEY = 'media_grid_size'
 const thumbnailFit = ref<'cover' | 'contain'>('cover')
+const gridSizeOptions = [
+  { value: 'small' as const, label: '小' },
+  { value: 'medium' as const, label: '中' },
+  { value: 'large' as const, label: '大' },
+]
+const gridSize = ref<'small' | 'medium' | 'large'>('medium')
 
 function toggleThumbnailFit() {
   thumbnailFit.value = thumbnailFit.value === 'cover' ? 'contain' : 'cover'
   localStorage.setItem(THUMBNAIL_FIT_STORAGE_KEY, thumbnailFit.value)
+}
+
+function setGridSize(size: 'small' | 'medium' | 'large') {
+  gridSize.value = size
+  localStorage.setItem(GRID_SIZE_STORAGE_KEY, size)
 }
 
 const typeOptions = [
@@ -278,6 +304,7 @@ const vg = useVirtualGrid({
   container: scrollContainer,
   measureEl,
   filters,
+  gridSize,
 })
 
 const previewOpen = ref(false)
@@ -359,7 +386,7 @@ function navigateToNextBucket() { navigateToAdjacentBucket(1) }
 async function handleRefresh() {
   refreshing.value = true
   try {
-    vg.resetAll()
+    await vg.resetAll()
   } finally {
     refreshing.value = false
   }
@@ -371,6 +398,7 @@ const searchQuery = ref('')
 const similarMode = ref<{ media_id: number } | null>(null)
 const smartItems = ref<Media[]>([])
 const smartLoading = ref(false)
+let smartRequestGeneration = 0
 
 const smartActive = computed(() => !!searchQuery.value || !!similarMode.value)
 
@@ -386,21 +414,24 @@ async function commitSearch() {
 }
 
 async function fetchSearch(q: string) {
+  const generation = ++smartRequestGeneration
   smartLoading.value = true
   smartItems.value = []
   try {
     const res = await api.get<CursorResponse<Media>>(
       `/smart/search?q=${encodeURIComponent(q)}&limit=50`,
     )
+    if (generation !== smartRequestGeneration || searchQuery.value !== q || similarMode.value) return
     smartItems.value = res.items
   } catch (e: any) {
-    toast.error(e?.message || '搜索失败')
+    if (generation === smartRequestGeneration) toast.error(e?.message || '搜索失败')
   } finally {
-    smartLoading.value = false
+    if (generation === smartRequestGeneration) smartLoading.value = false
   }
 }
 
 async function enterSimilarMode(mediaId: number) {
+  const generation = ++smartRequestGeneration
   searchQuery.value = ''
   searchInput.value = ''
   similarMode.value = { media_id: mediaId }
@@ -408,16 +439,21 @@ async function enterSimilarMode(mediaId: number) {
   smartItems.value = []
   try {
     const res = await api.get<CursorResponse<Media>>(`/smart/similar/${mediaId}?limit=50`)
+    if (generation !== smartRequestGeneration || similarMode.value?.media_id !== mediaId) return
     smartItems.value = res.items
   } catch (e: any) {
-    toast.error(e?.message || '加载相似媒体失败')
-    similarMode.value = null
+    if (generation === smartRequestGeneration) {
+      toast.error(e?.message || '加载相似媒体失败')
+      similarMode.value = null
+    }
   } finally {
-    smartLoading.value = false
+    if (generation === smartRequestGeneration) smartLoading.value = false
   }
 }
 
 function clearSmartMode() {
+  smartRequestGeneration++
+  smartLoading.value = false
   searchQuery.value = ''
   searchInput.value = ''
   similarMode.value = null
@@ -441,6 +477,7 @@ function openSmartPreview(idx: number) {
     people: (m as any).people,
   }))
   previewStartIndex.value = idx
+  previewBucketKey.value = null
   previewOpen.value = true
 }
 
@@ -536,10 +573,17 @@ async function handlePreviewToggleStar(mediaId: number) {
 
   const smartItem = smartItems.value.find((item) => item.id === mediaId)
   if (smartItem) smartItem.starred = starred
+
+  if (starredFilter.value && !starred) {
+    previewItems.value = previewItems.value.filter((item) => item.id !== mediaId)
+    vg.removeItem(mediaId)
+  }
 }
 
 function handleMediaDeleted(mediaId: number) {
   vg.removeItem(mediaId)
+  smartItems.value = smartItems.value.filter((item) => item.id !== mediaId)
+  previewItems.value = previewItems.value.filter((item) => item.id !== mediaId)
 }
 
 function handleMediaRotated(mediaId: number) {
@@ -609,6 +653,10 @@ onMounted(() => {
   const savedFit = localStorage.getItem(THUMBNAIL_FIT_STORAGE_KEY)
   if (savedFit === 'cover' || savedFit === 'contain') {
     thumbnailFit.value = savedFit
+  }
+  const savedGridSize = localStorage.getItem(GRID_SIZE_STORAGE_KEY)
+  if (savedGridSize === 'small' || savedGridSize === 'medium' || savedGridSize === 'large') {
+    gridSize.value = savedGridSize
   }
   fetchTags()
   fetchCollections()
