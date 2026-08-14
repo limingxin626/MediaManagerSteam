@@ -1,5 +1,6 @@
 <template>
-  <div class="h-screen overflow-hidden bg-[var(--bg-secondary)] dark:bg-[var(--bg-primary)] bg-fixed transition-colors">
+  <div class="h-screen overflow-hidden bg-[var(--bg-secondary)] dark:bg-[var(--bg-primary)] bg-fixed transition-colors" :class="{ 'electron-shell': isElectron }">
+    <TitleBar v-if="isElectron" />
     <Navbar />
     <div class="md:pl-16">
       <!-- Message 始终挂载，v-show 切显隐，滚动位置天然保留 -->
@@ -26,9 +27,11 @@ import BottomNavBar from './components/BottomNavBar.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import Message from './views/Message.vue'
+import TitleBar from './components/TitleBar.vue'
 import { useTheme } from './composables/useTheme'
 
 const route = useRoute()
+const isElectron = navigator.userAgent.includes('Electron')
 const { initTheme } = useTheme()
 
 onMounted(() => {

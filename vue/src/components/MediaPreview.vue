@@ -365,16 +365,6 @@ import TagSuggestDrawer from './TagSuggestDrawer.vue'
 const toast = useToast()
 const router = useRouter()
 
-// 扩展 Window 接口以包含 Electron API
-declare global {
-  interface Window {
-    electronAPI?: {
-      openFileDialog: (options: any) => Promise<any>
-      showItemInFolder: (path: string) => void
-    }
-  }
-}
-
 interface Props {
   isOpen: boolean
   items: MessageMediaItem[]

@@ -110,6 +110,10 @@
 
 @variant dark (&:is(.dark *));
 
+.electron-shell { padding-top: 36px; }
+.electron-shell .app-sidebar { top: 36px; }
+.window-drag { -webkit-app-region: drag; }
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

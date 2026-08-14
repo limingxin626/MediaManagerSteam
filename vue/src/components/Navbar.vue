@@ -1,5 +1,5 @@
 <template>
-  <aside class="fixed left-0 top-0 bottom-0 w-16 z-50 bg-[var(--sidebar-bg)] transition-colors hidden md:flex flex-col border-r border-[var(--border-color)]">
+  <aside class="app-sidebar fixed left-0 top-0 bottom-0 w-16 z-50 bg-[var(--sidebar-bg)] transition-colors hidden md:flex flex-col border-r border-[var(--border-color)]">
     <div class="flex items-center justify-center h-16">
       <svg class="w-6 h-6 text-gray-800 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
