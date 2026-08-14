@@ -15,7 +15,9 @@
     </div>
 
     <!-- Cover (仅有媒体时占固定高) -->
-    <div v-if="cover" class="relative h-40 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
+    <div v-if="cover"
+      class="relative bg-gray-100 dark:bg-gray-800 overflow-hidden"
+      :class="message.text ? 'h-40 shrink-0' : 'flex-1 min-h-0'">
       <img :src="resolveThumb(cover)" alt="cover"
         class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" />
       <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 pointer-events-none"></div>
@@ -37,14 +39,14 @@
     </div>
 
     <!-- Body -->
-    <div class="flex flex-col flex-1 min-h-0 p-3">
+    <div class="flex flex-col min-h-0 p-3" :class="message.text || !cover ? 'flex-1' : 'shrink-0'">
       <!-- Text excerpt (fills remaining space; 无图时铺满整卡显示更多行) -->
       <div v-if="message.text"
         class="markdown-body markdown-body--compact text-[var(--text-secondary)] flex-1 min-h-0 overflow-hidden mb-2">
         <div v-html="renderedText"></div>
       </div>
       <!-- 无图无文字：留占位图标 + spacer -->
-      <div v-else class="flex-1 min-h-0 flex items-center justify-center">
+      <div v-else-if="!cover" class="flex-1 min-h-0 flex items-center justify-center">
         <svg class="w-8 h-8 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
             d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />

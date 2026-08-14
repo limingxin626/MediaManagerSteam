@@ -117,6 +117,7 @@
 /* Native Electron caption buttons occupy the top 36px title-bar overlay. */
 .electron-shell .media-preview-overlay { top: 36px; }
 .electron-shell .message-detail { top: 36px; }
+.electron-shell .message-compose-overlay { top: 36px; }
 
 ::-webkit-scrollbar {
   width: 8px;

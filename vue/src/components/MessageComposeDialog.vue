@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="fixed inset-0 z-[95] bg-[var(--bg-primary)] flex flex-col animate-fade-in"
+  <div v-if="visible" class="message-compose-overlay fixed inset-0 z-[95] bg-[var(--bg-primary)] flex flex-col animate-fade-in"
     @keydown.esc="handleEscape"
     @dragenter.prevent="onDragEnter" @dragover.prevent @dragleave="onDragLeave" @drop.prevent="onDropFiles">    <!-- 顶部工具栏 -->
     <div class="shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-b border-[var(--border-color)]">
