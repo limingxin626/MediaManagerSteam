@@ -949,6 +949,7 @@ const closePreview = () => {
   previewOpen.value = false
   previewItems.value = []
   currentMessageIndex.value = -1
+  previewMessageId.value = undefined
 }
 
 const handlePreviewToggleStar = async (mediaId: number) => {
@@ -1022,6 +1023,9 @@ const handleToggleMediaStar = async (mediaId: number, messageId?: number) => {
 }
 
 const navigateToPrevMessage = () => {
+  // 详情面板和 Tag 媒体面板使用 -1，预览范围仅限传入的 items。
+  if (currentMessageIndex.value < 0) return
+
   for (let i = currentMessageIndex.value - 1; i >= 0; i--) {
     const msg = messages.value[i]
     if (msg?.media_items?.length) {
@@ -1035,6 +1039,9 @@ const navigateToPrevMessage = () => {
 }
 
 const navigateToNextMessage = () => {
+  // 不属于消息流上下文时，禁止在媒体边缘跳到其他 message。
+  if (currentMessageIndex.value < 0) return
+
   for (let i = currentMessageIndex.value + 1; i < messages.value.length; i++) {
     const msg = messages.value[i]
     if (msg?.media_items?.length) {

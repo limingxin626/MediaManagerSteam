@@ -68,17 +68,17 @@
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
 
-  /* Cool slate dark neutrals */
-  --bg-primary: #0f1729;
-  --bg-secondary: #172033;
-  --bg-card: #1a2436;
-  --border-color: rgba(148, 163, 184, 0.14);
-  --border-strong: rgba(148, 163, 184, 0.22);
-  --text-primary: #e6ebf4;
-  --text-secondary: #a5b2c7;
-  --text-muted: #6b7a94;
-  --sidebar-bg: transparent;
-  --divider: rgba(148, 163, 184, 0.10);
+  /* Windows 11-inspired dark neutrals: warm charcoal, clearly layered surfaces */
+  --bg-primary: #202020;
+  --bg-secondary: #272727;
+  --bg-card: #2d2d2d;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text-primary: #f5f5f5;
+  --text-secondary: #c7c7c7;
+  --text-muted: #929292;
+  --sidebar-bg: #242424;
+  --divider: rgba(255, 255, 255, 0.07);
 
   /* Deeper shadows on dark */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -86,19 +86,19 @@
 }
 
 @theme inline {
-  --color-dark-bg: #0d1117;
-  --color-card-bg: #1c2128;
+  --color-dark-bg: #202020;
+  --color-card-bg: #2d2d2d;
   --color-button-success-bg: rgb(255, 169, 254);
 
   --color-select-bg: #ffffff;
-  --color-select-bg-dark: #1c2128;
+  --color-select-bg-dark: #303030;
   --color-select-border: #d1d5db;
-  --color-select-border-dark: #30363d;
+  --color-select-border-dark: #484848;
   --color-select-text: #111827;
   --color-select-text-dark: #e6edf3;
   --color-select-icon: #9ca3af;
   --color-select-menu-bg: #ffffff;
-  --color-select-menu-bg-dark: #161b22;
+  --color-select-menu-bg-dark: #2b2b2b;
   --color-select-option-active-bg: #e0e7ff;
   --color-select-option-active-bg-dark: rgba(124, 147, 255, 0.18);
   --color-select-option-active-text: #312e81;
@@ -272,23 +272,23 @@ video {
 }
 
 .dark .milkdown {
-  --crepe-color-background: #0d1117;
-  --crepe-color-on-background: #e6edf3;
-  --crepe-color-surface: #161b22;
-  --crepe-color-surface-low: #1c2128;
-  --crepe-color-on-surface: #c9d1d9;
-  --crepe-color-on-surface-variant: #9da7b3;
-  --crepe-color-outline: #6e7681;
+  --crepe-color-background: #202020;
+  --crepe-color-on-background: #f5f5f5;
+  --crepe-color-surface: #292929;
+  --crepe-color-surface-low: #303030;
+  --crepe-color-on-surface: #d6d6d6;
+  --crepe-color-on-surface-variant: #a8a8a8;
+  --crepe-color-outline: #686868;
   --crepe-color-primary: #7c93ff;
-  --crepe-color-secondary: #30363d;
-  --crepe-color-on-secondary: #c9d1d9;
-  --crepe-color-inverse: #e6edf3;
-  --crepe-color-on-inverse: #161b22;
+  --crepe-color-secondary: #3a3a3a;
+  --crepe-color-on-secondary: #d6d6d6;
+  --crepe-color-inverse: #f5f5f5;
+  --crepe-color-on-inverse: #202020;
   --crepe-color-inline-code: #ff7b72;
   --crepe-color-error: #f85149;
-  --crepe-color-hover: #1c2128;
-  --crepe-color-selected: #262c36;
-  --crepe-color-inline-area: #21262d;
+  --crepe-color-hover: #333333;
+  --crepe-color-selected: #3b3b3b;
+  --crepe-color-inline-area: #303030;
 }
 
 /* === Global font === */

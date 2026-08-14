@@ -1,24 +1,29 @@
 <template>
-  <div class="fixed inset-0 z-[95] bg-[var(--bg-primary)] flex flex-col animate-fade-in">
+  <div class="message-detail fixed inset-0 z-[95] bg-[var(--bg-primary)] flex flex-col animate-fade-in">
     <!-- 顶部工具栏 -->
-    <div class="shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-b border-[var(--border-color)]">
+    <header class="message-detail__header shrink-0 flex items-center justify-between gap-4 px-4 sm:px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-card)]/90 backdrop-blur-xl">
       <div class="flex items-center gap-3 min-w-0">
         <button @click="close" title="关闭 (Esc)"
-          class="shrink-0 flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+          class="shrink-0 flex items-center gap-2 px-3 py-2 -ml-2 rounded-[var(--radius-md)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          <span class="text-sm">返回</span>
+          <span class="text-sm font-medium">返回消息</span>
         </button>
-        <div v-if="message?.collection_name" class="flex items-center gap-2 min-w-0 pl-2 border-l border-[var(--border-color)]">
+        <div v-if="message?.collection_name" class="flex items-center gap-2.5 min-w-0 pl-3 border-l border-[var(--border-color)]">
           <div class="w-8 h-8 rounded-full bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] flex items-center justify-center font-semibold shrink-0">
             {{ collectionInitial }}
           </div>
           <span class="text-sm font-semibold text-[var(--text-primary)] truncate">{{ message.collection_name }}</span>
         </div>
       </div>
-      <p class="shrink-0 text-xs text-[var(--text-muted)]">{{ message ? formatDate(message.created_at) : '' }}</p>
-    </div>
+      <div class="flex items-center gap-3">
+        <span v-if="message?.starred" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400/10 text-amber-400 text-xs font-medium">
+          <span>★</span> 已收藏
+        </span>
+        <p class="shrink-0 text-xs text-[var(--text-muted)]">{{ message ? formatDate(message.created_at) : '' }}</p>
+      </div>
+    </header>
 
     <!-- Loading -->
     <div v-if="isLoading" class="flex-1 flex items-center justify-center">
@@ -28,16 +33,16 @@
     <template v-else-if="message">
       <!-- Body: 左媒体 + 右信息,居中容器 -->
       <div class="flex-1 overflow-y-auto">
-        <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col lg:flex-row gap-10">
+        <main class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 lg:py-10 flex flex-col lg:flex-row gap-6 lg:gap-8">
           <!-- 左:正文 + 媒体 -->
-          <div class="flex-1 min-w-0 space-y-6">
+          <article class="flex-1 min-w-0 space-y-5">
             <div v-if="message.text"
-              class="markdown-body text-[15px] text-[var(--text-primary)] leading-relaxed"
+              class="message-detail__content markdown-body text-[15px] text-[var(--text-primary)] leading-7 rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] px-5 sm:px-7 py-5 sm:py-6 shadow-[var(--shadow-sm)]"
               v-html="renderMarkdown(message.text)"></div>
 
             <!-- 单媒体:大图铺满,保留原始比例 -->
             <div v-if="mediaItems.length === 1"
-              class="relative overflow-hidden rounded-[var(--radius-lg)] bg-[var(--bg-secondary)] cursor-pointer group flex items-center justify-center"
+              class="message-detail__media relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[#181818] cursor-pointer group flex items-center justify-center shadow-[var(--shadow-md)]"
               @click="emit('media-click', mediaItems, 0)">
               <img :src="resolveThumb(mediaItems[0])" alt="Media"
                 class="max-w-full max-h-[70vh] object-contain transition-transform duration-200 group-hover:scale-[1.01]" />
@@ -55,10 +60,10 @@
 
             <!-- 多媒体:自适应网格 -->
             <div v-else-if="mediaItems.length > 1"
-              class="grid gap-3"
+                class="grid gap-2.5 p-2.5 rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]"
               :class="mediaItems.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'">
               <div v-for="(media, index) in mediaItems" :key="media.id"
-                class="relative overflow-hidden rounded-[var(--radius-md)] bg-[var(--bg-secondary)] cursor-pointer group aspect-square"
+                class="relative overflow-hidden rounded-[var(--radius-md)] bg-[#181818] cursor-pointer group aspect-square"
                 @click="emit('media-click', mediaItems, index)">
                 <img :src="resolveThumb(media)" :alt="`Media ${index + 1}`"
                   class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" />
@@ -74,13 +79,13 @@
                 </div>
               </div>
             </div>
-          </div>
+          </article>
 
           <!-- 右:标签 + 基本信息 -->
-          <div class="w-full lg:w-72 shrink-0 lg:sticky lg:top-0 lg:self-start space-y-6">
+          <aside class="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-6 lg:self-start rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)] overflow-hidden">
             <!-- 物理文件夹 -->
             <div v-if="message.folders?.length"
-              class="rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-secondary)]/40 p-4">
+              class="p-5 border-b border-[var(--border-color)]">
               <h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">文件夹</h4>
               <div class="space-y-3">
                 <div v-for="folder in message.folders" :key="folder.id" class="min-w-0">
@@ -97,7 +102,7 @@
             </div>
 
             <!-- 标签 -->
-            <div class="rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-secondary)]/40 p-4">
+            <div class="p-5 border-b border-[var(--border-color)]">
               <div class="flex items-center justify-between mb-3">
                 <h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">标签</h4>
                 <TagPickerPopover v-if="allTags.length" :all-tags="allTags" :message-tags="message.tags || []"
@@ -114,7 +119,7 @@
             </div>
 
             <!-- 基本信息 -->
-            <div class="rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-secondary)]/40 p-4">
+            <div class="p-5 border-b border-[var(--border-color)]">
               <h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">基本信息</h4>
               <div class="space-y-2.5 text-sm">
                 <div class="flex justify-between gap-3">
@@ -141,7 +146,7 @@
             </div>
 
             <!-- 操作 -->
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 p-4 bg-[var(--bg-secondary)]/45">
               <button @click="emit('edit', message.id)"
                 class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--color-primary-600)] hover:bg-[var(--color-primary-700)] text-white rounded-[var(--radius-md)] transition-colors text-sm font-medium">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,8 +163,8 @@
                 收藏
               </button>
             </div>
-          </div>
-        </div>
+          </aside>
+        </main>
       </div>
     </template>
 
@@ -283,5 +288,34 @@ onUnmounted(() => {
 
 .animate-fade-in {
   animation: fade-in 0.18s ease-out;
+}
+
+.message-detail {
+  background:
+    radial-gradient(circle at 30% -15%, color-mix(in srgb, var(--color-primary-500) 9%, transparent), transparent 34rem),
+    var(--bg-primary);
+}
+
+.message-detail__header {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.message-detail__content {
+  min-height: 5rem;
+}
+
+.message-detail__media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+  pointer-events: none;
+}
+
+@media (max-width: 1023px) {
+  .message-detail__media img {
+    max-height: 60vh;
+  }
 }
 </style>
