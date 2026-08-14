@@ -1,8 +1,9 @@
 <template>
-  <div class="h-screen overflow-hidden bg-[var(--bg-secondary)] dark:bg-[var(--bg-primary)] bg-fixed transition-colors" :class="{ 'electron-shell': isElectron }">
+  <div class="flex h-screen flex-col overflow-hidden bg-[var(--bg-secondary)] dark:bg-[var(--bg-primary)] bg-fixed transition-colors" :class="{ 'electron-shell': isElectron }">
     <TitleBar v-if="isElectron" />
-    <Navbar />
-    <div class="md:pl-16">
+    <div class="flex min-h-0 flex-1">
+      <Navbar />
+      <main class="min-w-0 flex-1 overflow-hidden">
       <!-- Message 始终挂载，v-show 切显隐，滚动位置天然保留 -->
       <Message v-show="route.path === '/messages'" />
       <router-view v-slot="{ Component }">
@@ -12,6 +13,7 @@
           </keep-alive>
         </Transition>
       </router-view>
+      </main>
     </div>
     <BottomNavBar />
     <ToastContainer />

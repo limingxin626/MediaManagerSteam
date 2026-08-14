@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen pl-0 md:pl-16 pb-24 md:pb-0 overflow-hidden">
+  <div class="h-full pb-24 md:pb-0 overflow-hidden">
     <div class="h-full max-w-7xl mx-auto px-4 py-6 flex flex-col min-h-0">
       <h1 class="shrink-0 text-2xl font-bold text-gray-900 dark:text-white mb-6">数据库管理</h1>
 

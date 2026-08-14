@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+  <div class="h-full flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
     <h1 class="text-6xl font-bold mb-4">404</h1>
     <p class="text-lg mb-8">页面不存在</p>
     <router-link

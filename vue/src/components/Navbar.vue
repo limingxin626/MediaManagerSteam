@@ -1,106 +1,28 @@
 <template>
-  <aside class="app-sidebar fixed left-0 top-0 bottom-0 w-16 z-50 bg-[var(--sidebar-bg)] transition-colors hidden md:flex flex-col border-r border-[var(--border-color)]">
-    <div class="flex items-center justify-center h-16">
-      <svg class="w-6 h-6 text-gray-800 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-    </div>
-
-    <nav class="flex-1 py-4 overflow-y-auto">
-      <div class="space-y-1 px-2">
-        <router-link
-          to="/"
-          class="flex items-center justify-center p-3 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-purple-900/30 hover:text-gray-900 dark:hover:text-white transition-colors"
-          active-class="bg-[var(--color-primary-600)] text-white dark:text-white"
-          title="主页"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-        </router-link>
-        <router-link
-          to="/messages"
-          class="flex items-center justify-center p-3 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-purple-900/30 hover:text-gray-900 dark:hover:text-white transition-colors"
-          active-class="bg-[var(--color-primary-600)] text-white dark:text-white"
-          title="消息"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-        </router-link>
-        <router-link
-          to="/media"
-          class="flex items-center justify-center p-3 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-purple-900/30 hover:text-gray-900 dark:hover:text-white transition-colors"
-          active-class="bg-[var(--color-primary-600)] text-white dark:text-white"
-          title="媒体"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-        </router-link>
-        <router-link
-          to="/collection"
-          class="flex items-center justify-center p-3 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-purple-900/30 hover:text-gray-900 dark:hover:text-white transition-colors"
-          active-class="bg-[var(--color-primary-600)] text-white dark:text-white"
-          title="合集"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10M4 6h16" />
-          </svg>
-        </router-link>
-        <router-link
-          to="/people"
-          class="flex items-center justify-center p-3 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-purple-900/30 hover:text-gray-900 dark:hover:text-white transition-colors"
-          active-class="bg-[var(--color-primary-600)] text-white dark:text-white"
-          title="人物"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </router-link>
-        <router-link
-          to="/transactions"
-          class="flex items-center justify-center p-3 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-purple-900/30 hover:text-gray-900 dark:hover:text-white transition-colors"
-          active-class="bg-[var(--color-primary-600)] text-white dark:text-white"
-          title="记账"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </router-link>
-        <router-link
-          to="/admin"
-          class="flex items-center justify-center p-3 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-purple-900/30 hover:text-gray-900 dark:hover:text-white transition-colors"
-          active-class="bg-[var(--color-primary-600)] text-white dark:text-white"
-          title="管理"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </router-link>
-      </div>
+  <aside class="app-sidebar hidden w-[52px] shrink-0 flex-col border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] md:flex">
+    <nav class="flex flex-1 flex-col items-center gap-1 py-2" aria-label="主导航">
+      <router-link v-for="item in navigationItems" :key="item.path" :to="item.path"
+        class="activity-item" :class="{ 'activity-item--active': isNavigationActive(route.path, item.path) }" :title="item.label" :aria-label="item.label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path :d="item.icon" /></svg>
+      </router-link>
     </nav>
-
-    <div class="p-2">
-      <button
-        @click="toggleTheme"
-        class="w-full flex items-center justify-center p-3 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-purple-900/30 hover:text-gray-900 dark:hover:text-white transition-colors"
-        :title="theme === 'light' ? '深色模式' : '浅色模式'"
-      >
-        <svg v-if="theme === 'light'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-        </svg>
-        <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-      </button>
-    </div>
+    <button class="activity-item mx-auto mb-2" :title="theme === 'light' ? '深色模式' : '浅色模式'" @click="toggleTheme">
+      <svg v-if="theme === 'light'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z" /></svg>
+      <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4m0-14.2-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+    </button>
   </aside>
 </template>
-
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
+import { navigationItems, isNavigationActive } from '../config/navigation'
 import { useTheme } from '../composables/useTheme'
-
+const route = useRoute()
 const { theme, toggleTheme } = useTheme()
 </script>
+<style scoped>
+.activity-item { position: relative; display: grid; width: 44px; height: 44px; place-items: center; color: var(--text-muted); transition: color 100ms ease, background-color 100ms ease; }
+.activity-item:hover { color: var(--text-primary); background: rgba(127,127,127,.09); }
+.activity-item svg { width: 23px; height: 23px; }
+.activity-item--active { color: var(--text-primary); }
+.activity-item--active::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; border-radius: 0 2px 2px 0; background: var(--color-primary-500); }
+</style>

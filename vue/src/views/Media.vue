@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex transition-colors">
+  <div class="h-full flex transition-colors">
     <FilterSidebar
       v-if="viewMode === 'timeline'"
       :tags="tags"
@@ -238,7 +238,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, nextTick, onActivated, onMounted } from 'vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import DateScrubber from '../components/DateScrubber.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
@@ -305,6 +305,11 @@ const vg = useVirtualGrid({
   measureEl,
   filters,
   gridSize,
+})
+
+onActivated(async () => {
+  await nextTick()
+  requestAnimationFrame(() => vg.restoreViewport())
 })
 
 const previewOpen = ref(false)

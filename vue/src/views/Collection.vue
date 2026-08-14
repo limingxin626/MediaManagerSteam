@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex transition-colors">
+  <div class="h-full flex transition-colors">
     <!-- Left Collection Column -->
     <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] overflow-y-auto">
       <div class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">合集列表</div>

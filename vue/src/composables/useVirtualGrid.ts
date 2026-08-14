@@ -432,6 +432,16 @@ export function useVirtualGrid(opts: Options) {
     dispatchFetches()
   }
 
+  /** Re-synchronise the retained virtual viewport after KeepAlive makes it visible again. */
+  function restoreViewport() {
+    const el = container.value
+    if (!el) return
+    el.scrollTop = scrollTop.value
+    viewportH.value = el.clientHeight
+    recomputeCellSize()
+    dispatchFetches()
+  }
+
   function findItemBucketAndIndex(id: number): { key: string; idx: number } | null {
     for (const [key, entry] of cacheRef.value.entries()) {
       const idx = entry.items.findIndex((m) => m.id === id)
@@ -555,6 +565,7 @@ export function useVirtualGrid(opts: Options) {
     visibleCells,
     currentDate,
     onScroll,
+    restoreViewport,
     scrollToBucket,
     scrollToDate,
     setDispatchPaused,

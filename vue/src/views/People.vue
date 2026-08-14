@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col transition-colors">
+  <div class="h-full flex flex-col transition-colors">
     <!-- Header -->
     <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">

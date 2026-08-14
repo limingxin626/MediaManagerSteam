@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex transition-colors">
+  <div class="h-full flex transition-colors">
     <FilterSidebar
       :tags="tags"
       :collections="collections"
@@ -153,7 +153,7 @@
             <!-- Card grid layout (页面级固定卡片网格) -->
             <div v-if="messageView === 'grid' && messages.length > 0"
               class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-w-7xl mx-auto">
-              <div v-for="message in messages" :key="message.id"
+              <div v-for="message in gridMessages" :key="message.id"
                 :data-message-id="message.id" :data-message-date="message.created_at.substring(0, 10)"
                 class="rounded-[var(--radius-lg)] transition-shadow"
                 :class="highlightMessageId === message.id ? 'ring-2 ring-[var(--color-primary-500)]' : ''">
@@ -618,6 +618,8 @@ const selectIssue = (issueId: number | null) => {
 }
 
 const messages = ref<MessageDetail[]>([])
+// Feed is chronological; Grid behaves like a gallery with the newest card first.
+const gridMessages = computed(() => [...messages.value].reverse())
 const loading = ref(false)
 const searchQuery = ref('')
 
@@ -691,6 +693,11 @@ const isViewingHistory = ref(false)
 const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
   const el = scrollContainer.value
   if (el) el.scrollTo({ top: el.scrollHeight, behavior })
+}
+
+const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => {
+  const el = scrollContainer.value
+  if (el) el.scrollTo({ top: messageView.value === 'grid' ? 0 : el.scrollHeight, behavior })
 }
 
 const fetchForwardMessages = async () => {
@@ -796,7 +803,7 @@ const openEditDialog = (messageId: number) => {
 const onDialogCreated = async (message: MessageDetail) => {
   messages.value.push(message)
   await nextTick()
-  scrollToBottom()
+  scrollToLatest()
   fetchTags()
 }
 
@@ -921,10 +928,13 @@ const fetchMessages = async (isLoadingMore = false) => {
 
     await nextTick()
     if (!isLoadingMore) {
-      scrollToBottom('auto')
+      scrollToLatest('auto')
     } else if (container) {
       const scrollDelta = container.scrollHeight - previousHeight
-      container.scrollTo({ top: previousScrollY + scrollDelta, behavior: 'auto' })
+      container.scrollTo({
+        top: messageView.value === 'grid' ? previousScrollY : previousScrollY + scrollDelta,
+        behavior: 'auto',
+      })
     }
   } catch (error) {
     toast.error('加载消息失败')
@@ -1276,8 +1286,11 @@ const setupObservers = () => {
   topObserver = new IntersectionObserver(
     (entries) => {
       const container = scrollContainer.value
-      if (entries[0]?.isIntersecting && !loading.value && hasMoreData.value && container && container.scrollTop > 0) {
+      if (!entries[0]?.isIntersecting || !container || container.scrollTop <= 0) return
+      if (messageView.value === 'feed' && !loading.value && hasMoreData.value) {
         fetchMessages(true)
+      } else if (messageView.value === 'grid' && !loadingForward.value && hasMoreForward.value) {
+        fetchForwardMessages()
       }
     },
     { root }
@@ -1285,8 +1298,11 @@ const setupObservers = () => {
 
   bottomObserver = new IntersectionObserver(
     (entries) => {
-      if (entries[0]?.isIntersecting && !loadingForward.value && hasMoreForward.value) {
+      if (!entries[0]?.isIntersecting) return
+      if (messageView.value === 'feed' && !loadingForward.value && hasMoreForward.value) {
         fetchForwardMessages()
+      } else if (messageView.value === 'grid' && !loading.value && hasMoreData.value) {
+        fetchMessages(true)
       }
     },
     { root }
@@ -1314,6 +1330,27 @@ const teardownObservers = () => {
   bottomObserver?.disconnect()
   bottomObserver = null
 }
+
+watch(messageView, () => {
+  const anchor = getFirstVisibleMessageId()
+  nextTick(() => {
+    setupObservers()
+    if (!anchor) {
+      scrollToLatest('auto')
+      return
+    }
+    const container = scrollContainer.value
+    const el = container?.querySelector<HTMLElement>(`[data-message-id="${anchor.messageId}"]`)
+    if (!container || !el) return
+    const containerRect = container.getBoundingClientRect()
+    const elRect = el.getBoundingClientRect()
+    container.scrollTo({
+      top: container.scrollTop + elRect.top - containerRect.top - anchor.scrollOffset,
+      behavior: 'auto',
+    })
+    updateVisibleDate()
+  })
+}, { flush: 'sync' })
 
 const tryRestoreScroll = () => {
   if (!pendingRestore.value) return
