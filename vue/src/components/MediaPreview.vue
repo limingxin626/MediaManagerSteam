@@ -1,6 +1,6 @@
 <template>
   <Transition name="fade">
-    <div v-if="isOpen" class="fixed inset-0 z-[100]">
+    <div v-if="isOpen" class="media-preview-overlay fixed inset-0 z-[90]">
       <div class="absolute inset-0 bg-black/90 backdrop-blur-sm" @click="close"></div>
       <div class="relative w-full h-full flex flex-col">
         <div class="flex items-center justify-between p-4">

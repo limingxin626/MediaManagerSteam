@@ -1,30 +1,5 @@
 <template>
   <div class="message-detail fixed inset-0 z-[95] bg-[var(--bg-primary)] flex flex-col animate-fade-in">
-    <!-- 顶部工具栏 -->
-    <header class="message-detail__header shrink-0 flex items-center justify-between gap-4 px-4 sm:px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-card)]/90 backdrop-blur-xl">
-      <div class="flex items-center gap-3 min-w-0">
-        <button @click="close" title="关闭 (Esc)"
-          class="shrink-0 flex items-center gap-2 px-3 py-2 -ml-2 rounded-[var(--radius-md)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          <span class="text-sm font-medium">返回消息</span>
-        </button>
-        <div v-if="message?.collection_name" class="flex items-center gap-2.5 min-w-0 pl-3 border-l border-[var(--border-color)]">
-          <div class="w-8 h-8 rounded-full bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] flex items-center justify-center font-semibold shrink-0">
-            {{ collectionInitial }}
-          </div>
-          <span class="text-sm font-semibold text-[var(--text-primary)] truncate">{{ message.collection_name }}</span>
-        </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <span v-if="message?.starred" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400/10 text-amber-400 text-xs font-medium">
-          <span>★</span> 已收藏
-        </span>
-        <p class="shrink-0 text-xs text-[var(--text-muted)]">{{ message ? formatDate(message.created_at) : '' }}</p>
-      </div>
-    </header>
-
     <!-- Loading -->
     <div v-if="isLoading" class="flex-1 flex items-center justify-center">
       <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[var(--color-primary-500)]"></div>
@@ -82,7 +57,20 @@
           </article>
 
           <!-- 右:标签 + 基本信息 -->
-          <aside class="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-6 lg:self-start rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)] overflow-hidden">
+          <aside class="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-10 lg:self-start rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)] overflow-hidden">
+            <div class="flex items-center gap-2 border-b border-[var(--border-color)] p-3">
+              <button @click="close" title="返回消息 (Esc)"
+                class="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0 7-7m-7 7h18" />
+                </svg>
+                返回消息
+              </button>
+            </div>
+            <div v-if="message.collection_name" class="flex items-center gap-2.5 border-b border-[var(--border-color)] p-5">
+              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] font-semibold text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]">{{ collectionInitial }}</div>
+              <span class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ message.collection_name }}</span>
+            </div>
             <!-- 物理文件夹 -->
             <div v-if="message.folders?.length"
               class="p-5 border-b border-[var(--border-color)]">
@@ -105,7 +93,7 @@
             <div class="p-5 border-b border-[var(--border-color)]">
               <div class="flex items-center justify-between mb-3">
                 <h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">标签</h4>
-                <TagPickerPopover v-if="allTags.length" :all-tags="allTags" :message-tags="message.tags || []"
+                <TagPickerPopover v-if="allTags.length" :all-tags="allTags" :message-tags="message.tags || []" direction="down"
                   @select="addTag" />
               </div>
               <div class="flex flex-wrap gap-2">
@@ -130,10 +118,6 @@
                   <span class="text-[var(--text-muted)] shrink-0">媒体数量</span>
                   <span class="text-[var(--text-primary)]">{{ mediaItems.length }}</span>
                 </div>
-                <div class="flex justify-between gap-3">
-                  <span class="text-[var(--text-muted)] shrink-0">收藏</span>
-                  <span class="text-[var(--text-primary)]">{{ message.starred ? '是' : '否' }}</span>
-                </div>
                 <div v-if="message.issue_title" class="flex justify-between gap-3">
                   <span class="text-[var(--text-muted)] shrink-0">Issue</span>
                   <span class="text-[var(--text-primary)] truncate">{{ message.issue_title }}</span>
@@ -154,13 +138,13 @@
                 </svg>
                 编辑
               </button>
-              <button @click="emit('toggle-star', message.id)"
+              <button @click="toggleStar" :disabled="isTogglingStar"
                 class="px-4 py-2 rounded-[var(--radius-md)] border border-[var(--border-color)] transition-colors text-sm flex items-center gap-2"
                 :class="message.starred ? 'text-amber-400 bg-amber-400/10' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'">
                 <svg class="w-4 h-4" :fill="message.starred ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                 </svg>
-                收藏
+                {{ message.starred ? '取消收藏' : '收藏' }}
               </button>
             </div>
           </aside>
@@ -193,13 +177,14 @@ const emit = defineEmits<{
   close: []
   'media-click': [items: MessageMediaItem[], index: number]
   edit: [id: number]
-  'toggle-star': [id: number]
+  'star-changed': [id: number, starred: boolean]
   'tags-changed': [messageId: number, tags: { id: number; name: string; category?: string | null }[]]
 }>()
 
 const toast = useToast()
 const message = ref<MessageDetail | null>(null)
 const isLoading = ref(true)
+const isTogglingStar = ref(false)
 
 const mediaItems = computed<MessageMediaItem[]>(() => message.value?.media_items ?? [])
 
@@ -251,6 +236,22 @@ const removeTag = (tagId: number) => {
   persistTags((message.value.tags || []).filter(t => t.id !== tagId))
 }
 
+const toggleStar = async () => {
+  if (!message.value || isTogglingStar.value) return
+  isTogglingStar.value = true
+  try {
+    const updated = await api.patch<MessageDetail>(`/messages/${message.value.id}`, {
+      starred: !message.value.starred,
+    })
+    message.value.starred = updated.starred
+    emit('star-changed', message.value.id, updated.starred)
+  } catch {
+    toast.error('操作失败')
+  } finally {
+    isTogglingStar.value = false
+  }
+}
+
 const close = () => emit('close')
 
 const handleKeydown = (e: KeyboardEvent) => {
@@ -294,10 +295,6 @@ onUnmounted(() => {
   background:
     radial-gradient(circle at 30% -15%, color-mix(in srgb, var(--color-primary-500) 9%, transparent), transparent 34rem),
     var(--bg-primary);
-}
-
-.message-detail__header {
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .message-detail__content {

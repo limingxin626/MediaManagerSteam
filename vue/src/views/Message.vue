@@ -256,7 +256,7 @@
         :preview-open="previewOpen"
         @close="detailMessageId = null" @edit="(id) => { detailMessageId = null; openEditDialog(id) }"
         @media-click="(items, index) => handlePanelPreview({ items, index })"
-        @toggle-star="handleToggleStar" @tags-changed="handleDetailTagsChanged" />
+        @star-changed="handleDetailStarChanged" @tags-changed="handleDetailTagsChanged" />
 
     </div>
   </div>
@@ -960,6 +960,11 @@ const closePreview = () => {
   previewItems.value = []
   currentMessageIndex.value = -1
   previewMessageId.value = undefined
+}
+
+const handleDetailStarChanged = (messageId: number, starred: boolean) => {
+  const msg = messages.value.find(m => m.id === messageId)
+  if (msg) msg.starred = starred
 }
 
 const handlePreviewToggleStar = async (mediaId: number) => {

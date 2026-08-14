@@ -114,6 +114,10 @@
 .electron-shell, #app { display: flex; min-height: 0; flex-direction: column; }
 .window-drag { -webkit-app-region: drag; }
 
+/* Native Electron caption buttons occupy the top 36px title-bar overlay. */
+.electron-shell .media-preview-overlay { top: 36px; }
+.electron-shell .message-detail { top: 36px; }
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
