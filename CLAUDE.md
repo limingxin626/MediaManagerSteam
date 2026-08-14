@@ -146,7 +146,6 @@ npm run build             # electron-builder, packages backend + vue dist
   - `bills_apply_categories.py` — 接受 `{biz_no: category}` JSON,写回到对应月份文件。未命中的 biz_no 会报错。
   - `bills_inject_labeled.py [--apply]` — 清空 `transaction` + `txn_category_rule`,按所有月份 JSON 重新注入。**先 dry-run,再加 `--apply`,apply 前手动备份 `Data/db.sqlite3`。**
 - 月度 mapping 文件(`backend/scratch/mappings/YYYY-MM.py`)是 Claude 的产出物,保留下来便于回溯/重跑。
-- 老的 `import_bills.py` CLI 不要再用 —— 它会走废弃的自动分类。
 
 ## Key Patterns
 

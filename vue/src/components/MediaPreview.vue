@@ -335,9 +335,10 @@
           </button>
           <button
             @click="confirmDelete"
-            class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
+            :disabled="isDeleting"
+            class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
           >
-            删除
+            {{ isDeleting ? '删除中...' : '删除' }}
           </button>
         </div>
       </div>
@@ -357,7 +358,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import type { MessageMediaItem, TagWithCount, TagItem, Media, Person, MediaPersonItem } from '../types'
 import { isVideo, isImage, resolveThumb, resolveMediaUrl, rotateMedia } from '../utils/media'
-import { api } from '../composables/useApi'
+import { api, ApiError } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import TagPickerPopover from './TagPickerPopover.vue'
 import TagSuggestDrawer from './TagSuggestDrawer.vue'
@@ -404,6 +405,7 @@ const THUMB_WINDOW = 5
 const previewStarBounce = ref(false)
 const showDeleteConfirm = ref(false)
 const deleteSourceFile = ref(false)
+const isDeleting = ref(false)
 const rotationDegrees = ref(0)
 const isRotating = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -454,9 +456,18 @@ function handleStarClick() {
 }
 
 async function confirmDelete() {
-  if (!currentItem.value) return
+  if (!currentItem.value || isDeleting.value) return
   const mediaId = currentItem.value.id
+  isDeleting.value = true
   try {
+    // On Windows an actively loaded <video> keeps the file locked. Drop the
+    // media resource before asking the backend to remove the source file.
+    if (deleteSourceFile.value && videoRef.value) {
+      videoRef.value.pause()
+      videoRef.value.removeAttribute('src')
+      videoRef.value.load()
+      await nextTick()
+    }
     const params: Record<string, any> = { delete_source: deleteSourceFile.value }
     if (props.messageId) params.message_id = props.messageId
     const res = await api.del<{ unlinked: boolean }>(`/media/${mediaId}`, params)
@@ -465,7 +476,9 @@ async function confirmDelete() {
     toast.success(res.unlinked ? '已从当前消息移除' : '媒体已删除')
   } catch (error) {
     console.error('删除媒体失败:', error)
-    toast.error('删除失败')
+    toast.error(error instanceof ApiError ? error.message : '删除失败')
+  } finally {
+    isDeleting.value = false
   }
   showDeleteConfirm.value = false
   deleteSourceFile.value = false

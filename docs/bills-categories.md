@@ -89,7 +89,7 @@ python scripts/bills_inject_labeled.py --apply    # 真做
 **注意:**
 - `bills_inject_labeled.py --apply` 会清空 `transaction` **和** `txn_category_rule` 全表,重新基于 `scratch/bills_by_month/*.json` 注入。**所以历史月份 JSON 必须一直保留** —— 它是真相之源,DB 只是它的物化。
 - apply 前自动备份:`cp Data/db.sqlite3 Data/db.sqlite3.bak.YYYYMMDD`
-- `import_bills.py`(老的 CLI)还在,但跑完后会有大量"未分类",所以**别用**;新流程一律走 split → mappings → inject。
+- 旧的自动分类导入 CLI 已移除;新流程一律走 split → mappings → inject。
 
 ## 历史
 

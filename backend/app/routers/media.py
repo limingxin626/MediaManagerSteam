@@ -431,6 +431,11 @@ def rotate_media_endpoint(
         return MediaResponse.model_validate(media)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except OSError as e:
+        raise HTTPException(
+            status_code=409,
+            detail=f"无法删除源文件，请先停止播放或关闭占用该文件的程序：{e}",
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
 

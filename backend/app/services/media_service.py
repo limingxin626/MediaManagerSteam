@@ -585,12 +585,27 @@ def delete_media(
     file_path = config.resolve_to_absolute(media.repo_id, media.file_path)
     media_id_to_clean = media_id
 
-    db.query(MessageMedia).filter(MessageMedia.media_id == media_id).delete(synchronize_session=False)
-    db.execute(media_tag.delete().where(media_tag.c.media_id == media_id))
-    db.delete(media)
+    staged_source_path: Optional[str] = None
+    if delete_source_file and file_path and os.path.exists(file_path):
+        # Windows refuses to rename an open video. Stage the source before touching
+        # the database so a locked file produces a real API failure instead of a
+        # successful logical delete with the source silently left behind.
+        staged_source_path = f"{file_path}.deleting-{media_id}"
+        os.replace(file_path, staged_source_path)
 
-    if commit:
-        db.commit()
+    try:
+        db.query(MessageMedia).filter(MessageMedia.media_id == media_id).delete(synchronize_session=False)
+        db.execute(media_tag.delete().where(media_tag.c.media_id == media_id))
+        db.delete(media)
+
+        if commit:
+            db.commit()
+    except Exception:
+        if commit:
+            db.rollback()
+        if staged_source_path and os.path.exists(staged_source_path):
+            os.replace(staged_source_path, file_path)
+        raise
 
     # 文件清理在 commit 之后做(失败不影响 DB 状态)
     thumb_path = config.get_thumbnail_path(media_id_to_clean)
@@ -598,10 +613,12 @@ def delete_media(
         try: os.remove(thumb_path)
         except Exception as e: logger.warning(f"Failed to remove thumb {thumb_path}: {e}")
 
-    if delete_source_file and file_path and os.path.exists(file_path):
+    if staged_source_path and os.path.exists(staged_source_path):
         try:
-            os.remove(file_path)
+            os.remove(staged_source_path)
         except Exception as e:
-            logger.warning(f"Failed to remove source file {file_path}: {e}")
+            # The logical delete has committed; retain the staged path for manual
+            # recovery/cleanup and make the incomplete cleanup visible in logs.
+            logger.error(f"Failed to remove staged source file {staged_source_path}: {e}")
 
     return {"action": "deleted", "media_id": media_id_to_clean}

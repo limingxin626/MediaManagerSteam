@@ -1,5 +1,5 @@
 """
-初始化 DATA_ROOT:建子目录 + 写 repositories.json 模板。
+初始化 DATA_ROOT:建子目录、写 repositories.json,并创建最新数据库结构。
 幂等,可重复跑(--force 覆盖 repositories.json)。
 
 用法:
@@ -12,8 +12,7 @@
 完整新机器流程:
     1. uv run scripts/init_data_root.py
     2. 编辑 $DATA_ROOT/repositories.json,把所有 platform 的 paths 填好
-    3. uv run alembic upgrade head
-    4. uv run api.py
+    3. uv run api.py
 """
 import argparse
 import json
@@ -53,6 +52,11 @@ def main() -> None:
         "--force",
         action="store_true",
         help="覆盖已存在的 repositories.json",
+    )
+    ap.add_argument(
+        "--skip-db",
+        action="store_true",
+        help="只创建目录和 repositories.json，不初始化数据库",
     )
     args = ap.parse_args()
 
@@ -100,9 +104,38 @@ def main() -> None:
             json.dump(template, f, indent=2, ensure_ascii=False)
         log.info("✓ repositories.json(请编辑 paths 填好所有 platform)")
 
+    if not args.skip_db:
+        # A new database must start from the current ORM schema. The historical
+        # baseline migration also uses current metadata, so running every later
+        # migration on a fresh DB attempts to create some tables twice. Create the
+        # current schema and stamp Alembic at head instead; existing instances still
+        # use `alembic upgrade head` normally.
+        os.environ["DATA_ROOT"] = data_root
+        os.environ["ALEMBIC_SKIP_REPO_LOAD"] = "1"
+
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if backend_dir not in sys.path:
+            sys.path.insert(0, backend_dir)
+
+        from alembic import command
+        from alembic.config import Config
+        from app.models import Base, engine
+
+        db_path = os.path.join(data_root, "db.sqlite3")
+        if os.path.exists(db_path) and os.path.getsize(db_path) > 0:
+            log.info("db.sqlite3 已存在,跳过数据库初始化: %s", db_path)
+        else:
+            Base.metadata.create_all(bind=engine)
+            alembic_config = Config(os.path.join(backend_dir, "alembic.ini"))
+            alembic_config.set_main_option(
+                "script_location", os.path.join(backend_dir, "alembic")
+            )
+            command.stamp(alembic_config, "head")
+            log.info("✓ db.sqlite3(当前 schema, Alembic head)")
+
     log.info("✅ 初始化完成。")
     log.info("  下一步: 编辑 %s 设置实际路径(尤其是外接盘)", repo_json)
-    log.info("  然后:   uv run alembic upgrade head  &&  uv run api.py")
+    log.info("  然后:   uv run api.py")
 
 
 if __name__ == "__main__":
