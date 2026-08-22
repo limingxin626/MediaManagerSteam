@@ -144,7 +144,9 @@ fun SystemMediaEditScreen(
 
                 // 创建新记录
                 val mediaToSave = Media(
-                    localMediaPath = systemMedia.uri.toString(),
+                    sourceType = Media.SOURCE_MEDIA_STORE,
+                    contentUri = systemMedia.uri.toString(),
+                    originalFileName = systemMedia.displayName,
                     mimeType = systemMedia.mimeType ?: "unknown",
                     width = systemMedia.width,
                     height = systemMedia.height,

@@ -1,6 +1,7 @@
 package com.example.myapplication.ui.viewmodel
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,6 +13,7 @@ import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.database.entities.Message
 import com.example.myapplication.data.database.entities.MessageWithDetails
 import com.example.myapplication.data.model.ProgressRequestBody
+import com.example.myapplication.data.model.SystemMedia
 import com.example.myapplication.data.repository.MessageRepository
 import com.example.myapplication.data.service.ClientMediaFile
 import com.example.myapplication.data.service.MessageSyncRequest
@@ -44,7 +46,9 @@ import java.time.format.DateTimeFormatter
  */
 class MessageViewModel(
     private val messageRepository: MessageRepository,
+    context: Context
 ) : ViewModel() {
+    private val appContext = context.applicationContext
     // 搜索查询
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
@@ -243,6 +247,96 @@ class MessageViewModel(
     }
 
     /**
+     * 直接引用 MediaStore 项创建一条消息，不复制原文件。
+     */
+    fun sendSystemMediaMessage(
+        systemMedia: List<SystemMedia>,
+        onLocalCreated: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        if (systemMedia.isEmpty() || _isSending.value) return
+        viewModelScope.launch {
+            _isSending.value = true
+            var createdMessageId: Long? = null
+            try {
+                val filePicker = MediaFilePicker(appContext)
+                val entities = withContext(Dispatchers.IO) {
+                    systemMedia.map { item ->
+                        val hash = filePicker.computeBlake2bHash(item.uri)
+                            ?: throw SourceMediaUnavailableException(item.displayName)
+                        Media(
+                            sourceType = Media.SOURCE_MEDIA_STORE,
+                            contentUri = item.uri.toString(),
+                            originalFileName = item.displayName,
+                            fileHash = hash,
+                            fileSize = item.size,
+                            mimeType = item.mimeType,
+                            width = item.width.takeIf { it > 0 },
+                            height = item.height.takeIf { it > 0 },
+                            durationMs = item.duration
+                        )
+                    }
+                }
+                val (messageId, _) = messageRepository.createMessageWithMedia(
+                    message = Message(sendStatus = Message.MSG_STATUS_PUSHING),
+                    mediaEntities = entities
+                )
+                createdMessageId = messageId
+                _isSending.value = false
+                onLocalCreated()
+
+                val storedMedia = messageRepository.getMediaByMessageId(messageId)
+                val uploadResults = coroutineScope {
+                    storedMedia.map { media ->
+                        async {
+                            ClientMediaFile(
+                                id = media.id,
+                                file_path = uploadFileFromMedia(media)
+                            )
+                        }
+                    }.awaitAll()
+                }
+                val message = messageRepository.getMessageById(messageId)
+                val createdAtIso = message?.let {
+                    Instant.ofEpochMilli(it.createdAt)
+                        .atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                }
+                val response = SyncNetwork.messageSyncService.createFromClient(
+                    MessageSyncRequest(
+                        id = messageId,
+                        text = null,
+                        collection_id = null,
+                        tag_ids = emptyList(),
+                        created_at = createdAtIso,
+                        files = uploadResults
+                    )
+                )
+                messageRepository.applyRemoteUrls(messageId, response)
+            } catch (e: SourceMediaUnavailableException) {
+                _isSending.value = false
+                createdMessageId?.let {
+                    messageRepository.updateSendStatus(it, Message.MSG_STATUS_PUSH_FAILED)
+                }
+                onError("原始媒体不可用: ${e.fileName}")
+            } catch (e: IOException) {
+                _isSending.value = false
+                createdMessageId?.let {
+                    messageRepository.updateSendStatus(it, Message.MSG_STATUS_PENDING_SYNC)
+                }
+                onError("网络连接失败，消息已保存并可稍后重试")
+            } catch (e: Exception) {
+                _isSending.value = false
+                createdMessageId?.let {
+                    messageRepository.updateSendStatus(it, Message.MSG_STATUS_PUSH_FAILED)
+                }
+                Log.e(TAG, "创建系统媒体消息失败", e)
+                onError("创建消息失败: ${e.message ?: "未知错误"}")
+            }
+        }
+    }
+
+    /**
      * 拆分发送：每个媒体各自组成一条消息（文本只挂在第一条）。
      * 先把 N 条消息全部落库（立刻在 paging 中可见），再逐条走 retrySync 上传推送。
      */
@@ -294,6 +388,8 @@ class MessageViewModel(
             if (isVideo) filePicker.getVideoDuration(info.uri)?.let { it * 1000 } else null
         val thumbnailPath = localPath?.let { thumbnailGenerator.generateThumbnail(it, isVideo) }
         return Media(
+            sourceType = Media.SOURCE_APP_FILE,
+            originalFileName = info.fileName,
             fileHash = fileHash,
             localMediaPath = localPath,
             localThumbnailPath = thumbnailPath,
@@ -317,11 +413,10 @@ class MessageViewModel(
                 val uploadResults = coroutineScope {
                     mediaList.map { media ->
                         async {
-                            val serverPath = uploadFileFromMedia(media)
-                            if (serverPath != null) ClientMediaFile(
+                            ClientMediaFile(
                                 id = media.id,
-                                file_path = serverPath
-                            ) else null
+                                file_path = uploadFileFromMedia(media)
+                            )
                         }
                     }.awaitAll()
                 }
@@ -341,10 +436,13 @@ class MessageViewModel(
                         collection_id = msg?.collectionId,
                         tag_ids = tagIds,
                         created_at = createdAtIso,
-                        files = uploadResults.filterNotNull()
+                        files = uploadResults
                     )
                 )
                 messageRepository.applyRemoteUrls(messageId, response)
+            } catch (e: SourceMediaUnavailableException) {
+                Log.w(TAG, "retrySync 原始媒体不可用: ${e.fileName}")
+                messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PUSH_FAILED)
             } catch (e: IOException) {
                 Log.w(TAG, "retrySync 网络异常，回到 PENDING_SYNC: ${e.message}")
                 messageRepository.updateSendStatus(messageId, Message.MSG_STATUS_PENDING_SYNC)
@@ -372,20 +470,39 @@ class MessageViewModel(
     }
 
     /** 从已有 Media 实体上传文件 */
-    private suspend fun uploadFileFromMedia(media: Media): String? {
-        val path = media.localMediaPath ?: return null
-        val file = File(path)
-        if (!file.exists()) return null
-        return try {
-            val mimeType = media.mimeType ?: "application/octet-stream"
-            val body = ProgressRequestBody(file, mimeType) { }
-            val part = MultipartBody.Part.createFormData("file", file.name, body)
-            SyncNetwork.uploadService.uploadMedia(part).path
-        } catch (e: Exception) {
-            Log.e(TAG, "uploadFileFromMedia 失败: ${e.message}", e)
-            null
+    private suspend fun uploadFileFromMedia(media: Media): String {
+        val mimeType = media.mimeType ?: "application/octet-stream"
+        val localPath = media.localMediaPath
+        val body: ProgressRequestBody
+        val fileName: String
+
+        if (localPath != null) {
+            val file = File(localPath)
+            if (!file.exists()) throw SourceMediaUnavailableException(file.name)
+            body = ProgressRequestBody(file, mimeType) { }
+            fileName = media.originalFileName ?: file.name
+        } else {
+            val uriString = media.contentUri
+                ?: throw SourceMediaUnavailableException(media.originalFileName ?: media.id.toString())
+            val uri = Uri.parse(uriString)
+            fileName = media.originalFileName ?: "media_${media.id}"
+            body = ProgressRequestBody(
+                openStream = {
+                    appContext.contentResolver.openInputStream(uri)
+                        ?: throw SourceMediaUnavailableException(fileName)
+                },
+                length = media.fileSize ?: -1L,
+                mimeType = mimeType,
+                onProgress = { }
+            )
         }
+
+        return SyncNetwork.uploadService.uploadMedia(
+            MultipartBody.Part.createFormData("file", fileName, body)
+        ).path
     }
+
+    private class SourceMediaUnavailableException(val fileName: String) : IOException(fileName)
 
     companion object {
         private const val TAG = "MessageViewModel"

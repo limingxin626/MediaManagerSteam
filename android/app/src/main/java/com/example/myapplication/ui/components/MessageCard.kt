@@ -653,7 +653,8 @@ private fun MediaThumbnailItem(
     Box(modifier = modifier.clickable { onClick() }) {
         OptimizedThumbnail(
             thumbnailPath = media.thumbnailPath ?: media.filePath,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            fallbackPath = media.remoteThumbnailUrl ?: media.remoteMediaUrl
         )
 
         // 收藏标记 - 右上角

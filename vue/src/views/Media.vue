@@ -247,7 +247,6 @@ import RepositoryBrowser from '../components/RepositoryBrowser.vue'
 import type { Media, TagWithCount, Collection, CursorResponse, MessageMediaItem } from '../types'
 import { api } from '../composables/useApi'
 import { useVirtualGrid } from '../composables/useVirtualGrid'
-import { toggleMediaStar } from '../utils/media'
 import { useToast } from '../composables/useToast'
 
 const toast = useToast()
@@ -283,6 +282,7 @@ const typeOptions = [
   { value: '', label: '全部' },
   { value: 'video', label: '视频' },
   { value: 'image', label: '图片' },
+  { value: 'screenshot', label: '截图' },
 ]
 
 const selectedType = ref('')
@@ -565,13 +565,11 @@ function openPreview(bucketKey: string, idx: number) {
   previewOpen.value = true
 }
 
-async function handlePreviewToggleStar(mediaId: number) {
+function handlePreviewToggleStar(mediaId: number) {
   const previewItem = previewItems.value.find((item) => item.id === mediaId)
   if (!previewItem) return
 
-  await toggleMediaStar(previewItem)
   const starred = previewItem.starred
-
   vg.updateItem(mediaId, (item) => {
     item.starred = starred
   })

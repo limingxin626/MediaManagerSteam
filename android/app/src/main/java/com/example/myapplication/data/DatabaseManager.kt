@@ -9,6 +9,7 @@ import com.example.myapplication.data.repository.MessageRepository
 import com.example.myapplication.data.repository.PersonRepository
 import com.example.myapplication.data.repository.SyncOutboxRepository
 import com.example.myapplication.data.repository.TagRepository
+import com.example.myapplication.data.repository.SystemMediaMetadataRepository
 import com.example.myapplication.data.service.SyncPreferences
 
 /**
@@ -30,6 +31,7 @@ class DatabaseManager private constructor(context: Context) {
     private val tagDao = database.tagDao()
     private val syncOutboxDao = database.syncOutboxDao()
     private val messageDao = database.messageDao()
+    private val systemMediaMetadataDao = database.systemMediaMetadataDao()
 
     // 同步偏好
     val syncPreferences = SyncPreferences(appContext)
@@ -41,6 +43,7 @@ class DatabaseManager private constructor(context: Context) {
     val personRepository = PersonRepository(personDao, syncOutboxRepository)
     val mediaRepository = MediaRepository(mediaDao, syncOutboxRepository)
     val tagRepository = TagRepository(tagDao)
+    val systemMediaMetadataRepository = SystemMediaMetadataRepository(systemMediaMetadataDao)
     val messageRepository =
         MessageRepository(messageDao, mediaDao, tagDao, collectionDao, personDao, syncOutboxRepository, database)
 

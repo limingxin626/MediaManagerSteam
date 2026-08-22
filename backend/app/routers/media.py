@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import exists, func, Integer
+from sqlalchemy import exists, func, Integer, or_
 from app.models import get_db, Media, MessageMedia, Message, Tag, Person, message_tag, media_tag
 from app.models.repository_catalog import RepositoryFile
 from typing import Optional, List, Literal
@@ -50,6 +50,22 @@ def _filter_physical_file(query, has_physical_file: Optional[bool]):
     return query.filter(physical_file_exists if has_physical_file else ~physical_file_exists)
 
 
+def _filter_media_type(query, media_type: Optional[str]):
+    if media_type == 'screenshot':
+        return query.filter(or_(
+            func.lower(Media.mime_type) == 'image/gif',
+            func.lower(Media.file_path).like('%.gif'),
+            Media.video_media_id.is_not(None),
+        ))
+
+    query = query.filter(Media.video_media_id.is_(None))
+    if media_type == 'video':
+        return query.filter(Media.mime_type.like('video/%'))
+    if media_type == 'image':
+        return query.filter(Media.mime_type.like('image/%'))
+    return query
+
+
 @router.get("", response_model=MediaCursorResponse)
 def get_media(
     cursor: Optional[str] = Query(None, description="游标，格式为'media_time|id'"),
@@ -58,7 +74,7 @@ def get_media(
     message_id: Optional[int] = None,
     message_ids: Optional[List[int]] = Query(None, description="按多条 message 取并集过滤"),
     starred: Optional[bool] = Query(None),
-    type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
+    type: Optional[str] = Query(None, description="媒体类型: 'video'、'image' 或 'screenshot'"),
     tag_id: Optional[int] = Query(None, description="标签 ID"),
     collection_id: Optional[int] = Query(None, description="合集 ID"),
     has_physical_file: Optional[bool] = Query(None, description="是否存在已物化的物理文件"),
@@ -85,18 +101,13 @@ def get_media(
             has_more=False
         )
     else:
-        # 直接查 Media 表，显示所有媒体（包括孤立媒体），但隐藏作为视频预览的 Media
-        query = db.query(Media).filter(Media.video_media_id.is_(None))
+        # 直接查 Media 表，显示所有媒体（包括孤立媒体）
+        query = _filter_media_type(db.query(Media), type)
         query = _filter_physical_file(query, has_physical_file)
 
         if starred is not None:
             query = query.filter(Media.starred == (1 if starred else 0))
         
-        if type == 'video':
-            query = query.filter(Media.mime_type.like('video/%'))
-        elif type == 'image':
-            query = query.filter(Media.mime_type.like('image/%'))
-
         if message_ids:
             media_ids_msgs = db.query(MessageMedia.media_id).filter(
                 MessageMedia.message_id.in_(message_ids)
@@ -203,7 +214,7 @@ def get_media(
 @router.get("/timeline", response_model=list[TimelineItem])
 def get_media_timeline(
     starred: Optional[bool] = Query(None),
-    type: Optional[str] = Query(None, description="媒体类型: 'video' 或 'image'"),
+    type: Optional[str] = Query(None, description="媒体类型: 'video'、'image' 或 'screenshot'"),
     tag_id: Optional[int] = Query(None),
     collection_id: Optional[int] = Query(None),
     has_physical_file: Optional[bool] = Query(None, description="是否存在已物化的物理文件"),
@@ -219,19 +230,12 @@ def get_media_timeline(
         month_col.label('month'),
         day_col.label('day'),
         func.count().label('count'),
-    ).filter(
-        Media.video_media_id.is_(None),
-        media_time.is_not(None),
-    )
+    ).filter(media_time.is_not(None))
+    query = _filter_media_type(query, type)
     query = _filter_physical_file(query, has_physical_file)
 
     if starred is not None:
         query = query.filter(Media.starred == (1 if starred else 0))
-    if type == 'video':
-        query = query.filter(Media.mime_type.like('video/%'))
-    elif type == 'image':
-        query = query.filter(Media.mime_type.like('image/%'))
-
     if tag_id is not None:
         media_ids = db.query(media_tag.c.media_id).filter(media_tag.c.tag_id == tag_id)
         query = query.filter(Media.id.in_(media_ids))

@@ -5,14 +5,25 @@ from app.models.repository_catalog import RepositoryFile, RepositoryFolder
 from app.routers.media import get_media, get_media_timeline
 
 
-def add_media(db, media_id, *, taken_at=None, file_created_at=None, created_at=None):
+def add_media(
+    db,
+    media_id,
+    *,
+    taken_at=None,
+    file_created_at=None,
+    created_at=None,
+    file_path=None,
+    mime_type="image/jpeg",
+    video_media_id=None,
+):
     media = Media(
         id=media_id,
         repo_id="test",
-        file_path=f"{media_id}.jpg",
+        file_path=file_path or f"{media_id}.jpg",
         file_hash=f"hash-{media_id}",
         file_size=1,
-        mime_type="image/jpeg",
+        mime_type=mime_type,
+        video_media_id=video_media_id,
         taken_at=taken_at,
         file_created_at=file_created_at,
         created_at=created_at or datetime(2026, 1, 1),
@@ -31,7 +42,7 @@ def list_media(db, **kwargs):
         message_id=None,
         message_ids=None,
         starred=None,
-        type=None,
+        type=kwargs.get("type"),
         tag_id=None,
         collection_id=None,
         has_physical_file=kwargs.get("has_physical_file"),
@@ -127,6 +138,32 @@ def test_timeline_uses_file_created_fallback_and_excludes_undated(catalog_env):
         assert [(row.year, row.month, row.day, row.count) for row in rows] == [
             (2024, 2, 3, 1),
             (2023, 1, 1, 1),
+        ]
+
+
+def test_screenshot_filter_includes_gifs_and_video_preview_media(catalog_env):
+    _, session_factory = catalog_env
+    media_time = datetime(2024, 2, 3)
+    with session_factory() as db:
+        add_media(db, 1, file_created_at=media_time, mime_type="video/mp4")
+        add_media(db, 2, file_created_at=media_time, file_path="animated.GIF", mime_type="image/gif")
+        add_media(db, 3, file_created_at=media_time, video_media_id=1)
+        add_media(db, 4, file_created_at=media_time)
+        db.commit()
+
+        result = list_media(db, type="screenshot")
+        timeline = get_media_timeline(
+            starred=None,
+            type="screenshot",
+            tag_id=None,
+            collection_id=None,
+            has_physical_file=None,
+            db=db,
+        )
+
+        assert {item.id for item in result.items} == {2, 3}
+        assert [(row.year, row.month, row.day, row.count) for row in timeline] == [
+            (2024, 2, 3, 2),
         ]
 
 

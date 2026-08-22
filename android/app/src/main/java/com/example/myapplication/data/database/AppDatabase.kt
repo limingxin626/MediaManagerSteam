@@ -10,6 +10,7 @@ import com.example.myapplication.data.database.dao.MessageDao
 import com.example.myapplication.data.database.dao.PersonDao
 import com.example.myapplication.data.database.dao.SyncOutboxDao
 import com.example.myapplication.data.database.dao.TagDao
+import com.example.myapplication.data.database.dao.SystemMediaMetadataDao
 import com.example.myapplication.data.database.entities.Collection
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.database.entities.MediaPerson
@@ -20,6 +21,8 @@ import com.example.myapplication.data.database.entities.MessageTag
 import com.example.myapplication.data.database.entities.Person
 import com.example.myapplication.data.database.entities.SyncOutboxItem
 import com.example.myapplication.data.database.entities.Tag
+import com.example.myapplication.data.database.entities.SystemMediaMetadata
+import com.example.myapplication.data.database.entities.SystemMediaTag
 
 /**
  * 应用主数据库
@@ -35,9 +38,11 @@ import com.example.myapplication.data.database.entities.Tag
         MessageMedia::class,
         MessageTag::class,
         MediaTag::class,
-        MediaPerson::class
+        MediaPerson::class,
+        SystemMediaMetadata::class,
+        SystemMediaTag::class
     ],
-    version = 32,
+    version = 34,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -49,6 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tagDao(): TagDao
     abstract fun syncOutboxDao(): SyncOutboxDao
     abstract fun messageDao(): MessageDao
+    abstract fun systemMediaMetadataDao(): SystemMediaMetadataDao
 
     companion object {
         // 数据库名称

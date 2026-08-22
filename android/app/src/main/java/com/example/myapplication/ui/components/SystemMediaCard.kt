@@ -4,6 +4,7 @@ import android.os.Build
 import android.util.Size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -132,6 +134,8 @@ fun SystemMediaCard(
     isSelectionMode: Boolean = false,
     onMediaClick: (SystemMedia) -> Unit,
     onMediaLongClick: (SystemMedia) -> Unit = {},
+    starred: Boolean = false,
+    onToggleStarred: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -140,9 +144,10 @@ fun SystemMediaCard(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clickable {
-                onMediaClick(media)
-            },
+            .combinedClickable(
+                onClick = { onMediaClick(media) },
+                onLongClick = { onMediaLongClick(media) }
+            ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(0.dp) // 使用直角，不要圆角
     ) {
@@ -194,6 +199,26 @@ fun SystemMediaCard(
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            if (starred || onToggleStarred != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(40.dp)
+                        .then(
+                            if (onToggleStarred != null) Modifier.clickable(onClick = onToggleStarred)
+                            else Modifier
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = if (starred) "已收藏" else "收藏",
+                        tint = if (starred) Color(0xFFFFD700) else Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

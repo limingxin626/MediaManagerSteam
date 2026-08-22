@@ -967,18 +967,14 @@ const handleDetailStarChanged = (messageId: number, starred: boolean) => {
   if (msg) msg.starred = starred
 }
 
-const handlePreviewToggleStar = async (mediaId: number) => {
+const handlePreviewToggleStar = (mediaId: number) => {
   const currentItem = previewItems.value.find(item => item.id === mediaId)
-  if (!currentItem) return
+  if (!currentItem || currentMessageIndex.value < 0) return
 
-  await toggleMediaStar(currentItem)
-
-  if (currentMessageIndex.value >= 0) {
-    const msg = messages.value[currentMessageIndex.value]
-    const mediaItem = msg?.media_items?.find(item => item.id === mediaId)
-    if (mediaItem) {
-      mediaItem.starred = currentItem.starred
-    }
+  const msg = messages.value[currentMessageIndex.value]
+  const mediaItem = msg?.media_items?.find(item => item.id === mediaId)
+  if (mediaItem) {
+    mediaItem.starred = currentItem.starred
   }
 }
 

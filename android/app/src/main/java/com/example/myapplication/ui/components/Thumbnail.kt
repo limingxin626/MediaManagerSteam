@@ -31,7 +31,8 @@ import java.io.File
 @Composable
 fun OptimizedThumbnail(
     thumbnailPath: String?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fallbackPath: String? = null
 ) {
     // 获取Context在Composable作用域中
     val context = LocalContext.current
@@ -66,7 +67,7 @@ fun OptimizedThumbnail(
 
                 ImageRequest.Builder(context)
                     .data(dataSource)
-                    .size(coil.size.Size.ORIGINAL) // 使用原始分辨率，避免二次缩放模糊
+                    .size(180, 180)
                     .crossfade(false) // 禁用交叉淡入，减少GPU负担
                     .allowHardware(true) // 启用硬件解码
                     .memoryCachePolicy(CachePolicy.ENABLED)
@@ -81,8 +82,12 @@ fun OptimizedThumbnail(
                 contentScale = ContentScale.Crop,
                 modifier = modifier,
                 error = {
-                    // 如果加载失败，显示默认图标
-                    Surface(
+                    if (!fallbackPath.isNullOrEmpty() && fallbackPath != thumbnailPath) {
+                        OptimizedThumbnail(
+                            thumbnailPath = fallbackPath,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = typeColor.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(8.dp)

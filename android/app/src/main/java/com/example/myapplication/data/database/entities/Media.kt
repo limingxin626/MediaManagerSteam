@@ -23,6 +23,9 @@ data class Media(
     val remoteThumbnailUrl: String? = null,
 
     // ==================== 本地媒体字段 ====================
+    val sourceType: String = SOURCE_REMOTE,
+    val contentUri: String? = null,
+    val originalFileName: String? = null,
     val localMediaPath: String? = null,
     val localThumbnailPath: String? = null,
     val isDownloaded: Boolean = false,
@@ -52,11 +55,30 @@ data class Media(
      * 获取实际可用的媒体URI（优先使用本地）
      */
     val filePath: String?
-        get() = localMediaPath ?: remoteMediaUrl
+        get() = primaryMediaPath()
 
     /**
      * 获取实际可用的缩略图路径（优先使用本地）
      */
     val thumbnailPath: String?
-        get() = localThumbnailPath ?: remoteThumbnailUrl
+        get() = primaryThumbnailPath()
+
+    fun primaryMediaPath(contentUriAvailable: Boolean = true): String? = when {
+        localMediaPath != null -> localMediaPath
+        contentUriAvailable && contentUri != null -> contentUri
+        else -> remoteMediaUrl
+    }
+
+    fun primaryThumbnailPath(contentUriAvailable: Boolean = true): String? = when {
+        localThumbnailPath != null -> localThumbnailPath
+        contentUriAvailable && contentUri != null -> contentUri
+        remoteThumbnailUrl != null -> remoteThumbnailUrl
+        else -> remoteMediaUrl
+    }
+
+    companion object {
+        const val SOURCE_REMOTE = "REMOTE"
+        const val SOURCE_APP_FILE = "APP_FILE"
+        const val SOURCE_MEDIA_STORE = "MEDIA_STORE"
+    }
 }

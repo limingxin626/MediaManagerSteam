@@ -402,10 +402,12 @@ const navigateToNextMessage = () => {
   }
 }
 
-const handlePreviewToggleStar = async () => {
-  if (currentMessageIndex.value >= 0) {
-    await handleToggleStar(messages.value[currentMessageIndex.value]!.id)
-  }
+const handlePreviewToggleStar = (mediaId: number) => {
+  const currentItem = previewItems.value.find(item => item.id === mediaId)
+  if (!currentItem || currentMessageIndex.value < 0) return
+
+  const mediaItem = messages.value[currentMessageIndex.value]?.media_items.find(item => item.id === mediaId)
+  if (mediaItem) mediaItem.starred = currentItem.starred
 }
 
 const handleMediaRotated = (mediaId: number) => {

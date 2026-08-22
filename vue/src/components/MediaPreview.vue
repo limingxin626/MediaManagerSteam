@@ -357,7 +357,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import type { MessageMediaItem, TagWithCount, TagItem, Media, Person, MediaPersonItem } from '../types'
-import { isVideo, isImage, resolveThumb, resolveMediaUrl, rotateMedia } from '../utils/media'
+import { isVideo, isImage, resolveThumb, resolveMediaUrl, rotateMedia, toggleMediaStar } from '../utils/media'
 import { api, ApiError } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import TagPickerPopover from './TagPickerPopover.vue'
@@ -448,10 +448,11 @@ function onSmartTagsApplied(mediaId: number, tags: TagItem[]) {
   emit('media-tags-changed', mediaId, tags)
 }
 
-function handleStarClick() {
+async function handleStarClick() {
   if (!currentItem.value) return
   previewStarBounce.value = true
   setTimeout(() => previewStarBounce.value = false, 300)
+  await toggleMediaStar(currentItem.value)
   emit('toggle-star', currentItem.value.id)
 }
 

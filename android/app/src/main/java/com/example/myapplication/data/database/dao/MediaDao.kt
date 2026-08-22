@@ -33,6 +33,8 @@ interface MediaDao {
         """
         SELECT * FROM media 
         WHERE localMediaPath LIKE '%' || :query || '%'
+           OR contentUri LIKE '%' || :query || '%'
+           OR originalFileName LIKE '%' || :query || '%'
            OR remoteMediaUrl LIKE '%' || :query || '%'
         ORDER BY createdAt DESC
     """
@@ -116,7 +118,7 @@ interface MediaDao {
 
 
     // 更新媒体的下载状态
-    @Query("UPDATE media SET isDownloaded = :isDownloaded, localMediaPath = :localMediaPath, localThumbnailPath = :localThumbnailPath, downloadedAt = :downloadedAt, updatedAt = :updatedAt WHERE id = :mediaId")
+    @Query("UPDATE media SET sourceType = CASE WHEN :isDownloaded THEN 'APP_FILE' ELSE sourceType END, isDownloaded = :isDownloaded, localMediaPath = :localMediaPath, localThumbnailPath = :localThumbnailPath, downloadedAt = :downloadedAt, updatedAt = :updatedAt WHERE id = :mediaId")
     suspend fun updateDownloadStatus(
         mediaId: Long,
         isDownloaded: Boolean,

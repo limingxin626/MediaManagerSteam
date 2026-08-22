@@ -153,7 +153,10 @@ class MainActivity : ComponentActivity() {
         object : ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return MessageViewModel(databaseManager.messageRepository) as T
+                return MessageViewModel(
+                    databaseManager.messageRepository,
+                    this@MainActivity
+                ) as T
             }
         }
     }
@@ -501,6 +504,13 @@ fun AppNavHost(
                 viewModel = mediaViewModel!!,
                 onMediaClick = { media ->
                     navController.navigate(Routes.systemMediaDetail(media))
+                },
+                onCreateMessage = { media, done ->
+                    messageViewModel?.sendSystemMediaMessage(
+                        systemMedia = media,
+                        onLocalCreated = done,
+                        onError = { done() }
+                    )
                 }
             )
         }
@@ -720,9 +730,10 @@ fun AppNavHost(
             val mediaUri = Uri.decode(backStackEntry.arguments?.getString("uri").orEmpty())
             SystemMediaDetailScreen(
                 mediaUri = mediaUri,
-                mediaList = mediaViewModel?.mediaList?.value.orEmpty().ifEmpty {
+                mediaList = mediaViewModel?.mediaList?.value.orEmpty().map { it.media }.ifEmpty {
                     systemGalleryViewModel?.mediaList?.value.orEmpty()
                 },
+                mediaViewModel = mediaViewModel!!,
                 navController = navController
             )
         }

@@ -1,40 +1,15 @@
 package com.example.myapplication.ui.screens.media
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,19 +18,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.myapplication.LocalBottomBarVisible
 import com.example.myapplication.data.DatabaseManager
 import com.example.myapplication.data.database.entities.Media
 import com.example.myapplication.data.repository.MessageRepository
-import com.example.myapplication.ui.components.OptimizedThumbnail
-import com.example.myapplication.ui.components.TelegramVideoPlayer
-import com.example.myapplication.ui.components.ZoomableImage
+import com.example.myapplication.ui.components.SharedMediaViewer
+import com.example.myapplication.ui.model.toViewerMediaItem
 import kotlinx.coroutines.launch
 
 /**
@@ -82,7 +52,6 @@ fun MediaViewerScreen(
     filterQuery: String = ""
 ) {
     val bottomBarVisible = LocalBottomBarVisible.current
-    val coroutineScope = rememberCoroutineScope()
 
     // 隐藏底部导航栏
     DisposableEffect(Unit) {
@@ -180,15 +149,6 @@ private fun FederatedListModeViewer(
     val groupSize = (groupRange.last - groupRange.first + 1).coerceAtLeast(1)
     val groupMediaList = remember(groupRange, mediaList.size) {
         mediaList.subList(groupRange.first, groupRange.last + 1)
-    }
-
-    LaunchedEffect(pagerState.currentPage, groupRange) {
-        // 居中当前缩略图（缩略图条内的索引 = pageInGroup）
-        val viewportWidth = stripListState.layoutInfo.viewportSize.width
-        val itemWidthPx =
-            stripListState.layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: viewportWidth
-        val offset = -(viewportWidth / 2 - itemWidthPx / 2)
-        stripListState.scrollToItem(index = pageInGroup, scrollOffset = offset)
     }
 
     // 边界扩展：MessageList 是 reverseLayout（最新在视觉底部）。
@@ -307,18 +267,6 @@ private fun BrowseModeViewer(
     val pagerState = rememberPagerState(initialPage = startIndex) { mediaList.size }
     val stripListState = rememberLazyListState()
 
-    // 居中缩略图
-    LaunchedEffect(pagerState.currentPage) {
-        val viewportWidth = stripListState.layoutInfo.viewportSize.width
-        val itemWidthPx =
-            stripListState.layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: viewportWidth
-        val offset = -(viewportWidth / 2 - itemWidthPx / 2)
-        stripListState.scrollToItem(
-            index = pagerState.currentPage,
-            scrollOffset = offset
-        )
-    }
-
     MediaViewerContent(
         mediaList = mediaList,
         pagerState = pagerState,
@@ -388,17 +336,6 @@ private fun BrowseModeViewer(
 
     // 当前页面在全局列表中的索引
     val currentGlobalIdx = windowStart + pagerState.currentPage
-
-    LaunchedEffect(pagerState.currentPage) {
-        val viewportWidth = stripListState.layoutInfo.viewportSize.width
-        val itemWidthPx =
-            stripListState.layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: viewportWidth
-        val offset = -(viewportWidth / 2 - itemWidthPx / 2)
-        stripListState.scrollToItem(
-            index = pagerState.currentPage,
-            scrollOffset = offset
-        )
-    }
 
     // 边界预加载：接近窗口边缘时扩展
     LaunchedEffect(pagerState.currentPage) {
@@ -478,232 +415,33 @@ private fun MediaViewerContent(
     stripMediaList: List<Media> = mediaList,
     stripBaseIndex: Int = 0
 ) {
-    // 用于收藏状态变更的可变列表引用
     val mutableMediaList = mediaList as? MutableList<Media>
-
-    // 图片缩放状态 — 控制 Pager 是否允许滑动
-    var currentScale by remember { mutableFloatStateOf(1f) }
-
-    // 顶部栏 + 底部缩略图条的显隐（仅由图片单击翻转，不受视频自动隐藏影响）
-    var stripVisible by remember { mutableStateOf(true) }
-
-    // 视频内部控件（进度条/播放按钮）的显隐，沿用 3s 自动隐藏
-    var videoControlsVisible by remember { mutableStateOf(false) }
-
-    // 切换页面时重置缩放状态，并清掉视频控件可见态避免跨页继承
-    LaunchedEffect(pagerState.settledPage) {
-        currentScale = 1f
-        videoControlsVisible = false
+    val viewerItems = mediaList.map { it.toViewerMediaItem() }
+    val stripViewerItems = if (stripMediaList === mediaList) {
+        viewerItems
+    } else {
+        stripMediaList.map { it.toViewerMediaItem() }
     }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .systemBarsPadding()
-    ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 0, // 只保留当前页的 ExoPlayer，避免 OOM
-            userScrollEnabled = currentScale <= 1f
-        ) { page ->
-            val media = mediaList[page]
-            val isVideo = media.mimeType?.startsWith("video/") == true
-            val isCurrentPage = pagerState.settledPage == page
-            if (isVideo) {
-                val path = media.filePath
-                if (path != null) {
-                    TelegramVideoPlayer(
-                        videoPath = path,
-                        autoPlay = isCurrentPage,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(bottom = if (mediaList.size > 1) 76.dp else 0.dp),
-                        zoomEnabled = true,
-                        controlsVisible = videoControlsVisible,
-                        onScaleChanged = { if (isCurrentPage) currentScale = it },
-                        onControlsVisibilityChanged = { visible ->
-                            if (isCurrentPage) videoControlsVisible = visible
-                        }
-                    )
-                } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("无法加载视频", color = Color.White)
-                    }
-                }
-            } else {
-                val imagePath = media.filePath ?: media.thumbnailPath
-                ZoomableImage(
-                    imagePath = imagePath,
-                    onScaleChanged = { if (isCurrentPage) currentScale = it },
-                    modifier = Modifier.fillMaxSize(),
-                    onSingleTap = { stripVisible = !stripVisible }
-                )
-            }
-        }
-
-        // 顶部：关闭按钮 + 页码
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "关闭",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Spacer(modifier = Modifier.weight(1f))
-
-            // 收藏按钮
-            if (mediaList.isNotEmpty()) {
-                val idx = pagerState.currentPage.coerceIn(0, mediaList.size - 1)
-                val currentMedia = mediaList[idx]
-                val starred = currentMedia.starred
-                IconButton(onClick = {
-                    val targetId = currentMedia.id
-                    val newStarred = !starred
-                    mutableMediaList?.let {
-                        if (idx in it.indices && it[idx].id == targetId) {
-                            it[idx] = it[idx].copy(starred = newStarred)
-                        }
-                    }
-                    coroutineScope.launch {
-                        databaseManager.mediaRepository.toggleMediaStarred(targetId)
-                    }
-                }) {
-                    Icon(
-                        imageVector = if (starred) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription = if (starred) "取消收藏" else "收藏",
-                        tint = if (starred) Color(0xFFFFD700) else Color.White
-                    )
+    SharedMediaViewer(
+        items = viewerItems,
+        pagerState = pagerState,
+        stripListState = stripListState,
+        totalCount = totalCount,
+        globalIndexOffset = currentGlobalIndex - pagerState.currentPage,
+        onClose = { navController.popBackStack() },
+        stripItems = stripViewerItems,
+        stripBaseIndex = stripBaseIndex,
+        onToggleStar = { page ->
+            val media = mediaList.getOrNull(page) ?: return@SharedMediaViewer
+            val newStarred = !media.starred
+            mutableMediaList?.let { list ->
+                if (page in list.indices && list[page].id == media.id) {
+                    list[page] = media.copy(starred = newStarred)
                 }
             }
-
-            if (totalCount > 1) {
-                Text(
-                    text = "${currentGlobalIndex + 1} / $totalCount",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(end = 16.dp)
-                )
+            coroutineScope.launch {
+                databaseManager.mediaRepository.toggleMediaStarred(media.id)
             }
         }
-
-        // 底部：横向缩略图导航条（多于1个媒体时显示，受 stripVisible 控制）
-        if (stripMediaList.size > 1) {
-            AnimatedVisibility(
-                visible = stripVisible,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-            ) {
-                MediaStripBar(
-                    mediaList = stripMediaList,
-                    currentIndex = (pagerState.currentPage - stripBaseIndex)
-                        .coerceIn(0, stripMediaList.size - 1),
-                    listState = stripListState,
-                    pagerState = pagerState,
-                    baseIndex = stripBaseIndex
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MediaStripBar(
-    mediaList: List<Media>,
-    currentIndex: Int,
-    listState: androidx.compose.foundation.lazy.LazyListState,
-    pagerState: androidx.compose.foundation.pager.PagerState,
-    modifier: Modifier = Modifier,
-    baseIndex: Int = 0
-) {
-    val coroutineScope = rememberCoroutineScope()
-
-    Box(
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.55f))
-            .padding(vertical = 8.dp)
-    ) {
-        LazyRow(
-            state = listState,
-            contentPadding = PaddingValues(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            itemsIndexed(mediaList) { index, media ->
-                val isSelected = index == currentIndex
-                val thumbPath = media.thumbnailPath ?: media.filePath
-                val isVideo = media.mimeType?.startsWith("video/") == true
-
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .then(
-                            if (isSelected) Modifier.border(
-                                2.dp,
-                                Color.White,
-                                RoundedCornerShape(4.dp)
-                            )
-                            else Modifier
-                        )
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(baseIndex + index)
-                            }
-                        }
-                ) {
-                    OptimizedThumbnail(
-                        thumbnailPath = thumbPath,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    // 视频标记
-                    if (isVideo) {
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .align(Alignment.BottomEnd)
-                                .padding(2.dp)
-                                .background(
-                                    Color.Black.copy(alpha = 0.6f),
-                                    RoundedCornerShape(2.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            androidx.compose.foundation.Canvas(modifier = Modifier.size(8.dp)) {
-                                // 小三角形播放标记
-                                val path = androidx.compose.ui.graphics.Path().apply {
-                                    moveTo(0f, 0f)
-                                    lineTo(size.width, size.height / 2f)
-                                    lineTo(0f, size.height)
-                                    close()
-                                }
-                                drawPath(path, color = Color.White)
-                            }
-                        }
-                    }
-                    // 未选中时轻微遮罩
-                    if (!isSelected) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.35f))
-                        )
-                    }
-                }
-            }
-        }
-    }
+    )
 }
