@@ -161,6 +161,37 @@ export interface RepositoryBrowseResponse {
   files: RepositoryFile[]
 }
 
+// --- Folder（独立于 Message 的逻辑目录） ---
+
+export interface FolderLocation {
+  id: number
+  repo_id: string
+  rel_path: string
+  name: string
+  role: 'PRIMARY' | 'MIRROR' | string
+}
+
+export interface Folder {
+  id: number
+  name: string
+  collection_id: number | null
+  collection_name: string | null
+  issue_id: number | null
+  issue_title: string | null
+  starred: boolean
+  location_count: number
+  media_count: number
+  primary_repo_id: string | null
+  primary_folder_path: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FolderDetail extends Folder {
+  locations: FolderLocation[]
+  files: RepositoryFile[]
+}
+
 // --- 纯前端类型（后端无对应 schema） ---
 
 export interface ViewMode {

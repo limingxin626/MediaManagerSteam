@@ -1,12 +1,12 @@
 <template>
   <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 md:hidden">
-    <nav class="bg-[var(--bg-card)]/85 backdrop-blur-lg rounded-full shadow-[var(--shadow-md)] border border-[var(--border-color)] px-3 py-2 flex items-center gap-4">
+    <nav class="bg-[var(--bg-card)]/85 backdrop-blur-lg rounded-full shadow-[var(--shadow-md)] border border-[var(--border-color)] px-2 py-2 flex items-center gap-1">
       <button
         v-for="item in navItems"
         :key="item.path"
         @click="navigateTo(item.path)"
         :class="[
-          'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-full transition-colors',
+          'flex min-w-11 flex-col items-center justify-center gap-1 px-2 py-2 rounded-full transition-colors',
           isActive(item.path) ? 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
         ]"
       >

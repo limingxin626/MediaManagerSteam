@@ -24,6 +24,11 @@ const routes = [
     props: (route: any) => ({ mediaId: Number(route.params.id) })
   },
   {
+    path: '/folders',
+    name: 'Folder',
+    component: () => import('../views/Folder.vue')
+  },
+  {
     path: '/admin',
     component: () => import('../views/Admin.vue'),
     children: [
