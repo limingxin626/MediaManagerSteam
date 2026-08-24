@@ -6,14 +6,31 @@
 
     <template v-else-if="folder">
       <div class="flex-1 overflow-y-auto">
-        <main class="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:gap-8 lg:px-8 lg:py-10 xl:px-10">
+        <main class="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 lg:space-y-8 lg:px-8 lg:py-10 xl:px-10">
+          <button
+            v-if="fanartFile"
+            class="group relative block aspect-[800/535] w-full overflow-hidden rounded-[var(--radius-lg)] bg-[#181818] shadow-[var(--shadow-md)]"
+            @click="openPreview(fanartFile)"
+          >
+            <img
+              v-if="resolveThumb(fanartFile)"
+              :src="resolveThumb(fanartFile)"
+              :alt="fanartFile.name"
+              class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.01]"
+            />
+            <div v-else class="grid h-full w-full place-items-center text-[var(--text-muted)]">
+              <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3" /></svg>
+            </div>
+          </button>
+
+          <div class="flex flex-col gap-6 lg:flex-row lg:gap-8">
           <article class="min-w-0 flex-1">
             <div v-if="mediaFiles.length" class="grid grid-cols-2 gap-2.5 rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 shadow-[var(--shadow-sm)] sm:grid-cols-3 xl:grid-cols-4">
               <button
-                v-for="(file, index) in mediaFiles"
+                v-for="file in mediaFiles"
                 :key="file.id"
                 class="group relative aspect-square overflow-hidden rounded-[var(--radius-md)] bg-[#181818]"
-                @click="openPreview(index)"
+                @click="openPreview(file)"
               >
                 <img
                   v-if="resolveThumb(file)"
@@ -82,6 +99,7 @@
               </button>
             </div>
           </aside>
+          </div>
         </main>
       </div>
     </template>
@@ -118,7 +136,9 @@ const previewOpen = ref(false)
 const previewItems = ref<MessageMediaItem[]>([])
 const previewIndex = ref(0)
 
-const mediaFiles = computed(() => folder.value?.files.filter(file => file.media_id !== null) ?? [])
+const allMediaFiles = computed(() => folder.value?.files.filter(file => file.media_id !== null) ?? [])
+const fanartFile = computed(() => folder.value?.fanart_file ?? null)
+const mediaFiles = computed(() => allMediaFiles.value.filter(file => file.id !== fanartFile.value?.id))
 const folderPath = computed(() => {
   if (!folder.value?.primary_repo_id) return '位置不可用'
   return `${folder.value.primary_repo_id}/${folder.value.primary_folder_path || ''}`.replace(/\/$/, '')
@@ -147,9 +167,10 @@ async function loadFolder() {
   }
 }
 
-function openPreview(index: number) {
-  previewItems.value = mapPreviewFiles(mediaFiles.value)
-  previewIndex.value = index
+function openPreview(file: RepositoryFile) {
+  previewItems.value = mapPreviewFiles(allMediaFiles.value)
+  previewIndex.value = allMediaFiles.value.findIndex(item => item.id === file.id)
+  if (previewIndex.value < 0) return
   previewOpen.value = true
 }
 
