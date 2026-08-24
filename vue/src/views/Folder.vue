@@ -98,8 +98,11 @@
       <div ref="scrollContainer" class="relative min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto w-full px-4 py-4 pb-24 sm:px-6 lg:px-8 md:pb-6">
           <div v-if="loading && !folders.length" class="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            <div v-for="index in 8" :key="index" class="h-72 animate-pulse rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
-              <div class="h-44 bg-[var(--bg-secondary)]"></div>
+            <div v-for="index in 8" :key="index" class="animate-pulse overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
+              <div class="bg-[var(--bg-secondary)]" :class="gridPreviewSizeClass"></div>
+              <div class="h-10 px-3 py-2.5">
+                <div class="h-4 w-2/3 rounded bg-[var(--bg-secondary)]"></div>
+              </div>
             </div>
           </div>
           <div v-else-if="error && !folders.length" class="py-20 text-center">
@@ -119,7 +122,6 @@
               :key="folder.id"
               :data-folder-id="folder.id"
               class="group flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
-              :class="gridMode === 'poster' ? '' : 'h-72'"
               @click="openFolder(folder.id)"
             >
               <div
@@ -140,15 +142,8 @@
                   <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3.5 6.5h6l2 2h9v10h-17z" /></svg>
                 </div>
               </div>
-              <div class="flex min-h-0 flex-1 flex-col p-3">
-                <div class="flex items-center gap-2">
-                  <h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{{ folder.name }}</h2>
-                  <span class="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">{{ folder.media_count }}</span>
-                </div>
-                <p class="mt-1 truncate text-xs text-[var(--text-muted)]" :title="folderPath(folder)">{{ folderPath(folder) }}</p>
-                <div v-if="folderTags(folder).length" class="mt-auto flex min-w-0 gap-1 overflow-hidden pt-2">
-                  <span v-for="tag in folderTags(folder).slice(0, 3)" :key="tag.id" class="tag-chip shrink-0">{{ tag.name }}</span>
-                </div>
+              <div class="h-10 shrink-0 px-3 py-2.5">
+                <h2 class="truncate text-sm font-semibold leading-5">{{ folder.name }}</h2>
               </div>
             </article>
           </div>
@@ -307,8 +302,8 @@ const viewActiveClass = 'bg-[var(--bg-card)] text-[var(--color-primary-600)] sha
 const viewInactiveClass = 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
 const selectedTagName = computed(() => tags.value.find(tag => tag.id === selectedTagId.value)?.name ?? null)
 const gridPreviewSizeClass = computed(() => {
-  if (gridMode.value === 'poster') return 'aspect-[2/3]'
-  if (gridMode.value === 'fanart') return 'aspect-video'
+  if (gridMode.value === 'poster') return 'aspect-[376/535]'
+  if (gridMode.value === 'fanart') return 'aspect-[800/535]'
   return 'h-44'
 })
 
