@@ -29,9 +29,10 @@
       </div>
     </aside>
 
-    <main class="relative flex min-w-0 flex-1 flex-col">
+    <main class="flex min-w-0 flex-1">
+      <div class="relative flex min-w-0 flex-1 flex-col">
       <header class="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
-        <div class="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 pr-10 sm:px-6 lg:px-8">
           <div class="flex min-w-0 items-center gap-2">
             <button class="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] md:hidden" title="标签筛选" @click="mobileTagsOpen = true">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
@@ -72,9 +73,9 @@
         </div>
       </header>
 
-      <div class="min-h-0 flex-1 overflow-y-auto">
-        <div class="mx-auto w-full max-w-7xl px-4 py-4 pb-24 sm:px-6 lg:px-8 md:pb-6">
-          <div v-if="loading && !folders.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <div ref="scrollContainer" class="relative min-h-0 flex-1 overflow-y-auto">
+        <div class="mx-auto w-full px-4 py-4 pb-24 sm:px-6 lg:px-8 md:pb-6">
+          <div v-if="loading && !folders.length" class="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             <div v-for="index in 8" :key="index" class="h-72 animate-pulse rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
               <div class="h-44 bg-[var(--bg-secondary)]"></div>
             </div>
@@ -90,10 +91,11 @@
             <h2 class="mt-4 text-sm font-medium">暂无目录</h2>
           </div>
 
-          <div v-if="viewMode === 'grid' && folders.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div v-if="viewMode === 'grid' && folders.length" class="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             <article
               v-for="folder in folders"
               :key="folder.id"
+              :data-folder-id="folder.id"
               class="group flex h-72 min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
               @click="openFolder(folder.id)"
             >
@@ -125,10 +127,11 @@
             </article>
           </div>
 
-          <div v-else-if="folders.length" class="mx-auto flex max-w-5xl flex-col gap-4">
+          <div v-else-if="folders.length" class="mx-auto flex max-w-6xl flex-col gap-4">
             <article
               v-for="folder in folders"
               :key="folder.id"
+              :data-folder-id="folder.id"
               class="overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]"
             >
               <button class="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-[var(--bg-secondary)]" @click="openFolder(folder.id)">
@@ -160,10 +163,11 @@
             </article>
           </div>
 
-          <div v-if="hasMore" class="py-6 text-center">
-            <button class="rounded-lg px-4 py-2 text-sm text-[var(--color-primary-600)] hover:bg-[var(--bg-secondary)] disabled:opacity-50" :disabled="loading" @click="loadFolders(false)">
-              {{ loading ? '加载中...' : '加载更多' }}
-            </button>
+          <div v-if="loading && folders.length" class="py-6 text-center">
+            <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-color)] border-t-[var(--color-primary-500)]"></div>
+          </div>
+          <div v-else-if="!hasMore && folders.length" class="py-8 text-center">
+            <p class="text-xs text-[var(--text-muted)]">已经到底了</p>
           </div>
         </div>
       </div>
@@ -202,6 +206,7 @@
           </div>
         </aside>
       </div>
+      </div>
     </main>
 
     <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" @close="previewOpen = false" @media-deleted="handleMediaChanged" @media-rotated="handleMediaChanged" @media-replaced="handleMediaChanged" />
@@ -209,7 +214,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, onMounted, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
@@ -251,12 +256,16 @@ const loadingDetail = ref(false)
 const detailError = ref('')
 const uploading = ref(false)
 const mobileTagsOpen = ref(false)
+const scrollContainer = ref<HTMLElement | null>(null)
 const uploadInput = ref<HTMLInputElement | null>(null)
 const previewOpen = ref(false)
 const previewItems = ref<MessageMediaItem[]>([])
 const previewIndex = ref(0)
 const toast = useToast()
 let detailRequest = 0
+let infiniteScrollObserver: IntersectionObserver | null = null
+
+const PREFETCH_DISTANCE = 10
 
 const activeFilterClass = 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
 const inactiveFilterClass = 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
@@ -312,10 +321,15 @@ async function loadFolders(reset = false) {
     hasMore.value = data.has_more
   } catch (caught: any) {
     error.value = caught?.message || '加载目录失败'
-  } finally { loading.value = false }
+  } finally {
+    loading.value = false
+    await nextTick()
+    bindInfiniteScrollTarget()
+  }
 }
 
 async function refresh() {
+  scrollContainer.value?.scrollTo({ top: 0 })
   await Promise.all([loadTags(), loadFolders(true)])
 }
 
@@ -323,12 +337,34 @@ async function selectTag(tagId: number | null) {
   if (selectedTagId.value === tagId) return
   selectedTagId.value = tagId
   mobileTagsOpen.value = false
+  scrollContainer.value?.scrollTo({ top: 0 })
   await loadFolders(true)
+}
+
+function setupInfiniteScroll() {
+  infiniteScrollObserver?.disconnect()
+  const root = scrollContainer.value
+  if (!root) return
+  infiniteScrollObserver = new IntersectionObserver(entries => {
+    if (entries[0]?.isIntersecting && !loading.value && hasMore.value) loadFolders()
+  }, { root })
+  bindInfiniteScrollTarget()
+}
+
+function bindInfiniteScrollTarget() {
+  const root = scrollContainer.value
+  if (!root || !infiniteScrollObserver) return
+  const cards = root.querySelectorAll<HTMLElement>('[data-folder-id]')
+  infiniteScrollObserver.disconnect()
+  if (!cards.length || !hasMore.value) return
+  const targetIndex = Math.max(0, cards.length - 1 - PREFETCH_DISTANCE)
+  infiniteScrollObserver.observe(cards[targetIndex]!)
 }
 
 function setViewMode(mode: 'grid' | 'feed') {
   viewMode.value = mode
   localStorage.setItem('folder_view', mode)
+  nextTick(bindInfiniteScrollTarget)
 }
 
 function openPreview(files: RepositoryFile[], index: number) {
@@ -395,9 +431,12 @@ async function handleMediaChanged() {
   if (detail.value) await openFolder(detail.value.id)
 }
 
-onMounted(() => {
+onMounted(async () => {
   const saved = localStorage.getItem('folder_view')
   viewMode.value = saved === 'feed' ? 'feed' : 'grid'
-  refresh()
+  await refresh()
+  setupInfiniteScroll()
 })
+
+onUnmounted(() => infiniteScrollObserver?.disconnect())
 </script>
