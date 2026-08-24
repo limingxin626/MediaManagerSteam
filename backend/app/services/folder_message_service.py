@@ -26,6 +26,26 @@ def _folder_label(folder: RepositoryFolder) -> dict:
     return {"id": folder.id, "repo_id": folder.repo_id, "rel_path": folder.rel_path}
 
 
+def _primary_folder_name(db: Session, message_id: int) -> str | None:
+    """Return the name of a message's primary folder (first link as fallback)."""
+    links = db.query(MessageFolder).filter_by(message_id=message_id).all()
+    if not links:
+        return None
+    primary = next((link for link in links if link.role == "PRIMARY"), links[0])
+    return primary.folder.name
+
+
+def _sync_message_text(db: Session, message_id: int) -> None:
+    """A folder-bound message's text is always its folder name."""
+    name = _primary_folder_name(db, message_id)
+    if name is None:
+        return
+    message = db.get(Message, message_id)
+    if message is not None and message.text != name:
+        message.text = name
+        message.updated_at = datetime.now()
+
+
 def bind_folder_to_existing_message(
     db: Session,
     message_id: int,
@@ -61,6 +81,7 @@ def bind_folder_to_existing_message(
         link.role = role
     db.flush()
     reconcile_message_media(db, message_id)
+    _sync_message_text(db, message_id)
 
     if old_message_id is not None:
         old_message = db.get(Message, old_message_id)
@@ -199,6 +220,7 @@ def backfill_existing_folder_messages(
             db.flush()
 
         reconcile_message_media(db, target_message_id)
+        _sync_message_text(db, target_message_id)
         for old_message_id in old_message_ids - {target_message_id}:
             if db.query(MessageFolder.id).filter_by(message_id=old_message_id).first() is not None:
                 continue
@@ -241,7 +263,7 @@ def ensure_folder_messages(db: Session, repo_id: str) -> set[int]:
                 message_ids.add(link.message_id)
             continue
         if folder.message_link is None:
-            message = Message()
+            message = Message(text=folder.name)
             db.add(message)
             db.flush()
             db.add(MessageFolder(
@@ -252,6 +274,10 @@ def ensure_folder_messages(db: Session, repo_id: str) -> set[int]:
             message_ids.add(message.id)
         else:
             message_ids.add(folder.message_link.message_id)
+    # A folder-bound message's text is always its folder name; keep it in sync
+    # after renames or explicit bindings (the catalog scan updates folder.name first).
+    for message_id in message_ids:
+        _sync_message_text(db, message_id)
     db.flush()
     return message_ids
 
