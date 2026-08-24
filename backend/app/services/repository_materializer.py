@@ -127,10 +127,6 @@ def _process_row(db, row: RepositoryFile) -> bool:
         row.materialize_error = None
         row.is_hdr = media_info.get("is_hdr")
         row.color_transfer = media_info.get("color_transfer")
-        db.flush()
-        if row.folder.message_link is not None:
-            from app.services.folder_message_service import reconcile_message_media
-            reconcile_message_media(db, row.folder.message_link.message_id)
         db.commit()
         logger.info(
             "[catalog-worker] %s Media id=%s for %s",

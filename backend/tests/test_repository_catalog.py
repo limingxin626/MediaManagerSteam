@@ -3,14 +3,11 @@ from io import BytesIO
 
 import pytest
 
-from app.models import Media, Message, MessageFolder, MessageMedia, RepositoryFile, RepositoryFolder
+from app.models import Folder, FolderLocation, Media, Message, MessageFolder, RepositoryFile, RepositoryFolder
+from app.routers.folder import get_folder
 from app.services import repository_catalog, repository_materializer
-from app.services.folder_message_service import (
-    backfill_existing_folder_messages,
-    store_file_in_primary_folder,
-)
-from app.services.message_service import add_media_to_message_service, update_message_service
-from app.routers.message import _build_detail_response
+from app.services.folder_service import store_file_in_primary_folder
+from app.routers.message import _build_detail_query, _execute_like_search
 
 
 def test_scan_skips_empty_folders_and_only_catalogs_supported_files(catalog_env):
@@ -43,7 +40,7 @@ def test_non_media_folder_does_not_create_message(catalog_env):
         assert db.query(Message).count() == 0
 
 
-def test_removing_last_media_deletes_generated_message_when_other_files_remain(catalog_env):
+def test_removing_last_media_deletes_logical_folder_when_other_files_remain(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"
     album.mkdir()
@@ -53,8 +50,7 @@ def test_removing_last_media_deletes_generated_message_when_other_files_remain(c
 
     repository_catalog.rescan("test")
     with session_factory() as db:
-        assert db.query(Message).count() == 1
-        assert db.query(MessageFolder).count() == 1
+        assert db.query(Folder).count() == 1
 
     media_file.unlink()
     repository_catalog.rescan("test")
@@ -62,8 +58,7 @@ def test_removing_last_media_deletes_generated_message_when_other_files_remain(c
     with session_factory() as db:
         assert db.query(RepositoryFolder).filter_by(rel_path="album").count() == 1
         assert db.query(RepositoryFile).count() == 0
-        assert db.query(MessageFolder).count() == 0
-        assert db.query(Message).count() == 0
+        assert db.query(Folder).count() == 0
 
 
 def test_changed_path_detaches_old_media_and_requeues(catalog_env):
@@ -140,7 +135,7 @@ def test_folder_rename_preserves_catalog_identity(catalog_env):
         assert db.query(RepositoryFolder).filter_by(rel_path="original").count() == 0
 
 
-def test_folder_message_media_is_derived_from_catalog(catalog_env):
+def test_folder_media_is_read_directly_from_catalog(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"
     album.mkdir()
@@ -158,14 +153,16 @@ def test_folder_message_media_is_derived_from_catalog(catalog_env):
 
     with session_factory() as db:
         folder = db.query(RepositoryFolder).filter_by(rel_path="album").one()
-        link = db.query(MessageFolder).filter_by(repository_folder_id=folder.id).one()
-        relation = db.query(MessageMedia).filter_by(message_id=link.message_id).one()
-        assert db.query(Message).filter_by(id=link.message_id).count() == 1
-        assert relation.media_id == db.query(Media).one().id
-        assert relation.position == 0
+        location = db.query(FolderLocation).filter_by(repository_folder_id=folder.id).one()
+        file = db.query(RepositoryFile).filter_by(folder_id=folder.id).one()
+        response = get_folder(location.folder_id, db)
+
+        assert file.media_id == db.query(Media).one().id
+        assert response.media_count == 1
+        assert [item.media_id for item in response.files] == [file.media_id]
 
 
-def test_removed_file_is_removed_from_derived_message_only(catalog_env):
+def test_removed_file_removes_logical_folder_but_preserves_media(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"
     album.mkdir()
@@ -185,11 +182,11 @@ def test_removed_file_is_removed_from_derived_message_only(catalog_env):
     repository_catalog.rescan("test")
 
     with session_factory() as db:
-        assert db.query(MessageMedia).count() == 0
+        assert db.query(Folder).count() == 0
         assert db.query(Media).count() == 1
 
 
-def test_folder_becoming_empty_removes_folder_and_message(catalog_env):
+def test_folder_becoming_empty_removes_catalog_and_logical_folder(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"
     album.mkdir()
@@ -210,84 +207,11 @@ def test_folder_becoming_empty_removes_folder_and_message(catalog_env):
 
     with session_factory() as db:
         assert db.query(RepositoryFolder).filter_by(rel_path="album").count() == 0
-        assert db.query(MessageFolder).count() == 0
-        assert db.query(Message).count() == 0
+        assert db.query(Folder).count() == 0
         assert db.query(Media).count() == 1
 
 
-def test_backfill_reuses_existing_message_and_removes_generated_duplicate(catalog_env):
-    repo, session_factory = catalog_env
-    album = repo / "album"
-    album.mkdir()
-    (album / "photo.jpg").write_bytes(b"image")
-    with session_factory() as db:
-        media = Media(
-            repo_id="test",
-            file_path="album/photo.jpg",
-            file_hash="backfill-photo-hash",
-            file_size=5,
-        )
-        message = Message(text="existing album")
-        db.add_all([media, message])
-        db.flush()
-        db.add(MessageMedia(message_id=message.id, media_id=media.id, position=0))
-        db.commit()
-        existing_message_id = message.id
-
-    repository_catalog.rescan("test")
-
-    with session_factory() as db:
-        assert db.query(Message).count() == 2
-        dry_run = backfill_existing_folder_messages(db, apply=False)
-        assert dry_run["matched_folders"] == 1
-        assert dry_run["matched_messages"] == 1
-        assert db.query(MessageFolder).one().message_id != existing_message_id
-        db.rollback()
-
-    with session_factory() as db:
-        applied = backfill_existing_folder_messages(db, apply=True)
-        db.commit()
-        assert applied["deleted_generated_messages"] == 1
-        assert db.query(MessageFolder).one().message_id == existing_message_id
-        assert db.query(Message).count() == 1
-        assert db.query(MessageMedia).filter_by(message_id=existing_message_id).count() == 1
-
-
-def test_backfill_does_not_replace_edited_folder_message(catalog_env):
-    repo, session_factory = catalog_env
-    album = repo / "album"
-    album.mkdir()
-    (album / "photo.jpg").write_bytes(b"image")
-    with session_factory() as db:
-        media = Media(
-            repo_id="test",
-            file_path="album/photo.jpg",
-            file_hash="protected-backfill-photo-hash",
-            file_size=5,
-        )
-        legacy = Message(text="legacy")
-        db.add_all([media, legacy])
-        db.flush()
-        db.add(MessageMedia(message_id=legacy.id, media_id=media.id, position=0))
-        db.commit()
-        legacy_id = legacy.id
-
-    repository_catalog.rescan("test")
-    with session_factory() as db:
-        link = db.query(MessageFolder).one()
-        generated_id = link.message_id
-        link.message.text = "edited after migration"
-        db.commit()
-
-    with session_factory() as db:
-        stats = backfill_existing_folder_messages(db, apply=True)
-        db.commit()
-        assert stats["ambiguous_folders"] == 1
-        assert db.query(MessageFolder).one().message_id == generated_id
-        assert db.get(Message, legacy_id) is not None
-
-
-def test_folder_backed_message_rejects_direct_media_writes(catalog_env):
+def test_ordinary_message_query_excludes_folder_backed_messages(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"
     album.mkdir()
@@ -295,14 +219,16 @@ def test_folder_backed_message_rejects_direct_media_writes(catalog_env):
     repository_catalog.rescan("test")
 
     with session_factory() as db:
-        message_id = db.query(MessageFolder).one().message_id
-        with pytest.raises(ValueError, match="Folder-backed"):
-            update_message_service(db, message_id, media_order=[], commit=False)
-        with pytest.raises(ValueError, match="Folder-backed"):
-            add_media_to_message_service(db, message_id, [], commit=False)
+        ordinary = Message(text="ordinary")
+        db.add(ordinary)
+        db.commit()
+
+        rows = _build_detail_query(db, None, None, None, None).all()
+
+        assert [row.id for row in rows] == [ordinary.id]
 
 
-def test_message_detail_includes_repository_folders(catalog_env):
+def test_message_like_search_excludes_folder_backed_messages(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"
     album.mkdir()
@@ -310,15 +236,34 @@ def test_message_detail_includes_repository_folders(catalog_env):
     repository_catalog.rescan("test")
 
     with session_factory() as db:
-        message = db.query(Message).join(MessageFolder).one()
-        response = _build_detail_response(db, message, media_limit=None)
-        assert len(response.folders) == 1
-        assert response.folders[0].repo_id == "test"
-        assert response.folders[0].rel_path == "album"
-        assert response.folders[0].role == "PRIMARY"
+        ordinary = Message(text="album note")
+        db.add(ordinary)
+        db.commit()
+
+        rows = _execute_like_search(db, "album", None, None, None, None, 20)
+
+        assert [row.id for row in rows] == [ordinary.id]
 
 
-def test_store_file_in_message_primary_folder(catalog_env):
+def test_scan_creates_independent_folder_with_catalog_files(catalog_env):
+    repo, session_factory = catalog_env
+    album = repo / "album"
+    album.mkdir()
+    (album / "existing.jpg").write_bytes(b"image")
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(Folder).one()
+        location = db.query(FolderLocation).one()
+        response = get_folder(folder.id, db)
+
+        assert location.repository_folder.rel_path == "album"
+        assert response.name == "album"
+        assert [item.rel_path for item in response.files] == ["album/existing.jpg"]
+
+
+def test_folder_name_follows_physical_folder_rename(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"
     album.mkdir()
@@ -326,10 +271,32 @@ def test_store_file_in_message_primary_folder(catalog_env):
     repository_catalog.rescan("test")
 
     with session_factory() as db:
-        message_id = db.query(MessageFolder).one().message_id
+        folder_id = db.query(Folder).one().id
+
+    album.rename(repo / "renamed")
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(Folder).one()
+        response = get_folder(folder.id, db)
+
+        assert folder.id == folder_id
+        assert response.name == "renamed"
+        assert response.primary_folder_path == "renamed"
+
+
+def test_store_file_in_folder_primary_location(catalog_env):
+    repo, session_factory = catalog_env
+    album = repo / "album"
+    album.mkdir()
+    (album / "existing.jpg").write_bytes(b"image")
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder_id = db.query(Folder).one().id
         repo_id, destination = store_file_in_primary_folder(
             db,
-            message_id,
+            folder_id,
             "photo.jpg",
             BytesIO(b"image"),
         )
@@ -369,7 +336,7 @@ def test_worker_materializes_and_copies_hdr_metadata(catalog_env, monkeypatch):
         assert row.color_transfer == "smpte2084"
 
 
-def test_worker_updates_folder_backed_message(catalog_env, monkeypatch):
+def test_worker_updates_folder_catalog_media(catalog_env, monkeypatch):
     repo, session_factory = catalog_env
     album = repo / "album"
     album.mkdir()
@@ -392,11 +359,12 @@ def test_worker_updates_folder_backed_message(catalog_env, monkeypatch):
     assert repository_materializer._process_batch() == 1
 
     with session_factory() as db:
-        link = db.query(MessageFolder).join(RepositoryFolder).filter(
-            RepositoryFolder.rel_path == "album",
-        ).one()
-        relation = db.query(MessageMedia).filter_by(message_id=link.message_id).one()
-        assert relation.media_id == db.query(Media).one().id
+        folder = db.query(Folder).one()
+        file = db.query(RepositoryFile).filter_by(rel_path="album/movie.mp4").one()
+        response = get_folder(folder.id, db)
+
+        assert file.media_id == db.query(Media).one().id
+        assert response.media_count == 1
 
 
 def test_folder_rename_promotes_media_canonical_path(catalog_env, monkeypatch):
@@ -428,10 +396,10 @@ def test_folder_rename_promotes_media_canonical_path(catalog_env, monkeypatch):
         media = db.query(Media).one()
         assert media.repo_id == "test"
         assert media.file_path == "renamed/photo.jpg"
-        link = db.query(MessageFolder).join(RepositoryFolder).filter(
-            RepositoryFolder.rel_path == "renamed",
-        ).one()
-        assert db.query(MessageMedia).filter_by(
-            message_id=link.message_id,
-            media_id=media.id,
-        ).count() == 1
+        folder = db.query(Folder).one()
+        file = db.query(RepositoryFile).filter_by(rel_path="renamed/photo.jpg").one()
+        response = get_folder(folder.id, db)
+
+        assert file.media_id == media.id
+        assert response.name == "renamed"
+        assert response.media_count == 1

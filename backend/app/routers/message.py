@@ -90,7 +90,7 @@ def _build_detail_query(
     issue_id: Optional[int] = None,
 ):
     """공통 필터만 적용한 Message 쿼리를 반환 (정렬·커서 없음)."""
-    query = db.query(Message)
+    query = db.query(Message).filter(~Message.folder_links.any())
     if collection_id is not None:
         if collection_id == 0:
             query = query.filter(Message.collection_id.is_(None))
@@ -315,7 +315,7 @@ def get_message_dates(
 ):
     """获取指定月份中有消息的日期及数量"""
     date_label = func.strftime('%Y-%m-%d', Message.created_at).label('date_str')
-    query = db.query(date_label, func.count().label('cnt'))
+    query = db.query(date_label, func.count().label('cnt')).filter(~Message.folder_links.any())
 
     if collection_id is not None:
         if collection_id == 0:
@@ -354,7 +354,7 @@ def get_message_dates(
 @router.get("/sync", response_model=List[MessageSyncResponse])
 def sync_messages(db: Session = Depends(get_db)):
     """全量同步：返回所有消息的完整详情（含 media 元数据和 tag）"""
-    messages = db.query(Message).order_by(Message.created_at.desc()).all()
+    messages = db.query(Message).filter(~Message.folder_links.any()).order_by(Message.created_at.desc()).all()
     if not messages:
         return []
 
@@ -470,7 +470,10 @@ def _execute_like_search(
     from sqlalchemy import text as sql_text
 
     params: dict = {"pat": f"%{like_q}%", "limit": limit + 1}
-    where = ["m.text LIKE :pat"]
+    where = [
+        "m.text LIKE :pat",
+        "NOT EXISTS (SELECT 1 FROM message_folder mf WHERE mf.message_id = m.id)",
+    ]
 
     if collection_id is not None:
         if collection_id == 0:
@@ -556,7 +559,10 @@ def _execute_fts_search(
     from sqlalchemy import text as sql_text
 
     params: dict = {"q": match_q, "limit": limit + 1}
-    where = ["message_fts MATCH :q"]
+    where = [
+        "message_fts MATCH :q",
+        "NOT EXISTS (SELECT 1 FROM message_folder mf WHERE mf.message_id = m.id)",
+    ]
 
     if collection_id is not None:
         if collection_id == 0:
@@ -695,7 +701,10 @@ def get_message_detail(
     db: Session = Depends(get_db),
 ):
     """获取单条消息详情"""
-    message = db.query(Message).filter(Message.id == message_id).first()
+    message = db.query(Message).filter(
+        Message.id == message_id,
+        ~Message.folder_links.any(),
+    ).first()
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
     return _build_detail_response(db, message, media_limit=None)

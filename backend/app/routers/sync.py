@@ -141,7 +141,10 @@ def _tag_snapshot(tag: Tag) -> Dict[str, Any]:
 
 def _fetch_snapshot(db: Session, entity_type: str, entity_id: int) -> Optional[Dict[str, Any]]:
     if entity_type == "MESSAGE":
-        obj = db.query(Message).filter(Message.id == entity_id).first()
+        obj = db.query(Message).filter(
+            Message.id == entity_id,
+            ~Message.folder_links.any(),
+        ).first()
         return _message_snapshot(db, obj) if obj else None
     elif entity_type == "COLLECTION":
         obj = db.query(Collection).filter(Collection.id == entity_id).first()

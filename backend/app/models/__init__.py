@@ -70,6 +70,7 @@ class Collection(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     messages = relationship("Message", back_populates="collection")
+    folders = relationship("Folder", back_populates="collection")
 
     __table_args__ = (
         UniqueConstraint("name", name="uq_collection_name"),
@@ -100,6 +101,7 @@ class Tag(Base):
 
     messages = relationship("Message", secondary=message_tag, back_populates="tags")
     media_items = relationship("Media", secondary=media_tag, back_populates="tags")
+    folders = relationship("Folder", secondary="folder_tag", back_populates="tags")
 
     __table_args__ = (
         UniqueConstraint("name", name="uq_tag_name"),
@@ -219,4 +221,11 @@ from app.models.todo import Todo  # noqa: E402,F401
 from app.models.issue import Issue  # noqa: E402,F401
 from app.models.transaction import Transaction, TxnCategoryRule  # noqa: E402,F401
 from app.models.telegram import TelegramSyncState, RemoteMediaReference  # noqa: E402,F401
-from app.models.repository_catalog import MessageFolder, RepositoryFile, RepositoryFolder  # noqa: E402,F401
+from app.models.repository_catalog import (  # noqa: E402,F401
+    Folder,
+    FolderLocation,
+    MessageFolder,
+    RepositoryFile,
+    RepositoryFolder,
+    folder_tag,
+)

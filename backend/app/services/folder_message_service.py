@@ -13,8 +13,9 @@ from app.config import config
 
 
 def _is_disposable_generated_message(message: Message) -> bool:
+    folder_names = {link.folder.name for link in message.folder_links}
     return (
-        not message.text
+        (not message.text or message.text in folder_names)
         and message.collection_id is None
         and message.issue_id is None
         and not message.starred
@@ -63,6 +64,7 @@ def bind_folder_to_existing_message(
     if link is not None and link.message_id == message_id:
         return False
     old_message_id = link.message_id if link is not None else None
+    old_message_disposable = link is not None and _is_disposable_generated_message(link.message)
     has_primary = db.query(MessageFolder.id).filter_by(
         message_id=message_id,
         role="PRIMARY",
@@ -77,7 +79,7 @@ def bind_folder_to_existing_message(
     else:
         link.role = "MIRROR"
         db.flush()
-        link.message_id = message_id
+        link.message = message
         link.role = role
     db.flush()
     reconcile_message_media(db, message_id)
@@ -88,7 +90,7 @@ def bind_folder_to_existing_message(
         if (
             old_message is not None
             and db.query(MessageFolder.id).filter_by(message_id=old_message_id).first() is None
-            and _is_disposable_generated_message(old_message)
+            and old_message_disposable
         ):
             db.delete(old_message)
             db.flush()
@@ -201,6 +203,8 @@ def backfill_existing_folder_messages(
             continue
 
         old_message_ids: set[int] = set()
+        disposable_old_message_ids: set[int] = set()
+        target_message = db.get(Message, target_message_id)
         for index, folder_id in enumerate(folder_ids):
             folder = db.get(RepositoryFolder, folder_id)
             link = folder.message_link
@@ -213,9 +217,11 @@ def backfill_existing_folder_messages(
                 ))
             else:
                 old_message_ids.add(link.message_id)
+                if _is_disposable_generated_message(link.message):
+                    disposable_old_message_ids.add(link.message_id)
                 link.role = "MIRROR"
                 db.flush()
-                link.message_id = target_message_id
+                link.message = target_message
                 link.role = role
             db.flush()
 
@@ -225,7 +231,7 @@ def backfill_existing_folder_messages(
             if db.query(MessageFolder.id).filter_by(message_id=old_message_id).first() is not None:
                 continue
             old_message = db.get(Message, old_message_id)
-            if old_message is not None and _is_disposable_generated_message(old_message):
+            if old_message is not None and old_message_id in disposable_old_message_ids:
                 db.delete(old_message)
                 stats["deleted_generated_messages"] += 1
         db.flush()

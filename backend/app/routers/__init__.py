@@ -12,6 +12,7 @@ from .health import router as health_router
 from .smart import router as smart_router
 from .transactions import router as transactions_router
 from .repositories import router as repositories_router
+from .folder import router as folder_router
 
 # 所有路由列表
 all_routers = [
@@ -29,4 +30,5 @@ all_routers = [
     smart_router,
     transactions_router,
     repositories_router,
+    folder_router,
 ]

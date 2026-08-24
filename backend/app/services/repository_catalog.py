@@ -13,7 +13,7 @@ from pathlib import PurePosixPath
 from typing import Optional
 
 from app.config import config
-from app.models import Media, Message, MessageFolder, RepositoryFile, RepositoryFolder, SessionLocal
+from app.models import Media, RepositoryFile, RepositoryFolder, SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +197,6 @@ def _scan_repository(repo_id: str, root: str, other_roots: set[str]) -> Optional
         # Otherwise every existing row still looks stale on repeat scans.
         db.flush()
         deleted = 0
-        removed_folder_message_ids: set[int] = set()
         if complete:
             stale_files = db.query(RepositoryFile).filter(
                 RepositoryFile.repo_id == repo_id, RepositoryFile.scanned_at < token).all()
@@ -209,21 +208,12 @@ def _scan_repository(repo_id: str, root: str, other_roots: set[str]) -> Optional
             ).order_by(RepositoryFolder.rel_path.desc()).all()
             deleted += len(stale_folders)
             for row in stale_folders:
-                if row.message_link is not None:
-                    removed_folder_message_ids.add(row.message_link.message_id)
                 db.delete(row)
         else:
             logger.warning("[catalog] repository %s scan incomplete; sweep skipped", repo_id)
         db.flush()
-        for message_id in removed_folder_message_ids:
-            if db.query(MessageFolder.id).filter_by(message_id=message_id).first() is None:
-                message = db.get(Message, message_id)
-                if message is not None:
-                    db.delete(message)
-        db.flush()
-        from app.services.folder_message_service import ensure_folder_messages, reconcile_folder_messages
-        message_ids = ensure_folder_messages(db, repo_id)
-        reconcile_folder_messages(db, message_ids)
+        from app.services.folder_service import ensure_folders
+        ensure_folders(db, repo_id)
         db.commit()
         return {"scanned": len(folders) + len(files), "inserted": inserted, "updated": updated,
                 "unchanged": unchanged, "deleted": deleted, "matched": matched, "pending": pending}

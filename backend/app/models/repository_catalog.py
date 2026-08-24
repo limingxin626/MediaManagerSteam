@@ -5,10 +5,62 @@ assets. Physically empty directories are intentionally omitted.
 """
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, text
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, String, Table, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 
 from app.models import Base
+
+
+folder_tag = Table(
+    "folder_tag",
+    Base.metadata,
+    Column("folder_id", Integer, ForeignKey("folder.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tag.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class Folder(Base):
+    __tablename__ = "folder"
+
+    id = Column(Integer, primary_key=True, index=True)
+    collection_id = Column(Integer, ForeignKey("collection.id", ondelete="SET NULL"), nullable=True, index=True)
+    issue_id = Column(Integer, ForeignKey("issue.id", ondelete="SET NULL"), nullable=True, index=True)
+    starred = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    collection = relationship("Collection", back_populates="folders")
+    issue = relationship("Issue", back_populates="folders")
+    locations = relationship("FolderLocation", back_populates="folder", cascade="all, delete-orphan")
+    tags = relationship("Tag", secondary=folder_tag, back_populates="folders")
+
+
+class FolderLocation(Base):
+    __tablename__ = "folder_location"
+
+    id = Column(Integer, primary_key=True, index=True)
+    folder_id = Column(Integer, ForeignKey("folder.id", ondelete="CASCADE"), nullable=False, index=True)
+    repository_folder_id = Column(
+        Integer,
+        ForeignKey("repository_folder.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    role = Column(String(16), nullable=False, default="PRIMARY", server_default="PRIMARY")
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    folder = relationship("Folder", back_populates="locations")
+    repository_folder = relationship("RepositoryFolder", back_populates="folder_location")
+
+    __table_args__ = (
+        Index(
+            "uq_folder_location_primary",
+            "folder_id",
+            unique=True,
+            sqlite_where=text("role = 'PRIMARY'"),
+        ),
+    )
 
 
 class RepositoryFolder(Base):
@@ -28,6 +80,12 @@ class RepositoryFolder(Base):
     children = relationship("RepositoryFolder", back_populates="parent", cascade="all, delete-orphan", passive_deletes=True)
     files = relationship("RepositoryFile", back_populates="folder", cascade="all, delete-orphan", passive_deletes=True)
     message_link = relationship("MessageFolder", back_populates="folder", cascade="all, delete-orphan", uselist=False)
+    folder_location = relationship(
+        "FolderLocation",
+        back_populates="repository_folder",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
     __table_args__ = (
         UniqueConstraint("repo_id", "rel_path", name="uq_repository_folder_repo_path"),

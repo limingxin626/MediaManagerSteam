@@ -18,6 +18,7 @@ class Issue(Base):
     completed_at = Column(DateTime, nullable=True)
 
     messages = relationship("Message", back_populates="issue")
+    folders = relationship("Folder", back_populates="issue")
 
     __table_args__ = (
         Index("ix_issue_status_position", "status", "position"),
