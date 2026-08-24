@@ -43,6 +43,28 @@
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
+            <select
+              v-if="viewMode === 'grid'"
+              v-model="gridMode"
+              class="h-8 rounded-[var(--radius-sm)] border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 text-xs text-[var(--text-secondary)] sm:hidden"
+              aria-label="Grid 模式"
+              @change="persistGridMode"
+            >
+              <option value="mosaic">拼图</option>
+              <option value="fanart">Fanart</option>
+              <option value="poster">Poster</option>
+            </select>
+            <div v-if="viewMode === 'grid'" class="hidden rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-0.5 sm:flex" aria-label="Grid 模式">
+              <button
+                v-for="option in gridModeOptions"
+                :key="option.value"
+                class="h-7 rounded-[5px] px-2 text-xs transition-colors"
+                :class="gridMode === option.value ? viewActiveClass : viewInactiveClass"
+                @click="setGridMode(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
             <button
               class="grid h-8 w-8 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--color-primary-600)] disabled:opacity-50"
               :disabled="loading"
@@ -96,21 +118,25 @@
               v-for="folder in folders"
               :key="folder.id"
               :data-folder-id="folder.id"
-              class="group flex h-72 min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
+              class="group flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
+              :class="gridMode === 'poster' ? '' : 'h-72'"
               @click="openFolder(folder.id)"
             >
-              <div class="grid h-44 shrink-0 gap-0.5 overflow-hidden bg-[var(--bg-secondary)]" :class="previewGridClass(folderPreviews(folder).length)">
+              <div
+                class="grid shrink-0 gap-0.5 overflow-hidden bg-[var(--bg-secondary)]"
+                :class="[gridPreviewSizeClass, previewGridClass(folderGridFiles(folder).length)]"
+              >
                 <button
-                  v-for="(file, index) in folderPreviews(folder)"
+                  v-for="(file, index) in folderGridFiles(folder)"
                   :key="file.id"
                   class="group/media relative min-h-0 min-w-0 overflow-hidden"
-                  @click.stop="openPreview(folderPreviews(folder), index)"
+                  @click.stop="openPreview(folderGridFiles(folder), index)"
                 >
                   <img v-if="resolveThumb(file)" :src="resolveThumb(file)" :alt="file.name" class="h-full w-full object-cover transition-transform duration-200 group-hover/media:scale-[1.03]" loading="lazy" />
                   <MediaPlaceholder v-else />
                   <VideoBadge v-if="file.media_type === 'VIDEO'" />
                 </button>
-                <div v-if="!folderPreviews(folder).length" class="col-span-2 grid h-full place-items-center text-amber-600/70 dark:text-amber-400/70">
+                <div v-if="!folderGridFiles(folder).length" class="col-span-2 grid h-full place-items-center text-amber-600/70 dark:text-amber-400/70">
                   <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3.5 6.5h6l2 2h9v10h-17z" /></svg>
                 </div>
               </div>
@@ -251,6 +277,7 @@ const hasMore = ref(false)
 const loading = ref(false)
 const error = ref('')
 const viewMode = ref<'grid' | 'feed'>('grid')
+const gridMode = ref<GridMode>('mosaic')
 const detail = ref<FolderDetail | null>(null)
 const loadingDetail = ref(false)
 const detailError = ref('')
@@ -266,12 +293,24 @@ let detailRequest = 0
 let infiniteScrollObserver: IntersectionObserver | null = null
 
 const PREFETCH_DISTANCE = 10
+type GridMode = 'mosaic' | 'fanart' | 'poster'
+
+const gridModeOptions: { value: GridMode; label: string }[] = [
+  { value: 'mosaic', label: '拼图' },
+  { value: 'fanart', label: 'Fanart' },
+  { value: 'poster', label: 'Poster' },
+]
 
 const activeFilterClass = 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
 const inactiveFilterClass = 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
 const viewActiveClass = 'bg-[var(--bg-card)] text-[var(--color-primary-600)] shadow-[var(--shadow-sm)]'
 const viewInactiveClass = 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
 const selectedTagName = computed(() => tags.value.find(tag => tag.id === selectedTagId.value)?.name ?? null)
+const gridPreviewSizeClass = computed(() => {
+  if (gridMode.value === 'poster') return 'aspect-[2/3]'
+  if (gridMode.value === 'fanart') return 'aspect-video'
+  return 'h-44'
+})
 
 function folderPath(folder: Folder) {
   if (!folder.primary_repo_id) return '位置不可用'
@@ -280,6 +319,13 @@ function folderPath(folder: Folder) {
 
 function folderPreviews(folder: Folder) {
   return folder.preview_files ?? []
+}
+
+function folderGridFiles(folder: Folder) {
+  const previews = folderPreviews(folder)
+  if (gridMode.value === 'mosaic') return previews
+  const cover = gridMode.value === 'fanart' ? folder.fanart_file : folder.poster_file
+  return cover ? [cover] : previews.slice(0, 1)
 }
 
 function folderTags(folder: Folder) {
@@ -367,6 +413,15 @@ function setViewMode(mode: 'grid' | 'feed') {
   nextTick(bindInfiniteScrollTarget)
 }
 
+function setGridMode(mode: GridMode) {
+  gridMode.value = mode
+  persistGridMode()
+}
+
+function persistGridMode() {
+  localStorage.setItem('folder_grid_mode', gridMode.value)
+}
+
 function openPreview(files: RepositoryFile[], index: number) {
   const materialized = files.filter(file => file.media_id !== null)
   const selected = files[index]
@@ -433,7 +488,9 @@ async function handleMediaChanged() {
 
 onMounted(async () => {
   const saved = localStorage.getItem('folder_view')
+  const savedGridMode = localStorage.getItem('folder_grid_mode')
   viewMode.value = saved === 'feed' ? 'feed' : 'grid'
+  gridMode.value = savedGridMode === 'fanart' || savedGridMode === 'poster' ? savedGridMode : 'mosaic'
   await refresh()
   setupInfiniteScroll()
 })

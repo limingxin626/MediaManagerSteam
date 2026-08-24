@@ -38,6 +38,8 @@ class FolderResponse(TimestampMixin):
     primary_folder_path: Optional[str] = None
     tags: List[FolderTagItem] = []
     preview_files: List[RepositoryFileResponse] = []
+    fanart_file: Optional[RepositoryFileResponse] = None
+    poster_file: Optional[RepositoryFileResponse] = None
 
 
 class FolderDetailResponse(FolderResponse):

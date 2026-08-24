@@ -162,6 +162,38 @@ def test_folder_media_is_read_directly_from_catalog(catalog_env):
         assert [item.media_id for item in response.files] == [file.media_id]
 
 
+def test_folder_response_includes_named_cover_files(catalog_env):
+    repo, session_factory = catalog_env
+    album = repo / "album"
+    album.mkdir()
+    names = ["a.jpg", "b.jpg", "c.jpg", "d.jpg", "fanart.jpg", "poster.jpg"]
+    for name in names:
+        (album / name).write_bytes(name.encode())
+
+    with session_factory() as db:
+        for index, name in enumerate(names):
+            db.add(Media(
+                repo_id="test",
+                file_path=f"album/{name}",
+                file_hash=f"cover-{index}",
+                file_size=len(name),
+            ))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(RepositoryFolder).filter_by(rel_path="album").one()
+        location = db.query(FolderLocation).filter_by(repository_folder_id=folder.id).one()
+        response = get_folder(location.folder_id, db)
+
+        assert [item.name for item in response.preview_files] == names[:4]
+        assert response.fanart_file is not None
+        assert response.fanart_file.name == "fanart.jpg"
+        assert response.poster_file is not None
+        assert response.poster_file.name == "poster.jpg"
+
+
 def test_removed_file_removes_logical_folder_but_preserves_media(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"

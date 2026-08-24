@@ -195,6 +195,8 @@ export interface Folder {
   primary_folder_path: string | null
   tags: FolderTag[]
   preview_files: RepositoryFile[]
+  fanart_file: RepositoryFile | null
+  poster_file: RepositoryFile | null
   created_at: string
   updated_at: string
 }

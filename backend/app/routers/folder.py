@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import cast
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Folder, RepositoryFile, Tag, folder_tag, get_db
@@ -37,12 +37,20 @@ def _folder_response(db: Session, folder: Folder) -> FolderResponse:
             RepositoryFile.materialize_status == "done",
         ).scalar() or 0
     preview_rows = []
+    cover_rows = []
     if physical_ids:
-        preview_rows = db.query(RepositoryFile).options(joinedload(RepositoryFile.media)).filter(
+        files_query = db.query(RepositoryFile).options(joinedload(RepositoryFile.media)).filter(
             RepositoryFile.folder_id.in_(physical_ids),
             RepositoryFile.media_id.is_not(None),
             RepositoryFile.materialize_status == "done",
-        ).order_by(func.lower(RepositoryFile.name), RepositoryFile.id).limit(4).all()
+        )
+        preview_rows = files_query.order_by(func.lower(RepositoryFile.name), RepositoryFile.id).limit(4).all()
+        cover_rows = files_query.filter(or_(
+            func.lower(RepositoryFile.name).like("fanart.%"),
+            func.lower(RepositoryFile.name).like("poster.%"),
+        )).order_by(func.lower(RepositoryFile.name), RepositoryFile.id).all()
+    fanart = next((row for row in cover_rows if row.name.rsplit(".", 1)[0].lower() == "fanart"), None)
+    poster = next((row for row in cover_rows if row.name.rsplit(".", 1)[0].lower() == "poster"), None)
     return FolderResponse(
         id=cast(int, folder.id),
         name=cast(str, physical.name if physical is not None else ""),
@@ -57,6 +65,8 @@ def _folder_response(db: Session, folder: Folder) -> FolderResponse:
         primary_folder_path=physical.rel_path if physical is not None else None,
         tags=[FolderTagItem(id=tag.id, name=tag.name, category=tag.category) for tag in folder.tags],
         preview_files=[_file_response(row) for row in preview_rows],
+        fanart_file=_file_response(fanart) if fanart is not None else None,
+        poster_file=_file_response(poster) if poster is not None else None,
         created_at=cast(datetime, folder.created_at).isoformat(),
         updated_at=cast(datetime, folder.updated_at).isoformat(),
     )
