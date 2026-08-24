@@ -133,6 +133,7 @@ fun SystemMediaDetailScreen(
         show = tagEditorKey != null,
         allTags = allTags,
         selectedTags = editingItem?.tags.orEmpty(),
+        onCreateTag = mediaViewModel::createOrGetTag,
         onTagSelectionChanged = { tags ->
             val media = systemItems.find { it.stableKey == tagEditorKey }
             if (media != null) {

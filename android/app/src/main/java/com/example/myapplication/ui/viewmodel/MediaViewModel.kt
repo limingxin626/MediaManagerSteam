@@ -132,6 +132,9 @@ class MediaViewModel(
         }
     }
 
+    suspend fun createOrGetTag(name: String): Tag =
+        databaseManager.tagRepository.createOrGetTag(name.trim())
+
     fun toggleStarredFilter() {
         _starredOnly.value = !_starredOnly.value
     }
