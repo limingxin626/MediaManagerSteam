@@ -200,7 +200,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api } from '../composables/useApi'
@@ -245,6 +245,7 @@ const previewItems = ref<MessageMediaItem[]>([])
 const previewIndex = ref(0)
 const router = useRouter()
 let infiniteScrollObserver: IntersectionObserver | null = null
+let savedScrollTop = 0
 
 const PREFETCH_DISTANCE = 10
 type GridMode = 'mosaic' | 'fanart' | 'poster'
@@ -387,6 +388,7 @@ function openPreview(files: RepositoryFile[], index: number) {
 }
 
 function openFolder(folderId: number) {
+  savedScrollTop = scrollContainer.value?.scrollTop ?? 0
   router.push({ name: 'FolderDetail', params: { id: folderId } })
 }
 
@@ -401,6 +403,18 @@ onMounted(async () => {
   gridMode.value = savedGridMode === 'fanart' || savedGridMode === 'poster' ? savedGridMode : 'mosaic'
   await refresh()
   setupInfiniteScroll()
+})
+
+onActivated(() => {
+  nextTick(() => {
+    scrollContainer.value?.scrollTo({ top: savedScrollTop })
+    setupInfiniteScroll()
+  })
+})
+
+onDeactivated(() => {
+  savedScrollTop = scrollContainer.value?.scrollTop ?? savedScrollTop
+  infiniteScrollObserver?.disconnect()
 })
 
 onUnmounted(() => infiniteScrollObserver?.disconnect())
