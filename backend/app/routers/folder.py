@@ -5,13 +5,15 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Folder, RepositoryFile, get_db
+from app.models import Folder, RepositoryFile, Tag, folder_tag, get_db
 from app.schemas.file import FileUploadResponse
 from app.schemas.folder import (
     FolderCursorResponse,
     FolderDetailResponse,
     FolderLocationItem,
     FolderResponse,
+    FolderTagCount,
+    FolderTagItem,
 )
 from app.schemas.repositories import RepositoryFileResponse
 
@@ -34,6 +36,13 @@ def _folder_response(db: Session, folder: Folder) -> FolderResponse:
             RepositoryFile.media_id.is_not(None),
             RepositoryFile.materialize_status == "done",
         ).scalar() or 0
+    preview_rows = []
+    if physical_ids:
+        preview_rows = db.query(RepositoryFile).options(joinedload(RepositoryFile.media)).filter(
+            RepositoryFile.folder_id.in_(physical_ids),
+            RepositoryFile.media_id.is_not(None),
+            RepositoryFile.materialize_status == "done",
+        ).order_by(func.lower(RepositoryFile.name), RepositoryFile.id).limit(4).all()
     return FolderResponse(
         id=cast(int, folder.id),
         name=cast(str, physical.name if physical is not None else ""),
@@ -46,6 +55,8 @@ def _folder_response(db: Session, folder: Folder) -> FolderResponse:
         media_count=media_count,
         primary_repo_id=physical.repo_id if physical is not None else None,
         primary_folder_path=physical.rel_path if physical is not None else None,
+        tags=[FolderTagItem(id=tag.id, name=tag.name, category=tag.category) for tag in folder.tags],
+        preview_files=[_file_response(row) for row in preview_rows],
         created_at=cast(datetime, folder.created_at).isoformat(),
         updated_at=cast(datetime, folder.updated_at).isoformat(),
     )
@@ -68,6 +79,7 @@ def list_folders(
     cursor: int | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     starred: bool | None = Query(None),
+    tag_id: int | None = Query(None),
     db: Session = Depends(get_db),
 ):
     query = db.query(Folder)
@@ -75,6 +87,8 @@ def list_folders(
         query = query.filter(Folder.id < cursor)
     if starred is not None:
         query = query.filter(Folder.starred == (1 if starred else 0))
+    if tag_id is not None:
+        query = query.filter(Folder.tags.any(Tag.id == tag_id))
     rows = query.order_by(Folder.id.desc()).limit(limit + 1).all()
     has_more = len(rows) > limit
     rows = rows[:limit]
@@ -83,6 +97,26 @@ def list_folders(
         next_cursor=cast(int, rows[-1].id) if has_more and rows else None,
         has_more=has_more,
     )
+
+
+@router.get("/tags", response_model=list[FolderTagCount])
+def list_folder_tags(db: Session = Depends(get_db)):
+    rows = (
+        db.query(Tag, func.count(folder_tag.c.folder_id).label("folder_count"))
+        .join(folder_tag, folder_tag.c.tag_id == Tag.id)
+        .group_by(Tag.id)
+        .order_by(func.count(folder_tag.c.folder_id).desc(), func.lower(Tag.name))
+        .all()
+    )
+    return [
+        FolderTagCount(
+            id=tag.id,
+            name=tag.name,
+            category=tag.category,
+            folder_count=folder_count,
+        )
+        for tag, folder_count in rows
+    ]
 
 
 @router.get("/{folder_id}", response_model=FolderDetailResponse)

@@ -14,6 +14,16 @@ class FolderLocationItem(BaseModel):
     role: str
 
 
+class FolderTagItem(BaseModel):
+    id: int
+    name: str
+    category: Optional[str] = None
+
+
+class FolderTagCount(FolderTagItem):
+    folder_count: int = 0
+
+
 class FolderResponse(TimestampMixin):
     id: int
     name: str
@@ -26,6 +36,8 @@ class FolderResponse(TimestampMixin):
     media_count: int
     primary_repo_id: Optional[str] = None
     primary_folder_path: Optional[str] = None
+    tags: List[FolderTagItem] = []
+    preview_files: List[RepositoryFileResponse] = []
 
 
 class FolderDetailResponse(FolderResponse):

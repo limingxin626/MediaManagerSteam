@@ -171,6 +171,16 @@ export interface FolderLocation {
   role: 'PRIMARY' | 'MIRROR' | string
 }
 
+export interface FolderTag {
+  id: number
+  name: string
+  category: string | null
+}
+
+export interface FolderTagCount extends FolderTag {
+  folder_count: number
+}
+
 export interface Folder {
   id: number
   name: string
@@ -183,6 +193,8 @@ export interface Folder {
   media_count: number
   primary_repo_id: string | null
   primary_folder_path: string | null
+  tags: FolderTag[]
+  preview_files: RepositoryFile[]
   created_at: string
   updated_at: string
 }

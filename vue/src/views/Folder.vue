@@ -1,187 +1,222 @@
 <template>
   <div class="flex h-full min-h-0 bg-[var(--bg-primary)] text-[var(--text-primary)]">
-    <aside
-      class="w-full shrink-0 flex-col border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] md:flex md:w-72"
-      :class="selectedFolderId ? 'hidden' : 'flex'"
-    >
-      <header class="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border-color)] px-5">
-        <div>
-          <h1 class="text-lg font-semibold">目录</h1>
-          <p class="text-xs text-[var(--text-muted)]">{{ folders.length }} 个已加载</p>
-        </div>
-        <button
-          class="grid h-9 w-9 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)]"
-          title="刷新"
-          :disabled="loadingFolders"
-          @click="loadFolders(true)"
-        >
-          <svg class="h-5 w-5" :class="{ 'animate-spin': loadingFolders }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M20 7v5h-5M4 17v-5h5M6.1 8.2A7 7 0 0 1 18.5 7M17.9 15.8A7 7 0 0 1 5.5 17" />
-          </svg>
+    <button v-if="mobileTagsOpen" class="fixed inset-0 z-30 bg-black/25 md:hidden" aria-label="关闭标签筛选" @click="mobileTagsOpen = false"></button>
+    <aside class="fixed inset-y-0 left-0 z-40 w-48 shrink-0 flex-col border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] md:static md:z-auto md:flex" :class="mobileTagsOpen ? 'flex' : 'hidden'">
+      <div class="flex h-10 shrink-0 items-center justify-between border-b border-[var(--border-color)] px-4">
+        <span class="text-xs font-semibold text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)]">标签</span>
+        <button class="text-[var(--text-muted)] md:hidden" title="关闭" @click="mobileTagsOpen = false">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18" /></svg>
         </button>
-      </header>
-
-      <div class="min-h-0 flex-1 overflow-y-auto p-2">
-        <div v-if="loadingFolders && !folders.length" class="py-16 text-center text-sm text-[var(--text-muted)]">加载中...</div>
-        <div v-else-if="folderError && !folders.length" class="px-4 py-16 text-center">
-          <p class="text-sm text-red-500">{{ folderError }}</p>
-          <button class="mt-3 text-sm text-[var(--color-primary-600)]" @click="loadFolders(true)">重试</button>
-        </div>
-        <div v-else-if="!folders.length" class="py-16 text-center text-sm text-[var(--text-muted)]">暂无目录</div>
-
+      </div>
+      <div class="min-h-0 flex-1 overflow-y-auto px-2 py-3">
         <button
-          v-for="folder in folders"
-          :key="folder.id"
-          class="mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--bg-card)]"
-          :class="selectedFolderId === folder.id ? 'bg-[var(--bg-card)] shadow-[var(--shadow-sm)]' : ''"
-          @click="selectFolder(folder.id)"
+          class="mb-0.5 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors"
+          :class="selectedTagId === null ? activeFilterClass : inactiveFilterClass"
+          @click="selectTag(null)"
         >
-          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-500/12 text-amber-600 dark:text-amber-400">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M3.5 6.5h6l2 2h9v10h-17z" />
-            </svg>
-          </span>
-          <span class="min-w-0 flex-1">
-            <span class="flex items-center gap-1.5">
-              <span class="truncate text-sm font-medium">{{ folder.name }}</span>
-              <svg v-if="folder.starred" class="h-3.5 w-3.5 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z" /></svg>
-            </span>
-            <span class="mt-0.5 block truncate text-xs text-[var(--text-muted)]" :title="folderPath(folder)">{{ folderPath(folder) }}</span>
-          </span>
-          <span class="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">{{ folder.media_count }}</span>
+          <span>全部</span>
         </button>
-
         <button
-          v-if="hasMore"
-          class="my-2 w-full rounded-lg py-2 text-sm text-[var(--color-primary-600)] hover:bg-[var(--bg-card)] disabled:opacity-50"
-          :disabled="loadingFolders"
-          @click="loadFolders(false)"
+          v-for="tag in tags"
+          :key="tag.id"
+          class="mb-0.5 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors"
+          :class="selectedTagId === tag.id ? activeFilterClass : inactiveFilterClass"
+          @click="selectTag(tag.id)"
         >
-          {{ loadingFolders ? '加载中...' : '加载更多' }}
+          <span class="truncate">{{ tag.name }}</span>
+          <span class="ml-2 shrink-0 text-xs tabular-nums text-[var(--text-muted)]">{{ tag.folder_count }}</span>
         </button>
       </div>
     </aside>
 
-    <main class="min-w-0 flex-1 flex-col" :class="selectedFolderId ? 'flex' : 'hidden md:flex'">
-      <div v-if="loadingDetail && !detail" class="grid flex-1 place-items-center text-sm text-[var(--text-muted)]">加载中...</div>
-      <div v-else-if="detailError" class="grid flex-1 place-items-center px-6 text-center">
-        <div>
-          <p class="text-sm text-red-500">{{ detailError }}</p>
-          <button class="mt-3 text-sm text-[var(--color-primary-600)]" @click="reloadDetail">重试</button>
+    <main class="relative flex min-w-0 flex-1 flex-col">
+      <header class="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+        <div class="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div class="flex min-w-0 items-center gap-2">
+            <button class="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] md:hidden" title="标签筛选" @click="mobileTagsOpen = true">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+            </button>
+            <div class="min-w-0">
+              <h1 class="truncate text-base font-semibold">{{ selectedTagName || '全部目录' }}</h1>
+              <p class="mt-0.5 text-xs text-[var(--text-muted)]">{{ folders.length }} 个已加载</p>
+            </div>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <button
+              class="grid h-8 w-8 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--color-primary-600)] disabled:opacity-50"
+              :disabled="loading"
+              title="刷新"
+              @click="refresh"
+            >
+              <svg class="h-4 w-4" :class="{ 'animate-spin': loading }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7v5h-5M4 17v-5h5M6.1 8.2A7 7 0 0 1 18.5 7M17.9 15.8A7 7 0 0 1 5.5 17" /></svg>
+            </button>
+            <div class="flex rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-0.5" aria-label="目录视图">
+              <button
+                class="grid h-7 w-8 place-items-center rounded-[5px] transition-colors"
+                :class="viewMode === 'grid' ? viewActiveClass : viewInactiveClass"
+                title="Grid"
+                @click="setViewMode('grid')"
+              >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
+              </button>
+              <button
+                class="grid h-7 w-8 place-items-center rounded-[5px] transition-colors"
+                :class="viewMode === 'feed' ? viewActiveClass : viewInactiveClass"
+                title="Feed"
+                @click="setViewMode('feed')"
+              >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 6h14M5 12h14M5 18h14" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <div class="mx-auto w-full max-w-7xl px-4 py-4 pb-24 sm:px-6 lg:px-8 md:pb-6">
+          <div v-if="loading && !folders.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div v-for="index in 8" :key="index" class="h-72 animate-pulse rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
+              <div class="h-44 bg-[var(--bg-secondary)]"></div>
+            </div>
+          </div>
+          <div v-else-if="error && !folders.length" class="py-20 text-center">
+            <p class="text-sm text-red-500">{{ error }}</p>
+            <button class="mt-3 text-sm text-[var(--color-primary-600)]" @click="refresh">重试</button>
+          </div>
+          <div v-else-if="!folders.length" class="flex flex-col items-center py-20 text-center">
+            <span class="grid h-14 w-14 place-items-center rounded-lg bg-[var(--bg-secondary)] text-[var(--text-muted)]">
+              <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.5 6.5h6l2 2h9v10h-17z" /></svg>
+            </span>
+            <h2 class="mt-4 text-sm font-medium">暂无目录</h2>
+          </div>
+
+          <div v-if="viewMode === 'grid' && folders.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <article
+              v-for="folder in folders"
+              :key="folder.id"
+              class="group flex h-72 min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
+              @click="openFolder(folder.id)"
+            >
+              <div class="grid h-44 shrink-0 gap-0.5 overflow-hidden bg-[var(--bg-secondary)]" :class="previewGridClass(folderPreviews(folder).length)">
+                <button
+                  v-for="(file, index) in folderPreviews(folder)"
+                  :key="file.id"
+                  class="group/media relative min-h-0 min-w-0 overflow-hidden"
+                  @click.stop="openPreview(folderPreviews(folder), index)"
+                >
+                  <img v-if="resolveThumb(file)" :src="resolveThumb(file)" :alt="file.name" class="h-full w-full object-cover transition-transform duration-200 group-hover/media:scale-[1.03]" loading="lazy" />
+                  <MediaPlaceholder v-else />
+                  <VideoBadge v-if="file.media_type === 'VIDEO'" />
+                </button>
+                <div v-if="!folderPreviews(folder).length" class="col-span-2 grid h-full place-items-center text-amber-600/70 dark:text-amber-400/70">
+                  <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3.5 6.5h6l2 2h9v10h-17z" /></svg>
+                </div>
+              </div>
+              <div class="flex min-h-0 flex-1 flex-col p-3">
+                <div class="flex items-center gap-2">
+                  <h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{{ folder.name }}</h2>
+                  <span class="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">{{ folder.media_count }}</span>
+                </div>
+                <p class="mt-1 truncate text-xs text-[var(--text-muted)]" :title="folderPath(folder)">{{ folderPath(folder) }}</p>
+                <div v-if="folderTags(folder).length" class="mt-auto flex min-w-0 gap-1 overflow-hidden pt-2">
+                  <span v-for="tag in folderTags(folder).slice(0, 3)" :key="tag.id" class="tag-chip shrink-0">{{ tag.name }}</span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div v-else-if="folders.length" class="mx-auto flex max-w-5xl flex-col gap-4">
+            <article
+              v-for="folder in folders"
+              :key="folder.id"
+              class="overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]"
+            >
+              <button class="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-[var(--bg-secondary)]" @click="openFolder(folder.id)">
+                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-500/12 text-amber-600 dark:text-amber-400">
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3.5 6.5h6l2 2h9v10h-17z" /></svg>
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-semibold">{{ folder.name }}</span>
+                  <span class="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{{ folderPath(folder) }}</span>
+                </span>
+                <span class="shrink-0 text-xs text-[var(--text-muted)]">{{ folder.media_count }} 个媒体</span>
+                <svg class="h-4 w-4 shrink-0 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7" /></svg>
+              </button>
+              <div v-if="folderPreviews(folder).length" class="grid grid-cols-4 gap-0.5 border-t border-[var(--border-color)] bg-[var(--bg-secondary)] sm:grid-cols-6">
+                <button
+                  v-for="(file, index) in folderPreviews(folder)"
+                  :key="file.id"
+                  class="group/media relative aspect-square overflow-hidden"
+                  @click="openPreview(folderPreviews(folder), index)"
+                >
+                  <img v-if="resolveThumb(file)" :src="resolveThumb(file)" :alt="file.name" class="h-full w-full object-cover transition-transform duration-200 group-hover/media:scale-[1.03]" loading="lazy" />
+                  <MediaPlaceholder v-else />
+                  <VideoBadge v-if="file.media_type === 'VIDEO'" />
+                </button>
+              </div>
+              <div v-if="folderTags(folder).length" class="flex gap-1 overflow-hidden px-4 py-2">
+                <span v-for="tag in folderTags(folder)" :key="tag.id" class="tag-chip shrink-0">{{ tag.name }}</span>
+              </div>
+            </article>
+          </div>
+
+          <div v-if="hasMore" class="py-6 text-center">
+            <button class="rounded-lg px-4 py-2 text-sm text-[var(--color-primary-600)] hover:bg-[var(--bg-secondary)] disabled:opacity-50" :disabled="loading" @click="loadFolders(false)">
+              {{ loading ? '加载中...' : '加载更多' }}
+            </button>
+          </div>
         </div>
       </div>
-      <div v-else-if="detail" class="flex min-h-0 flex-1 flex-col">
-        <header class="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-4 md:px-7">
-          <div class="flex items-start gap-3">
-            <button
-              class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] md:hidden"
-              title="返回目录列表"
-              @click="closeMobileDetail"
-            >
+
+      <div v-if="detail || loadingDetail || detailError" class="absolute inset-0 z-30 flex justify-end bg-black/20" @click.self="closeDetail">
+        <aside class="flex h-full w-full max-w-xl flex-col border-l border-[var(--border-color)] bg-[var(--bg-primary)] shadow-2xl">
+          <div class="flex shrink-0 items-start gap-3 border-b border-[var(--border-color)] bg-[var(--bg-card)] p-4">
+            <button class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]" title="关闭" @click="closeDetail">
               <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
             </button>
             <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <h2 class="truncate text-xl font-semibold">{{ detail.name }}</h2>
-                <span v-if="detail.starred" class="text-amber-500" title="已收藏">★</span>
-              </div>
-              <p class="mt-1 truncate text-xs text-[var(--text-muted)]" :title="folderPath(detail)">{{ folderPath(detail) }}</p>
+              <h2 class="truncate text-lg font-semibold">{{ detail?.name || '目录' }}</h2>
+              <p v-if="detail" class="mt-0.5 truncate text-xs text-[var(--text-muted)]">{{ folderPath(detail) }}</p>
             </div>
             <input ref="uploadInput" class="hidden" type="file" multiple accept="video/mp4,image/jpeg,image/png,image/gif" @change="uploadFiles" />
-            <button
-              class="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-[var(--color-primary-600)] px-3 text-sm font-medium text-white hover:bg-[var(--color-primary-700)] disabled:opacity-50"
-              :disabled="uploading"
-              @click="uploadInput?.click()"
-            >
+            <button v-if="detail" class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--color-primary-600)] px-3 text-sm text-white disabled:opacity-50" :disabled="uploading" @click="uploadInput?.click()">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0-4 4m4-4 4 4M5 15v4h14v-4" /></svg>
-              <span class="hidden sm:inline">{{ uploading ? '上传中...' : '上传' }}</span>
+              {{ uploading ? '上传中' : '上传' }}
             </button>
           </div>
-
-          <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
-            <span class="rounded-md bg-[var(--bg-secondary)] px-2 py-1">{{ detail.media_count }} 个媒体</span>
-            <span class="rounded-md bg-[var(--bg-secondary)] px-2 py-1">{{ detail.files.length }} 个文件</span>
-            <span v-if="detail.collection_name" class="rounded-md bg-[var(--color-accent-soft)] px-2 py-1 text-[var(--color-primary-600)]">{{ detail.collection_name }}</span>
-            <span v-if="detail.issue_title" class="rounded-md bg-[var(--bg-secondary)] px-2 py-1">{{ detail.issue_title }}</span>
+          <div v-if="loadingDetail" class="grid flex-1 place-items-center text-sm text-[var(--text-muted)]">加载中...</div>
+          <div v-else-if="detailError" class="grid flex-1 place-items-center px-6 text-center text-sm text-red-500">{{ detailError }}</div>
+          <div v-else-if="detail" class="min-h-0 flex-1 overflow-y-auto p-4 pb-24 md:pb-4">
+            <div class="mb-4 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
+              <span class="rounded-md bg-[var(--bg-secondary)] px-2 py-1">{{ detail.media_count }} 个媒体</span>
+              <span v-for="tag in folderTags(detail)" :key="tag.id" class="tag-chip">{{ tag.name }}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <button v-for="(file, index) in detail.files" :key="file.id" class="group/media relative aspect-square overflow-hidden rounded-lg bg-[var(--bg-secondary)]" :disabled="!file.media_id" @click="openDetailPreview(index)">
+                <img v-if="file.media_id && resolveThumb(file)" :src="resolveThumb(file)" :alt="file.name" class="h-full w-full object-cover transition-transform duration-200 group-hover/media:scale-[1.03]" loading="lazy" />
+                <MediaPlaceholder v-else />
+                <VideoBadge v-if="file.media_type === 'VIDEO'" />
+                <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1.5 text-left text-xs text-white">{{ file.name }}</span>
+              </button>
+            </div>
           </div>
-
-          <div v-if="detail.locations.length > 1" class="mt-3 flex gap-2 overflow-x-auto pb-1">
-            <span
-              v-for="location in detail.locations"
-              :key="location.id"
-              class="max-w-sm shrink-0 truncate rounded-md border border-[var(--border-color)] px-2 py-1 text-xs text-[var(--text-muted)]"
-              :title="`${location.repo_id}/${location.rel_path}`"
-            >
-              {{ location.role === 'PRIMARY' ? '主目录' : '镜像' }} · {{ location.repo_id }}/{{ location.rel_path }}
-            </span>
-          </div>
-        </header>
-
-        <div class="min-h-0 flex-1 overflow-y-auto p-3 pb-24 md:p-6 md:pb-6">
-          <div v-if="!detail.files.length" class="grid h-full min-h-64 place-items-center text-sm text-[var(--text-muted)]">目录中没有媒体文件</div>
-          <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-            <button
-              v-for="(file, index) in detail.files"
-              :key="file.id"
-              class="group relative aspect-square min-w-0 overflow-hidden rounded-lg bg-[var(--bg-secondary)] text-left"
-              :class="file.media_id ? 'cursor-pointer' : 'cursor-default'"
-              :disabled="!file.media_id"
-              @click="openPreview(file, index)"
-            >
-              <img
-                v-if="file.media_id && resolveThumb(file)"
-                :src="resolveThumb(file)"
-                :alt="file.name"
-                class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                loading="lazy"
-              />
-              <div v-else class="grid h-full place-items-center text-[var(--text-muted)]">
-                <svg class="h-9 w-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3" /></svg>
-              </div>
-              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8">
-                <p class="truncate text-xs text-white" :title="file.name">{{ file.name }}</p>
-              </div>
-              <span v-if="file.media_type === 'VIDEO'" class="absolute left-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-black/55 text-white">
-                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7z" /></svg>
-              </span>
-              <span
-                v-if="file.materialize_status !== 'done'"
-                class="absolute right-2 top-2 rounded-md bg-black/60 px-1.5 py-1 text-[10px] text-white"
-              >
-                {{ statusLabel(file.materialize_status) }}
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div v-else class="grid flex-1 place-items-center text-[var(--text-muted)]">
-        <div class="text-center">
-          <svg class="mx-auto h-12 w-12 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3.5 6.5h6l2 2h9v10h-17z" /></svg>
-          <p class="mt-3 text-sm">选择一个目录</p>
-        </div>
+        </aside>
       </div>
     </main>
 
-    <MediaPreview
-      :is-open="previewOpen"
-      :items="previewItems"
-      :start-index="previewIndex"
-      @close="previewOpen = false"
-      @media-deleted="handleMediaChanged"
-      @media-rotated="handleMediaChanged"
-      @media-replaced="handleMediaChanged"
-    />
+    <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" @close="previewOpen = false" @media-deleted="handleMediaChanged" @media-rotated="handleMediaChanged" @media-replaced="handleMediaChanged" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineComponent, h, onMounted, ref } from 'vue'
+import MediaPreview from '../components/MediaPreview.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import MediaPreview from '../components/MediaPreview.vue'
-import type { Folder, FolderDetail, MessageMediaItem, RepositoryFile } from '../types'
+import type { Folder, FolderDetail, FolderTagCount, MessageMediaItem, RepositoryFile } from '../types'
 import { resolveThumb } from '../utils/media'
+
+defineOptions({ name: 'Folder' })
 
 interface FolderCursorResponse {
   items: Folder[]
@@ -189,121 +224,166 @@ interface FolderCursorResponse {
   has_more: boolean
 }
 
+const MediaPlaceholder = defineComponent({
+  setup: () => () => h('div', { class: 'grid h-full w-full place-items-center text-[var(--text-muted)]' }, [
+    h('svg', { class: 'h-8 w-8', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.4' }, [
+      h('path', { d: 'M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3' }),
+    ]),
+  ]),
+})
+
+const VideoBadge = defineComponent({
+  setup: () => () => h('span', { class: 'absolute left-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-black/55 text-white' }, [
+    h('svg', { class: 'h-3.5 w-3.5', viewBox: '0 0 24 24', fill: 'currentColor' }, [h('path', { d: 'm8 5 11 7-11 7z' })]),
+  ]),
+})
+
 const folders = ref<Folder[]>([])
-const selectedFolderId = ref<number | null>(null)
-const detail = ref<FolderDetail | null>(null)
+const tags = ref<FolderTagCount[]>([])
+const selectedTagId = ref<number | null>(null)
 const nextCursor = ref<number | null>(null)
 const hasMore = ref(false)
-const loadingFolders = ref(false)
+const loading = ref(false)
+const error = ref('')
+const viewMode = ref<'grid' | 'feed'>('grid')
+const detail = ref<FolderDetail | null>(null)
 const loadingDetail = ref(false)
-const uploading = ref(false)
-const folderError = ref('')
 const detailError = ref('')
+const uploading = ref(false)
+const mobileTagsOpen = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
 const previewOpen = ref(false)
+const previewItems = ref<MessageMediaItem[]>([])
 const previewIndex = ref(0)
 const toast = useToast()
 let detailRequest = 0
 
-const materializedFiles = computed(() => detail.value?.files.filter(file => file.media_id !== null) ?? [])
-const previewItems = computed<MessageMediaItem[]>(() => materializedFiles.value.map(file => ({
-  id: file.media_id!,
-  repo_id: file.repo_id,
-  file_path: file.file_path,
-  file_url: file.file_url,
-  thumb_url: file.thumb_url,
-  local_file_path: file.local_file_path,
-  local_thumb_path: file.local_thumb_path,
-  mime_type: file.mime_type,
-  width: file.width,
-  height: file.height,
-  duration_ms: file.duration_ms,
-  starred: false,
-  tags: [],
-} as unknown as MessageMediaItem)))
+const activeFilterClass = 'bg-[var(--color-accent-soft)] text-[var(--color-primary-600)] dark:text-[var(--color-primary-500)] font-medium'
+const inactiveFilterClass = 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
+const viewActiveClass = 'bg-[var(--bg-card)] text-[var(--color-primary-600)] shadow-[var(--shadow-sm)]'
+const viewInactiveClass = 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+const selectedTagName = computed(() => tags.value.find(tag => tag.id === selectedTagId.value)?.name ?? null)
 
 function folderPath(folder: Folder) {
   if (!folder.primary_repo_id) return '位置不可用'
   return `${folder.primary_repo_id}/${folder.primary_folder_path || ''}`.replace(/\/$/, '')
 }
 
-function statusLabel(status: RepositoryFile['materialize_status']) {
-  if (status === 'pending') return '处理中'
-  if (status === 'failed') return '失败'
-  return ''
+function folderPreviews(folder: Folder) {
+  return folder.preview_files ?? []
+}
+
+function folderTags(folder: Folder) {
+  return folder.tags ?? []
+}
+
+function previewGridClass(count: number) {
+  if (count <= 1) return 'grid-cols-1'
+  return 'grid-cols-2'
+}
+
+function mapPreviewFiles(files: RepositoryFile[]) {
+  return files.filter(file => file.media_id !== null).map(file => ({
+    id: file.media_id!, repo_id: file.repo_id, file_path: file.file_path,
+    file_url: file.file_url, thumb_url: file.thumb_url,
+    local_file_path: file.local_file_path, local_thumb_path: file.local_thumb_path,
+    mime_type: file.mime_type, width: file.width, height: file.height,
+    duration_ms: file.duration_ms, starred: false, tags: [],
+  } as unknown as MessageMediaItem))
+}
+
+async function loadTags() {
+  try { tags.value = await api.get<FolderTagCount[]>('/folders/tags') }
+  catch { tags.value = [] }
 }
 
 async function loadFolders(reset = false) {
-  if (loadingFolders.value) return
-  loadingFolders.value = true
-  folderError.value = ''
+  if (loading.value) return
+  loading.value = true
+  error.value = ''
   try {
     const data = await api.get<FolderCursorResponse>('/folders', {
       cursor: reset ? undefined : nextCursor.value,
       limit: 40,
+      tag_id: selectedTagId.value,
     })
     folders.value = reset ? data.items : [...folders.value, ...data.items]
     nextCursor.value = data.next_cursor
     hasMore.value = data.has_more
-    if (!selectedFolderId.value && folders.value[0] && window.matchMedia('(min-width: 768px)').matches) {
-      await selectFolder(folders.value[0].id)
-    }
-  } catch (error: any) {
-    folderError.value = error?.message || '加载目录失败'
-  } finally {
-    loadingFolders.value = false
-  }
+  } catch (caught: any) {
+    error.value = caught?.message || '加载目录失败'
+  } finally { loading.value = false }
 }
 
-async function selectFolder(folderId: number) {
-  selectedFolderId.value = folderId
+async function refresh() {
+  await Promise.all([loadTags(), loadFolders(true)])
+}
+
+async function selectTag(tagId: number | null) {
+  if (selectedTagId.value === tagId) return
+  selectedTagId.value = tagId
+  mobileTagsOpen.value = false
+  await loadFolders(true)
+}
+
+function setViewMode(mode: 'grid' | 'feed') {
+  viewMode.value = mode
+  localStorage.setItem('folder_view', mode)
+}
+
+function openPreview(files: RepositoryFile[], index: number) {
+  const materialized = files.filter(file => file.media_id !== null)
+  const selected = files[index]
+  const mappedIndex = materialized.findIndex(file => file.id === selected?.id)
+  if (mappedIndex < 0) return
+  previewItems.value = mapPreviewFiles(materialized)
+  previewIndex.value = mappedIndex
+  previewOpen.value = true
+}
+
+async function openFolder(folderId: number) {
+  loadingDetail.value = true
   detail.value = null
   detailError.value = ''
-  loadingDetail.value = true
   const request = ++detailRequest
   try {
     const data = await api.get<FolderDetail>(`/folders/${folderId}`)
     if (request === detailRequest) detail.value = data
-  } catch (error: any) {
-    if (request === detailRequest) detailError.value = error?.message || '加载目录详情失败'
+  } catch (caught: any) {
+    if (request === detailRequest) detailError.value = caught?.message || '加载目录详情失败'
   } finally {
     if (request === detailRequest) loadingDetail.value = false
   }
 }
 
-async function reloadDetail() {
-  if (selectedFolderId.value) await selectFolder(selectedFolderId.value)
-}
-
-function closeMobileDetail() {
-  selectedFolderId.value = null
+function closeDetail() {
+  detailRequest++
   detail.value = null
+  loadingDetail.value = false
   detailError.value = ''
 }
 
-function openPreview(file: RepositoryFile, _fileIndex: number) {
-  if (!file.media_id) return
-  const index = materializedFiles.value.findIndex(item => item.id === file.id)
-  if (index < 0) return
-  previewIndex.value = index
-  previewOpen.value = true
+function openDetailPreview(index: number) {
+  if (!detail.value) return
+  openPreview(detail.value.files, index)
 }
 
 async function uploadFiles(event: Event) {
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files ?? [])
-  if (!selectedFolderId.value || !files.length || uploading.value) return
+  if (!detail.value || !files.length || uploading.value) return
+  const folderId = detail.value.id
   uploading.value = true
   try {
     for (const file of files) {
       const form = new FormData()
       form.append('file', file)
-      await api.post(`/folders/${selectedFolderId.value}/files`, form)
+      await api.post(`/folders/${folderId}/files`, form)
     }
     toast.success(`已上传 ${files.length} 个文件`)
-    await Promise.all([reloadDetail(), loadFolders(true)])
-  } catch (error: any) {
-    toast.error(error?.message || '上传失败')
+    await Promise.all([openFolder(folderId), loadFolders(true)])
+  } catch (caught: any) {
+    toast.error(caught?.message || '上传失败')
   } finally {
     uploading.value = false
     input.value = ''
@@ -311,8 +391,13 @@ async function uploadFiles(event: Event) {
 }
 
 async function handleMediaChanged() {
-  await Promise.all([reloadDetail(), loadFolders(true)])
+  await loadFolders(true)
+  if (detail.value) await openFolder(detail.value.id)
 }
 
-onMounted(() => loadFolders(true))
+onMounted(() => {
+  const saved = localStorage.getItem('folder_view')
+  viewMode.value = saved === 'feed' ? 'feed' : 'grid'
+  refresh()
+})
 </script>

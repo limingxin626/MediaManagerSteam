@@ -3,8 +3,8 @@ from io import BytesIO
 
 import pytest
 
-from app.models import Folder, FolderLocation, Media, Message, MessageFolder, RepositoryFile, RepositoryFolder
-from app.routers.folder import get_folder
+from app.models import Folder, FolderLocation, Media, Message, MessageFolder, RepositoryFile, RepositoryFolder, Tag
+from app.routers.folder import get_folder, list_folder_tags, list_folders
 from app.services import repository_catalog, repository_materializer
 from app.services.folder_service import store_file_in_primary_folder
 from app.routers.message import _build_detail_query, _execute_like_search
@@ -283,6 +283,30 @@ def test_folder_name_follows_physical_folder_rename(catalog_env):
         assert folder.id == folder_id
         assert response.name == "renamed"
         assert response.primary_folder_path == "renamed"
+
+
+def test_folder_list_filters_and_counts_tags(catalog_env):
+    repo, session_factory = catalog_env
+    for name in ("alpha", "beta"):
+        directory = repo / name
+        directory.mkdir()
+        (directory / "photo.jpg").write_bytes(b"image")
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        tag = Tag(name="精选")
+        tagged = db.query(Folder).join(FolderLocation).join(RepositoryFolder).filter(
+            RepositoryFolder.rel_path == "alpha",
+        ).one()
+        tagged.tags.append(tag)
+        db.commit()
+
+        tags = list_folder_tags(db)
+        result = list_folders(cursor=None, limit=20, starred=None, tag_id=tag.id, db=db)
+
+        assert [(item.name, item.folder_count) for item in tags] == [("精选", 1)]
+        assert [item.name for item in result.items] == ["alpha"]
+        assert [item.name for item in result.items[0].tags] == ["精选"]
 
 
 def test_store_file_in_folder_primary_location(catalog_env):
