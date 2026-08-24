@@ -29,6 +29,12 @@ const routes = [
     component: () => import('../views/Folder.vue')
   },
   {
+    path: '/folders/:id(\\d+)',
+    name: 'FolderDetail',
+    component: () => import('../views/FolderDetail.vue'),
+    props: (route: any) => ({ folderId: Number(route.params.id) })
+  },
+  {
     path: '/admin',
     component: () => import('../views/Admin.vue'),
     children: [

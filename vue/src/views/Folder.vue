@@ -128,16 +128,15 @@
                 class="grid shrink-0 gap-0.5 overflow-hidden bg-[var(--bg-secondary)]"
                 :class="[gridPreviewSizeClass, previewGridClass(folderGridFiles(folder).length)]"
               >
-                <button
-                  v-for="(file, index) in folderGridFiles(folder)"
+                <div
+                  v-for="file in folderGridFiles(folder)"
                   :key="file.id"
                   class="group/media relative min-h-0 min-w-0 overflow-hidden"
-                  @click.stop="openPreview(folderGridFiles(folder), index)"
                 >
                   <img v-if="resolveThumb(file)" :src="resolveThumb(file)" :alt="file.name" class="h-full w-full object-cover transition-transform duration-200 group-hover/media:scale-[1.03]" loading="lazy" />
                   <MediaPlaceholder v-else />
                   <VideoBadge v-if="file.media_type === 'VIDEO'" />
-                </button>
+                </div>
                 <div v-if="!folderGridFiles(folder).length" class="col-span-2 grid h-full place-items-center text-amber-600/70 dark:text-amber-400/70">
                   <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3.5 6.5h6l2 2h9v10h-17z" /></svg>
                 </div>
@@ -193,40 +192,6 @@
         </div>
       </div>
 
-      <div v-if="detail || loadingDetail || detailError" class="absolute inset-0 z-30 flex justify-end bg-black/20" @click.self="closeDetail">
-        <aside class="flex h-full w-full max-w-xl flex-col border-l border-[var(--border-color)] bg-[var(--bg-primary)] shadow-2xl">
-          <div class="flex shrink-0 items-start gap-3 border-b border-[var(--border-color)] bg-[var(--bg-card)] p-4">
-            <button class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]" title="关闭" @click="closeDetail">
-              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
-            </button>
-            <div class="min-w-0 flex-1">
-              <h2 class="truncate text-lg font-semibold">{{ detail?.name || '目录' }}</h2>
-              <p v-if="detail" class="mt-0.5 truncate text-xs text-[var(--text-muted)]">{{ folderPath(detail) }}</p>
-            </div>
-            <input ref="uploadInput" class="hidden" type="file" multiple accept="video/mp4,image/jpeg,image/png,image/gif" @change="uploadFiles" />
-            <button v-if="detail" class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--color-primary-600)] px-3 text-sm text-white disabled:opacity-50" :disabled="uploading" @click="uploadInput?.click()">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0-4 4m4-4 4 4M5 15v4h14v-4" /></svg>
-              {{ uploading ? '上传中' : '上传' }}
-            </button>
-          </div>
-          <div v-if="loadingDetail" class="grid flex-1 place-items-center text-sm text-[var(--text-muted)]">加载中...</div>
-          <div v-else-if="detailError" class="grid flex-1 place-items-center px-6 text-center text-sm text-red-500">{{ detailError }}</div>
-          <div v-else-if="detail" class="min-h-0 flex-1 overflow-y-auto p-4 pb-24 md:pb-4">
-            <div class="mb-4 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
-              <span class="rounded-md bg-[var(--bg-secondary)] px-2 py-1">{{ detail.media_count }} 个媒体</span>
-              <span v-for="tag in folderTags(detail)" :key="tag.id" class="tag-chip">{{ tag.name }}</span>
-            </div>
-            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <button v-for="(file, index) in detail.files" :key="file.id" class="group/media relative aspect-square overflow-hidden rounded-lg bg-[var(--bg-secondary)]" :disabled="!file.media_id" @click="openDetailPreview(index)">
-                <img v-if="file.media_id && resolveThumb(file)" :src="resolveThumb(file)" :alt="file.name" class="h-full w-full object-cover transition-transform duration-200 group-hover/media:scale-[1.03]" loading="lazy" />
-                <MediaPlaceholder v-else />
-                <VideoBadge v-if="file.media_type === 'VIDEO'" />
-                <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1.5 text-left text-xs text-white">{{ file.name }}</span>
-              </button>
-            </div>
-          </div>
-        </aside>
-      </div>
       </div>
     </main>
 
@@ -236,10 +201,10 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api } from '../composables/useApi'
-import { useToast } from '../composables/useToast'
-import type { Folder, FolderDetail, FolderTagCount, MessageMediaItem, RepositoryFile } from '../types'
+import type { Folder, FolderTagCount, MessageMediaItem, RepositoryFile } from '../types'
 import { resolveThumb } from '../utils/media'
 
 defineOptions({ name: 'Folder' })
@@ -273,18 +238,12 @@ const loading = ref(false)
 const error = ref('')
 const viewMode = ref<'grid' | 'feed'>('grid')
 const gridMode = ref<GridMode>('mosaic')
-const detail = ref<FolderDetail | null>(null)
-const loadingDetail = ref(false)
-const detailError = ref('')
-const uploading = ref(false)
 const mobileTagsOpen = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
-const uploadInput = ref<HTMLInputElement | null>(null)
 const previewOpen = ref(false)
 const previewItems = ref<MessageMediaItem[]>([])
 const previewIndex = ref(0)
-const toast = useToast()
-let detailRequest = 0
+const router = useRouter()
 let infiniteScrollObserver: IntersectionObserver | null = null
 
 const PREFETCH_DISTANCE = 10
@@ -427,58 +386,12 @@ function openPreview(files: RepositoryFile[], index: number) {
   previewOpen.value = true
 }
 
-async function openFolder(folderId: number) {
-  loadingDetail.value = true
-  detail.value = null
-  detailError.value = ''
-  const request = ++detailRequest
-  try {
-    const data = await api.get<FolderDetail>(`/folders/${folderId}`)
-    if (request === detailRequest) detail.value = data
-  } catch (caught: any) {
-    if (request === detailRequest) detailError.value = caught?.message || '加载目录详情失败'
-  } finally {
-    if (request === detailRequest) loadingDetail.value = false
-  }
-}
-
-function closeDetail() {
-  detailRequest++
-  detail.value = null
-  loadingDetail.value = false
-  detailError.value = ''
-}
-
-function openDetailPreview(index: number) {
-  if (!detail.value) return
-  openPreview(detail.value.files, index)
-}
-
-async function uploadFiles(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  if (!detail.value || !files.length || uploading.value) return
-  const folderId = detail.value.id
-  uploading.value = true
-  try {
-    for (const file of files) {
-      const form = new FormData()
-      form.append('file', file)
-      await api.post(`/folders/${folderId}/files`, form)
-    }
-    toast.success(`已上传 ${files.length} 个文件`)
-    await Promise.all([openFolder(folderId), loadFolders(true)])
-  } catch (caught: any) {
-    toast.error(caught?.message || '上传失败')
-  } finally {
-    uploading.value = false
-    input.value = ''
-  }
+function openFolder(folderId: number) {
+  router.push({ name: 'FolderDetail', params: { id: folderId } })
 }
 
 async function handleMediaChanged() {
   await loadFolders(true)
-  if (detail.value) await openFolder(detail.value.id)
 }
 
 onMounted(async () => {
