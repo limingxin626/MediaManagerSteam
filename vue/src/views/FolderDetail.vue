@@ -83,55 +83,6 @@
           </aside>
           </section>
 
-          <section v-if="folder.entries.length" class="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]">
-            <div class="flex min-h-12 items-center justify-between gap-4 border-b border-[var(--border-color)] px-4 py-2 sm:px-5">
-              <div class="flex min-w-0 items-center gap-2">
-                <h2 class="shrink-0 text-sm font-semibold text-[var(--text-primary)]">{{ contentSectionTitle }}</h2>
-                <span class="truncate rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-primary-600)]">{{ folderKindLabel }}</span>
-              </div>
-              <span v-if="folder.detection.ambiguous" class="shrink-0 text-xs text-amber-500" title="文件名证据不足，当前分类可能需要人工调整">待确认</span>
-            </div>
-            <div class="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              <button
-                v-for="entry in folder.entries"
-                :key="entry.id"
-                class="group flex min-w-0 items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2.5 text-left transition-colors hover:border-[var(--color-primary-500)]"
-                @click="openEntry(entry)"
-              >
-                <div class="relative h-20 w-28 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-[#181818]">
-                  <img v-if="entry.files[0] && resolveThumb(entry.files[0])" :src="resolveThumb(entry.files[0])" :alt="entry.title" class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
-                  <div v-else class="grid h-full place-items-center text-white/65">
-                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7z" /></svg>
-                  </div>
-                  <span class="absolute bottom-1.5 left-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white">
-                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7z" /></svg>
-                  </span>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm font-medium text-[var(--text-primary)]" :title="entry.title">{{ entry.title }}</p>
-                  <p class="mt-1 text-xs text-[var(--text-muted)]">{{ entrySubtitle(entry) }}</p>
-                  <p v-if="entry.files[0]?.duration_ms" class="mt-1 text-xs tabular-nums text-[var(--text-muted)]">{{ formatDuration(entry.files[0].duration_ms) }}</p>
-                </div>
-              </button>
-            </div>
-          </section>
-
-          <section v-if="folder.extras.length" class="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]">
-            <div class="flex h-12 items-center justify-between border-b border-[var(--border-color)] px-4 sm:px-5">
-              <h2 class="text-sm font-semibold text-[var(--text-primary)]">附加内容</h2>
-              <span class="text-xs tabular-nums text-[var(--text-muted)]">{{ folder.extras.length }} 项</span>
-            </div>
-            <div class="flex gap-3 overflow-x-auto p-3">
-              <button v-for="entry in folder.extras" :key="entry.id" class="group w-48 shrink-0 text-left" @click="openEntry(entry)">
-                <div class="relative aspect-video overflow-hidden rounded-[var(--radius-md)] bg-[#181818]">
-                  <img v-if="entry.files[0] && resolveThumb(entry.files[0])" :src="resolveThumb(entry.files[0])" :alt="entry.title" class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
-                  <span class="absolute left-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-black/55 text-white"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7z" /></svg></span>
-                </div>
-                <span class="mt-2 block truncate text-xs text-[var(--text-secondary)]">{{ entry.title }}</span>
-              </button>
-            </div>
-          </section>
-
           <section v-if="folderPreviews.length" class="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]">
             <div class="flex h-12 items-center justify-between border-b border-[var(--border-color)] px-4 sm:px-5">
               <div class="flex items-center gap-2">
@@ -157,11 +108,11 @@
             </div>
           </section>
 
-          <article class="min-w-0">
+          <article v-for="group in mediaGroups" :key="group.title" class="min-w-0">
             <div class="flex h-12 items-center justify-between">
-              <h2 class="text-sm font-semibold text-[var(--text-primary)]">{{ mediaSectionTitle }}</h2>
+              <h2 class="text-sm font-semibold text-[var(--text-primary)]">{{ group.title }}</h2>
               <div class="flex items-center gap-3">
-                <span class="text-xs tabular-nums text-[var(--text-muted)]">{{ mediaFiles.length }} 项</span>
+                <span class="text-xs tabular-nums text-[var(--text-muted)]">{{ group.files.length }} 项</span>
                 <button class="flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]" :title="mediaFit === 'cover' ? '当前：填充裁切，点击切换为完整显示' : '当前：完整显示，点击切换为填充裁切'" @click="toggleMediaFit">
                   <svg v-if="mediaFit === 'cover'" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></svg>
                   <svg v-else class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /><path d="M8 8h8v8H8z" /></svg>
@@ -169,9 +120,9 @@
                 </button>
               </div>
             </div>
-            <div v-if="mediaFiles.length" class="grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+            <div class="grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               <button
-                v-for="file in mediaFiles"
+                v-for="file in group.files"
                 :key="file.id"
                 class="group min-w-0 text-left"
                 @click="openPreview(file)"
@@ -188,17 +139,14 @@
                   <div v-else class="grid h-full w-full place-items-center text-[var(--text-muted)]">
                     <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3" /></svg>
                   </div>
-                  <span v-if="file.media_type === 'VIDEO'" class="absolute left-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/55 text-white">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7z" /></svg>
-                  </span>
                 </div>
                 <span class="mt-2.5 block truncate px-1 text-center text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" :title="file.name">{{ file.name }}</span>
               </button>
             </div>
-            <div v-else class="grid min-h-72 place-items-center px-6 text-center text-sm text-[var(--text-muted)]">
-              暂无其他媒体
-            </div>
           </article>
+          <div v-if="!mediaGroups.length" class="grid min-h-72 place-items-center px-6 text-center text-sm text-[var(--text-muted)]">
+            暂无媒体
+          </div>
         </main>
       </div>
     </template>
@@ -220,7 +168,7 @@ import { useRouter } from 'vue-router'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import type { FolderDetail, FolderMediaEntry, FolderPreview, MessageMediaItem, RepositoryFile } from '../types'
+import type { FolderDetail, FolderPreview, MessageMediaItem, RepositoryFile } from '../types'
 import { IS_ELECTRON } from '../utils/constants'
 import { resolveMediaUrl, resolveThumb } from '../utils/media'
 
@@ -258,12 +206,6 @@ const allMediaFiles = computed(() => {
   return [...unique.values()]
 })
 const mediaFiles = computed(() => {
-  const classifiedMediaIds = new Set(
-    [...(folder.value?.entries ?? []), ...(folder.value?.extras ?? [])]
-      .flatMap(entry => entry.files)
-      .map(file => file.media_id)
-      .filter((id): id is number => id !== null),
-  )
   const artworkMediaIds = new Set(
     [
       fanartFile.value?.media_id,
@@ -272,14 +214,16 @@ const mediaFiles = computed(() => {
     ].filter((id): id is number => id !== null && id !== undefined),
   )
   return allMediaFiles.value.filter(file => (
-    !artworkMediaIds.has(file.media_id!) && !classifiedMediaIds.has(file.media_id!)
+    !artworkMediaIds.has(file.media_id!)
   ))
 })
+const mediaGroups = computed(() => [
+  { title: '视频', files: mediaFiles.value.filter(file => file.media_type === 'VIDEO') },
+  { title: folder.value?.kind === 'gallery' ? '图集' : '图片', files: mediaFiles.value.filter(file => file.media_type === 'IMAGE') },
+].filter(group => group.files.length))
 const folderKindLabel = computed(() => ({
   movie: '电影', multi_part: '多部内容', series: '剧集', gallery: '图集', mixed: '混合媒体', unknown: '未分类',
 }[folder.value?.kind ?? 'unknown']))
-const contentSectionTitle = computed(() => folder.value?.kind === 'series' ? '分集' : '视频')
-const mediaSectionTitle = computed(() => folder.value?.kind === 'gallery' ? '图集' : '其他媒体')
 const fanartUrl = computed(() => {
   if (!fanartFile.value) return ''
   return fanartFallback.value
@@ -361,35 +305,12 @@ function openFolderPreview(preview: FolderPreview) {
   previewOpen.value = true
 }
 
-function openEntry(entry: FolderMediaEntry) {
-  if (!entry.files.length) return
-  previewItems.value = mapPreviewFiles(entry.files)
-  previewIndex.value = 0
-  previewOpen.value = true
-}
-
 async function handleMediaDeleted(mediaId: number) {
   const scrollTop = scrollContainer.value?.scrollTop ?? 0
   previewItems.value = previewItems.value.filter(item => item.id !== mediaId)
   await refreshFolder()
   await nextTick()
   scrollContainer.value?.scrollTo({ top: scrollTop })
-}
-
-function entrySubtitle(entry: FolderMediaEntry) {
-  if (entry.kind === 'episode' && entry.season_number !== null) {
-    return `第 ${entry.season_number} 季 · 第 ${entry.episode_numbers.join('、')} 集`
-  }
-  if (entry.kind === 'part' && entry.sequence !== null) return `第 ${entry.sequence} 部`
-  if (entry.files.length > 1) return `${entry.files.length} 个连续片段`
-  return entry.files[0]?.name ?? ''
-}
-
-function formatDuration(durationMs: number) {
-  const totalMinutes = Math.max(1, Math.round(durationMs / 60000))
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  return hours ? `${hours} 小时 ${minutes} 分钟` : `${minutes} 分钟`
 }
 
 function handleFanartError() {
