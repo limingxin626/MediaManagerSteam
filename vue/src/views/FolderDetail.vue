@@ -29,15 +29,21 @@
       <div ref="scrollContainer" class="min-h-0 flex-1 overflow-y-auto">
         <main class="mx-auto w-full max-w-[1760px] space-y-8 px-4 py-6 sm:px-6 lg:space-y-10 lg:px-8 lg:py-8 xl:px-10">
           <section class="mx-auto grid w-full items-start overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-md)] lg:max-w-[56.25rem] lg:grid-cols-[800fr_376fr] xl:max-w-[62.5rem]">
-          <video
+          <button
             v-if="featuredVideo"
-            :src="resolveMediaUrl(featuredVideo)"
-            :poster="resolveThumb(featuredVideo)"
-            class="block aspect-video h-full w-full bg-black object-contain"
-            controls
-            playsinline
-            preload="metadata"
-          />
+            class="group relative block aspect-video w-full overflow-hidden bg-black text-left"
+            @click="openPreview(featuredVideo)"
+          >
+            <img
+              v-if="resolveThumb(featuredVideo)"
+              :src="resolveThumb(featuredVideo)"
+              :alt="featuredVideo.name"
+              class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.01]"
+            />
+            <div v-else class="grid h-full w-full place-items-center text-white/65">
+              <svg class="h-12 w-12" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7z" /></svg>
+            </div>
+          </button>
           <button
             v-else-if="fanartFile"
             class="group relative block w-full overflow-hidden text-left"
