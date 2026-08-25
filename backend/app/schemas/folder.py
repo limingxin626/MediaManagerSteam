@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.base import MediaUrlMixin, TimestampMixin
 from app.schemas.repositories import RepositoryFileResponse
@@ -38,6 +38,29 @@ class FolderPreviewItem(MediaUrlMixin):
     source: str
 
 
+class FolderDetectionInfo(BaseModel):
+    source: str = "filename"
+    confidence: float = 0.0
+    reason: Optional[str] = None
+    ambiguous: bool = False
+
+
+class FolderMediaEntry(BaseModel):
+    id: str
+    kind: str
+    title: str
+    sequence: Optional[int] = None
+    season_number: Optional[int] = None
+    episode_numbers: List[int] = Field(default_factory=list)
+    files: List[RepositoryFileResponse] = Field(default_factory=list)
+    detection: FolderDetectionInfo = Field(default_factory=FolderDetectionInfo)
+
+
+class FolderArtwork(BaseModel):
+    poster: Optional[RepositoryFileResponse] = None
+    fanart: Optional[RepositoryFileResponse] = None
+
+
 class FolderResponse(TimestampMixin):
     id: int
     name: str
@@ -57,9 +80,17 @@ class FolderResponse(TimestampMixin):
 
 
 class FolderDetailResponse(FolderResponse):
-    locations: List[FolderLocationItem] = []
-    files: List[RepositoryFileResponse] = []
-    previews: List[FolderPreviewItem] = []
+    kind: str = "unknown"
+    artwork: FolderArtwork = Field(default_factory=FolderArtwork)
+    entries: List[FolderMediaEntry] = Field(default_factory=list)
+    gallery: List[RepositoryFileResponse] = Field(default_factory=list)
+    extras: List[FolderMediaEntry] = Field(default_factory=list)
+    unclassified: List[RepositoryFileResponse] = Field(default_factory=list)
+    primary_entry_id: Optional[str] = None
+    detection: FolderDetectionInfo = Field(default_factory=FolderDetectionInfo)
+    locations: List[FolderLocationItem] = Field(default_factory=list)
+    files: List[RepositoryFileResponse] = Field(default_factory=list)
+    previews: List[FolderPreviewItem] = Field(default_factory=list)
 
 
 class FolderCursorResponse(BaseModel):

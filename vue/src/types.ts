@@ -203,9 +203,42 @@ export interface Folder {
 }
 
 export interface FolderDetail extends Folder {
+  kind: FolderKind
+  artwork: FolderArtwork
+  entries: FolderMediaEntry[]
+  gallery: RepositoryFile[]
+  extras: FolderMediaEntry[]
+  unclassified: RepositoryFile[]
+  primary_entry_id: string | null
+  detection: FolderDetectionInfo
   locations: FolderLocation[]
   files: RepositoryFile[]
   previews: FolderPreview[]
+}
+
+export type FolderKind = 'movie' | 'multi_part' | 'series' | 'gallery' | 'mixed' | 'unknown'
+
+export interface FolderDetectionInfo {
+  source: 'filename' | 'nfo' | 'manual' | string
+  confidence: number
+  reason: string | null
+  ambiguous: boolean
+}
+
+export interface FolderMediaEntry {
+  id: string
+  kind: 'feature' | 'part' | 'episode' | 'extra' | 'video' | string
+  title: string
+  sequence: number | null
+  season_number: number | null
+  episode_numbers: number[]
+  files: RepositoryFile[]
+  detection: FolderDetectionInfo
+}
+
+export interface FolderArtwork {
+  poster: RepositoryFile | null
+  fanart: RepositoryFile | null
 }
 
 export interface FolderPreview {

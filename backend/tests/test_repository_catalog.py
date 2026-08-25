@@ -160,6 +160,9 @@ def test_folder_media_is_read_directly_from_catalog(catalog_env):
         assert file.media_id == db.query(Media).one().id
         assert response.media_count == 1
         assert [item.media_id for item in response.files] == [file.media_id]
+        assert response.kind == "gallery"
+        assert [item.media_id for item in response.gallery] == [file.media_id]
+        assert response.primary_entry_id is None
 
 
 def test_folder_response_includes_named_cover_files(catalog_env):

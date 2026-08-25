@@ -11,13 +11,17 @@ from app.schemas.file import FileUploadResponse
 from app.schemas.folder import (
     FolderCursorResponse,
     FolderDetailResponse,
+    FolderArtwork,
+    FolderDetectionInfo,
     FolderLocationItem,
+    FolderMediaEntry,
     FolderPreviewItem,
     FolderResponse,
     FolderTagCount,
     FolderTagItem,
 )
 from app.schemas.repositories import RepositoryFileResponse
+from app.services.folder_classifier import ClassifiedEntry, Detection, classify_folder
 
 
 router = APIRouter(prefix="/folders", tags=["folders"])
@@ -171,6 +175,28 @@ def _file_response(row: RepositoryFile) -> RepositoryFileResponse:
         ):
             setattr(response, field, getattr(row.media, field))
     return response
+
+
+def _detection_response(detection: Detection) -> FolderDetectionInfo:
+    return FolderDetectionInfo(
+        source=detection.source,
+        confidence=detection.confidence,
+        reason=detection.reason,
+        ambiguous=detection.ambiguous,
+    )
+
+
+def _entry_response(entry: ClassifiedEntry) -> FolderMediaEntry:
+    return FolderMediaEntry(
+        id=entry.id,
+        kind=entry.kind,
+        title=entry.title,
+        sequence=entry.sequence,
+        season_number=entry.season_number,
+        episode_numbers=entry.episode_numbers,
+        files=[_file_response(row) for row in entry.files],
+        detection=_detection_response(entry.detection),
+    )
 
 
 def _folder_preview_item(media: Media, name: str, source: str) -> FolderPreviewItem:
@@ -348,8 +374,22 @@ def get_folder(folder_id: int, db: Session = Depends(get_db)):
         files = db.query(RepositoryFile).options(joinedload(RepositoryFile.media)).filter(
             RepositoryFile.folder_id.in_(physical_ids),
         ).order_by(func.lower(RepositoryFile.name), RepositoryFile.id).all()
+    primary = _primary_location(folder)
+    classification = classify_folder(
+        base.name,
+        files,
+        primary.repository_folder_id if primary is not None else None,
+    )
     return FolderDetailResponse(
         **base.model_dump(),
+        kind=classification.kind,
+        artwork=FolderArtwork(poster=base.poster_file, fanart=base.fanart_file),
+        entries=[_entry_response(entry) for entry in classification.entries],
+        gallery=[_file_response(row) for row in classification.gallery],
+        extras=[_entry_response(entry) for entry in classification.extras],
+        unclassified=[_file_response(row) for row in classification.unclassified],
+        primary_entry_id=classification.primary_entry_id,
+        detection=_detection_response(classification.detection),
         locations=locations,
         files=[_file_response(row) for row in files],
         previews=_folder_previews(db, folder, files),
