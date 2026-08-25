@@ -29,8 +29,17 @@
       <div ref="scrollContainer" class="min-h-0 flex-1 overflow-y-auto">
         <main class="mx-auto w-full max-w-[1760px] space-y-8 px-4 py-6 sm:px-6 lg:space-y-10 lg:px-8 lg:py-8 xl:px-10">
           <section class="mx-auto grid w-full items-start overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-md)] lg:max-w-[56.25rem] lg:grid-cols-[800fr_376fr] xl:max-w-[62.5rem]">
+          <video
+            v-if="featuredVideo"
+            :src="resolveMediaUrl(featuredVideo)"
+            :poster="resolveThumb(featuredVideo)"
+            class="block aspect-video h-full w-full bg-black object-contain"
+            controls
+            playsinline
+            preload="metadata"
+          />
           <button
-            v-if="fanartFile"
+            v-else-if="fanartFile"
             class="group relative block w-full overflow-hidden text-left"
             @click="openPreview(fanartFile)"
           >
@@ -103,7 +112,6 @@
                   <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3" /></svg>
                 </div>
                 <span v-if="preview.frame_ms !== null" class="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] tabular-nums text-white/90 backdrop-blur">{{ formatFrameTime(preview.frame_ms) }}</span>
-                <span class="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-2.5 pb-2 pt-8 text-xs text-white">{{ preview.name }}</span>
               </button>
             </div>
           </section>
@@ -217,8 +225,10 @@ const mediaFiles = computed(() => {
     !artworkMediaIds.has(file.media_id!)
   ))
 })
+const videoFiles = computed(() => mediaFiles.value.filter(file => file.media_type === 'VIDEO'))
+const featuredVideo = computed(() => videoFiles.value.length === 1 ? videoFiles.value[0] : null)
 const mediaGroups = computed(() => [
-  { title: '视频', files: mediaFiles.value.filter(file => file.media_type === 'VIDEO') },
+  { title: '视频', files: featuredVideo.value ? [] : videoFiles.value },
   { title: folder.value?.kind === 'gallery' ? '图集' : '图片', files: mediaFiles.value.filter(file => file.media_type === 'IMAGE') },
 ].filter(group => group.files.length))
 const folderKindLabel = computed(() => ({
