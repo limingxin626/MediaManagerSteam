@@ -2,10 +2,10 @@ from datetime import datetime
 from typing import cast
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import case, func, or_
+from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models import Folder, RepositoryFile, Tag, folder_tag, get_db
+from app.models import Folder, FolderLocation, RepositoryFile, Tag, folder_tag, get_db
 from app.schemas.file import FileUploadResponse
 from app.schemas.folder import (
     FolderCursorResponse,
@@ -25,32 +25,119 @@ def _primary_location(folder: Folder):
     return next((location for location in folder.locations if location.role == "PRIMARY"), None)
 
 
-def _folder_response(db: Session, folder: Folder) -> FolderResponse:
+def _load_folder_file_summaries(
+    db: Session,
+    folders: list[Folder],
+) -> tuple[
+    dict[int, int],
+    dict[int, list[RepositoryFile]],
+    dict[int, dict[str, RepositoryFile]],
+]:
+    """Load counts, previews and Kodi covers in a fixed number of queries."""
+    logical_ids = [cast(int, folder.id) for folder in folders]
+    if not logical_ids:
+        return {}, {}, {}
+
+    completed = (
+        RepositoryFile.media_id.is_not(None),
+        RepositoryFile.materialize_status == "done",
+    )
+    counts = {
+        logical_id: count
+        for logical_id, count in (
+            db.query(
+                FolderLocation.folder_id,
+                func.count(func.distinct(RepositoryFile.media_id)),
+            )
+            .join(
+                RepositoryFile,
+                RepositoryFile.folder_id == FolderLocation.repository_folder_id,
+            )
+            .filter(FolderLocation.folder_id.in_(logical_ids), *completed)
+            .group_by(FolderLocation.folder_id)
+            .all()
+        )
+    }
+
+    location_priority = case((FolderLocation.role == "PRIMARY", 0), else_=1)
+    ranked_previews = (
+        db.query(
+            FolderLocation.folder_id.label("logical_folder_id"),
+            RepositoryFile.id.label("repository_file_id"),
+            func.row_number().over(
+                partition_by=FolderLocation.folder_id,
+                order_by=(
+                    location_priority,
+                    func.lower(RepositoryFile.name),
+                    RepositoryFile.id,
+                ),
+            ).label("position"),
+        )
+        .join(
+            RepositoryFile,
+            RepositoryFile.folder_id == FolderLocation.repository_folder_id,
+        )
+        .filter(FolderLocation.folder_id.in_(logical_ids), *completed)
+        .subquery()
+    )
+    preview_rows = (
+        db.query(ranked_previews.c.logical_folder_id, RepositoryFile)
+        .join(RepositoryFile, RepositoryFile.id == ranked_previews.c.repository_file_id)
+        .options(joinedload(RepositoryFile.media))
+        .filter(ranked_previews.c.position <= 4)
+        .order_by(ranked_previews.c.logical_folder_id, ranked_previews.c.position)
+        .all()
+    )
+    previews: dict[int, list[RepositoryFile]] = {}
+    for logical_id, row in preview_rows:
+        previews.setdefault(logical_id, []).append(row)
+
+    cover_rows = (
+        db.query(FolderLocation.folder_id, FolderLocation.role, RepositoryFile)
+        .join(
+            RepositoryFile,
+            RepositoryFile.folder_id == FolderLocation.repository_folder_id,
+        )
+        .options(joinedload(RepositoryFile.media))
+        .filter(
+            FolderLocation.folder_id.in_(logical_ids),
+            *completed,
+            or_(
+                func.lower(RepositoryFile.name).like("fanart.%"),
+                func.lower(RepositoryFile.name).like("poster.%"),
+            ),
+        )
+        .order_by(
+            FolderLocation.folder_id,
+            location_priority,
+            FolderLocation.id,
+            func.lower(RepositoryFile.name),
+            RepositoryFile.id,
+        )
+        .all()
+    )
+    covers: dict[int, dict[str, RepositoryFile]] = {}
+    for logical_id, _role, row in cover_rows:
+        kind = row.name.rsplit(".", 1)[0].lower()
+        if kind in {"fanart", "poster"}:
+            covers.setdefault(logical_id, {}).setdefault(kind, row)
+
+    return counts, previews, covers
+
+
+def _folder_response(
+    folder: Folder,
+    counts: dict[int, int],
+    previews: dict[int, list[RepositoryFile]],
+    covers: dict[int, dict[str, RepositoryFile]],
+) -> FolderResponse:
     primary = _primary_location(folder)
     physical = primary.repository_folder if primary is not None else None
-    physical_ids = [location.repository_folder_id for location in folder.locations]
-    media_count = 0
-    if physical_ids:
-        media_count = db.query(func.count(func.distinct(RepositoryFile.media_id))).filter(
-            RepositoryFile.folder_id.in_(physical_ids),
-            RepositoryFile.media_id.is_not(None),
-            RepositoryFile.materialize_status == "done",
-        ).scalar() or 0
-    preview_rows = []
-    cover_rows = []
-    if physical_ids:
-        files_query = db.query(RepositoryFile).options(joinedload(RepositoryFile.media)).filter(
-            RepositoryFile.folder_id.in_(physical_ids),
-            RepositoryFile.media_id.is_not(None),
-            RepositoryFile.materialize_status == "done",
-        )
-        preview_rows = files_query.order_by(func.lower(RepositoryFile.name), RepositoryFile.id).limit(4).all()
-        cover_rows = files_query.filter(or_(
-            func.lower(RepositoryFile.name).like("fanart.%"),
-            func.lower(RepositoryFile.name).like("poster.%"),
-        )).order_by(func.lower(RepositoryFile.name), RepositoryFile.id).all()
-    fanart = next((row for row in cover_rows if row.name.rsplit(".", 1)[0].lower() == "fanart"), None)
-    poster = next((row for row in cover_rows if row.name.rsplit(".", 1)[0].lower() == "poster"), None)
+    folder_id = cast(int, folder.id)
+    preview_rows = previews.get(folder_id, [])
+    folder_covers = covers.get(folder_id, {})
+    fanart = folder_covers.get("fanart")
+    poster = folder_covers.get("poster")
     return FolderResponse(
         id=cast(int, folder.id),
         name=cast(str, physical.name if physical is not None else ""),
@@ -60,7 +147,7 @@ def _folder_response(db: Session, folder: Folder) -> FolderResponse:
         issue_title=folder.issue.title if folder.issue else None,
         starred=bool(folder.starred),
         location_count=len(folder.locations),
-        media_count=media_count,
+        media_count=counts.get(folder_id, 0),
         primary_repo_id=physical.repo_id if physical is not None else None,
         primary_folder_path=physical.rel_path if physical is not None else None,
         tags=[FolderTagItem(id=tag.id, name=tag.name, category=tag.category) for tag in folder.tags],
@@ -92,7 +179,12 @@ def list_folders(
     tag_id: int | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Folder)
+    query = db.query(Folder).options(
+        joinedload(Folder.collection),
+        joinedload(Folder.issue),
+        selectinload(Folder.locations).joinedload(FolderLocation.repository_folder),
+        selectinload(Folder.tags),
+    )
     if cursor is not None:
         query = query.filter(Folder.id < cursor)
     if starred is not None:
@@ -102,8 +194,9 @@ def list_folders(
     rows = query.order_by(Folder.id.desc()).limit(limit + 1).all()
     has_more = len(rows) > limit
     rows = rows[:limit]
+    counts, previews, covers = _load_folder_file_summaries(db, rows)
     return FolderCursorResponse(
-        items=[_folder_response(db, folder) for folder in rows],
+        items=[_folder_response(folder, counts, previews, covers) for folder in rows],
         next_cursor=cast(int, rows[-1].id) if has_more and rows else None,
         has_more=has_more,
     )
@@ -135,7 +228,8 @@ def get_folder(folder_id: int, db: Session = Depends(get_db)):
     if folder is None:
         raise HTTPException(status_code=404, detail="Folder not found")
 
-    base = _folder_response(db, folder)
+    counts, previews, covers = _load_folder_file_summaries(db, [folder])
+    base = _folder_response(folder, counts, previews, covers)
     locations = [
         FolderLocationItem(
             id=location.repository_folder.id,

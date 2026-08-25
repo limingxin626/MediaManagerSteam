@@ -15,12 +15,6 @@ function createWindow() {
     width: 1200,
     height: 800,
     show: false, // 先隐藏窗口
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#f0f2f6',
-      symbolColor: '#475569',
-      height: 36
-    },
     backgroundColor: '#202020',
     webPreferences: {
       webSecurity: false, // 必须！允许播放本地绝对路径视频
@@ -100,11 +94,4 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
-});
-ipcMain.handle('window:setTitleBarTheme', (event, dark) => {
-  BrowserWindow.fromWebContents(event.sender)?.setTitleBarOverlay({
-    color: dark ? '#242424' : '#f0f2f6',
-    symbolColor: dark ? '#c7c7c7' : '#475569',
-    height: 36
-  });
 });

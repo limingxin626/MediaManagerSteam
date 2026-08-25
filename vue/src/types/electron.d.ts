@@ -6,7 +6,6 @@ declare global {
         filePaths: string[]
       }>
       showItemInFolder: (path: string) => void
-      setTitleBarTheme: (dark: boolean) => Promise<void>
     }
   }
 }

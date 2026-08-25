@@ -1,4 +1,4 @@
-import { IS_ELECTRON } from './constants'
+import { API_BASE_URL, IS_ELECTRON } from './constants'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 
@@ -50,16 +50,21 @@ export function dirname(p: string): string {
 
 /** Resolve a backend-relative path to a full absolute path */
 export function resolveUrl(path: string): string {
-  if (IS_ELECTRON) {
-    return `file://${path.replace(/#/g, '%23')}`
-  }
-  return `${path.replace(/#/g, '%23')}`
+  const escaped = path.replace(/#/g, '%23')
+  if (/^(?:https?:|data:|blob:|file:)/i.test(escaped)) return escaped
+  if (escaped.startsWith('/')) return `${API_BASE_URL}${escaped}`
+  return escaped
+}
+
+function resolveLocalFile(path: string): string {
+  const escaped = path.replace(/\\/g, '/').replace(/#/g, '%23')
+  return escaped.startsWith('/') ? `file://${escaped}` : `file:///${escaped}`
 }
 
 /** Resolve media thumb to absolute path. 优先用本机绝对路径(Electron file://),HTTP URL 兜底。 */
 export function resolveThumb(item: { thumb_url?: string | null; local_thumb_path?: string | null } | null): string {
   if (!item) return ''
-  if (item.local_thumb_path) return resolveUrl(item.local_thumb_path)
+  if (IS_ELECTRON && item.local_thumb_path) return resolveLocalFile(item.local_thumb_path)
   if (item.thumb_url) return resolveUrl(item.thumb_url)
   return ''
 }
@@ -67,7 +72,7 @@ export function resolveThumb(item: { thumb_url?: string | null; local_thumb_path
 /** Resolve media file to absolute path. 同 resolveThumb 优先级。 */
 export function resolveMediaUrl(item: { file_url?: string | null; local_file_path?: string | null } | null): string {
   if (!item) return ''
-  if (item.local_file_path) return resolveUrl(item.local_file_path)
+  if (IS_ELECTRON && item.local_file_path) return resolveLocalFile(item.local_file_path)
   if (item.file_url) return resolveUrl(item.file_url)
   return ''
 }
@@ -75,7 +80,7 @@ export function resolveMediaUrl(item: { file_url?: string | null; local_file_pat
 /** Resolve collection / person cover to absolute path */
 export function resolveCover(entity: { cover_url?: string | null; cover_abs_path?: string | null } | null): string {
   if (!entity) return ''
-  if (entity.cover_abs_path) return resolveUrl(entity.cover_abs_path)
+  if (IS_ELECTRON && entity.cover_abs_path) return resolveLocalFile(entity.cover_abs_path)
   if (entity.cover_url) return resolveUrl(entity.cover_url)
   return ''
 }

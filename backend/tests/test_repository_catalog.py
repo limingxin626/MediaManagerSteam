@@ -194,6 +194,104 @@ def test_folder_response_includes_named_cover_files(catalog_env):
         assert response.poster_file.name == "poster.jpg"
 
 
+def test_folder_response_prefers_primary_kodi_covers(catalog_env):
+    repo, session_factory = catalog_env
+    album = repo / "album"
+    album.mkdir()
+    (album / "fanart.jpg").write_bytes(b"primary")
+
+    with session_factory() as db:
+        db.add(Media(
+            repo_id="test",
+            file_path="album/fanart.jpg",
+            file_hash="primary-fanart",
+            file_size=7,
+        ))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        logical = db.query(Folder).one()
+        mirror_folder = RepositoryFolder(
+            repo_id="test",
+            rel_path="mirror",
+            name="mirror",
+        )
+        mirror_media = Media(
+            repo_id="test",
+            file_path="mirror/fanart.jpeg",
+            file_hash="mirror-fanart",
+            file_size=6,
+        )
+        db.add_all([mirror_folder, mirror_media])
+        db.flush()
+        db.add(FolderLocation(
+            folder_id=logical.id,
+            repository_folder_id=mirror_folder.id,
+            role="MIRROR",
+        ))
+        db.add(RepositoryFile(
+            repo_id="test",
+            folder_id=mirror_folder.id,
+            rel_path="mirror/fanart.jpeg",
+            name="fanart.jpeg",
+            mime_type="image/jpeg",
+            media_type="IMAGE",
+            file_size=6,
+            mtime=0,
+            media_id=mirror_media.id,
+            materialize_status="done",
+        ))
+        db.commit()
+
+        response = get_folder(logical.id, db)
+
+        assert response.fanart_file is not None
+        assert response.fanart_file.rel_path == "album/fanart.jpg"
+
+
+def test_folder_list_batches_file_summary_queries(catalog_env):
+    repo, session_factory = catalog_env
+    for folder_name in ("alpha", "beta", "gamma"):
+        directory = repo / folder_name
+        directory.mkdir()
+        (directory / "fanart.jpg").write_bytes(folder_name.encode())
+
+    with session_factory() as db:
+        for index, folder_name in enumerate(("alpha", "beta", "gamma")):
+            db.add(Media(
+                repo_id="test",
+                file_path=f"{folder_name}/fanart.jpg",
+                file_hash=f"batched-cover-{index}",
+                file_size=len(folder_name),
+            ))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        statements = []
+
+        from sqlalchemy import event
+
+        def record_selects(_connection, _cursor, statement, _parameters, _context, _many):
+            if statement.lstrip().upper().startswith("SELECT"):
+                statements.append(statement)
+
+        event.listen(db.get_bind(), "before_cursor_execute", record_selects)
+        try:
+            response = list_folders(
+                cursor=None, limit=20, starred=None, tag_id=None, db=db,
+            )
+        finally:
+            event.remove(db.get_bind(), "before_cursor_execute", record_selects)
+
+        assert len(response.items) == 3
+        assert all(item.fanart_file is not None for item in response.items)
+        assert len(statements) <= 8
+
+
 def test_removed_file_removes_logical_folder_but_preserves_media(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"
