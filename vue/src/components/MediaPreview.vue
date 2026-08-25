@@ -23,7 +23,7 @@
             </button>
             <button
               v-if="currentItem"
-              @click="showDeleteConfirm = true"
+              @click="openDeleteConfirm"
               class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
               title="删除媒体"
             >
@@ -404,7 +404,7 @@ const transitionName = ref<'slide-left' | 'slide-right'>('slide-left')
 const THUMB_WINDOW = 5
 const previewStarBounce = ref(false)
 const showDeleteConfirm = ref(false)
-const deleteSourceFile = ref(false)
+const deleteSourceFile = ref(true)
 const isDeleting = ref(false)
 const rotationDegrees = ref(0)
 const isRotating = ref(false)
@@ -456,6 +456,11 @@ async function handleStarClick() {
   emit('toggle-star', currentItem.value.id)
 }
 
+function openDeleteConfirm() {
+  deleteSourceFile.value = true
+  showDeleteConfirm.value = true
+}
+
 async function confirmDelete() {
   if (!currentItem.value || isDeleting.value) return
   const mediaId = currentItem.value.id
@@ -482,7 +487,7 @@ async function confirmDelete() {
     isDeleting.value = false
   }
   showDeleteConfirm.value = false
-  deleteSourceFile.value = false
+  deleteSourceFile.value = true
 }
 
 function openDetailPage() {

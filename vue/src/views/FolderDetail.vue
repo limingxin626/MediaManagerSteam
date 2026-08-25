@@ -26,7 +26,7 @@
         </div>
       </header>
 
-      <div class="min-h-0 flex-1 overflow-y-auto">
+      <div ref="scrollContainer" class="min-h-0 flex-1 overflow-y-auto">
         <main class="mx-auto w-full max-w-[1760px] space-y-8 px-4 py-6 sm:px-6 lg:space-y-10 lg:px-8 lg:py-8 xl:px-10">
           <section class="mx-auto grid w-full items-start overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-md)] lg:max-w-[56.25rem] lg:grid-cols-[800fr_376fr] xl:max-w-[62.5rem]">
           <button
@@ -43,10 +43,6 @@
             />
             <div v-else class="grid h-full w-full place-items-center text-[var(--text-muted)]">
               <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3" /></svg>
-            </div>
-            <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent px-5 pb-4 pt-16 text-white sm:px-7 sm:pb-6">
-              <p class="truncate text-xl font-semibold drop-shadow sm:text-2xl">{{ folder.name }}</p>
-              <p class="mt-1 text-xs text-white/75">Fanart</p>
             </div>
           </button>
 
@@ -214,12 +210,12 @@
       </div>
     </div>
 
-    <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" @close="previewOpen = false" @media-deleted="loadFolder" @media-rotated="loadFolder" @media-replaced="loadFolder" />
+    <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" @close="previewOpen = false" @media-deleted="handleMediaDeleted" @media-rotated="refreshFolder" @media-replaced="refreshFolder" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api } from '../composables/useApi'
@@ -236,6 +232,7 @@ const loading = ref(true)
 const error = ref('')
 const uploading = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
+const scrollContainer = ref<HTMLElement | null>(null)
 const previewOpen = ref(false)
 const previewItems = ref<MessageMediaItem[]>([])
 const previewIndex = ref(0)
@@ -304,9 +301,9 @@ function mapPreviewFiles(files: RepositoryFile[]) {
   } as unknown as MessageMediaItem))
 }
 
-async function loadFolder() {
+async function fetchFolder(showLoading: boolean) {
   const request = ++loadRequest
-  loading.value = true
+  if (showLoading) loading.value = true
   error.value = ''
   fanartFallback.value = false
   try {
@@ -318,8 +315,16 @@ async function loadFolder() {
       error.value = caught?.message || '加载目录失败'
     }
   } finally {
-    if (request === loadRequest) loading.value = false
+    if (request === loadRequest && showLoading) loading.value = false
   }
+}
+
+function loadFolder() {
+  return fetchFolder(true)
+}
+
+function refreshFolder() {
+  return fetchFolder(false)
 }
 
 function mapFolderPreviews(previews: FolderPreview[]) {
@@ -361,6 +366,14 @@ function openEntry(entry: FolderMediaEntry) {
   previewItems.value = mapPreviewFiles(entry.files)
   previewIndex.value = 0
   previewOpen.value = true
+}
+
+async function handleMediaDeleted(mediaId: number) {
+  const scrollTop = scrollContainer.value?.scrollTop ?? 0
+  previewItems.value = previewItems.value.filter(item => item.id !== mediaId)
+  await refreshFolder()
+  await nextTick()
+  scrollContainer.value?.scrollTo({ top: scrollTop })
 }
 
 function entrySubtitle(entry: FolderMediaEntry) {
