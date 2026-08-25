@@ -6,6 +6,7 @@ declare global {
         filePaths: string[]
       }>
       showItemInFolder: (path: string) => void
+      openPath: (path: string) => Promise<string>
     }
   }
 }

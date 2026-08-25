@@ -169,6 +169,7 @@ export interface FolderLocation {
   rel_path: string
   name: string
   role: 'PRIMARY' | 'MIRROR' | string
+  local_path: string | null
 }
 
 export interface FolderTag {
@@ -204,6 +205,27 @@ export interface Folder {
 export interface FolderDetail extends Folder {
   locations: FolderLocation[]
   files: RepositoryFile[]
+  previews: FolderPreview[]
+}
+
+export interface FolderPreview {
+  id: number
+  repo_id: string
+  file_path: string
+  file_url: string
+  thumb_url: string
+  local_file_path?: string
+  local_thumb_path?: string
+  name: string
+  mime_type: string | null
+  width: number | null
+  height: number | null
+  duration_ms: number | null
+  video_media_id: number | null
+  frame_ms: number | null
+  start_ms: number | null
+  end_ms: number | null
+  source: 'kodi' | 'video'
 }
 
 // --- 纯前端类型（后端无对应 schema） ---

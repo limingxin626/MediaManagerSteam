@@ -194,6 +194,56 @@ def test_folder_response_includes_named_cover_files(catalog_env):
         assert response.poster_file.name == "poster.jpg"
 
 
+def test_folder_detail_includes_named_and_video_child_previews(catalog_env):
+    repo, session_factory = catalog_env
+    album = repo / "album"
+    album.mkdir()
+    names = ["movie.mp4", "preview-01.jpg", "Preivew_02.png", "photo.jpg"]
+    for name in names:
+        (album / name).write_bytes(name.encode())
+
+    with session_factory() as db:
+        media_by_name = {}
+        for index, name in enumerate(names):
+            media = Media(
+                repo_id="test",
+                file_path=f"album/{name}",
+                file_hash=f"folder-preview-{index}",
+                file_size=len(name),
+                mime_type="video/mp4" if name.endswith(".mp4") else "image/jpeg",
+            )
+            db.add(media)
+            media_by_name[name] = media
+        db.flush()
+        generated = Media(
+            repo_id="uploads",
+            file_path="preview/generated.jpg",
+            file_hash="generated-folder-preview",
+            file_size=9,
+            mime_type="image/jpeg",
+            video_media_id=media_by_name["movie.mp4"].id,
+            frame_ms=2500,
+        )
+        db.add(generated)
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(RepositoryFolder).filter_by(rel_path="album").one()
+        location = db.query(FolderLocation).filter_by(repository_folder_id=folder.id).one()
+        response = get_folder(location.folder_id, db)
+
+        assert [(item.name, item.source) for item in response.previews] == [
+            ("Preivew_02.png", "kodi"),
+            ("preview-01.jpg", "kodi"),
+            ("generated.jpg", "video"),
+        ]
+        assert response.previews[-1].video_media_id is not None
+        assert response.previews[-1].frame_ms == 2500
+        assert all(item.name != "photo.jpg" for item in response.previews)
+
+
 def test_folder_response_prefers_primary_kodi_covers(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"

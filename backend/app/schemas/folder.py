@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from app.schemas.base import TimestampMixin
+from app.schemas.base import MediaUrlMixin, TimestampMixin
 from app.schemas.repositories import RepositoryFileResponse
 
 
@@ -12,6 +12,7 @@ class FolderLocationItem(BaseModel):
     rel_path: str
     name: str
     role: str
+    local_path: Optional[str] = None
 
 
 class FolderTagItem(BaseModel):
@@ -22,6 +23,19 @@ class FolderTagItem(BaseModel):
 
 class FolderTagCount(FolderTagItem):
     folder_count: int = 0
+
+
+class FolderPreviewItem(MediaUrlMixin):
+    name: str
+    mime_type: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    duration_ms: Optional[int] = None
+    video_media_id: Optional[int] = None
+    frame_ms: Optional[int] = None
+    start_ms: Optional[int] = None
+    end_ms: Optional[int] = None
+    source: str
 
 
 class FolderResponse(TimestampMixin):
@@ -45,6 +59,7 @@ class FolderResponse(TimestampMixin):
 class FolderDetailResponse(FolderResponse):
     locations: List[FolderLocationItem] = []
     files: List[RepositoryFileResponse] = []
+    previews: List[FolderPreviewItem] = []
 
 
 class FolderCursorResponse(BaseModel):

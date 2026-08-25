@@ -20,9 +20,7 @@ function createWindow() {
       webSecurity: false, // 必须！允许播放本地绝对路径视频
       nodeIntegration: true,
       contextIsolation: true, // 启用 contextIsolation 以使用 preload
-      preload: isDev 
-        ? path.join(__dirname, 'preload.js')
-        : path.join(process.resourcesPath, 'app', 'preload.js')
+      preload: path.join(__dirname, 'preload.js')
     }
   });
   

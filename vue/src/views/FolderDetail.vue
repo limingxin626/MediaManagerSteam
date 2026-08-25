@@ -14,6 +14,10 @@
             <h1 class="truncate text-sm font-semibold text-[var(--text-primary)] sm:text-base">{{ folder.name }}</h1>
             <p class="truncate text-xs text-[var(--text-muted)]">{{ folderPath }}</p>
           </div>
+          <button v-if="isElectron" class="flex h-9 shrink-0 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50" :disabled="!primaryLocation?.local_path" title="在系统文件管理器中打开" @click="openFolderPath">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 6.5h6l2 2h9v10h-17z" /></svg>
+            <span class="hidden sm:inline">打开文件夹</span>
+          </button>
           <input ref="uploadInput" class="hidden" type="file" multiple accept="video/mp4,image/jpeg,image/png,image/gif" @change="uploadFiles" />
           <button class="flex h-9 shrink-0 items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-primary-600)] px-3 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-700)] disabled:opacity-50" :disabled="uploading" @click="uploadInput?.click()">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0-4 4m4-4 4 4M5 15v4h14v-4" /></svg>
@@ -23,10 +27,11 @@
       </header>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
-        <main class="mx-auto w-full max-w-[1600px] space-y-5 px-4 py-5 sm:px-6 lg:space-y-7 lg:px-8 lg:py-7 xl:px-10">
+        <main class="mx-auto grid w-full max-w-[1760px] items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10 lg:px-8 lg:py-8 xl:grid-cols-[minmax(0,1fr)_18rem] xl:px-10">
+          <div class="min-w-0 space-y-7 lg:space-y-9">
           <button
             v-if="fanartFile"
-            class="group relative block h-[clamp(16rem,48vw,38rem)] w-full overflow-hidden rounded-[var(--radius-lg)] bg-[#181818] text-left shadow-[var(--shadow-md)]"
+            class="group relative block aspect-[800/535] max-h-[36rem] min-h-64 w-full overflow-hidden rounded-[var(--radius-lg)] bg-[#181818] text-left shadow-[var(--shadow-md)]"
             @click="openPreview(fanartFile)"
           >
             <img
@@ -45,39 +50,74 @@
             </div>
           </button>
 
-          <div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-7 xl:grid-cols-[minmax(0,1fr)_20rem]">
-          <article class="min-w-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]">
+          <section v-if="folderPreviews.length" class="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]">
             <div class="flex h-12 items-center justify-between border-b border-[var(--border-color)] px-4 sm:px-5">
-              <h2 class="text-sm font-semibold text-[var(--text-primary)]">媒体</h2>
-              <span class="text-xs tabular-nums text-[var(--text-muted)]">{{ mediaFiles.length }} 项</span>
+              <div class="flex items-center gap-2">
+                <h2 class="text-sm font-semibold text-[var(--text-primary)]">Preview</h2>
+                <span class="rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-primary-600)]">章节</span>
+              </div>
+              <span class="text-xs tabular-nums text-[var(--text-muted)]">{{ folderPreviews.length }} 项</span>
             </div>
-            <div v-if="mediaFiles.length" class="grid grid-cols-2 gap-2.5 p-2.5 sm:grid-cols-3 xl:grid-cols-4">
+            <div class="grid grid-cols-2 gap-2.5 p-2.5 sm:grid-cols-3 xl:grid-cols-4">
               <button
-                v-for="file in mediaFiles"
-                :key="file.id"
-                class="group relative aspect-square overflow-hidden rounded-[var(--radius-md)] bg-[#181818]"
-                @click="openPreview(file)"
+                v-for="preview in folderPreviews"
+                :key="preview.id"
+                class="group relative aspect-video overflow-hidden rounded-[var(--radius-md)] bg-[#181818] text-left"
+                @click="openFolderPreview(preview)"
               >
-                <img
-                  v-if="resolveThumb(file)"
-                  :src="resolveThumb(file)"
-                  :alt="file.name"
-                  class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
-                  loading="lazy"
-                />
+                <img v-if="resolveThumb(preview)" :src="resolveThumb(preview)" :alt="preview.name" class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" loading="lazy" />
                 <div v-else class="grid h-full w-full place-items-center text-[var(--text-muted)]">
                   <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3" /></svg>
                 </div>
-                <span v-if="file.media_type === 'VIDEO'" class="absolute left-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/55 text-white">
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7z" /></svg>
-                </span>
-                <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1.5 text-left text-xs text-white">{{ file.name }}</span>
+                <span v-if="preview.frame_ms !== null" class="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] tabular-nums text-white/90 backdrop-blur">{{ formatFrameTime(preview.frame_ms) }}</span>
+                <span class="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-2.5 pb-2 pt-8 text-xs text-white">{{ preview.name }}</span>
+              </button>
+            </div>
+          </section>
+
+          <article class="min-w-0">
+            <div class="flex h-12 items-center justify-between">
+              <h2 class="text-sm font-semibold text-[var(--text-primary)]">媒体</h2>
+              <div class="flex items-center gap-3">
+                <span class="text-xs tabular-nums text-[var(--text-muted)]">{{ mediaFiles.length }} 项</span>
+                <button class="flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]" :title="mediaFit === 'cover' ? '当前：填充裁切，点击切换为完整显示' : '当前：完整显示，点击切换为填充裁切'" @click="toggleMediaFit">
+                  <svg v-if="mediaFit === 'cover'" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></svg>
+                  <svg v-else class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /><path d="M8 8h8v8H8z" /></svg>
+                  {{ mediaFit === 'cover' ? 'Cover' : 'Contain' }}
+                </button>
+              </div>
+            </div>
+            <div v-if="mediaFiles.length" class="grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3 xl:grid-cols-4">
+              <button
+                v-for="file in mediaFiles"
+                :key="file.id"
+                class="group min-w-0 text-left"
+                @click="openPreview(file)"
+              >
+                <div class="relative aspect-square overflow-hidden">
+                  <img
+                    v-if="resolveThumb(file)"
+                    :src="resolveThumb(file)"
+                    :alt="file.name"
+                    class="h-full w-full transition-transform duration-200 group-hover:scale-[1.03]"
+                    :class="mediaFit === 'cover' ? 'object-cover' : 'object-contain'"
+                    loading="lazy"
+                  />
+                  <div v-else class="grid h-full w-full place-items-center text-[var(--text-muted)]">
+                    <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3" /></svg>
+                  </div>
+                  <span v-if="file.media_type === 'VIDEO'" class="absolute left-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/55 text-white">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7z" /></svg>
+                  </span>
+                </div>
+                <span class="mt-2.5 block truncate px-1 text-center text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" :title="file.name">{{ file.name }}</span>
               </button>
             </div>
             <div v-else class="grid min-h-72 place-items-center px-6 text-center text-sm text-[var(--text-muted)]">
               暂无其他媒体
             </div>
           </article>
+          </div>
 
           <aside class="w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)] lg:sticky lg:top-5">
             <button v-if="posterFile" class="group relative mx-auto block aspect-[376/535] w-full max-w-sm overflow-hidden bg-[#181818]" @click="openPreview(posterFile)">
@@ -112,7 +152,6 @@
             </div>
 
           </aside>
-          </div>
         </main>
       </div>
     </template>
@@ -134,7 +173,8 @@ import { useRouter } from 'vue-router'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import type { FolderDetail, MessageMediaItem, RepositoryFile } from '../types'
+import type { FolderDetail, FolderPreview, MessageMediaItem, RepositoryFile } from '../types'
+import { IS_ELECTRON } from '../utils/constants'
 import { resolveMediaUrl, resolveThumb } from '../utils/media'
 
 const props = defineProps<{ folderId: number }>()
@@ -149,11 +189,15 @@ const previewOpen = ref(false)
 const previewItems = ref<MessageMediaItem[]>([])
 const previewIndex = ref(0)
 const fanartFallback = ref(false)
+const mediaFit = ref<'cover' | 'contain'>('cover')
 let loadRequest = 0
+const isElectron = IS_ELECTRON
 
 const fanartFile = computed(() => folder.value?.fanart_file ?? null)
 const posterFile = computed(() => folder.value?.poster_file ?? null)
-const primaryFolderId = computed(() => folder.value?.locations.find(location => location.role === 'PRIMARY')?.id ?? null)
+const folderPreviews = computed(() => folder.value?.previews ?? [])
+const primaryLocation = computed(() => folder.value?.locations.find(location => location.role === 'PRIMARY') ?? null)
+const primaryFolderId = computed(() => primaryLocation.value?.id ?? null)
 const allMediaFiles = computed(() => {
   const unique = new Map<number, RepositoryFile>()
   for (const file of folder.value?.files ?? []) {
@@ -167,7 +211,11 @@ const allMediaFiles = computed(() => {
 })
 const mediaFiles = computed(() => {
   const artworkMediaIds = new Set(
-    [fanartFile.value?.media_id, posterFile.value?.media_id].filter((id): id is number => id !== null && id !== undefined),
+    [
+      fanartFile.value?.media_id,
+      posterFile.value?.media_id,
+      ...folderPreviews.value.map(preview => preview.id),
+    ].filter((id): id is number => id !== null && id !== undefined),
   )
   return allMediaFiles.value.filter(file => !artworkMediaIds.has(file.media_id!))
 })
@@ -210,6 +258,26 @@ async function loadFolder() {
   }
 }
 
+function mapFolderPreviews(previews: FolderPreview[]) {
+  return previews.map(preview => ({
+    id: preview.id, repo_id: preview.repo_id, file_path: preview.file_path,
+    file_url: preview.file_url, thumb_url: preview.thumb_url,
+    local_file_path: preview.local_file_path, local_thumb_path: preview.local_thumb_path,
+    mime_type: preview.mime_type, width: preview.width, height: preview.height,
+    duration_ms: preview.duration_ms, starred: false, tags: [],
+  } as unknown as MessageMediaItem))
+}
+
+function formatFrameTime(frameMs: number) {
+  const totalSeconds = Math.floor(frameMs / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+    : `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 function openPreview(file: RepositoryFile) {
   previewItems.value = mapPreviewFiles(allMediaFiles.value)
   previewIndex.value = allMediaFiles.value.findIndex(item => item.media_id === file.media_id)
@@ -217,8 +285,34 @@ function openPreview(file: RepositoryFile) {
   previewOpen.value = true
 }
 
+function openFolderPreview(preview: FolderPreview) {
+  previewItems.value = mapFolderPreviews(folderPreviews.value)
+  previewIndex.value = folderPreviews.value.findIndex(item => item.id === preview.id)
+  if (previewIndex.value < 0) return
+  previewOpen.value = true
+}
+
 function handleFanartError() {
   if (!fanartFallback.value) fanartFallback.value = true
+}
+
+function toggleMediaFit() {
+  mediaFit.value = mediaFit.value === 'cover' ? 'contain' : 'cover'
+  localStorage.setItem('folder_detail_media_fit', mediaFit.value)
+}
+
+async function openFolderPath() {
+  const path = primaryLocation.value?.local_path
+  if (!path || !window.electronAPI?.openPath) {
+    toast.error('文件夹位置不可用')
+    return
+  }
+  try {
+    const errorMessage = await window.electronAPI.openPath(path)
+    if (errorMessage) toast.error(`无法打开文件夹：${errorMessage}`)
+  } catch (caught: any) {
+    toast.error(caught?.message || '无法打开文件夹')
+  }
 }
 
 function close() {
@@ -254,6 +348,7 @@ async function uploadFiles(event: Event) {
 }
 
 onMounted(() => {
+  mediaFit.value = localStorage.getItem('folder_detail_media_fit') === 'contain' ? 'contain' : 'cover'
   window.addEventListener('keydown', handleKeydown)
 })
 

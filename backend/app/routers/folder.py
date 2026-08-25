@@ -5,12 +5,14 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models import Folder, FolderLocation, RepositoryFile, Tag, folder_tag, get_db
+from app.config import config
+from app.models import Folder, FolderLocation, Media, RepositoryFile, Tag, folder_tag, get_db
 from app.schemas.file import FileUploadResponse
 from app.schemas.folder import (
     FolderCursorResponse,
     FolderDetailResponse,
     FolderLocationItem,
+    FolderPreviewItem,
     FolderResponse,
     FolderTagCount,
     FolderTagItem,
@@ -171,6 +173,102 @@ def _file_response(row: RepositoryFile) -> RepositoryFileResponse:
     return response
 
 
+def _folder_preview_item(media: Media, name: str, source: str) -> FolderPreviewItem:
+    return FolderPreviewItem(
+        id=cast(int, media.id),
+        repo_id=cast(str, media.repo_id),
+        file_path=cast(str, media.file_path),
+        name=name,
+        mime_type=media.mime_type,
+        width=media.width,
+        height=media.height,
+        duration_ms=media.duration_ms,
+        video_media_id=media.video_media_id,
+        frame_ms=media.frame_ms,
+        start_ms=media.start_ms,
+        end_ms=media.end_ms,
+        source=source,
+    )
+
+
+def _folder_previews(
+    db: Session,
+    folder: Folder,
+    files: list[RepositoryFile],
+) -> list[FolderPreviewItem]:
+    """Return Kodi preview images and preview children of videos in the folder."""
+    primary = _primary_location(folder)
+    primary_id = primary.repository_folder_id if primary is not None else None
+    completed_files = [
+        row for row in files
+        if row.media is not None
+        and row.media_id is not None
+        and row.materialize_status == "done"
+    ]
+    named_rows = sorted(
+        (
+            row for row in completed_files
+            if row.media_type == "IMAGE"
+            and row.name.rsplit(".", 1)[0].lower().startswith(("preview", "preivew"))
+        ),
+        key=lambda row: (
+            row.folder_id != primary_id,
+            row.name.lower(),
+            row.id,
+        ),
+    )
+
+    result: list[FolderPreviewItem] = []
+    seen_media_ids: set[int] = set()
+    for row in named_rows:
+        media_id = cast(int, row.media_id)
+        if media_id in seen_media_ids:
+            continue
+        seen_media_ids.add(media_id)
+        result.append(_folder_preview_item(row.media, row.name, "kodi"))
+
+    child_rows = sorted(
+        (row for row in completed_files if row.media.video_media_id is not None),
+        key=lambda row: (
+            row.folder_id != primary_id,
+            row.media.video_media_id,
+            row.media.frame_ms is None,
+            row.media.frame_ms or 0,
+            row.id,
+        ),
+    )
+    for row in child_rows:
+        media_id = cast(int, row.media_id)
+        if media_id in seen_media_ids:
+            continue
+        seen_media_ids.add(media_id)
+        result.append(_folder_preview_item(row.media, row.name, "video"))
+
+    folder_media_ids = {cast(int, row.media_id) for row in completed_files}
+    if not folder_media_ids:
+        return result
+
+    children = (
+        db.query(Media)
+        .filter(Media.video_media_id.in_(folder_media_ids))
+        .order_by(
+            Media.video_media_id,
+            case((Media.frame_ms.is_(None), 1), else_=0),
+            Media.frame_ms,
+            Media.id,
+        )
+        .all()
+    )
+    for media in children:
+        media_id = cast(int, media.id)
+        if media_id in seen_media_ids:
+            continue
+        seen_media_ids.add(media_id)
+        name = cast(str, media.file_path).replace("\\", "/").rsplit("/", 1)[-1]
+        result.append(_folder_preview_item(media, name, "video"))
+    return result
+
+
 @router.get("", response_model=FolderCursorResponse)
 def list_folders(
     cursor: int | None = Query(None),
@@ -237,6 +335,10 @@ def get_folder(folder_id: int, db: Session = Depends(get_db)):
             rel_path=location.repository_folder.rel_path,
             name=location.repository_folder.name,
             role=location.role,
+            local_path=config.resolve_to_absolute(
+                location.repository_folder.repo_id,
+                location.repository_folder.rel_path,
+            ),
         )
         for location in sorted(folder.locations, key=lambda item: (item.role != "PRIMARY", item.id))
     ]
@@ -250,6 +352,7 @@ def get_folder(folder_id: int, db: Session = Depends(get_db)):
         **base.model_dump(),
         locations=locations,
         files=[_file_response(row) for row in files],
+        previews=_folder_previews(db, folder, files),
     )
 
 
