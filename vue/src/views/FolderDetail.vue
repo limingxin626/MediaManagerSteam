@@ -172,7 +172,7 @@
       </div>
     </div>
 
-    <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" :all-tags="allTags" @close="previewOpen = false" @media-deleted="handleMediaDeleted" @media-rotated="refreshFolder" @media-replaced="refreshFolder" />
+    <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" :all-tags="allTags" @close="previewOpen = false" @toggle-star="handleMediaStarChanged" @media-deleted="handleMediaDeleted" @media-rotated="refreshFolder" @media-replaced="refreshFolder" />
   </div>
 </template>
 
@@ -258,7 +258,7 @@ function mapPreviewFiles(files: RepositoryFile[]) {
     file_url: file.file_url, thumb_url: file.thumb_url,
     local_file_path: file.local_file_path, local_thumb_path: file.local_thumb_path,
     mime_type: file.mime_type, width: file.width, height: file.height,
-    duration_ms: file.duration_ms, starred: false,
+    duration_ms: file.duration_ms, starred: file.starred,
   } as unknown as MessageMediaItem))
 }
 
@@ -302,7 +302,7 @@ function mapFolderPreviews(previews: FolderPreview[]) {
     file_url: preview.file_url, thumb_url: preview.thumb_url,
     local_file_path: preview.local_file_path, local_thumb_path: preview.local_thumb_path,
     mime_type: preview.mime_type, width: preview.width, height: preview.height,
-    duration_ms: preview.duration_ms, starred: false,
+    duration_ms: preview.duration_ms, starred: preview.starred,
   } as unknown as MessageMediaItem))
 }
 
@@ -328,6 +328,17 @@ function openFolderPreview(preview: FolderPreview) {
   previewIndex.value = folderPreviews.value.findIndex(item => item.id === preview.id)
   if (previewIndex.value < 0) return
   previewOpen.value = true
+}
+
+function handleMediaStarChanged(mediaId: number) {
+  const starred = previewItems.value.find(item => item.id === mediaId)?.starred
+  if (starred === undefined || !folder.value) return
+  for (const file of folder.value.files) {
+    if (file.media_id === mediaId) file.starred = starred
+  }
+  for (const preview of folder.value.previews) {
+    if (preview.id === mediaId) preview.starred = starred
+  }
 }
 
 async function handleMediaDeleted(mediaId: number) {

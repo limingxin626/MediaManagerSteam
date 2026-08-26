@@ -25,6 +25,7 @@ def _file_response(row: RepositoryFile) -> RepositoryFileResponse:
     response = RepositoryFileResponse.model_validate(row)
     media = row.media
     if media is not None:
+        response.starred = bool(media.starred)
         for field in (
             "width", "height", "duration_ms", "fps", "bitrate", "video_codec",
             "audio_codec", "has_audio", "taken_at", "gps_lat", "gps_lng",

@@ -146,6 +146,7 @@ def test_folder_media_is_read_directly_from_catalog(catalog_env):
             file_path="album/photo.jpg",
             file_hash="photo-hash",
             file_size=5,
+            starred=1,
         ))
         db.commit()
 
@@ -160,8 +161,10 @@ def test_folder_media_is_read_directly_from_catalog(catalog_env):
         assert file.media_id == db.query(Media).one().id
         assert response.media_count == 1
         assert [item.media_id for item in response.files] == [file.media_id]
+        assert response.files[0].starred is True
         assert response.kind == "gallery"
         assert [item.media_id for item in response.gallery] == [file.media_id]
+        assert response.gallery[0].starred is True
         assert response.primary_entry_id is None
 
 
@@ -214,6 +217,7 @@ def test_folder_detail_includes_named_and_video_child_previews(catalog_env):
                 file_hash=f"folder-preview-{index}",
                 file_size=len(name),
                 mime_type="video/mp4" if name.endswith(".mp4") else "image/jpeg",
+                starred=1 if name == "preview-01.jpg" else 0,
             )
             db.add(media)
             media_by_name[name] = media
@@ -226,6 +230,7 @@ def test_folder_detail_includes_named_and_video_child_previews(catalog_env):
             mime_type="image/jpeg",
             video_media_id=media_by_name["movie.mp4"].id,
             frame_ms=2500,
+            starred=1,
         )
         db.add(generated)
         db.commit()
@@ -244,6 +249,7 @@ def test_folder_detail_includes_named_and_video_child_previews(catalog_env):
         ]
         assert response.previews[-1].video_media_id is not None
         assert response.previews[-1].frame_ms == 2500
+        assert [item.starred for item in response.previews] == [False, True, True]
         assert all(item.name != "photo.jpg" for item in response.previews)
 
 

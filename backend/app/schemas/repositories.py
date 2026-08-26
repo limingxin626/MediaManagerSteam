@@ -21,6 +21,7 @@ class RepositoryFileResponse(OrmBase):
     mtime: float
     scanned_at: str
     media_id: Optional[int] = None
+    starred: bool = False
     materialize_status: str
     materialize_error: Optional[str] = None
     file_url: str = ""

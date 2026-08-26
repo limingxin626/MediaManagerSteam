@@ -189,7 +189,7 @@
       </div>
     </main>
 
-    <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" @close="previewOpen = false" @media-deleted="handleMediaChanged" @media-rotated="handleMediaChanged" @media-replaced="handleMediaChanged" />
+    <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" @close="previewOpen = false" @toggle-star="handleMediaStarChanged" @media-deleted="handleMediaChanged" @media-rotated="handleMediaChanged" @media-replaced="handleMediaChanged" />
   </div>
 </template>
 
@@ -291,7 +291,7 @@ function mapPreviewFiles(files: RepositoryFile[]) {
     file_url: file.file_url, thumb_url: file.thumb_url,
     local_file_path: file.local_file_path, local_thumb_path: file.local_thumb_path,
     mime_type: file.mime_type, width: file.width, height: file.height,
-    duration_ms: file.duration_ms, starred: false, tags: [],
+    duration_ms: file.duration_ms, starred: file.starred, tags: [],
   } as unknown as MessageMediaItem))
 }
 
@@ -383,6 +383,18 @@ function openPreview(files: RepositoryFile[], index: number) {
 function openFolder(folderId: number) {
   savedScrollTop = scrollContainer.value?.scrollTop ?? 0
   router.push({ name: 'FolderDetail', params: { id: folderId } })
+}
+
+function handleMediaStarChanged(mediaId: number) {
+  const starred = previewItems.value.find(item => item.id === mediaId)?.starred
+  if (starred === undefined) return
+  for (const folder of folders.value) {
+    for (const file of folder.preview_files ?? []) {
+      if (file.media_id === mediaId) file.starred = starred
+    }
+    if (folder.fanart_file?.media_id === mediaId) folder.fanart_file.starred = starred
+    if (folder.poster_file?.media_id === mediaId) folder.poster_file.starred = starred
+  }
 }
 
 async function handleMediaChanged() {

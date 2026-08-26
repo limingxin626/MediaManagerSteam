@@ -168,6 +168,7 @@ def _folder_response(
 def _file_response(row: RepositoryFile) -> RepositoryFileResponse:
     response = RepositoryFileResponse.model_validate(row)
     if row.media is not None:
+        response.starred = bool(row.media.starred)
         for field in (
             "width", "height", "duration_ms", "fps", "bitrate", "video_codec",
             "audio_codec", "has_audio", "taken_at", "gps_lat", "gps_lng",
@@ -205,6 +206,7 @@ def _folder_preview_item(media: Media, name: str, source: str) -> FolderPreviewI
         repo_id=cast(str, media.repo_id),
         file_path=cast(str, media.file_path),
         name=name,
+        starred=bool(media.starred),
         mime_type=media.mime_type,
         width=media.width,
         height=media.height,

@@ -27,6 +27,7 @@ class FolderTagCount(FolderTagItem):
 
 class FolderPreviewItem(MediaUrlMixin):
     name: str
+    starred: bool = False
     mime_type: Optional[str] = None
     width: Optional[int] = None
     height: Optional[int] = None

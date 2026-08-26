@@ -116,6 +116,7 @@ export interface RepositoryFile {
   mtime: number               // epoch 秒
   scanned_at: string
   media_id: number | null
+  starred: boolean
   materialize_status: 'pending' | 'done' | 'failed'
   materialize_error: string | null
   width: number | null
@@ -243,6 +244,7 @@ export interface FolderArtwork {
 
 export interface FolderPreview {
   id: number
+  starred: boolean
   repo_id: string
   file_path: string
   file_url: string
