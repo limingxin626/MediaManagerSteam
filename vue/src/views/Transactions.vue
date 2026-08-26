@@ -2,8 +2,6 @@
   <div class="h-full overflow-y-auto pb-24 md:pb-8">
     <div class="max-w-7xl w-full mx-auto px-4 pt-6 space-y-4">
       <div class="flex items-center justify-between flex-wrap gap-3">
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white">记账</h1>
-
         <!-- 月份范围选择 -->
         <div class="flex items-center gap-2 flex-wrap">
           <label class="text-xs text-gray-500 dark:text-gray-400">起</label>

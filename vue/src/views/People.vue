@@ -4,7 +4,6 @@
     <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div class="flex items-center gap-4 max-w-5xl mx-auto">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white shrink-0">人物</h2>
           <SearchInput v-model="filterName" placeholder="搜索人物..." @search="() => {}" />
           <button
             @click="openCreate"

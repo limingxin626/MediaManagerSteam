@@ -3,7 +3,7 @@
     <div v-if="isOpen" class="media-preview-overlay fixed inset-0 z-[90]">
       <div class="absolute inset-0 bg-black/90 backdrop-blur-sm" @click="close"></div>
       <div class="relative w-full h-full flex flex-col">
-        <div class="flex items-center justify-between p-4">
+        <div class="flex shrink-0 items-center justify-between px-4 py-2">
           <div class="text-white text-sm font-medium">
             {{ currentIndex + 1 }} / {{ totalItems }}
           </div>
@@ -51,7 +51,7 @@
               </svg>
             </button>
             <button
-              v-if="currentItem"
+              v-if="currentItem && isElectron"
               @click="triggerReplace"
               :disabled="isReplacing"
               class="p-2 text-white hover:bg-white/10 rounded-full transition-colors disabled:opacity-50"
@@ -65,22 +65,52 @@
               </svg>
             </button>
             <input
+              v-if="isElectron"
               ref="fileInput"
               type="file"
               accept="video/mp4,image/jpeg,image/png,image/gif"
               class="hidden"
               @change="onFileSelected"
             />
-            <button
-              v-if="currentItem"
-              @click="openSuggestDrawer"
-              class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
-              title="智能 tag 建议"
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a2 2 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            </button>
+            <TagPickerPopover
+              v-if="currentItem && allTags.length"
+              :all-tags="allTags"
+              :message-tags="currentItem.tags || []"
+              direction="down"
+              variant="preview-toolbar"
+              @select="addMediaTag"
+            />
+            <div v-if="currentItem" class="relative">
+              <button
+                @click.stop="togglePeoplePicker"
+                class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+                title="标注人物"
+                aria-label="标注人物"
+                :aria-expanded="peoplePickerOpen"
+              >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-6 9v-2a6 6 0 0 1 12 0v2m4-10v6m-3-3h6" />
+                </svg>
+              </button>
+              <div
+                v-if="peoplePickerOpen"
+                class="absolute z-[110] top-full right-0 mt-2 w-48 max-h-60 overflow-y-auto rounded-lg bg-gray-900 border border-white/10 shadow-xl p-1"
+                @click.stop
+              >
+                <div v-if="!allPeople.length" class="px-2 py-2 text-xs text-white/50 text-center">暂无人物</div>
+                <button
+                  v-for="person in allPeople"
+                  :key="person.id"
+                  @click="toggleMediaPerson(person.id)"
+                  class="w-full flex items-center justify-between px-2 py-1.5 text-xs rounded text-left text-white/80 hover:bg-white/10 transition-colors"
+                >
+                  <span class="truncate">{{ person.name }}</span>
+                  <svg v-if="(currentItem.people || []).some(p => p.id === person.id)" class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
             <button
               v-if="currentItem"
               @click="emitFindSimilar"
@@ -103,7 +133,7 @@
               </svg>
             </button>
             <button
-              v-if="currentItem"
+              v-if="currentItem && isElectron"
               @click="openFileLocation"
               class="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
               title="打开文件位置"
@@ -124,7 +154,7 @@
         </div>
 
         <!-- Main preview area with left/right nav -->
-        <div class="flex-1 flex items-center justify-center px-4 pb-2 relative min-h-0">
+        <div class="relative flex min-h-0 flex-1 items-center justify-center">
           <!-- Prev button (left) -->
           <button
             @click.stop="prev"
@@ -136,14 +166,14 @@
             </svg>
           </button>
 
-          <div class="relative flex flex-col items-center max-w-[90vw] max-h-[86vh]">
+          <div class="relative h-full w-full">
             <Transition :name="transitionName" mode="out-in">
-              <div class="relative w-[90vw] h-[80vh]" :key="currentItem?.id ?? -1">
+              <div class="relative h-full w-full" :key="currentItem?.id ?? -1">
                 <video
                   v-if="currentItem && isVideo(currentItem.mime_type) && !showFallback"
                   ref="videoRef"
                   :src="getMediaUrl(currentItem)"
-                  class="w-full h-full object-contain rounded-lg shadow-2xl"
+                  class="w-full h-full object-contain shadow-2xl"
                   :style="mediaTransformStyle"
                   controls
                   playsinline
@@ -156,7 +186,7 @@
                   v-else-if="currentItem && isImage(currentItem.mime_type) && !showFallback"
                   :src="getMediaUrl(currentItem)"
                   :alt="`Media ${currentIndex + 1}`"
-                  class="w-full h-full object-contain rounded-lg shadow-2xl"
+                  class="w-full h-full object-contain shadow-2xl"
                   :style="mediaTransformStyle"
                   @error="handleMediaError"
                 />
@@ -166,7 +196,7 @@
                   <img
                     :src="resolveThumb(currentItem)"
                     :alt="`Media ${currentIndex + 1} (缩略图)`"
-                    class="w-full h-full object-contain rounded-lg shadow-2xl"
+                    class="w-full h-full object-contain shadow-2xl"
                     :style="mediaTransformStyle"
                   />
                   <div class="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 text-white/90 text-xs rounded-full backdrop-blur-sm">
@@ -176,75 +206,6 @@
               </div>
             </Transition>
 
-            <!-- Media metadata floats over the bottom of the preview. -->
-            <div
-              v-if="currentItem"
-              class="absolute z-20 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[90vw] px-4 pt-12 pb-3 flex flex-col items-center gap-2 rounded-b-lg bg-gradient-to-t from-black/80 via-black/45 to-transparent pointer-events-none"
-            >
-              <div
-                v-if="currentItem.file_path"
-                class="w-full max-w-3xl truncate text-center text-xs text-white/70 drop-shadow pointer-events-auto"
-                :title="currentItem.file_path"
-              >
-                {{ currentItem.file_path }}
-              </div>
-
-              <!-- Media tags -->
-              <div class="flex items-center gap-1.5 flex-wrap justify-center pointer-events-auto">
-              <span
-                v-for="tag in (currentItem.tags || [])"
-                :key="tag.id"
-                @click.stop="removeMediaTag(tag.id)"
-                class="px-2 py-0.5 text-xs rounded-full bg-white/15 text-white/90 hover:bg-red-500/40 hover:line-through cursor-pointer transition-colors"
-              >
-                #{{ tag.name }}
-              </span>
-              <TagPickerPopover
-                v-if="allTags.length"
-                :all-tags="allTags"
-                :message-tags="currentItem.tags || []"
-                @select="addMediaTag"
-              />
-              </div>
-
-              <!-- Media people (标注人物) -->
-              <div class="flex items-center gap-1.5 flex-wrap justify-center pointer-events-auto">
-              <span
-                v-for="person in (currentItem.people || [])"
-                :key="'p-' + person.id"
-                @click.stop="removeMediaPerson(person.id)"
-                class="px-2 py-0.5 text-xs rounded-full bg-emerald-500/20 text-emerald-200 hover:bg-red-500/40 hover:line-through cursor-pointer transition-colors"
-              >
-                @{{ person.name }}
-              </span>
-              <div class="relative">
-                <button
-                  @click.stop="togglePeoplePicker"
-                  class="px-2 py-0.5 text-xs rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-colors"
-                >
-                  + 标注人物
-                </button>
-                <div
-                  v-if="peoplePickerOpen"
-                  class="absolute z-[110] bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 max-h-60 overflow-y-auto rounded-lg bg-gray-900 border border-white/10 shadow-xl p-1"
-                  @click.stop
-                >
-                  <div v-if="!allPeople.length" class="px-2 py-2 text-xs text-white/50 text-center">暂无人物</div>
-                  <button
-                    v-for="person in allPeople"
-                    :key="person.id"
-                    @click="toggleMediaPerson(person.id)"
-                    class="w-full flex items-center justify-between px-2 py-1.5 text-xs rounded text-left text-white/80 hover:bg-white/10 transition-colors"
-                  >
-                    <span class="truncate">{{ person.name }}</span>
-                    <svg v-if="(currentItem.people || []).some(p => p.id === person.id)" class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              </div>
-            </div>
           </div>
 
           <!-- Next button (right) -->
@@ -259,8 +220,33 @@
           </button>
         </div>
 
+        <!-- Tags and people occupy their own space below the media. -->
+        <div v-if="currentItem" class="flex min-h-9 shrink-0 flex-col items-center justify-center gap-1.5 px-4 py-2">
+          <div v-if="currentItem.tags?.length" class="flex flex-wrap items-center justify-center gap-1.5">
+            <span
+              v-for="tag in currentItem.tags"
+              :key="tag.id"
+              @click.stop="removeMediaTag(tag.id)"
+              class="cursor-pointer rounded-full border px-2 py-0.5 text-xs transition-opacity hover:line-through hover:opacity-75"
+              :style="tagChipStyle(tag.id)"
+            >
+              {{ tag.name }}
+            </span>
+          </div>
+          <div v-if="currentItem.people?.length" class="flex flex-wrap items-center justify-center gap-1.5">
+            <span
+              v-for="person in currentItem.people"
+              :key="'p-' + person.id"
+              @click.stop="removeMediaPerson(person.id)"
+              class="cursor-pointer rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-200 transition-colors hover:bg-red-500/40 hover:line-through"
+            >
+              @{{ person.name }}
+            </span>
+          </div>
+        </div>
+
         <!-- Thumbnail strip -->
-        <div v-if="items.length >= 1" class="px-4 pb-4 pt-2 relative z-10 flex justify-center">
+        <div v-if="items.length >= 1" class="relative z-10 flex shrink-0 justify-center px-4 pb-4 pt-1">
           <TransitionGroup
             tag="div"
             name="thumb"
@@ -344,13 +330,6 @@
       </div>
     </div>
   </Transition>
-  <!-- Smart tag suggestion drawer -->
-  <TagSuggestDrawer
-    :is-open="suggestDrawerOpen"
-    :media-id="suggestDrawerMediaId"
-    @close="suggestDrawerOpen = false"
-    @tags-applied="onSmartTagsApplied"
-  />
 </template>
 
 <script setup lang="ts">
@@ -360,11 +339,12 @@ import type { MessageMediaItem, TagWithCount, TagItem, Media, Person, MediaPerso
 import { isVideo, isImage, resolveThumb, resolveMediaUrl, rotateMedia, toggleMediaStar } from '../utils/media'
 import { api, ApiError } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
+import { IS_ELECTRON } from '../utils/constants'
 import TagPickerPopover from './TagPickerPopover.vue'
-import TagSuggestDrawer from './TagSuggestDrawer.vue'
 
 const toast = useToast()
 const router = useRouter()
+const isElectron = IS_ELECTRON
 
 interface Props {
   isOpen: boolean
@@ -411,8 +391,6 @@ const isRotating = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isReplacing = ref(false)
 const mediaCacheBust = ref<Record<number, number>>({})
-const suggestDrawerOpen = ref(false)
-const suggestDrawerMediaId = ref<number | null>(null)
 // per-item 跟踪加载失败:用于 file:// / HTTP 媒体文件无法访问时回退到缩略图
 const loadFailedIds = ref<Set<number>>(new Set())
 
@@ -429,23 +407,10 @@ const showFallback = computed(() => {
   return loadFailedIds.value.has(currentItem.value.id)
 })
 
-function openSuggestDrawer() {
-  if (!currentItem.value) return
-  suggestDrawerMediaId.value = currentItem.value.id
-  suggestDrawerOpen.value = true
-}
-
 function emitFindSimilar() {
   if (!currentItem.value) return
   emit('find-similar', currentItem.value.id)
   emit('close')
-}
-
-function onSmartTagsApplied(mediaId: number, tags: TagItem[]) {
-  if (currentItem.value && currentItem.value.id === mediaId) {
-    currentItem.value.tags = tags
-  }
-  emit('media-tags-changed', mediaId, tags)
 }
 
 async function handleStarClick() {
@@ -593,6 +558,15 @@ async function addMediaTag(tag: TagWithCount) {
   }
 }
 
+function tagChipStyle(tagId: number) {
+  const hue = Math.round((tagId * 137.508) % 360)
+  return {
+    backgroundColor: `hsl(${hue}, 68%, 42%)`,
+    borderColor: `hsl(${hue}, 72%, 52%)`,
+    color: 'white',
+  }
+}
+
 async function removeMediaTag(tagId: number) {
   if (!currentItem.value) return
   const newTags = (currentItem.value.tags || []).filter(t => t.id !== tagId)
@@ -673,6 +647,21 @@ const currentItem = computed(() => {
   if (props.items.length === 0) return null
   return props.items[currentIndex.value]
 })
+
+async function hydrateCurrentItemMetadata() {
+  const item = currentItem.value
+  if (!item || (item.tags !== undefined && item.people !== undefined)) return
+  const mediaId = item.id
+  try {
+    const detail = await api.get<Media>(`/media/${mediaId}`)
+    const target = props.items.find(candidate => candidate.id === mediaId)
+    if (!target) return
+    target.tags = detail.tags || []
+    target.people = detail.people || []
+  } catch {
+    // 元数据加载失败不影响媒体本身的预览。
+  }
+}
 
 const isCurrentStarred = computed(() => currentItem.value?.starred ?? props.starred)
 
@@ -824,6 +813,7 @@ watch(() => props.isOpen, async (newValue) => {
   if (newValue) {
     currentIndex.value = props.startIndex
     transitionName.value = 'slide-left'
+    await hydrateCurrentItemMetadata()
     await nextTick()
     if (videoRef.value) {
       videoRef.value.play().catch(() => {})
@@ -834,6 +824,7 @@ watch(() => props.isOpen, async (newValue) => {
 watch(currentIndex, async () => {
   rotationDegrees.value = 0
   peoplePickerOpen.value = false
+  await hydrateCurrentItemMetadata()
   await nextTick()
   if (videoRef.value) {
     videoRef.value.play().catch(() => {})

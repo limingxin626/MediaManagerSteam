@@ -1,8 +1,6 @@
 <template>
   <div class="h-full pb-24 md:pb-0 overflow-hidden">
     <div class="h-full max-w-7xl mx-auto px-4 py-6 flex flex-col min-h-0">
-      <h1 class="shrink-0 text-2xl font-bold text-gray-900 dark:text-white mb-6">数据库管理</h1>
-
       <div class="shrink-0 flex gap-1 mb-6 border-b border-[var(--border-color)] overflow-x-auto overflow-y-hidden">
         <RouterLink
           v-for="tab in tabs"

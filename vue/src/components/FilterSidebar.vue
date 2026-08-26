@@ -1,5 +1,8 @@
 <template>
-  <div class="flex flex-col w-48 shrink-0 border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] min-h-0">
+  <aside
+    class="fixed inset-y-0 left-0 z-40 w-48 shrink-0 flex-col border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] min-h-0 md:static md:z-auto md:flex"
+    :class="mobileOpen ? 'flex' : 'hidden'"
+  >
     <!-- Tab bar -->
     <div class="shrink-0 flex border-b border-[var(--border-color)]">
       <button
@@ -16,6 +19,14 @@
           v-if="activeTab === tab.key"
           class="absolute left-2 right-2 -bottom-px h-0.5 rounded-full bg-[var(--color-primary-600)] dark:bg-[var(--color-primary-500)]"
         ></span>
+      </button>
+      <button
+        class="grid w-9 shrink-0 place-items-center text-[var(--text-muted)] md:hidden"
+        title="关闭"
+        aria-label="关闭标签筛选"
+        @click="emit('close')"
+      >
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18" /></svg>
       </button>
     </div>
 
@@ -119,7 +130,7 @@
         <span class="ml-1 text-xs text-[var(--text-muted)] shrink-0 tabular-nums">{{ issue.message_count }}</span>
       </button>
     </div>
-  </div>
+  </aside>
 </template>
 
 <script setup lang="ts">
@@ -138,16 +149,19 @@ const props = withDefaults(defineProps<{
   noIssueCount?: number
   selectedIssueId?: number | null
   onCreateIssue?: () => void
+  mobileOpen?: boolean
 }>(), {
   issues: () => [],
   noIssueCount: 0,
   selectedIssueId: null,
+  mobileOpen: false,
 })
 
 const emit = defineEmits<{
   (e: 'select-tag', tagId: number | null): void
   (e: 'select-collection', collectionId: number | null): void
   (e: 'select-issue', issueId: number | null): void
+  (e: 'close'): void
 }>()
 
 // Issue 功能仅在消费方接入(传 issues / onCreateIssue / 已选 issue)时启用;

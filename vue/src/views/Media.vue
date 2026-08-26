@@ -1,58 +1,54 @@
 <template>
   <div class="h-full flex transition-colors">
+    <button v-if="mobileFiltersOpen" class="fixed inset-0 z-30 bg-black/25 md:hidden" aria-label="关闭标签筛选" @click="mobileFiltersOpen = false"></button>
     <FilterSidebar
-      v-if="viewMode === 'timeline'"
       :tags="tags"
       :collections="collections"
       :no-collection-count="noCollectionCount"
       :selected-tag-id="selectedTagId"
       :selected-collection-id="selectedCollectionId"
+      :mobile-open="mobileFiltersOpen"
       @select-tag="selectTag"
       @select-collection="selectCollection"
+      @close="mobileFiltersOpen = false"
     />
 
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-w-0 relative">
     <!-- Fixed Header -->
-    <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
+    <div class="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div class="flex items-center gap-3 max-w-4xl mx-auto">
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white shrink-0">媒体</h2>
-        <div class="flex rounded-lg bg-gray-100 dark:bg-white/10 p-0.5 shrink-0">
-          <button
-            v-for="option in viewModeOptions"
-            :key="option.value"
-            class="px-3 py-1 rounded-md text-sm transition-colors"
-            :class="viewMode === option.value
-              ? 'bg-white dark:bg-white/20 text-gray-900 dark:text-white shadow-sm'
-              : 'text-gray-500 dark:text-gray-300'"
-            @click="viewMode = option.value"
-          >
+        <button class="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] md:hidden" title="标签筛选" @click="mobileFiltersOpen = true">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+        </button>
+        <select
+          :value="gridSize"
+          class="h-8 shrink-0 rounded-md border-0 bg-gray-100 px-2 text-sm text-gray-600 outline-none transition-colors hover:bg-gray-200 focus:ring-1 focus:ring-[var(--color-primary-500)] dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/20"
+          aria-label="网格大小"
+          title="网格大小"
+          @change="setGridSize(($event.target as HTMLSelectElement).value as 'small' | 'medium' | 'large')"
+        >
+          <option v-for="option in gridSizeOptions" :key="option.value" :value="option.value">
             {{ option.label }}
-          </button>
-        </div>
-        <template v-if="viewMode === 'timeline'">
-        <div class="flex rounded-lg bg-gray-100 dark:bg-white/10 p-0.5 shrink-0" aria-label="网格大小">
-          <button
-            v-for="option in gridSizeOptions"
-            :key="option.value"
-            class="px-2.5 py-1 rounded-md text-sm transition-colors"
-            :class="gridSize === option.value
-              ? 'bg-white dark:bg-white/20 text-gray-900 dark:text-white shadow-sm'
-              : 'text-gray-500 dark:text-gray-300'"
-            :title="`${option.label}网格`"
-            @click="setGridSize(option.value)"
-          >
-            {{ option.label }}
-          </button>
-        </div>
+          </option>
+        </select>
         <!-- Thumbnail fit: container dimensions remain unchanged. -->
         <button
           @click="toggleThumbnailFit"
-          class="px-2.5 py-1.5 rounded-md text-sm transition-colors text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20"
-          :title="thumbnailFit === 'cover' ? '切换为完整显示（Contain）' : '切换为填充显示（Cover）'"
+          class="grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors"
+          :class="thumbnailFit === 'cover'
+            ? 'bg-[var(--color-primary-600)] text-white shadow-sm'
+            : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/20'"
+          :title="thumbnailFit === 'cover' ? '图片填充：已开启' : '图片填充：未开启'"
+          aria-label="图片填充"
+          :aria-pressed="thumbnailFit === 'cover'"
         >
-          图片：{{ thumbnailFit === 'cover' ? '填充' : '完整' }}
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="4" y="5" width="16" height="14" rx="1.5" />
+            <path d="m7 16 3.5-4 2.5 2.5 2-2 2 2.5" />
+            <path d="M8 2v3M5 5h3M16 19v3M16 19h3" />
+          </svg>
         </button>
         <!-- Refresh -->
         <button
@@ -66,21 +62,19 @@
           </svg>
         </button>
         <!-- Type Filter -->
-        <div class="flex gap-2">
-          <button
-            v-for="opt in typeOptions"
-            :key="opt.value"
-            @click="setType(opt.value)"
-            :class="[
-              'px-3 py-1.5 rounded-full text-sm transition-colors',
-              selectedType === opt.value
-                ? 'bg-[var(--color-primary-600)] text-white'
-                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
-            ]"
-          >{{ opt.label }}</button>
-        </div>
+        <select
+          :value="selectedType"
+          class="h-8 shrink-0 rounded-md border-0 bg-gray-100 px-2 text-sm text-gray-600 outline-none transition-colors hover:bg-gray-200 focus:ring-1 focus:ring-[var(--color-primary-500)] dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/20"
+          aria-label="媒体类型"
+          title="媒体类型"
+          @change="setType(($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
         <!-- Smart search -->
-        <div v-if="viewMode === 'timeline'" class="relative flex-1 max-w-xs">
+        <div class="relative flex-1 max-w-xs">
           <input
             v-model="searchInput"
             @keydown.enter="commitSearch"
@@ -113,15 +107,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
           </svg>
         </button>
-        </template>
         </div>
       </div>
     </div>
 
-    <RepositoryBrowser v-if="viewMode === 'folder'" class="flex-1 min-h-0" />
-
     <!-- Scrollable Content Area -->
-    <div v-else class="flex-1 min-h-0 relative">
+    <div class="flex-1 min-h-0 relative">
 
     <!-- Smart mode grid (search / similar) -->
     <div v-if="smartActive" class="absolute inset-0 overflow-y-auto">
@@ -243,7 +234,6 @@ import MediaPreview from '../components/MediaPreview.vue'
 import DateScrubber from '../components/DateScrubber.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
 import MediaCell from '../components/MediaCell.vue'
-import RepositoryBrowser from '../components/RepositoryBrowser.vue'
 import type { Media, TagWithCount, Collection, CursorResponse, MessageMediaItem } from '../types'
 import { api } from '../composables/useApi'
 import { useVirtualGrid } from '../composables/useVirtualGrid'
@@ -253,11 +243,7 @@ const toast = useToast()
 
 defineOptions({ name: 'Media' })
 
-const viewModeOptions = [
-  { value: 'timeline' as const, label: '时间线' },
-  { value: 'folder' as const, label: '文件夹' },
-]
-const viewMode = ref<'timeline' | 'folder'>('timeline')
+const mobileFiltersOpen = ref(false)
 const THUMBNAIL_FIT_STORAGE_KEY = 'media_thumbnail_fit'
 const GRID_SIZE_STORAGE_KEY = 'media_grid_size'
 const thumbnailFit = ref<'cover' | 'contain'>('cover')
@@ -510,11 +496,13 @@ async function fetchCollections() {
 }
 
 function selectTag(tagId: number | null) {
+  mobileFiltersOpen.value = false
   selectedTagId.value = tagId
   selectedCollectionId.value = null
 }
 
 function selectCollection(collectionId: number | null) {
+  mobileFiltersOpen.value = false
   selectedCollectionId.value = collectionId
   selectedTagId.value = null
 }

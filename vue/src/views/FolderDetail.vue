@@ -172,7 +172,7 @@
       </div>
     </div>
 
-    <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" @close="previewOpen = false" @media-deleted="handleMediaDeleted" @media-rotated="refreshFolder" @media-replaced="refreshFolder" />
+    <MediaPreview :is-open="previewOpen" :items="previewItems" :start-index="previewIndex" :all-tags="allTags" @close="previewOpen = false" @media-deleted="handleMediaDeleted" @media-rotated="refreshFolder" @media-replaced="refreshFolder" />
   </div>
 </template>
 
@@ -182,7 +182,7 @@ import { useRouter } from 'vue-router'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import type { FolderDetail, FolderPreview, MessageMediaItem, RepositoryFile } from '../types'
+import type { FolderDetail, FolderPreview, MessageMediaItem, RepositoryFile, TagWithCount } from '../types'
 import { IS_ELECTRON } from '../utils/constants'
 import { resolveMediaUrl, resolveThumb } from '../utils/media'
 
@@ -198,6 +198,7 @@ const scrollContainer = ref<HTMLElement | null>(null)
 const previewOpen = ref(false)
 const previewItems = ref<MessageMediaItem[]>([])
 const previewIndex = ref(0)
+const allTags = ref<TagWithCount[]>([])
 const fanartFallback = ref(false)
 const mediaFit = ref<'cover' | 'contain'>('cover')
 let loadRequest = 0
@@ -257,7 +258,7 @@ function mapPreviewFiles(files: RepositoryFile[]) {
     file_url: file.file_url, thumb_url: file.thumb_url,
     local_file_path: file.local_file_path, local_thumb_path: file.local_thumb_path,
     mime_type: file.mime_type, width: file.width, height: file.height,
-    duration_ms: file.duration_ms, starred: false, tags: [],
+    duration_ms: file.duration_ms, starred: false,
   } as unknown as MessageMediaItem))
 }
 
@@ -287,13 +288,21 @@ function refreshFolder() {
   return fetchFolder(false)
 }
 
+async function fetchTags() {
+  try {
+    allTags.value = await api.get<TagWithCount[]>('/tags')
+  } catch {
+    allTags.value = []
+  }
+}
+
 function mapFolderPreviews(previews: FolderPreview[]) {
   return previews.map(preview => ({
     id: preview.id, repo_id: preview.repo_id, file_path: preview.file_path,
     file_url: preview.file_url, thumb_url: preview.thumb_url,
     local_file_path: preview.local_file_path, local_thumb_path: preview.local_thumb_path,
     mime_type: preview.mime_type, width: preview.width, height: preview.height,
-    duration_ms: preview.duration_ms, starred: false, tags: [],
+    duration_ms: preview.duration_ms, starred: false,
   } as unknown as MessageMediaItem))
 }
 
@@ -386,6 +395,7 @@ async function uploadFiles(event: Event) {
 
 onMounted(() => {
   mediaFit.value = localStorage.getItem('folder_detail_media_fit') === 'contain' ? 'contain' : 'cover'
+  fetchTags()
   window.addEventListener('keydown', handleKeydown)
 })
 

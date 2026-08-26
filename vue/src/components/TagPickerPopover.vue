@@ -1,8 +1,11 @@
 <template>
   <div class="relative inline-block">
-    <button @click.stop="open = !open" class="p-1 text-gray-500 hover:text-green-500 rounded transition-colors"
+    <button @click.stop="open = !open"
+      :class="variant === 'preview-toolbar'
+        ? 'p-2 text-white hover:bg-white/10 rounded-full transition-colors'
+        : 'p-1 text-gray-500 hover:text-green-500 rounded transition-colors'"
       title="添加标签">
-      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg :class="variant === 'preview-toolbar' ? 'w-6 h-6' : 'w-3.5 h-3.5'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
           d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
       </svg>
@@ -59,6 +62,7 @@ const props = defineProps<{
   allTags: TagWithCount[]
   messageTags: TagItem[]
   direction?: 'up' | 'down'
+  variant?: 'default' | 'preview-toolbar'
 }>()
 
 const emit = defineEmits<{

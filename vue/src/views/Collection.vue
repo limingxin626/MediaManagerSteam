@@ -36,7 +36,6 @@
       <div class="shrink-0 border-b border-[var(--border-color)] shadow-sm">
         <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div class="flex gap-4 items-center max-w-2xl mx-auto">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">合集消息</h2>
             <!-- Search -->
             <SearchInput v-model="filterName" placeholder="搜索合集..." @search="resetAndFetch" />
           </div>

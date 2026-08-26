@@ -33,15 +33,9 @@
       <div class="relative flex min-w-0 flex-1 flex-col">
       <header class="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
         <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 pr-10 sm:px-6 lg:px-8">
-          <div class="flex min-w-0 items-center gap-2">
-            <button class="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] md:hidden" title="标签筛选" @click="mobileTagsOpen = true">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
-            </button>
-            <div class="min-w-0">
-              <h1 class="truncate text-base font-semibold">{{ selectedTagName || '全部目录' }}</h1>
-              <p class="mt-0.5 text-xs text-[var(--text-muted)]">{{ folders.length }} 个已加载</p>
-            </div>
-          </div>
+          <button class="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] md:hidden" title="标签筛选" @click="mobileTagsOpen = true">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+          </button>
           <div class="flex shrink-0 items-center gap-2">
             <select
               v-if="viewMode === 'grid'"
@@ -260,7 +254,6 @@ const activeFilterClass = 'bg-[var(--color-accent-soft)] text-[var(--color-prima
 const inactiveFilterClass = 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
 const viewActiveClass = 'bg-[var(--bg-card)] text-[var(--color-primary-600)] shadow-[var(--shadow-sm)]'
 const viewInactiveClass = 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-const selectedTagName = computed(() => tags.value.find(tag => tag.id === selectedTagId.value)?.name ?? null)
 const gridPreviewSizeClass = computed(() => {
   if (gridMode.value === 'poster') return 'aspect-[376/535]'
   if (gridMode.value === 'fanart') return 'aspect-[800/535]'

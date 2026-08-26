@@ -1,5 +1,6 @@
 <template>
   <div class="h-full flex transition-colors">
+    <button v-if="mobileFiltersOpen" class="fixed inset-0 z-30 bg-black/25 md:hidden" aria-label="关闭标签筛选" @click="mobileFiltersOpen = false"></button>
     <FilterSidebar
       :tags="tags"
       :collections="collections"
@@ -10,9 +11,11 @@
       :no-issue-count="noIssueCount"
       :selected-issue-id="selectedIssueId"
       :on-create-issue="promptCreateIssue"
+      :mobile-open="mobileFiltersOpen"
       @select-tag="selectTag"
       @select-collection="selectCollection"
       @select-issue="selectIssue"
+      @close="mobileFiltersOpen = false"
     />
 
     <!-- Main Content -->
@@ -23,7 +26,11 @@
         <div class="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
           <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div class="flex gap-2 items-center justify-between max-w-6xl mx-auto pr-10">
-              <h2 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">消息流</h2>
+              <div class="flex min-w-0 items-center gap-2">
+                <button class="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] md:hidden" title="标签筛选" @click="mobileFiltersOpen = true">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+                </button>
+              </div>
               <!-- New message -->
               <button @click="openCreateDialog"
                 class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-[var(--radius-sm)] bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)] transition-colors"
@@ -290,6 +297,7 @@ defineOptions({ name: 'Message' })
 
 const route = useRoute()
 const pendingRestore = ref<{ messageId: number; scrollOffset: number } | null>(null)
+const mobileFiltersOpen = ref(false)
 
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -585,6 +593,7 @@ const resetFilters = () => {
 }
 
 const selectTag = (tagId: number | null) => {
+  mobileFiltersOpen.value = false
   saveScrollPosition()
   selectedTagId.value = tagId
   selectedCollectionId.value = null
@@ -596,6 +605,7 @@ const selectTag = (tagId: number | null) => {
 }
 
 const selectCollection = (collectionId: number | null) => {
+  mobileFiltersOpen.value = false
   saveScrollPosition()
   selectedCollectionId.value = collectionId
   selectedTagId.value = null
@@ -607,6 +617,7 @@ const selectCollection = (collectionId: number | null) => {
 }
 
 const selectIssue = (issueId: number | null) => {
+  mobileFiltersOpen.value = false
   saveScrollPosition()
   selectedIssueId.value = issueId
   selectedTagId.value = null
