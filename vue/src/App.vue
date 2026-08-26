@@ -14,7 +14,6 @@
       </router-view>
       </main>
     </div>
-    <BottomNavBar />
     <ToastContainer />
     <ConfirmDialog />
   </div>
@@ -24,7 +23,6 @@
 import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import Navbar from './components/Navbar.vue'
-import BottomNavBar from './components/BottomNavBar.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import Message from './views/Message.vue'

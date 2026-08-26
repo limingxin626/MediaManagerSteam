@@ -90,7 +90,7 @@
       </header>
 
       <div ref="scrollContainer" class="relative min-h-0 flex-1 overflow-y-auto">
-        <div class="mx-auto w-full px-4 py-4 pb-24 sm:px-6 lg:px-8 md:pb-6">
+        <div class="mx-auto w-full px-4 py-4 pb-6 sm:px-6 lg:px-8">
           <div v-if="loading && !folders.length" class="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             <div v-for="index in 8" :key="index" class="animate-pulse overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
               <div class="bg-[var(--bg-secondary)]" :class="gridPreviewSizeClass"></div>

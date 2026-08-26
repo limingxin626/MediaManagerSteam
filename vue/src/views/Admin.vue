@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full pb-24 md:pb-0 overflow-hidden">
+  <div class="h-full overflow-hidden">
     <div class="h-full max-w-7xl mx-auto px-4 py-6 flex flex-col min-h-0">
       <div class="shrink-0 flex gap-1 mb-6 border-b border-[var(--border-color)] overflow-x-auto overflow-y-hidden">
         <RouterLink
