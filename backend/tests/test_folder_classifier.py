@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from app.services.folder_classifier import classify_folder
+from app.modules.repository.folder_classifier import classify_folder
 
 
 def media_file(file_id: int, name: str, media_type: str):

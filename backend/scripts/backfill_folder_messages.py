@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.config import config
 from app.models import SessionLocal
-from app.services.folder_message_service import (
+from app.modules.repository.folder_message_service import (
     backfill_existing_folder_messages,
     bind_folder_to_existing_message,
 )

@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from bs4 import BeautifulSoup
 from app.models import SessionLocal, Message, Tag
 from app.config import config
-from app.services.media_service import process_file
-from app.services.message_service import link_media_to_message
+from app.modules.media.service import process_file
+from app.modules.message.service import link_media_to_message
 
 # ── 配置 ────────────────────────────────────────────────────────────────────
 FLOMO_DIR = os.path.join(
@@ -135,7 +135,7 @@ def main():
                     if not os.path.exists(dest):
                         shutil.copy2(abs_src, dest)
 
-                    result = process_file(db, dest, commit=False)
+                    result = process_file(db, dest)
                     if result is None:
                         print(f"  警告：process_file 返回 None，跳过 {dest}")
                         continue

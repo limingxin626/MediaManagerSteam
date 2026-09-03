@@ -1,13 +1,13 @@
 from datetime import datetime
 
 import pytest
-from fastapi import HTTPException
+from app.shared.exceptions import ApplicationError
 
 from app.models import Media
 from app.models.repository_catalog import RepositoryFile, RepositoryFolder
-from app.routers.media import get_media
-from app.routers.repositories import list_duplicate_files
-from app.services.duplicate_file_service import _safe_repository_path, delete_physical_files
+from app.modules.media.router import get_media
+from app.modules.repository.router import list_duplicate_files
+from app.modules.repository.duplicate_file_service import _safe_repository_path, delete_physical_files
 
 
 def add_media(db, media_id, repo_id="test", file_path=None):
@@ -135,7 +135,7 @@ def test_delete_rejects_stale_cross_group_and_unsafe_paths(catalog_env):
         other = add_file(db, repo, folder, 3, 2, "2-a.jpg")
         db.commit()
 
-        with pytest.raises(HTTPException):
+        with pytest.raises(ApplicationError):
             delete_physical_files(db, media.id, [first.id, other.id])
         with pytest.raises(ValueError):
             _safe_repository_path("test", "../outside.jpg")

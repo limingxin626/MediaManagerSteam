@@ -4,10 +4,12 @@ from io import BytesIO
 import pytest
 
 from app.models import Folder, FolderLocation, Media, Message, MessageFolder, RepositoryFile, RepositoryFolder, Tag
-from app.routers.folder import get_folder, list_folder_tags, list_folders
-from app.services import repository_catalog, repository_materializer
-from app.services.folder_service import store_file_in_primary_folder
-from app.routers.message import _build_detail_query, _execute_like_search
+from app.modules.repository.folder_queries import get_folder, list_folder_tags, list_folders
+from app.modules.repository import catalog as repository_catalog
+from app.modules.repository import materializer as repository_materializer
+from app.modules.repository.folder_service import store_file_in_primary_folder
+from app.modules.message.router import _build_detail_query
+from app.modules.message.queries import _like_search
 
 
 def test_scan_skips_empty_folders_and_only_catalogs_supported_files(catalog_env):
@@ -429,9 +431,9 @@ def test_message_like_search_excludes_folder_backed_messages(catalog_env):
         db.add(ordinary)
         db.commit()
 
-        rows = _execute_like_search(db, "album", None, None, None, None, 20)
+        rows = _like_search(db, "album", None, None, None, None, 20)
 
-        assert [row.id for row in rows] == [ordinary.id]
+        assert [row["id"] for row in rows] == [ordinary.id]
 
 
 def test_scan_creates_independent_folder_with_catalog_files(catalog_env):
@@ -530,7 +532,7 @@ def test_worker_materializes_and_copies_hdr_metadata(catalog_env, monkeypatch):
     source.write_bytes(b"video")
     repository_catalog.rescan("test")
 
-    def fake_process(db, path, commit=False):
+    def fake_process(db, path):
         media = Media(repo_id="test", file_path="movie.mp4", file_hash="video-hash", file_size=5)
         db.add(media)
         db.flush()
@@ -538,7 +540,7 @@ def test_worker_materializes_and_copies_hdr_metadata(catalog_env, monkeypatch):
             "is_hdr": 1, "color_transfer": "smpte2084",
         }}
 
-    monkeypatch.setattr(repository_materializer.media_service, "process_file", fake_process)
+    monkeypatch.setattr(repository_materializer, "process_file", fake_process)
     assert repository_materializer._process_batch() == 1
 
     with session_factory() as db:
@@ -557,7 +559,7 @@ def test_worker_updates_folder_catalog_media(catalog_env, monkeypatch):
     source.write_bytes(b"video")
     repository_catalog.rescan("test")
 
-    def fake_process(db, path, commit=False):
+    def fake_process(db, path):
         media = Media(
             repo_id="test",
             file_path="album/movie.mp4",
@@ -568,7 +570,7 @@ def test_worker_updates_folder_catalog_media(catalog_env, monkeypatch):
         db.flush()
         return {"media": media, "is_new": True, "media_info": {}}
 
-    monkeypatch.setattr(repository_materializer.media_service, "process_file", fake_process)
+    monkeypatch.setattr(repository_materializer, "process_file", fake_process)
     assert repository_materializer._process_batch() == 1
 
     with session_factory() as db:
@@ -599,10 +601,10 @@ def test_folder_rename_promotes_media_canonical_path(catalog_env, monkeypatch):
     album.rename(repo / "renamed")
     repository_catalog.rescan("test")
 
-    def fake_process(db, path, commit=False):
+    def fake_process(db, path):
         return {"media": db.query(Media).one(), "is_new": False, "media_info": {}}
 
-    monkeypatch.setattr(repository_materializer.media_service, "process_file", fake_process)
+    monkeypatch.setattr(repository_materializer, "process_file", fake_process)
     assert repository_materializer._process_batch() == 1
 
     with session_factory() as db:

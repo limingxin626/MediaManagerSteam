@@ -35,7 +35,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.models import Message, SessionLocal, Tag
-from app.services.message_service import create_message_with_files
+from app.modules.message.service import create_message_with_files
 
 DEFAULT_SCRAPE_DIR = "/private/tmp/_pw_full"
 DEFAULT_PLATFORM_TAG = "司机社"
@@ -171,7 +171,6 @@ def import_one(db, thread_path: Path, args, stats: dict) -> None:
             files=files,
             tag_ids=tag_ids,
             created_at=created_at,
-            commit=True,
         )
         stats["imported"] += 1
         stats["attachments"] += len(files)

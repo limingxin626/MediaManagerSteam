@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, Float, DateTime, Index, UniqueConstraint
 from datetime import datetime
 
-from app.models import Base
+from app.shared.database import Base
 
 
 class Transaction(Base):

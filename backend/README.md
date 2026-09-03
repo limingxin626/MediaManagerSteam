@@ -18,21 +18,28 @@ backend/
 ├── app/
 │   ├── __init__.py         # FastAPI 应用初始化、CORS、静态文件挂载
 │   ├── config.py           # 配置（数据目录、FFmpeg 路径、媒体类型）
+│   ├── runtime.py         # 后台服务统一生命周期
 │   ├── models/
 │   │   └── __init__.py     # SQLAlchemy ORM 模型
-│   ├── schemas/
-│   │   ├── message.py      # 消息请求/响应模型
-│   │   ├── tag.py          # 标签响应模型
-│   │   └── file.py         # 文件操作模型
-│   ├── routers/
-│   │   ├── message.py      # 消息相关接口
-│   │   ├── media.py        # 媒体相关接口
-│   │   ├── actor.py        # Actor 相关接口
-│   │   ├── tags.py         # 标签接口
-│   │   └── files.py        # 文件系统操作接口
-│   ├── services/
-│   │   ├── message_service.py  # #标签解析、媒体排序
-│   │   └── media_service.py    # 文件处理、hash 去重、缩略图生成
+│   ├── shared/             # database、schema 基类与事务边界
+│   ├── modules/            # 纵向领域包（router/schema/service/query）
+│   │   ├── message/
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   ├── queries.py
+│   │   │   └── service.py
+│   │   ├── media/
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │       ├── queries.py
+│   │       └── service.py
+│   │   ├── sync/
+│   │   ├── collection/、person/、tag/
+│   │   ├── repository/   # catalog、watcher、materializer 与 folder 逻辑
+│   │   ├── smart/        # CLIP 与智能标签
+│   │   ├── transaction/  # 账单解析与交易逻辑
+│   │   ├── issue/、todo/
+│   │   └── system/        # health、admin 与 dashboard
 │   └── utils/
 │       └── __init__.py     # 文件 hash、缩略图、媒体信息工具函数
 └── db_new.sqlite3          # SQLite 数据库
@@ -41,7 +48,7 @@ backend/
 ## 数据模型
 
 ```text
-Message ──── Actor
+Message ──── Collection
     │
     ├──── MessageMedia ──── Media
     │
@@ -49,10 +56,10 @@ Message ──── Actor
 ```
 
 - **Message** — feed 核心单元，每条消息对应一个时间点
-- **Actor** — 发言者，关联到消息
+- **Collection** — 消息合集
 - **Media** — 图片/视频资源，基于 `file_hash` 全局去重
 - **MessageMedia** — 关联表，记录媒体在消息中的 `position` 和 `created_at`
-- **Tag** — 标签，从消息 text 中的 `#标签` 语法自动解析
+- **Tag** — 可显式关联到消息或媒体的标签
 
 ## 快速启动
 
@@ -63,6 +70,20 @@ python api.py
 ```
 
 访问 `http://localhost:8002/docs` 查看 Swagger 文档。
+
+应用通过 `app.create_app()` 创建。集成测试可传入临时 session factory，并用
+`start_background_services=False, validate_runtime=False` 隔离真实数据库、静态目录和 watcher。
+路由只负责 HTTP 参数与异常映射；完整写用例在领域 service 中统一提交或回滚。
+
+create_app(settings=...) 接受独立的 AppConfig 实例；请求、后台扫描器和媒体处理会绑定到该实例，
+因此同一进程内的测试应用不会共享 repository 或 DATA_ROOT 状态。
+
+### 文件 API 路径边界
+
+通用 /files/* 接口不再接受服务器绝对路径。调用方必须传 root_id（data 或
+repositories.json 中的 repository id）和根目录内的 POSIX 相对 path。后端拒绝绝对路径、
+..、符号链接逃逸、根目录删除及跨 root 移动。/files/upload-media 仍返回可直接提交给
+POST /messages 的上传路径，以兼容现有两步上传流程。
 
 ## API 概览
 

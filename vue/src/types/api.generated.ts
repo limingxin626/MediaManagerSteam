@@ -11,10 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Sync Collections
-         * @description 全量同步：返回所有合集（供 Android 拉取）
-         */
+        /** Sync Collections */
         get: operations["sync_collections_collections_sync_get"];
         put?: never;
         post?: never;
@@ -31,16 +28,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Collections
-         * @description 获取合集列表（返回所有有消息的合集）
-         */
+        /** Get Collections */
         get: operations["get_collections_collections_get"];
         put?: never;
-        /**
-         * Create Collection
-         * @description 新建合集（名称唯一）
-         */
+        /** Create Collection */
         post: operations["create_collection_collections_post"];
         delete?: never;
         options?: never;
@@ -56,16 +47,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /**
-         * Update Collection
-         * @description 重命名 / 修改合集描述
-         */
+        /** Update Collection */
         put: operations["update_collection_collections__collection_id__put"];
         post?: never;
-        /**
-         * Delete Collection
-         * @description 删除合集：其下 message 的 collection_id 置 NULL，不级联删 message
-         */
+        /** Delete Collection */
         delete: operations["delete_collection_collections__collection_id__delete"];
         options?: never;
         head?: never;
@@ -79,16 +64,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get People
-         * @description 获取所有人物，附带每个人物关联的媒体数量。
-         */
+        /** Get People */
         get: operations["get_people_people_get"];
         put?: never;
-        /**
-         * Create Person
-         * @description 新建人物（名称唯一）
-         */
+        /** Create Person */
         post: operations["create_person_people_post"];
         delete?: never;
         options?: never;
@@ -104,16 +83,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /**
-         * Update Person
-         * @description 重命名 / 修改人物描述
-         */
+        /** Update Person */
         put: operations["update_person_people__person_id__put"];
         post?: never;
-        /**
-         * Delete Person
-         * @description 删除人物及其媒体关联
-         */
+        /** Delete Person */
         delete: operations["delete_person_people__person_id__delete"];
         options?: never;
         head?: never;
@@ -326,6 +299,26 @@ export interface paths {
          * @description 向已有消息添加媒体文件
          */
         post: operations["add_media_to_message_messages__message_id__media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/{message_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload File To Message
+         * @description Write a media file to the message's primary folder; catalog owns all links.
+         */
+        post: operations["upload_file_to_message_messages__message_id__files_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -608,11 +601,7 @@ export interface paths {
         put?: never;
         /**
          * Set Video Cover
-         * @description 把上传的图片设为视频封面。
-         *
-         *     落地策略遵循既有 sidecar 约定:`<stem>.cover.jpg` 写在视频同目录,
-         *     并立刻基于这张 sidecar 重生成 `DATA_ROOT/thumbs/{id}.webp`。
-         *     下次 re-import / replace 同一路径时,sidecar 仍会被自动识别,封面不会丢。
+         * @description 把上传的图片设为当前视频缩略图。
          */
         post: operations["set_video_cover_media__media_id__cover_post"];
         delete?: never;
@@ -628,17 +617,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 列出路径下的文件和文件夹
-         * @description 列出指定路径下的所有文件和文件夹信息
-         *
-         *     参数:
-         *     - path: 要列出的路径，默认为当前目录
-         *
-         *     返回:
-         *     - path: 当前路径
-         *     - items: 文件和文件夹列表，每个项目包含名称、路径、类型、大小和修改时间
-         */
+        /** 列出配置根目录下的文件和文件夹 */
         get: operations["list_path_files_list_get"];
         put?: never;
         post?: never;
@@ -658,16 +637,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /**
-         * 删除文件或文件夹
-         * @description 删除指定的文件或文件夹
-         *
-         *     参数:
-         *     - path: 要删除的文件或文件夹路径
-         *
-         *     返回:
-         *     - message: 操作结果消息
-         */
+        /** 删除文件或文件夹 */
         delete: operations["delete_path_files_delete_delete"];
         options?: never;
         head?: never;
@@ -683,17 +653,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 移动文件或文件夹
-         * @description 移动文件或文件夹到新位置
-         *
-         *     参数:
-         *     - source_path: 源文件或文件夹路径
-         *     - destination_path: 目标文件或文件夹路径
-         *
-         *     返回:
-         *     - message: 操作结果消息
-         */
+        /** 移动文件或文件夹 */
         post: operations["move_path_files_move_post"];
         delete?: never;
         options?: never;
@@ -709,17 +669,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /**
-         * 重命名文件或文件夹
-         * @description 重命名文件或文件夹
-         *
-         *     参数:
-         *     - path: 要重命名的文件或文件夹路径
-         *     - new_name: 新的名称
-         *
-         *     返回:
-         *     - message: 操作结果消息
-         */
+        /** 重命名文件或文件夹 */
         put: operations["rename_path_files_rename_put"];
         post?: never;
         delete?: never;
@@ -737,17 +687,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 创建文件或文件夹
-         * @description 创建新的文件或文件夹
-         *
-         *     参数:
-         *     - path: 要创建的文件或文件夹路径
-         *     - type: 类型，必须是 'file' 或 'directory'
-         *
-         *     返回:
-         *     - message: 操作结果消息
-         */
+        /** 创建文件或文件夹 */
         post: operations["create_path_files_create_post"];
         delete?: never;
         options?: never;
@@ -764,18 +704,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 上传文件
-         * @description 上传文件到指定路径
-         *
-         *     参数:
-         *     - file: 要上传的文件
-         *     - path: 上传目标路径，默认为当前目录
-         *
-         *     返回:
-         *     - message: 操作结果消息
-         *     - path: 上传后的文件路径
-         */
+        /** 上传文件 */
         post: operations["upload_file_files_upload_post"];
         delete?: never;
         options?: never;
@@ -792,11 +721,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 上传媒体文件
-         * @description 上传媒体文件（图片/视频），自动存入按日期组织的目录。
-         *     返回的 file_path 可直接用于 POST /messages 的 files 字段。
-         */
+        /** 上传媒体文件 */
         post: operations["upload_media_files_upload_media_post"];
         delete?: never;
         options?: never;
@@ -811,16 +736,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Tags
-         * @description 获取所有标签，支持按名称搜索，附带每个标签的关联数量。
-         */
+        /** Get Tags */
         get: operations["get_tags_tags_get"];
         put?: never;
-        /**
-         * Create Tag
-         * @description 创建新标签
-         */
+        /** Create Tag */
         post: operations["create_tag_tags_post"];
         delete?: never;
         options?: never;
@@ -838,17 +757,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /**
-         * Delete Tag
-         * @description 删除标签及其关联
-         */
+        /** Delete Tag */
         delete: operations["delete_tag_tags__tag_id__delete"];
         options?: never;
         head?: never;
-        /**
-         * Update Tag
-         * @description 重命名/修改标签分类
-         */
+        /** Update Tag */
         patch: operations["update_tag_tags__tag_id__patch"];
         trace?: never;
     };
@@ -921,10 +834,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Sync Logs
-         * @description 游标分页浏览 sync_log 表。
-         */
+        /** Get Sync Logs */
         get: operations["get_sync_logs_admin_sync_logs_get"];
         put?: never;
         post?: never;
@@ -958,10 +868,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Heatmap
-         * @description 过去 365 天每日消息数（GitHub 风格热力图）。
-         */
+        /** Get Heatmap */
         get: operations["get_heatmap_api_dashboard_heatmap_get"];
         put?: never;
         post?: never;
@@ -1295,6 +1202,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/repositories/duplicate-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Duplicate Files */
+        get: operations["list_duplicate_files_repositories_duplicate_files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/repositories/duplicate-files/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Duplicate Files */
+        delete: operations["remove_duplicate_files_repositories_duplicate_files__media_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/repositories/{repo_id}": {
         parameters: {
             query?: never;
@@ -1346,6 +1287,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Folders */
+        get: operations["list_folders_folders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/folders/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Folder Tags */
+        get: operations["list_folder_tags_folders_tags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/folders/{folder_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Folder */
+        get: operations["get_folder_folders__folder_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/folders/{folder_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload File To Folder */
+        post: operations["upload_file_to_folder_folders__folder_id__files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/todos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Board */
+        get: operations["get_board_todos_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_todos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/todos/{todo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete */
+        delete: operations["delete_todos__todo_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Title */
+        patch: operations["update_title_todos__todo_id__patch"];
+        trace?: never;
+    };
+    "/todos/{todo_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Move */
+        patch: operations["move_todos__todo_id__move_patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1394,11 +1456,29 @@ export interface components {
              * Format: binary
              */
             file: string;
+            /** Root Id */
+            root_id: string;
             /**
              * Path
-             * @default .
+             * @default
              */
             path: string;
+        };
+        /** Body_upload_file_to_folder_folders__folder_id__files_post */
+        Body_upload_file_to_folder_folders__folder_id__files_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
+        };
+        /** Body_upload_file_to_message_messages__message_id__files_post */
+        Body_upload_file_to_message_messages__message_id__files_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
         };
         /** Body_upload_media_files_upload_media_post */
         Body_upload_media_files_upload_media_post: {
@@ -1501,7 +1581,88 @@ export interface components {
             /** Todo Doing Count */
             todo_doing_count: number;
         };
-        /** FileInfo */
+        /** DuplicateFileCursorResponse */
+        DuplicateFileCursorResponse: {
+            /** Items */
+            items: components["schemas"]["DuplicateFileGroup"][];
+            /** Next Cursor */
+            next_cursor?: number | null;
+            /** Has More */
+            has_more: boolean;
+        };
+        /** DuplicateFileDeleteFailure */
+        DuplicateFileDeleteFailure: {
+            /** Id */
+            id: number;
+            /** Message */
+            message: string;
+        };
+        /** DuplicateFileDeleteRequest */
+        DuplicateFileDeleteRequest: {
+            /** Repository File Ids */
+            repository_file_ids: number[];
+        };
+        /** DuplicateFileDeleteResponse */
+        DuplicateFileDeleteResponse: {
+            /** Deleted Ids */
+            deleted_ids: number[];
+            /** Missing Ids */
+            missing_ids: number[];
+            /** Failures */
+            failures: components["schemas"]["DuplicateFileDeleteFailure"][];
+            /** Remaining Count */
+            remaining_count: number;
+            /** Canonical Available */
+            canonical_available: boolean;
+            /** Canonical Repo Id */
+            canonical_repo_id: string;
+            /** Canonical File Path */
+            canonical_file_path: string;
+        };
+        /** DuplicateFileGroup */
+        DuplicateFileGroup: {
+            /** Media Id */
+            media_id: number;
+            /** Repo Id */
+            repo_id: string;
+            /** File Path */
+            file_path: string;
+            /** Mime Type */
+            mime_type?: string | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Thumb Url */
+            thumb_url: string;
+            /** Local Thumb Path */
+            local_thumb_path: string;
+            /** Files */
+            files: components["schemas"]["DuplicatePhysicalFileItem"][];
+        };
+        /** DuplicatePhysicalFileItem */
+        DuplicatePhysicalFileItem: {
+            /** Id */
+            id: number;
+            /** Repo Id */
+            repo_id: string;
+            /** Rel Path */
+            rel_path: string;
+            /** Local File Path */
+            local_file_path: string;
+            /** File Size */
+            file_size?: number | null;
+            /** Mtime */
+            mtime: number;
+            /** Is Canonical */
+            is_canonical: boolean;
+        };
+        /**
+         * FileInfo
+         * @description 文件/文件夹信息模型
+         */
         FileInfo: {
             /** Name */
             name: string;
@@ -1514,24 +1675,295 @@ export interface components {
             /** Mtime */
             mtime: number;
         };
-        /** FileListResponse */
+        /**
+         * FileListResponse
+         * @description 文件列表响应模型
+         */
         FileListResponse: {
+            /** Root Id */
+            root_id: string;
             /** Path */
             path: string;
             /** Items */
             items: components["schemas"]["FileInfo"][];
         };
-        /** FileOperationResponse */
+        /**
+         * FileOperationResponse
+         * @description 文件操作响应模型
+         */
         FileOperationResponse: {
             /** Message */
             message: string;
         };
-        /** FileUploadResponse */
+        /**
+         * FileUploadResponse
+         * @description 文件上传响应模型
+         */
         FileUploadResponse: {
             /** Message */
             message: string;
+            /** Root Id */
+            root_id?: string | null;
             /** Path */
             path: string;
+        };
+        /** FolderArtwork */
+        FolderArtwork: {
+            poster?: components["schemas"]["RepositoryFileResponse"] | null;
+            fanart?: components["schemas"]["RepositoryFileResponse"] | null;
+        };
+        /** FolderCursorResponse */
+        FolderCursorResponse: {
+            /** Items */
+            items: components["schemas"]["FolderResponse"][];
+            /** Next Cursor */
+            next_cursor?: number | null;
+            /** Has More */
+            has_more: boolean;
+        };
+        /** FolderDetailResponse */
+        FolderDetailResponse: {
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Collection Id */
+            collection_id?: number | null;
+            /** Collection Name */
+            collection_name?: string | null;
+            /** Issue Id */
+            issue_id?: number | null;
+            /** Issue Title */
+            issue_title?: string | null;
+            /**
+             * Starred
+             * @default false
+             */
+            starred: boolean;
+            /** Location Count */
+            location_count: number;
+            /** Media Count */
+            media_count: number;
+            /** Primary Repo Id */
+            primary_repo_id?: string | null;
+            /** Primary Folder Path */
+            primary_folder_path?: string | null;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: components["schemas"]["FolderTagItem"][];
+            /**
+             * Preview Files
+             * @default []
+             */
+            preview_files: components["schemas"]["RepositoryFileResponse"][];
+            fanart_file?: components["schemas"]["RepositoryFileResponse"] | null;
+            poster_file?: components["schemas"]["RepositoryFileResponse"] | null;
+            /**
+             * Kind
+             * @default unknown
+             */
+            kind: string;
+            artwork?: components["schemas"]["FolderArtwork"];
+            /** Entries */
+            entries?: components["schemas"]["FolderMediaEntry"][];
+            /** Gallery */
+            gallery?: components["schemas"]["RepositoryFileResponse"][];
+            /** Extras */
+            extras?: components["schemas"]["FolderMediaEntry"][];
+            /** Unclassified */
+            unclassified?: components["schemas"]["RepositoryFileResponse"][];
+            /** Primary Entry Id */
+            primary_entry_id?: string | null;
+            detection?: components["schemas"]["FolderDetectionInfo"];
+            /** Locations */
+            locations?: components["schemas"]["FolderLocationItem"][];
+            /** Files */
+            files?: components["schemas"]["RepositoryFileResponse"][];
+            /** Previews */
+            previews?: components["schemas"]["FolderPreviewItem"][];
+        };
+        /** FolderDetectionInfo */
+        FolderDetectionInfo: {
+            /**
+             * Source
+             * @default filename
+             */
+            source: string;
+            /**
+             * Confidence
+             * @default 0
+             */
+            confidence: number;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Ambiguous
+             * @default false
+             */
+            ambiguous: boolean;
+        };
+        /** FolderLocationItem */
+        FolderLocationItem: {
+            /** Id */
+            id: number;
+            /** Repo Id */
+            repo_id: string;
+            /** Rel Path */
+            rel_path: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+            /** Local Path */
+            local_path?: string | null;
+        };
+        /** FolderMediaEntry */
+        FolderMediaEntry: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+            /** Sequence */
+            sequence?: number | null;
+            /** Season Number */
+            season_number?: number | null;
+            /** Episode Numbers */
+            episode_numbers?: number[];
+            /** Files */
+            files?: components["schemas"]["RepositoryFileResponse"][];
+            detection?: components["schemas"]["FolderDetectionInfo"];
+        };
+        /** FolderPreviewItem */
+        FolderPreviewItem: {
+            /** Id */
+            id: number;
+            /**
+             * Repo Id
+             * @default
+             */
+            repo_id: string;
+            /** File Path */
+            file_path: string;
+            /**
+             * Local File Path
+             * @default
+             */
+            local_file_path: string;
+            /**
+             * Local Thumb Path
+             * @default
+             */
+            local_thumb_path: string;
+            /**
+             * File Url
+             * @default
+             */
+            file_url: string;
+            /**
+             * Thumb Url
+             * @default
+             */
+            thumb_url: string;
+            /** Name */
+            name: string;
+            /**
+             * Starred
+             * @default false
+             */
+            starred: boolean;
+            /** Mime Type */
+            mime_type?: string | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Video Media Id */
+            video_media_id?: number | null;
+            /** Frame Ms */
+            frame_ms?: number | null;
+            /** Start Ms */
+            start_ms?: number | null;
+            /** End Ms */
+            end_ms?: number | null;
+            /** Source */
+            source: string;
+        };
+        /** FolderResponse */
+        FolderResponse: {
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Collection Id */
+            collection_id?: number | null;
+            /** Collection Name */
+            collection_name?: string | null;
+            /** Issue Id */
+            issue_id?: number | null;
+            /** Issue Title */
+            issue_title?: string | null;
+            /**
+             * Starred
+             * @default false
+             */
+            starred: boolean;
+            /** Location Count */
+            location_count: number;
+            /** Media Count */
+            media_count: number;
+            /** Primary Repo Id */
+            primary_repo_id?: string | null;
+            /** Primary Folder Path */
+            primary_folder_path?: string | null;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: components["schemas"]["FolderTagItem"][];
+            /**
+             * Preview Files
+             * @default []
+             */
+            preview_files: components["schemas"]["RepositoryFileResponse"][];
+            fanart_file?: components["schemas"]["RepositoryFileResponse"] | null;
+            poster_file?: components["schemas"]["RepositoryFileResponse"] | null;
+        };
+        /** FolderTagCount */
+        FolderTagCount: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Category */
+            category?: string | null;
+            /**
+             * Folder Count
+             * @default 0
+             */
+            folder_count: number;
+        };
+        /** FolderTagItem */
+        FolderTagItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Category */
+            category?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1702,7 +2134,7 @@ export interface components {
              * Tags
              * @default []
              */
-            tags: components["schemas"]["MessageTagItem"][];
+            tags: components["schemas"]["NamedTag"][];
             /**
              * People
              * @default []
@@ -1814,7 +2246,7 @@ export interface components {
              * Tags
              * @default []
              */
-            tags: components["schemas"]["MessageTagItem"][];
+            tags: components["schemas"]["NamedTag"][];
             /**
              * People
              * @default []
@@ -1944,6 +2376,15 @@ export interface components {
              * @default false
              */
             starred: boolean;
+            /**
+             * Folder Count
+             * @default 0
+             */
+            folder_count: number;
+            /** Primary Repo Id */
+            primary_repo_id?: string | null;
+            /** Primary Folder Path */
+            primary_folder_path?: string | null;
             /** Media Items */
             media_items: components["schemas"]["MessageMediaItem"][];
             /**
@@ -1951,6 +2392,24 @@ export interface components {
              * @default []
              */
             tags: components["schemas"]["MessageTagItem"][];
+            /**
+             * Folders
+             * @default []
+             */
+            folders: components["schemas"]["MessageFolderItem"][];
+        };
+        /** MessageFolderItem */
+        MessageFolderItem: {
+            /** Id */
+            id: number;
+            /** Repo Id */
+            repo_id: string;
+            /** Rel Path */
+            rel_path: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
         };
         /** MessageMediaItem */
         MessageMediaItem: {
@@ -2036,6 +2495,15 @@ export interface components {
              * @default false
              */
             starred: boolean;
+            /**
+             * Folder Count
+             * @default 0
+             */
+            folder_count: number;
+            /** Primary Repo Id */
+            primary_repo_id?: string | null;
+            /** Primary Folder Path */
+            primary_folder_path?: string | null;
         };
         /** MessageSearchCursorResponse */
         MessageSearchCursorResponse: {
@@ -2187,6 +2655,15 @@ export interface components {
              * @default false
              */
             starred: boolean;
+            /**
+             * Folder Count
+             * @default 0
+             */
+            folder_count: number;
+            /** Primary Repo Id */
+            primary_repo_id?: string | null;
+            /** Primary Folder Path */
+            primary_folder_path?: string | null;
             /** Media Items */
             media_items: components["schemas"]["MessageSyncMediaItem"][];
             /**
@@ -2247,6 +2724,15 @@ export interface components {
             by_category: {
                 [key: string]: components["schemas"]["CategorySlot"];
             };
+        };
+        /** NamedTag */
+        NamedTag: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Category */
+            category?: string | null;
         };
         /** PeopleRequest */
         PeopleRequest: {
@@ -2360,6 +2846,11 @@ export interface components {
             scanned_at: string;
             /** Media Id */
             media_id?: number | null;
+            /**
+             * Starred
+             * @default false
+             */
+            starred: boolean;
             /** Materialize Status */
             materialize_status: string;
             /** Materialize Error */
@@ -2580,6 +3071,67 @@ export interface components {
             day: number;
             /** Count */
             count: number;
+        };
+        /** TodoBoard */
+        TodoBoard: {
+            /** Pending */
+            pending: components["schemas"]["TodoOut"][];
+            /** Doing */
+            doing: components["schemas"]["TodoOut"][];
+            /** Done */
+            done: components["schemas"]["TodoOut"][];
+        };
+        /** TodoCreate */
+        TodoCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @default pending
+             * @enum {string}
+             */
+            status: "pending" | "doing" | "done";
+        };
+        /** TodoMove */
+        TodoMove: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "doing" | "done";
+            /** Position */
+            position: number;
+        };
+        /** TodoOut */
+        TodoOut: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "doing" | "done";
+            /** Position */
+            position: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Completed At */
+            completed_at?: string | null;
+        };
+        /** TodoUpdate */
+        TodoUpdate: {
+            /** Title */
+            title: string;
         };
         /** TransactionListResponse */
         TransactionListResponse: {
@@ -3441,6 +3993,41 @@ export interface operations {
             };
         };
     };
+    upload_file_to_message_messages__message_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_file_to_message_messages__message_id__files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     remove_media_from_message_messages__message_id__media__media_id__delete: {
         parameters: {
             query?: never;
@@ -3485,7 +4072,7 @@ export interface operations {
                 /** @description 按多条 message 取并集过滤 */
                 message_ids?: number[] | null;
                 starred?: boolean | null;
-                /** @description 媒体类型: 'video' 或 'image' */
+                /** @description 媒体类型: 'video'、'image' 或 'screenshot' */
                 type?: string | null;
                 /** @description 标签 ID */
                 tag_id?: number | null;
@@ -3524,7 +4111,7 @@ export interface operations {
         parameters: {
             query?: {
                 starred?: boolean | null;
-                /** @description 媒体类型: 'video' 或 'image' */
+                /** @description 媒体类型: 'video'、'image' 或 'screenshot' */
                 type?: string | null;
                 tag_id?: number | null;
                 collection_id?: number | null;
@@ -4068,7 +4655,8 @@ export interface operations {
     };
     list_path_files_list_get: {
         parameters: {
-            query?: {
+            query: {
+                root_id: string;
                 path?: string | null;
             };
             header?: never;
@@ -4100,6 +4688,7 @@ export interface operations {
     delete_path_files_delete_delete: {
         parameters: {
             query: {
+                root_id: string;
                 path: string;
             };
             header?: never;
@@ -4131,6 +4720,7 @@ export interface operations {
     move_path_files_move_post: {
         parameters: {
             query: {
+                root_id: string;
                 source_path: string;
                 destination_path: string;
             };
@@ -4163,6 +4753,7 @@ export interface operations {
     rename_path_files_rename_put: {
         parameters: {
             query: {
+                root_id: string;
                 path: string;
                 new_name: string;
             };
@@ -4195,6 +4786,7 @@ export interface operations {
     create_path_files_create_post: {
         parameters: {
             query: {
+                root_id: string;
                 path: string;
                 type: string;
             };
@@ -5211,6 +5803,73 @@ export interface operations {
             };
         };
     };
+    list_duplicate_files_repositories_duplicate_files_get: {
+        parameters: {
+            query?: {
+                cursor?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateFileCursorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_duplicate_files_repositories_duplicate_files__media_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateFileDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateFileDeleteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     repository_detail_repositories__repo_id__get: {
         parameters: {
             query?: never;
@@ -5293,6 +5952,278 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_folders_folders_get: {
+        parameters: {
+            query?: {
+                cursor?: number | null;
+                limit?: number;
+                starred?: boolean | null;
+                tag_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderCursorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_folder_tags_folders_tags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderTagCount"][];
+                };
+            };
+        };
+    };
+    get_folder_folders__folder_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folder_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_file_to_folder_folders__folder_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folder_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_file_to_folder_folders__folder_id__files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_board_todos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodoBoard"];
+                };
+            };
+        };
+    };
+    create_todos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TodoCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_todos__todo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                todo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_title_todos__todo_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                todo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TodoUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_todos__todo_id__move_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                todo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TodoMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodoOut"];
                 };
             };
             /** @description Validation Error */

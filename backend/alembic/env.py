@@ -15,7 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # 必须在 `from app.models` / `from app.config` 之前 set。
 os.environ.setdefault("ALEMBIC_SKIP_REPO_LOAD", "1")
 
-from app.models import Base
+from app.shared.database import Base
+import app.models  # noqa: F401  # register every model on Base.metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, String, Table, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 
-from app.models import Base
+from app.shared.database import Base
 
 
 folder_tag = Table(

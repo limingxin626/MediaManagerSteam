@@ -1,8 +1,8 @@
 from datetime import datetime
 
 from app.models import Media, Message, MessageMedia, Tag
-from app.routers.media import get_media, get_media_timeline
-from app.routers.tags import get_tags
+from app.modules.media.router import get_media, get_media_timeline
+from app.modules.tag.router import get_tags
 
 
 def add_media(db, media_id, *, file_created_at=None, video_media_id=None):

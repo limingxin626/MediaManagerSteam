@@ -1,25 +1,7 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Float, ForeignKey, Table, Index, UniqueConstraint, LargeBinary, event
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship, backref
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float, ForeignKey, Table, Index, UniqueConstraint, LargeBinary
+from sqlalchemy.orm import relationship, backref
 from datetime import datetime
-import os
-from app.config import config
-
-DATABASE_URL = f"sqlite:///{config.get_db_path()}"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-
-
-@event.listens_for(engine, "connect")
-def _enable_sqlite_fk(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    # WAL:允许 repository materializer 与请求线程并发写,避免 "database is locked"
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.close()
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
+from app.shared.database import Base, DATABASE_URL, SessionLocal, engine, get_db
 
 message_tag = Table(
     'message_tag',
@@ -206,14 +188,6 @@ class SyncLog(Base):
         Index("ix_sync_log_timestamp_id", "timestamp", "id"),
         Index("ix_sync_log_entity", "entity_type", "entity_id"),
     )
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 # 导入子模块模型，确保 Base.metadata 包含它们（alembic autogenerate 依赖此处）

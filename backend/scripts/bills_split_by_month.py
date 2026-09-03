@@ -10,7 +10,7 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.services import bill_parser  # noqa: E402
+from app.modules.transaction import bill_parser  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SLIP_DIR = os.path.normpath(os.path.join(ROOT, "..", "slip"))

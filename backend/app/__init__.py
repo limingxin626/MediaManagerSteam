@@ -1,109 +1,149 @@
+"""FastAPI application factory with side-effect-free imports."""
+from __future__ import annotations
+
 from contextlib import asynccontextmanager
-import threading
+import logging
+from logging.handlers import RotatingFileHandler
+import os
+from typing import Callable
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import os
-import sys
-import logging
-from logging.handlers import RotatingFileHandler
-from app.routers import all_routers
-from app.config import config
-from app.services.sync_log_service import register_sync_listeners
+from sqlalchemy.orm import Session
+from sqlalchemy.orm import sessionmaker
 
-# 配置日志
-log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "app.log")
+from app.config import AppConfig, use_settings
 
-# 创建根日志配置
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
+
+def _configure_logging() -> None:
+    """Install application handlers once per process."""
+    root = logging.getLogger()
+    if any(getattr(handler, "_media_manager_handler", False) for handler in root.handlers):
+        return
+    log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handlers = (
         RotatingFileHandler(
-            log_file,
-            maxBytes=10*1024*1024,  # 10MB
+            os.path.join(log_dir, "app.log"),
+            maxBytes=10 * 1024 * 1024,
             backupCount=5,
-            encoding="utf-8"
+            encoding="utf-8",
         ),
-        logging.StreamHandler()  # 同时输出到控制台
-    ]
-)
-logger = logging.getLogger(__name__)
-
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    """Own catalog background services for the complete application lifetime."""
-    from app.services.repository_watcher import start_watcher, stop_watcher
-    from app.services.repository_materializer import start_worker, stop_worker
-
-    start_worker()
-    start_watcher()
-    # Build the catalog after migrations without blocking API startup. The watcher
-    # also scans repositories as they become available later.
-    from app.services import repository_catalog
-    threading.Thread(target=repository_catalog.rescan, name="catalog-bootstrap", daemon=True).start()
-    try:
-        yield
-    finally:
-        stop_watcher()
-        stop_worker()
-
-
-# 创建FastAPI应用
-app = FastAPI(
-    title="媒体信息管理系统API",
-    description="用于管理人员、分组、媒体资源和标签的后端接口",
-    version="1.0.0",
-    lifespan=lifespan,
-)
-
-# 配置CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=config.ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https?://(?:localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})(?::\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# 校验 repositories.json 的 repo_id 与内置 /data 前缀不冲突
-config.validate_repositories()
-
-# 校验 DATA_ROOT 必须存在(不自动创建,运行 init 脚本来建)
-data_root = config.DATA_ROOT
-if not os.path.isdir(data_root):
-    logger.critical(
-        "DATA_ROOT=%s 不存在。请运行 `uv run scripts/init_data_root.py` 初始化。",
-        data_root,
+        logging.StreamHandler(),
     )
-    sys.exit(1)
+    for handler in handlers:
+        handler.setFormatter(formatter)
+        handler._media_manager_handler = True  # type: ignore[attr-defined]
+        root.addHandler(handler)
+    root.setLevel(logging.INFO)
 
-# 配置静态文件服务:每个挂载点单独检查,缺失就跳过(允许外接盘未挂)
-mounted = 0
-skipped = 0
-for url_prefix, system_path in config.get_static_mounts().items():
-    if not os.path.isdir(system_path):
-        logger.warning(
-            "[static] %s → %s 不存在,跳过挂载(对应 media URL 将返回 404)",
-            url_prefix, system_path,
-        )
-        skipped += 1
-        continue
-    mount_name = url_prefix.lstrip("/")
-    app.mount(url_prefix, StaticFiles(directory=system_path), name=mount_name)
-    mounted += 1
-logger.info("[static] 已挂载 %d 个,跳过 %d 个", mounted, skipped)
 
-# 注册所有路由
-for router in all_routers:
-    app.include_router(router)
+def _session_dependency(session_factory: Callable[[], Session]):
+    def dependency():
+        db = session_factory()
+        try:
+            yield db
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+    return dependency
 
-# 注册 SyncLog 事件监听器
-register_sync_listeners()
 
-# 检查 ffmpeg/ffprobe 路径
-config.check_paths()
+def create_app(
+    settings: AppConfig | None = None,
+    *,
+    session_factory: Callable[[], Session] | None = None,
+    start_background_services: bool = True,
+    validate_runtime: bool = True,
+) -> FastAPI:
+    """Build an isolated app; tests may replace sessions and disable workers."""
+    from app.config import get_settings
+    from app.models import get_db
+    from app.modules import all_routers
+    from app.runtime import BackgroundServiceManager
+    from app.modules.sync.log_service import register_sync_listeners
+
+    settings = settings or get_settings()
+    owned_engine = None
+    if session_factory is None:
+        from app.shared.database import DATABASE_URL, create_sqlite_engine
+        settings_database_url = f"sqlite:///{settings.get_db_path()}"
+        if settings_database_url != DATABASE_URL:
+            owned_engine = create_sqlite_engine(settings_database_url)
+            session_factory = sessionmaker(autocommit=False, autoflush=False, bind=owned_engine)
+    _configure_logging()
+    logger = logging.getLogger(__name__)
+    services = BackgroundServiceManager(
+        enabled=start_background_services,
+        settings=settings,
+        session_factory=session_factory,
+    )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        with use_settings(settings):
+            services.start()
+            try:
+                yield
+            finally:
+                services.stop()
+                if owned_engine is not None:
+                    owned_engine.dispose()
+
+    application = FastAPI(
+        title="媒体信息管理系统API",
+        description="用于管理人员、分组、媒体资源和标签的后端接口",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
+    application.state.settings = settings
+    application.state.background_services = services
+
+    @application.middleware("http")
+    async def bind_runtime_settings(request, call_next):
+        with use_settings(request.app.state.settings):
+            return await call_next(request)
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.ALLOWED_ORIGINS,
+        allow_origin_regex=(
+            r"^https?://(?:localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|"
+            r"192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])"
+            r"(?:\.\d{1,3}){2})(?::\d+)?$"
+        ),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    if validate_runtime:
+        settings.validate_repositories()
+        if not os.path.isdir(settings.DATA_ROOT):
+            raise RuntimeError(
+                f"DATA_ROOT={settings.DATA_ROOT} 不存在。"
+                "请运行 `uv run scripts/init_data_root.py` 初始化。"
+            )
+        for url_prefix, system_path in settings.get_static_mounts().items():
+            if not os.path.isdir(system_path):
+                logger.warning("[static] %s → %s 不存在,跳过挂载", url_prefix, system_path)
+                continue
+            application.mount(
+                url_prefix, StaticFiles(directory=system_path), name=url_prefix.lstrip("/")
+            )
+
+    for router in all_routers:
+        application.include_router(router)
+    if session_factory is not None:
+        application.dependency_overrides[get_db] = _session_dependency(session_factory)
+
+    register_sync_listeners()
+    if validate_runtime:
+        settings.check_paths()
+    return application
+
+
+__all__ = ["create_app"]

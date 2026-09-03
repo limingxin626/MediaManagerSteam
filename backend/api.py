@@ -27,9 +27,10 @@ def main() -> None:
         os.environ["DATA_ROOT"] = os.path.abspath(args.data_root)
 
     import uvicorn
-    from app import app
+    from app import create_app
     from app.config import config
 
+    app = create_app()
     uvicorn.run(app, host=config.HOST, port=args.port or config.PORT)
 
 

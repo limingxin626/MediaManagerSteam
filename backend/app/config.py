@@ -39,6 +39,8 @@ import json
 import logging
 import os
 import sys
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Dict, Optional, Tuple
 
 from dotenv import load_dotenv
@@ -151,6 +153,48 @@ def _load_repositories(data_root: str) -> Tuple[Dict[str, str], str]:
 class AppConfig:
     """应用配置类"""
 
+    def __init__(
+        self,
+        *,
+        data_root: str | None = None,
+        repositories: Dict[str, str] | None = None,
+        default_repo_id: str | None = None,
+        load_repositories: bool = True,
+    ) -> None:
+        """Build one isolated runtime configuration.
+
+        Environment-derived class attributes remain as backwards-compatible
+        defaults, while every instance owns its mutable path and repository
+        state. Tests and application factories can therefore coexist without
+        mutating process-global class attributes.
+        """
+        self.DATA_ROOT = os.path.abspath(data_root or type(self).DATA_ROOT)
+        self.HOST = type(self).HOST
+        self.PORT = type(self).PORT
+        self.FFMPEG_PATH = type(self).FFMPEG_PATH
+        self.FFPROBE_PATH = type(self).FFPROBE_PATH
+        self.TELEGRAM_LARGE_FILE_THRESHOLD = type(self).TELEGRAM_LARGE_FILE_THRESHOLD
+        self.TELEGRAM_API_ID = type(self).TELEGRAM_API_ID
+        self.TELEGRAM_API_HASH = type(self).TELEGRAM_API_HASH
+        self.TELEGRAM_SESSION_PATH = type(self).TELEGRAM_SESSION_PATH
+        self.TELEGRAM_INBOX_DIR = type(self).TELEGRAM_INBOX_DIR
+        self.TELEGRAM_POLL_INTERVAL = type(self).TELEGRAM_POLL_INTERVAL
+        self.ALLOWED_ORIGINS = list(type(self).ALLOWED_ORIGINS)
+        self.VIDEO_EXTENSIONS = set(type(self).VIDEO_EXTENSIONS)
+        self.IMAGE_EXTENSIONS = set(type(self).IMAGE_EXTENSIONS)
+        self.DATA_URL_PREFIX = type(self).DATA_URL_PREFIX
+
+        if repositories is not None:
+            self._REPOSITORIES = {
+                repo_id: os.path.abspath(path) for repo_id, path in repositories.items()
+            }
+            self._DEFAULT_REPO_ID = default_repo_id or next(iter(self._REPOSITORIES), "")
+        elif load_repositories and os.getenv("ALEMBIC_SKIP_REPO_LOAD") != "1":
+            self._REPOSITORIES, self._DEFAULT_REPO_ID = _load_repositories(self.DATA_ROOT)
+        else:
+            self._REPOSITORIES = {}
+            self._DEFAULT_REPO_ID = default_repo_id or ""
+
     DATA_ROOT: str = os.path.abspath(_get_env("DATA_ROOT"))
 
     HOST: str = os.getenv("HOST", "0.0.0.0").strip() or "0.0.0.0"
@@ -196,8 +240,7 @@ class AppConfig:
     # DATA_ROOT 在 FastAPI 上的固定 URL 前缀(thumbs / collection_cover / person_cover 都挂在这下面)
     DATA_URL_PREFIX: str = "/data"
 
-    @classmethod
-    def check_paths(cls) -> None:
+    def check_paths(self) -> None:
         """启动时校验 ffmpeg/ffprobe:解析到绝对路径,并实际执行 -version 探活。
         任一失败则 fail-fast,避免运行中静默失败导致缩略图/元数据丢失。
         """
@@ -205,7 +248,7 @@ class AppConfig:
         import subprocess as _sp
 
         for label in ("FFMPEG_PATH", "FFPROBE_PATH"):
-            raw = getattr(cls, label)
+            raw = getattr(self, label)
             resolved = raw if os.path.isabs(raw) else _shutil.which(raw)
             if not resolved or not os.path.isfile(resolved):
                 logger.error("%s 无法定位到可执行文件 (raw=%s, resolved=%s)。", label, raw, resolved)
@@ -220,23 +263,21 @@ class AppConfig:
                 logger.error("%s -version 返回非零 (%s, rc=%s): %s",
                              label, resolved, r.returncode, (r.stderr or "")[:200])
                 sys.exit(1)
-            setattr(cls, label, resolved)
+            setattr(self, label, resolved)
             logger.info("%s OK: %s", label, resolved)
 
-    @classmethod
-    def get_static_mounts(cls) -> Dict[str, str]:
+    def get_static_mounts(self) -> Dict[str, str]:
         """{url_prefix: system_path}。
 
         - DATA_ROOT 永远挂在 `/data`(thumbs/collection_cover/person_cover 子目录由前端拼)
         - 每个 repository 按 `/{repo_id}` 挂载,直接以 repo_id 小写作为 URL 段
         """
-        mounts: Dict[str, str] = {cls.DATA_URL_PREFIX: cls.DATA_ROOT}
-        for rid, abs_path in cls._REPOSITORIES.items():
+        mounts: Dict[str, str] = {self.DATA_URL_PREFIX: self.DATA_ROOT}
+        for rid, abs_path in self._REPOSITORIES.items():
             mounts[f"/{rid}"] = abs_path
         return mounts
 
-    @classmethod
-    def validate_repositories(cls) -> None:
+    def validate_repositories(self) -> None:
         """启动时检查:repo_id 与 /data 不冲突。
 
         **不**强制检查 repo 路径是否实际存在 —— 缺失的路径在
@@ -246,121 +287,102 @@ class AppConfig:
         if os.getenv("ALEMBIC_SKIP_REPO_LOAD") == "1":
             # alembic 上下文里 _REPOSITORIES 故意是空的,validate 也跳过
             return
-        if not cls._REPOSITORIES:
+        if not self._REPOSITORIES:
             logger.error("repositories 为空,无法启动")
             sys.exit(1)
-        if "data" in cls._REPOSITORIES:
+        if "data" in self._REPOSITORIES:
             logger.error("repo_id 'data' 与内置 /data 静态前缀冲突,请改名")
             sys.exit(1)
 
-    @classmethod
-    def get_media_type(cls, file_path: str) -> str | None:
+    def get_media_type(self, file_path: str) -> str | None:
         ext = os.path.splitext(file_path)[1].lower()
-        if ext in cls.VIDEO_EXTENSIONS:
+        if ext in self.VIDEO_EXTENSIONS:
             return "VIDEO"
-        elif ext in cls.IMAGE_EXTENSIONS:
+        elif ext in self.IMAGE_EXTENSIONS:
             return "IMAGE"
         return None
 
-    @classmethod
-    def get_upload_root(cls) -> str:
+    def get_upload_root(self) -> str:
         """default repo 的根目录(替代旧 UPLOAD_DIR 类属性的语义)。"""
-        return cls._REPOSITORIES[cls._DEFAULT_REPO_ID]
+        return self._REPOSITORIES[self._DEFAULT_REPO_ID]
 
-    @classmethod
-    def get_upload_dir(cls) -> str:
+    def get_upload_dir(self) -> str:
         """按日期分组的上传落地目录(default repo 之下)。"""
         from datetime import date
         today = date.today()
         return os.path.join(
-            cls.get_upload_root(),
+            self.get_upload_root(),
             str(today.year), f"{today.month:02d}", f"{today.day:02d}",
         )
 
-    @classmethod
-    def get_thumbs_dir(cls) -> str:
+    def get_thumbs_dir(self) -> str:
         # 与 Mac 端 (Models.swift localThumbURL) 一致:thumbs/preview/collection_cover
         # 都直接在 DATA_ROOT 根下,跟 `/data` URL mount 的根对齐
         # (`/data` → DATA_ROOT,所以 URL `/data/thumbs/x.webp` 物理就是 `DATA_ROOT/thumbs/x.webp`)。
-        return os.path.join(cls.DATA_ROOT, "thumbs")
+        return os.path.join(self.DATA_ROOT, "thumbs")
 
-    @classmethod
-    def get_thumbnail_path(cls, media_id: int) -> str:
-        return os.path.join(cls.get_thumbs_dir(), f"{media_id}.webp")
+    def get_thumbnail_path(self, media_id: int) -> str:
+        return os.path.join(self.get_thumbs_dir(), f"{media_id}.webp")
 
     # ── Telegram 路径解析 ──────────────────────────────────────────
-    @classmethod
-    def get_telegram_session_path(cls) -> str:
+    def get_telegram_session_path(self) -> str:
         """Telethon session 文件绝对路径(默认 DATA_ROOT/.telegram.session)。"""
-        return cls.TELEGRAM_SESSION_PATH or os.path.join(
-            cls.DATA_ROOT, ".telegram.session"
+        return self.TELEGRAM_SESSION_PATH or os.path.join(
+            self.DATA_ROOT, ".telegram.session"
         )
 
-    @classmethod
-    def get_telegram_inbox_dir(cls) -> str:
+    def get_telegram_inbox_dir(self) -> str:
         """Telegram 媒体下载暂存目录(默认 DATA_ROOT/telegram_inbox/)。
 
         自动 mkdir。process_file() 之后会把文件 copy 进 uploads/YYYY/MM/DD/,
         inbox 文件本身不视为 repo(不被 register_relative 命中)。
         """
-        d = cls.TELEGRAM_INBOX_DIR or os.path.join(cls.DATA_ROOT, "telegram_inbox")
+        d = self.TELEGRAM_INBOX_DIR or os.path.join(self.DATA_ROOT, "telegram_inbox")
         os.makedirs(d, exist_ok=True)
         return d
 
     # ── MP4 preview(为 GIF 等动画格式生成的小尺寸 H.264 视频)────
     # iOS MyNote 在 grid cell / 详情里优先用 AVPlayer 播这个文件
     # (VideoToolbox 硬件解码,<5ms 冷启),比 animated webp 快一个数量级。
-    @classmethod
-    def get_preview_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "preview")
+    def get_preview_dir(self) -> str:
+        return os.path.join(self.DATA_ROOT, "preview")
 
-    @classmethod
-    def get_preview_path(cls, media_id: int) -> str:
-        return os.path.join(cls.get_preview_dir(), f"{media_id}.mp4")
+    def get_preview_path(self, media_id: int) -> str:
+        return os.path.join(self.get_preview_dir(), f"{media_id}.mp4")
 
-    @classmethod
-    def get_collection_cover_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "collection_cover")
+    def get_collection_cover_dir(self) -> str:
+        return os.path.join(self.DATA_ROOT, "collection_cover")
 
-    @classmethod
-    def get_collection_cover_path(cls, collection_id: int) -> str:
-        return os.path.join(cls.get_collection_cover_dir(), f"{collection_id}.webp")
+    def get_collection_cover_path(self, collection_id: int) -> str:
+        return os.path.join(self.get_collection_cover_dir(), f"{collection_id}.webp")
 
-    @classmethod
-    def get_person_cover_dir(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "person_cover")
+    def get_person_cover_dir(self) -> str:
+        return os.path.join(self.DATA_ROOT, "person_cover")
 
-    @classmethod
-    def get_person_cover_path(cls, person_id: int) -> str:
-        return os.path.join(cls.get_person_cover_dir(), f"{person_id}.webp")
+    def get_person_cover_path(self, person_id: int) -> str:
+        return os.path.join(self.get_person_cover_dir(), f"{person_id}.webp")
 
-    @classmethod
-    def get_thumbnail_url(cls, media_id: int) -> str:
-        return f"{cls.DATA_URL_PREFIX}/thumbs/{media_id}.webp"
+    def get_thumbnail_url(self, media_id: int) -> str:
+        return f"{self.DATA_URL_PREFIX}/thumbs/{media_id}.webp"
 
-    @classmethod
-    def get_collection_cover_url(cls, collection_id: int) -> str:
-        return f"{cls.DATA_URL_PREFIX}/collection_cover/{collection_id}.webp"
+    def get_collection_cover_url(self, collection_id: int) -> str:
+        return f"{self.DATA_URL_PREFIX}/collection_cover/{collection_id}.webp"
 
-    @classmethod
-    def get_person_cover_url(cls, person_id: int) -> str:
-        return f"{cls.DATA_URL_PREFIX}/person_cover/{person_id}.webp"
+    def get_person_cover_url(self, person_id: int) -> str:
+        return f"{self.DATA_URL_PREFIX}/person_cover/{person_id}.webp"
 
     # ------------------------------------------------------------------ #
     # Repository API —— 把"挂载点"形式化到 DB 里(media.repo_id + 相对路径)
     # ------------------------------------------------------------------ #
 
-    @classmethod
-    def get_repositories(cls) -> Dict[str, str]:
+    def get_repositories(self) -> Dict[str, str]:
         """{repo_id: 本机绝对路径}。"""
-        return dict(cls._REPOSITORIES)
+        return dict(self._REPOSITORIES)
 
-    @classmethod
-    def default_repo_id(cls) -> str:
-        return cls._DEFAULT_REPO_ID
+    def default_repo_id(self) -> str:
+        return self._DEFAULT_REPO_ID
 
-    @classmethod
-    def resolve_to_absolute(cls, repo_id: str, relative_path: str) -> Optional[str]:
+    def resolve_to_absolute(self, repo_id: str, relative_path: str) -> Optional[str]:
         """(repo_id, relative_path) → 本机绝对路径。未知 repo 返回 None。
 
         relative_path 在 DB 里永远以 forward-slash 存储;这里转成 os.sep 再 join。
@@ -368,7 +390,7 @@ class AppConfig:
         """
         if not repo_id:
             return None
-        mount = cls._REPOSITORIES.get(repo_id)
+        mount = self._REPOSITORIES.get(repo_id)
         if mount is None:
             return None
         if not relative_path:
@@ -376,8 +398,7 @@ class AppConfig:
         rel = relative_path.lstrip("/").replace("/", os.sep)
         return os.path.join(mount, rel)
 
-    @classmethod
-    def register_relative(cls, absolute_path: str) -> Tuple[str, str]:
+    def register_relative(self, absolute_path: str) -> Tuple[str, str]:
         """inverse of resolve_to_absolute。按 mount path 长度 DESC 匹配,处理嵌套 mount。
 
         命中 → 返回 (repo_id, forward-slash 相对路径)。
@@ -388,7 +409,7 @@ class AppConfig:
         norm = absolute_path.replace("\\", "/")
         norm_lc = norm.lower()
         candidates = sorted(
-            cls._REPOSITORIES.items(),
+            self._REPOSITORIES.items(),
             key=lambda kv: len(kv[1]),
             reverse=True,
         )
@@ -402,29 +423,52 @@ class AppConfig:
                 return rid, rel
         raise ValueError(f"Path not under any registered repo: {absolute_path}")
 
-    @classmethod
-    def url_for(cls, repo_id: str, relative_path: str) -> str:
+    def url_for(self, repo_id: str, relative_path: str) -> str:
         """(repo_id, relative_path) → "/{repo_id}/relative/path" 的 HTTP URL。
 
         URL 段直接用 repo_id —— 跟 get_static_mounts() 一致。
         未知 repo 返回空串,由调用方决定兜底。
         """
-        if not repo_id or repo_id not in cls._REPOSITORIES:
+        if not repo_id or repo_id not in self._REPOSITORIES:
             return ""
         rel = (relative_path or "").lstrip("/")
         if not rel:
             return f"/{repo_id}"
         return f"/{repo_id}/{rel}"
 
-    @classmethod
-    def get_db_path(cls) -> str:
-        return os.path.join(cls.DATA_ROOT, "db.sqlite3")
+    def get_db_path(self) -> str:
+        return os.path.join(self.DATA_ROOT, "db.sqlite3")
 
 
 # 创建全局配置实例;模块加载时即把 repositories.json 读进类属性。
 # 例外:alembic 的 env.py 会先 set ALEMBIC_SKIP_REPO_LOAD=1 再 import,
 # 这样新机器从零跑 `alembic upgrade head` 时 seed migration 才能把 JSON 种出来。
 # 真正的 API 进程不会带这个标志,启动后仍 fail-fast。
-if os.getenv("ALEMBIC_SKIP_REPO_LOAD") != "1":
-    AppConfig._REPOSITORIES, AppConfig._DEFAULT_REPO_ID = _load_repositories(AppConfig.DATA_ROOT)
-config = AppConfig()
+_default_config = AppConfig()
+_active_config: ContextVar[AppConfig] = ContextVar("active_app_config", default=_default_config)
+
+
+class ConfigProxy:
+    """Compatibility facade that resolves configuration per execution context."""
+
+    def __getattr__(self, name):
+        return getattr(_active_config.get(), name)
+
+    def __setattr__(self, name, value):
+        setattr(_active_config.get(), name, value)
+
+
+config = ConfigProxy()
+
+
+def get_settings() -> AppConfig:
+    return _active_config.get()
+
+
+@contextmanager
+def use_settings(settings: AppConfig):
+    token = _active_config.set(settings)
+    try:
+        yield settings
+    finally:
+        _active_config.reset(token)

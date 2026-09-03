@@ -2,7 +2,7 @@ from datetime import datetime
 
 from app.models import Media
 from app.models.repository_catalog import RepositoryFile, RepositoryFolder
-from app.routers.media import get_media, get_media_timeline
+from app.modules.media.router import get_media, get_media_timeline
 
 
 def add_media(

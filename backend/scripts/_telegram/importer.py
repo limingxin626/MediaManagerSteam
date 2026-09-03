@@ -31,7 +31,7 @@ from telethon.tl.types import (
 )
 
 from app.models import RemoteMediaReference, Tag
-from app.services.message_service import create_message_with_files
+from app.modules.message.service import create_message_with_files
 
 from . import download, state
 
@@ -181,7 +181,6 @@ def _import_album(db: Session, group: list[Message], stats: CycleStats) -> bool:
             files=files,
             tag_ids=[_get_telegram_tag_id(db)],
             created_at=group[0].date,
-            commit=True,
         )
         _create_remote_refs(db, remote_refs, msg_row)
         stats.imported += 1
@@ -222,7 +221,6 @@ def _import_standalone(db: Session, msg: Message, stats: CycleStats) -> None:
         files=files,
         tag_ids=[_get_telegram_tag_id(db)],
         created_at=msg.date,
-        commit=True,
     )
     _create_remote_refs(db, remote_refs, msg_row)
     stats.imported += 1
