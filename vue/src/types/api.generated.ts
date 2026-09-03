@@ -1335,7 +1335,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Folder
+         * @description 设置/清空 folder 的元数据(当前仅 released_at 发行日期)。
+         */
+        patch: operations["update_folder_folders__folder_id__patch"];
         trace?: never;
     };
     "/folders/{folder_id}/files": {
@@ -1717,7 +1721,7 @@ export interface components {
             /** Items */
             items: components["schemas"]["FolderResponse"][];
             /** Next Cursor */
-            next_cursor?: number | null;
+            next_cursor?: string | null;
             /** Has More */
             has_more: boolean;
         };
@@ -1744,6 +1748,11 @@ export interface components {
              * @default false
              */
             starred: boolean;
+            /**
+             * Kind
+             * @default unknown
+             */
+            kind: string;
             /** Location Count */
             location_count: number;
             /** Media Count */
@@ -1764,11 +1773,8 @@ export interface components {
             preview_files: components["schemas"]["RepositoryFileResponse"][];
             fanart_file?: components["schemas"]["RepositoryFileResponse"] | null;
             poster_file?: components["schemas"]["RepositoryFileResponse"] | null;
-            /**
-             * Kind
-             * @default unknown
-             */
-            kind: string;
+            /** Released At */
+            released_at?: string | null;
             artwork?: components["schemas"]["FolderArtwork"];
             /** Entries */
             entries?: components["schemas"]["FolderMediaEntry"][];
@@ -1921,6 +1927,11 @@ export interface components {
              * @default false
              */
             starred: boolean;
+            /**
+             * Kind
+             * @default unknown
+             */
+            kind: string;
             /** Location Count */
             location_count: number;
             /** Media Count */
@@ -1941,6 +1952,8 @@ export interface components {
             preview_files: components["schemas"]["RepositoryFileResponse"][];
             fanart_file?: components["schemas"]["RepositoryFileResponse"] | null;
             poster_file?: components["schemas"]["RepositoryFileResponse"] | null;
+            /** Released At */
+            released_at?: string | null;
         };
         /** FolderTagCount */
         FolderTagCount: {
@@ -1964,6 +1977,14 @@ export interface components {
             name: string;
             /** Category */
             category?: string | null;
+        };
+        /**
+         * FolderUpdateRequest
+         * @description 可更新字段;仅传入的字段生效(空串/显式 null 表示清空 released_at)。
+         */
+        FolderUpdateRequest: {
+            /** Released At */
+            released_at?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5968,10 +5989,12 @@ export interface operations {
     list_folders_folders_get: {
         parameters: {
             query?: {
-                cursor?: number | null;
+                cursor?: string | null;
                 limit?: number;
                 starred?: boolean | null;
                 tag_id?: number | null;
+                kind?: string | null;
+                sort?: string | null;
             };
             header?: never;
             path?: never;
@@ -6029,6 +6052,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_folder_folders__folder_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folder_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderUpdateRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

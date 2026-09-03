@@ -1,6 +1,7 @@
-from typing import List, Optional 
+from typing import List, Optional
+from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.modules.repository.schemas import RepositoryFileResponse
 from app.shared.schemas import MediaUrlMixin, TimestampMixin
@@ -79,6 +80,15 @@ class FolderResponse(TimestampMixin):
     preview_files: List[RepositoryFileResponse] = []
     fanart_file: Optional[RepositoryFileResponse] = None
     poster_file: Optional[RepositoryFileResponse] = None
+    # 作品发行日期(ISO);无则 None,区别于 created_at(入库时间)
+    released_at: Optional[str] = None
+
+    @field_validator("released_at", mode="before")
+    @classmethod
+    def convert_released_at_to_str(cls, value):
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return value
 
 
 class FolderDetailResponse(FolderResponse):
@@ -94,7 +104,12 @@ class FolderDetailResponse(FolderResponse):
     previews: List[FolderPreviewItem] = Field(default_factory=list)
 
 
+class FolderUpdateRequest(BaseModel):
+    """可更新字段;仅传入的字段生效(空串/显式 null 表示清空 released_at)。"""
+    released_at: Optional[str] = None
+
+
 class FolderCursorResponse(BaseModel):
     items: List[FolderResponse]
-    next_cursor: Optional[int] = None
+    next_cursor: Optional[str] = None
     has_more: bool

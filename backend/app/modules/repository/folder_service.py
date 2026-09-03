@@ -16,6 +16,17 @@ def _primary_location(folder: Folder) -> FolderLocation | None:
     return next((location for location in folder.locations if location.role == "PRIMARY"), None)
 
 
+def repository_folder_has_nfo(physical: RepositoryFolder) -> bool:
+    """该物理目录里是否含 .nfo(影片元数据证据;.nfo 不进 catalog,须读物理目录)。"""
+    directory = config.resolve_to_absolute(physical.repo_id, physical.rel_path)
+    if directory is None or not os.path.isdir(directory):
+        return False
+    try:
+        return any(name.lower().endswith(".nfo") for name in os.listdir(directory))
+    except OSError:
+        return False
+
+
 def classify_logical_folder(db: Session, folder: Folder) -> FolderClassification:
     """Run the classifier over a logical folder's catalogued files and return the result.
 
@@ -29,7 +40,7 @@ def classify_logical_folder(db: Session, folder: Folder) -> FolderClassification
     if physical_ids:
         files = db.query(RepositoryFile).filter(RepositoryFile.folder_id.in_(physical_ids)).all()
     primary_folder_id = physical.id if physical is not None else None
-    return classify_folder(name, files, primary_folder_id)
+    return classify_folder(name, files, primary_folder_id, has_nfo=repository_folder_has_nfo(physical) if physical is not None else False)
 
 
 def refresh_folder_kind(db: Session, folder: Folder) -> str:
@@ -76,7 +87,10 @@ def refresh_repository_folder_kinds(db: Session, repo_id: str) -> int:
         files: list[RepositoryFile] = []
         for physical, _role in members:
             files.extend(files_by_physical.get(physical.id, ()))
-        classification = classify_folder(primary.name, files, primary.id)
+        classification = classify_folder(
+            primary.name, files, primary.id,
+            has_nfo=repository_folder_has_nfo(primary),
+        )
         folder.kind = classification.kind
         refreshed += 1
     return refreshed

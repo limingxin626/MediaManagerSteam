@@ -432,6 +432,68 @@ def test_folder_list_batches_file_summary_queries(catalog_env):
         assert len(statements) <= 8
 
 
+def test_folder_list_sorts_by_release_date_with_cursor(catalog_env):
+    from datetime import datetime
+
+    repo, session_factory = catalog_env
+    for folder_name in ("alpha", "beta", "gamma"):
+        directory = repo / folder_name
+        directory.mkdir()
+        (directory / "fanart.jpg").write_bytes(folder_name.encode())
+
+    with session_factory() as db:
+        for index, folder_name in enumerate(("alpha", "beta", "gamma")):
+            db.add(Media(
+                repo_id="test",
+                file_path=f"{folder_name}/fanart.jpg",
+                file_hash=f"released-cover-{index}",
+                file_size=len(folder_name),
+            ))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        # 逻辑 Folder 无 name 列;经 FolderLocation -> RepositoryFolder 取物理目录名
+        link = {
+            logical_id: physical_name
+            for logical_id, physical_name in db.query(
+                FolderLocation.folder_id, RepositoryFolder.name
+            ).join(RepositoryFolder, RepositoryFolder.id == FolderLocation.repository_folder_id)
+        }
+        by_name = {link[folder.id]: folder for folder in db.query(Folder)}
+        by_name["alpha"].released_at = datetime(2020, 1, 1)
+        # beta 无发行日期 -> 兜底到其(手动调早的)created_at
+        by_name["beta"].released_at = None
+        by_name["beta"].created_at = datetime(2019, 6, 1)
+        by_name["gamma"].released_at = datetime(2022, 5, 5)
+        db.commit()
+
+        # 默认(入库)序:id 倒序 => gamma,beta,alpha
+        added = list_folders(db, limit=20)
+        assert [item.name for item in added.items] == ["gamma", "beta", "alpha"]
+
+        # released 序:gamma(2022) > alpha(2020) > beta(2019 fallback)
+        released = list_folders(db, limit=20, sort="released")
+        assert [item.name for item in released.items] == ["gamma", "alpha", "beta"]
+
+        # 发行日期已透出;beta 无 release 时返回 None
+        by_name_iso = {item.name: item for item in released.items}
+        assert by_name_iso["gamma"].released_at == datetime(2022, 5, 5).isoformat()
+        assert by_name_iso["alpha"].released_at == datetime(2020, 1, 1).isoformat()
+        assert by_name_iso["beta"].released_at is None
+
+        # 复合游标分页:每页 1 条依序翻页,无重复/遗漏
+        page1 = list_folders(db, limit=1, sort="released")
+        assert [item.name for item in page1.items] == ["gamma"]
+        assert page1.next_cursor == f"{datetime(2022, 5, 5).isoformat()}|{by_name['gamma'].id}"
+        page2 = list_folders(db, cursor=page1.next_cursor, limit=1, sort="released")
+        assert [item.name for item in page2.items] == ["alpha"]
+        page3 = list_folders(db, cursor=page2.next_cursor, limit=1, sort="released")
+        assert [item.name for item in page3.items] == ["beta"]
+        assert page3.next_cursor is None
+
+
 def test_removed_file_removes_logical_folder_but_preserves_media(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"

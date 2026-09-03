@@ -15,12 +15,32 @@ def test_single_video_is_movie_and_primary():
         media_file(1, "Interstellar.mp4", "VIDEO"),
         media_file(2, "poster.jpg", "IMAGE"),
         media_file(3, "fanart.jpg", "IMAGE"),
-    ], 1)
+    ], 1, has_nfo=True)
 
     assert result.kind == "movie"
     assert result.primary_entry_id == result.entries[0].id
     assert [row.name for row in result.entries[0].files] == ["Interstellar.mp4"]
     assert result.detection.confidence == 0.98
+
+
+def test_single_video_without_nfo_is_video_not_movie():
+    # 目录只有一条视频、无 .nfo、目录名也不是 AV 编号 → 短视频/单条视频,非影片。
+    result = classify_folder("饱满俪丁", [
+        media_file(1, "1-饱满俪丁-1080P 高清-AVC.mp4", "VIDEO"),
+    ], 1)
+
+    assert result.kind == "video"
+    assert result.primary_entry_id == result.entries[0].id
+    assert result.detection.ambiguous is True
+
+
+def test_single_video_with_av_code_name_is_movie_without_nfo():
+    # 目录名是 AV 商品编号(如 SNIS-752)即使没有 .nfo 也算影片。
+    result = classify_folder("SNIS-752", [
+        media_file(1, "SNIS-752.mp4", "VIDEO"),
+    ], 1)
+
+    assert result.kind == "movie"
 
 
 def test_numbered_folder_name_files_are_separate_parts():
@@ -129,7 +149,7 @@ def test_prefixed_and_numbered_fanart_excluded_from_gallery():
         media_file(2, "Movie-fanart.jpg", "IMAGE"),
         media_file(3, "Movie-fanart1.jpg", "IMAGE"),
         media_file(4, "Movie-poster.jpg", "IMAGE"),
-    ], 1)
+    ], 1, has_nfo=True)
 
     assert result.kind == "movie"
     assert [row.name for row in result.entries[0].files] == ["Movie.mp4"]

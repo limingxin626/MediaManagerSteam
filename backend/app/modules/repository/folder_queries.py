@@ -12,6 +12,7 @@ from app.modules.repository.folder_classifier import (
     artwork_kind,
     classify_folder,
 )
+from app.modules.repository.folder_service import repository_folder_has_nfo
 from app.modules.repository.folder_schemas import (
     FolderArtwork,
     FolderCursorResponse,
@@ -166,6 +167,7 @@ def _folder_response(
         poster_file=_file_response(poster) if poster is not None else None,
         created_at=cast(datetime, folder.created_at).isoformat(),
         updated_at=cast(datetime, folder.updated_at).isoformat(),
+        released_at=folder.released_at.isoformat() if folder.released_at is not None else None,
     )
 
 
@@ -308,36 +310,86 @@ def _folder_previews(
     return result
 
 
+def _folder_next_cursor(folder: Folder, sort: str | None) -> str:
+    """Opaque cursor: 默认(入库/id 序)= ``str(id)``;released 序 = ``"ISO时间|id"``。"""
+    if sort == "released":
+        order_time = folder.released_at or folder.created_at
+        return f"{cast(datetime, order_time).isoformat()}|{folder.id}"
+    return str(cast(int, folder.id))
+
+
+def set_folder_released_at(
+    db: Session,
+    folder_id: int,
+    released_at: datetime | None,
+) -> Folder:
+    """设置/清空 folder 的发行日期(released_at)。folder 不存在抛 LookupError。"""
+    folder = db.get(Folder, folder_id)
+    if folder is None:
+        raise LookupError("Folder not found")
+    folder.released_at = released_at
+    db.commit()
+    return folder
+
+
 def list_folders(
     db: Session,
     *,
-    cursor: int | None = None,
+    cursor: str | None = None,
     limit: int = 20,
     starred: bool | None = None,
     tag_id: int | None = None,
     kind: str | None = None,
+    sort: str | None = None,
 ):
+    """Logical folder 列表。
+
+    - 默认(``sort`` 为空或 ``"added"``):按入库/id 倒序(最新入库在前),cursor = ``str(id)``。
+    - ``sort="released"``:按 ``coalesce(released_at, created_at)`` 倒序,空发行日期兜底到入库时间
+      (混合混排,永不缺位);cursor = ``"ISO|id"`` 复合游标,与 media 页一致。
+    """
     query = db.query(Folder).options(
         joinedload(Folder.collection),
         joinedload(Folder.issue),
         selectinload(Folder.locations).joinedload(FolderLocation.repository_folder),
         selectinload(Folder.tags),
     )
-    if cursor is not None:
-        query = query.filter(Folder.id < cursor)
     if starred is not None:
         query = query.filter(Folder.starred == (1 if starred else 0))
     if tag_id is not None:
         query = query.filter(Folder.tags.any(Tag.id == tag_id))
     if kind:
         query = query.filter(Folder.kind == kind)
-    rows = query.order_by(Folder.id.desc()).limit(limit + 1).all()
+
+    if sort == "released":
+        release_time = func.coalesce(Folder.released_at, Folder.created_at)
+        if cursor:
+            try:
+                raw_time, raw_id = cursor.rsplit("|", 1)
+                cursor_time = datetime.fromisoformat(raw_time)
+                cursor_id = int(raw_id)
+            except (ValueError, IndexError) as exc:
+                raise ValueError("Invalid cursor format") from exc
+            query = query.filter(
+                (release_time < cursor_time)
+                | ((release_time == cursor_time) & (Folder.id < cursor_id))
+            )
+        rows = query.order_by(release_time.desc(), Folder.id.desc()).limit(limit + 1).all()
+    else:
+        if cursor:
+            try:
+                cursor_id = int(cursor)
+            except ValueError as exc:
+                raise ValueError("Invalid cursor format") from exc
+            query = query.filter(Folder.id < cursor_id)
+        rows = query.order_by(Folder.id.desc()).limit(limit + 1).all()
+
     has_more = len(rows) > limit
     rows = rows[:limit]
     counts, previews, covers = _load_folder_file_summaries(db, rows)
     return FolderCursorResponse(
         items=[_folder_response(folder, counts, previews, covers) for folder in rows],
-        next_cursor=cast(int, rows[-1].id) if has_more and rows else None,
+        next_cursor=_folder_next_cursor(rows[-1], sort) if has_more and rows else None,
         has_more=has_more,
     )
 
@@ -393,6 +445,11 @@ def get_folder(folder_id: int, db: Session):
         base.name,
         files,
         primary.repository_folder_id if primary is not None else None,
+        has_nfo=(
+            repository_folder_has_nfo(primary.repository_folder)
+            if primary is not None and primary.repository_folder is not None
+            else False
+        ),
     )
     # Persist the freshly computed category so list filters (/folders?kind=) stay accurate.
     if folder.kind != classification.kind:

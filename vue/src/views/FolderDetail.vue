@@ -239,7 +239,7 @@ const mediaGroups = computed(() => [
   { title: folder.value?.kind === 'gallery' ? '图集' : '图片', files: mediaFiles.value.filter(file => file.media_type === 'IMAGE') },
 ].filter(group => group.files.length))
 const folderKindLabel = computed(() => ({
-  movie: '电影', multi_part: '多部内容', series: '剧集', gallery: '图集', mixed: '混合媒体', unknown: '未分类',
+  movie: '电影', multi_part: '多部内容', series: '剧集', gallery: '图集', video: '单视频', mixed: '混合媒体', unknown: '未分类',
 }[folder.value?.kind ?? 'unknown']))
 const fanartUrl = computed(() => {
   if (!fanartFile.value) return ''

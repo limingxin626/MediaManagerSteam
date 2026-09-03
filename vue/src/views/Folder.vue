@@ -104,7 +104,16 @@
               :class="selectedKind === option.value ? activeFilterClass : inactiveFilterClass"
               @click="selectKind(option.value)"
             >{{ option.label }}</button>
+          <div class="ml-auto flex shrink-0 items-center gap-1 rounded-full bg-[var(--bg-secondary)] p-0.5">
+            <button
+              v-for="option in sortOptions"
+              :key="option.value"
+              class="rounded-full px-2.5 py-1 text-xs transition-colors"
+              :class="sortMode === option.value ? activeFilterClass : inactiveFilterClass"
+              @click="selectSort(option.value)"
+            >{{ option.label }}</button>
           </div>
+        </div>
           <div v-if="loading && !folders.length" class="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             <div v-for="index in 8" :key="index" class="animate-pulse overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
               <div class="bg-[var(--bg-secondary)]" :class="gridPreviewSizeClass"></div>
@@ -149,8 +158,9 @@
                   <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3.5 6.5h6l2 2h9v10h-17z" /></svg>
                 </div>
               </div>
-              <div class="h-10 shrink-0 px-3 py-2.5">
-                <h2 class="truncate text-sm font-semibold leading-5">{{ folder.name }}</h2>
+              <div class="flex h-10 shrink-0 items-center gap-2 px-3 py-2.5">
+                <h2 class="min-w-0 truncate text-sm font-semibold leading-5">{{ folder.name }}</h2>
+                <span v-if="sortMode === 'released' && formatSortDate(folder)" class="ml-auto shrink-0 text-[11px] tabular-nums text-[var(--text-muted)]">{{ formatSortDate(folder) }}</span>
               </div>
             </article>
           </div>
@@ -219,7 +229,7 @@ defineOptions({ name: 'Folder' })
 
 interface FolderCursorResponse {
   items: Folder[]
-  next_cursor: number | null
+  next_cursor: string | null
   has_more: boolean
 }
 
@@ -246,10 +256,22 @@ const kindOptions: { value: FolderKind; label: string }[] = [
   { value: 'series', label: '剧集' },
   { value: 'multi_part', label: '多部' },
   { value: 'gallery', label: '图集' },
+  { value: 'video', label: '单视频' },
   { value: 'mixed', label: '混合' },
   { value: 'unknown', label: '未分类' },
 ]
-const nextCursor = ref<number | null>(null)
+// 目录排序:added=入库序(后端 id 倒序);released=按发行日期(coalesce released_at/created_at)
+const sortMode = ref<'added' | 'released'>('added')
+const sortOptions: { value: 'added' | 'released'; label: string }[] = [
+  { value: 'added', label: '新增' },
+  { value: 'released', label: '发行' },
+]
+// 发行模式下每张卡片标注的日期:有 released_at 用之,否则退回入库时间
+function formatSortDate(folder: Folder) {
+  const date = (folder.released_at || folder.created_at || '').slice(0, 10)
+  return date || ''
+}
+const nextCursor = ref<string | null>(null)
 const hasMore = ref(false)
 const loading = ref(false)
 const error = ref('')
@@ -333,6 +355,7 @@ async function loadFolders(reset = false) {
       limit: 40,
       tag_id: selectedTagId.value,
       kind: selectedKind.value || undefined,
+      sort: sortMode.value === 'released' ? 'released' : undefined,
     })
     folders.value = reset ? data.items : [...folders.value, ...data.items]
     nextCursor.value = data.next_cursor
@@ -362,6 +385,13 @@ async function selectTag(tagId: number | null) {
 async function selectKind(kind: '' | FolderKind) {
   if (selectedKind.value === kind) return
   selectedKind.value = kind
+  scrollContainer.value?.scrollTo({ top: 0 })
+  await loadFolders(true)
+}
+
+async function selectSort(sort: 'added' | 'released') {
+  if (sortMode.value === sort) return
+  sortMode.value = sort
   scrollContainer.value?.scrollTo({ top: 0 })
   await loadFolders(true)
 }

@@ -202,6 +202,7 @@ export interface Folder {
   poster_file: RepositoryFile | null
   created_at: string
   updated_at: string
+  released_at: string | null
 }
 
 export interface FolderDetail extends Folder {
@@ -217,7 +218,7 @@ export interface FolderDetail extends Folder {
   previews: FolderPreview[]
 }
 
-export type FolderKind = 'movie' | 'multi_part' | 'series' | 'gallery' | 'mixed' | 'unknown'
+export type FolderKind = 'movie' | 'multi_part' | 'series' | 'gallery' | 'video' | 'mixed' | 'unknown'
 
 export interface FolderDetectionInfo {
   source: 'filename' | 'nfo' | 'manual' | string

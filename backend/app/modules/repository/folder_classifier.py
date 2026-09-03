@@ -97,6 +97,20 @@ def _normalized(value: str) -> str:
     return "".join(character for character in value if character.isalnum())
 
 
+# 判定「单视频目录是否为影片」的元数据证据用。AV 商品编号风格目录名,如 SNIS-752 / ABF-055。
+AV_CODE_RE = re.compile(r"(?i)^[a-z]{2,8}\d{1,6}[a-z]?$")
+
+
+def is_movie_metadata_evidence(folder_name: str, has_nfo: bool) -> bool:
+    """单视频目录要判为 ``movie`` 需有影片证据:目录内有 ``.nfo``,或目录名是 AV 商品编号。
+
+    擦边/短视频库那种"目录里只有一条视频、无 .nfo"不应算影片,归 ``video``。
+    """
+    if has_nfo:
+        return True
+    return bool(AV_CODE_RE.fullmatch(_normalized(folder_name)))
+
+
 def _tokens(value: str) -> set[str]:
     compact = _normalized(value)
     tokens = {_normalized(token) for token in re.split(r"[^\w]+", value) if token}
@@ -139,6 +153,7 @@ def classify_folder(
     folder_name: str,
     files: Iterable[RepositoryFile],
     primary_folder_id: int | None = None,
+    has_nfo: bool = False,
 ) -> FolderClassification:
     rows = _deduplicate(files, primary_folder_id)
     artwork_or_preview: list[RepositoryFile] = []
@@ -265,12 +280,18 @@ def classify_folder(
             confidence=0.98 if exact_name else 0.9,
             reason="video name matches folder" if exact_name else "only non-extra video in folder",
         )
+        kind = "movie" if is_movie_metadata_evidence(folder_name, has_nfo) else "video"
+        if kind == "video":
+            detection = Detection(
+                source="filename", confidence=0.85, reason="single video without nfo metadata",
+                ambiguous=True,
+            )
         entry = ClassifiedEntry(
             id=_entry_id("feature", [row]), kind="feature", title=_stem(row.name), files=[row],
             detection=detection,
         )
         return FolderClassification(
-            kind="movie", entries=[entry], gallery=images, extras=extras,
+            kind=kind, entries=[entry], gallery=images, extras=extras,
             primary_entry_id=entry.id, detection=detection,
         )
 

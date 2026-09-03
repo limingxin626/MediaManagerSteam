@@ -27,6 +27,8 @@ class Folder(Base):
     issue_id = Column(Integer, ForeignKey("issue.id", ondelete="SET NULL"), nullable=True, index=True)
     starred = Column(Integer, default=0, nullable=False)
     kind = Column(String(32), nullable=False, default="unknown", server_default="unknown", index=True)
+    # 作品/影片的发行(发售)日期;区别于 created_at(入库时间)。可空:未抓取 NFO/JADB 前留空。
+    released_at = Column(DateTime, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
