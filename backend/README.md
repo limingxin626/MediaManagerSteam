@@ -1,6 +1,6 @@
 # MediaManager Backend
 
-基于 FastAPI + SQLite 的个人媒体管理系统后端，以时间流（feed）方式管理图片和视频。
+基于 FastAPI + SQLite 的个人媒体管理系统后端，以时间流（feed）方式管理图片和视频。**唯一真值源**：Web（Vue/PWA）、桌面端（Electron 包装 Vue，Windows + Mac）与 Android 在线调用/双向同步，Mac（MyNote）为已放弃的旧端。
 
 ## 技术栈
 
@@ -9,181 +9,176 @@
 - SQLAlchemy 2.x + SQLite
 - Pillow（图片处理）
 - FFmpeg / FFprobe（视频处理）
+- onnxruntime（CLIP 本地推理，可选）
 
 ## 项目结构
 
 ```text
 backend/
-├── api.py                  # 启动入口
+├── api.py                  # 启动入口（uvicorn 0.0.0.0:8002）
 ├── app/
 │   ├── __init__.py         # FastAPI 应用初始化、CORS、静态文件挂载
-│   ├── config.py           # 配置（数据目录、FFmpeg 路径、媒体类型）
-│   ├── runtime.py         # 后台服务统一生命周期
-│   ├── models/
-│   │   └── __init__.py     # SQLAlchemy ORM 模型
+│   ├── config.py           # 配置（DATA_ROOT、FFmpeg 路径、媒体类型）
+│   ├── runtime.py          # 后台服务统一生命周期
+│   ├── models/             # SQLAlchemy ORM 模型
 │   ├── shared/             # database、schema 基类与事务边界
 │   ├── modules/            # 纵向领域包（router/schema/service/query）
-│   │   ├── message/
-│   │   │   ├── router.py
-│   │   │   ├── schemas.py
-│   │   │   ├── queries.py
-│   │   │   └── service.py
-│   │   ├── media/
-│   │   │   ├── router.py
-│   │   │   ├── schemas.py
-│   │       ├── queries.py
-│   │       └── service.py
-│   │   ├── sync/
-│   │   ├── collection/、person/、tag/
-│   │   ├── repository/   # catalog、watcher、materializer 与 folder 逻辑
-│   │   ├── smart/        # CLIP 与智能标签
-│   │   ├── transaction/  # 账单解析与交易逻辑
-│   │   ├── issue/、todo/
-│   │   └── system/        # health、admin 与 dashboard
-│   └── utils/
-│       └── __init__.py     # 文件 hash、缩略图、媒体信息工具函数
-└── db_new.sqlite3          # SQLite 数据库
+│   │   ├── message/  media/  sync/  collection/  person/  tag/
+│   │   ├── repository/     # catalog、watcher、materializer 与 folder 逻辑
+│   │   ├── smart/          # CLIP 与智能标签
+│   │   ├── transaction/    # 账单解析与交易逻辑
+│   │   ├── issue/  todo/
+│   │   └── system/         # health、admin 与 dashboard
+│   └── utils/              # 文件 hash、缩略图、媒体信息工具函数
+├── scripts/                # 运维脚本（初始化、账单分类、数据修复…）
+├── alembic/                # 数据库迁移
+├── tests/
+├── .env.example            # 配置模板（复制为 .env）
+└── pyproject.toml
 ```
 
-## 数据模型
+## 配置
 
-```text
-Message ──── Collection
-    │
-    ├──── MessageMedia ──── Media
-    │
-    └──── Tag（多对多，通过 message_tag）
-```
-
-- **Message** — feed 核心单元，每条消息对应一个时间点
-- **Collection** — 消息合集
-- **Media** — 图片/视频资源，基于 `file_hash` 全局去重
-- **MessageMedia** — 关联表，记录媒体在消息中的 `position` 和 `created_at`
-- **Tag** — 可显式关联到消息或媒体的标签
-
-## 快速启动
+- `DATA_ROOT` **必填**：数据目录，含 SQLite 库、uploads、thumbs、CLIP 模型
+- 配置来源优先级：真实环境变量 / `python api.py --data-root <path>` > `backend/.env`（`load_dotenv(override=False)`）
+- 所有走 `from app.*` 的入口（api.py / alembic / scripts/*）自动跟随同一份 `.env`
+- 一个 instance == 一个 `DATA_ROOT`，各自独立；日常切 instance 只改 `backend/.env` 的 `DATA_ROOT` 一行
 
 ```bash
 cd backend
+cp .env.example .env   # 改 DATA_ROOT
 pip install -e .
 python api.py
 ```
 
 访问 `http://localhost:8002/docs` 查看 Swagger 文档。
 
-应用通过 `app.create_app()` 创建。集成测试可传入临时 session factory，并用
-`start_background_services=False, validate_runtime=False` 隔离真实数据库、静态目录和 watcher。
-路由只负责 HTTP 参数与异常映射；完整写用例在领域 service 中统一提交或回滚。
+## 数据模型
 
-create_app(settings=...) 接受独立的 AppConfig 实例；请求、后台扫描器和媒体处理会绑定到该实例，
-因此同一进程内的测试应用不会共享 repository 或 DATA_ROOT 状态。
+```text
+Collection(原 Actor) ── (1:N) ── Message
+Message ──┬── MessageMedia (position 排序) ── Media (file_hash 去重)
+          ├── message_tag ── Tag
+          └── MessageFolder (folder-backed 消息与磁盘目录绑定)
+Media ── media_tag ── Tag
+Media ── media_person ── Person
+Media ── media_embedding（CLIP 向量缓存）
+SyncLog / RepositoryFolder / RepositoryFile / Todo / Issue / Transaction / TxnCategoryRule / TelegramSyncState / RemoteMediaReference
+```
 
-### 文件 API 路径边界
-
-通用 /files/* 接口不再接受服务器绝对路径。调用方必须传 root_id（data 或
-repositories.json 中的 repository id）和根目录内的 POSIX 相对 path。后端拒绝绝对路径、
-..、符号链接逃逸、根目录删除及跨 root 移动。/files/upload-media 仍返回可直接提交给
-POST /messages 的上传路径，以兼容现有两步上传流程。
+- **Message** — feed 核心单元；tags 通过 `tag_ids` 显式设置，**无 `#hashtag` 自动解析**
+- **Media** — 图片/视频，基于 `file_hash`（Blake2b）全局去重；>100MB 用文件大小
+- **MessageMedia** — 关联表，记录 `position` 和 `created_at`（媒体流排序依据）
+- **Collection** — 原 Actor 重命名而来，`message.collection_id` 外键
+- **文件夹消息** — 非空、非根的 repository folder 自动拥有 folder-backed Message（`repository_catalog` + `folder_message_service`），上传走 `POST /messages/{id}/files` 原子写入 PRIMARY folder，再由 scan → materializer → reconcile 自动出现；folder-backed 消息禁止直接增删/排序 media
 
 ## API 概览
 
-## 智能查询（CLIP 本地推理）
-
-`/smart/*` 路由提供基于 CLIP ViT-B/32 的自动打 tag、相似媒体搜索、文本→图片搜索功能，**完全本地推理**（onnxruntime CPU）。
-
-### 模型文件放置
-
-把以下三个文件放到 `{DATA_ROOT}/models/clip/`：
-
-```text
-{DATA_ROOT}/models/clip/
-├── visual.onnx     # 图像编码器：输入 1x3x224x224 float32，输出 1x512
-├── textual.onnx    # 文本编码器：输入 1x77 int64，输出 1x512
-└── tokenizer.json  # HuggingFace tokenizers 格式的 CLIP BPE
-```
-
-推荐从 HuggingFace 导出 OpenAI CLIP ViT-B/32（`openai/clip-vit-base-patch32`）转 onnx。文件缺失时所有 `/smart/*` 端点返回 503。
-
-### 接口
+### 消息（核心 feed）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/smart/status` | 模型可用性 |
-| POST | `/smart/tags/suggest` | 给单个媒体推荐 Top-K tag（按 cosine 排序） |
-| POST | `/smart/tags/apply` | 把指定 tag 追加到媒体 |
-| GET | `/smart/similar/{media_id}` | 相似媒体列表（图→图） |
-| GET | `/smart/search?q=...` | 文本→媒体语义搜索 |
-| POST | `/smart/embeddings/rebuild` | 批量预计算（不传 ids 则只补缺失） |
-
-Embedding 缓存到 `media_embedding` 表（float16 BLOB，每条约 1KB）。
-
-## 消息（核心 feed）
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/messages` | 分页列表（游标翻页） |
-| GET | `/messages/with-detail` | 带媒体详情的列表，支持 `actor_id` / `query_text` / `media_id` / `tag_id` 过滤，支持 `direction=forward` 正向分页及 `inclusive` 日历跳转 |
-| GET | `/messages/dates` | 指定月份有消息的日期及数量（供日历组件使用） |
-| GET | `/messages/{id}` | 消息详情 |
-| POST | `/messages` | 创建消息（批量文件处理，自动解析 `#标签`） |
-| PATCH | `/messages/{id}` | 更新消息文字、actor、媒体顺序 |
-| DELETE | `/messages/{id}` | 删除消息 |
+| GET | `/messages/with-detail` | 消息流（含媒体/标签），支持 collection / query / media / tag 过滤、`direction=forward` 正向分页及日历跳转 |
+| GET | `/messages` | 分页列表（游标） |
+| GET | `/messages/dates` | 指定月份有消息的日期及数量（日历组件） |
+| GET | `/messages/search` | 全文搜索 |
+| GET | `/messages/sync` | 消息同步快照（Android） |
+| POST | `/messages` | 创建消息（`tag_ids` 显式打标） |
+| POST | `/messages/merge` / `/{id}/split` | 合并 / 拆分消息 |
+| POST | `/messages/{id}/files` | 上传文件（原子写入 PRIMARY folder，202 异步） |
+| PATCH | `/messages/{id}` | 更新文字、collection、媒体顺序 |
+| DELETE | `/messages/{id}` / `/{id}/media/{media_id}` | 删除消息 / 移除媒体 |
 
 ### 媒体
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/media` | 媒体时间流（基于 `MessageMedia.created_at` 排序） |
-| GET | `/media/{id}` | 媒体详情及关联消息 |
-| PUT | `/media/{id}/rating` | 更新评分（0–10） |
-| PUT | `/media/{id}/view` | 增加浏览次数 |
+| GET | `/media` / `/media/feed` | 媒体时间流（复合游标 `created_at|position`） |
+| GET | `/media/timeline` | 时间线聚合项 |
+| GET | `/media/{id}` | 详情及关联消息 |
+| PUT | `/media/{id}/starred` / `/rating` | 收藏 / 评分 |
+| POST | `/media/{id}/rotate` / `/replace` | 旋转 / 替换文件 |
+| PUT | `/media/{id}/tags` / `/people` | 设置标签 / 人物 |
+| GET/POST | `/media/{id}/previews` | 视频预览片段（章节）列表 / 创建 |
+| POST | `/media/{id}/previews/screenshot` | 从视频抽帧 |
+| POST | `/media/{id}/cover` | 设置封面 |
+| DELETE | `/media/{id}` | 删除媒体 |
 
-### 标签
+### Collection / Person / Tag
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/tags` | 所有标签，附 `message_count`，支持 `name` 模糊搜索 |
+| GET | `/collections` / `/collections/sync` | Collection 列表 / 同步快照 |
+| POST/PUT/DELETE | `/collections` / `/collections/{id}` | Collection CRUD |
+| GET/POST | `/people` | 人物列表 / 创建 |
+| PUT/DELETE | `/people/{id}` | 人物更新 / 删除 |
+| GET/POST | `/tags` | 标签列表（含 message_count）/ 创建 |
+| PATCH/DELETE | `/tags/{id}` | 标签更新 / 删除 |
 
-### Actor
+### 文件仓库
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/actors` | Actor 列表，支持名称搜索 |
-| GET | `/actors/{id}` | Actor 详情及其消息列表 |
+| GET | `/repositories` | 仓库列表 |
+| GET | `/repositories/{id}` / `/browse` | 仓库详情 / 目录浏览 |
+| POST | `/repositories/{id}/scan` | 触发扫描 |
+| GET | `/repositories/duplicate-files` | 重复文件列表（游标） |
+| DELETE | `/repositories/duplicate-files/{media_id}` | 删除重复文件 |
 
 ### 文件系统
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/files/list` | 列举目录内容 |
-| POST | `/files/upload-media` | 上传媒体文件，返回服务器路径（供手机端使用） |
-| POST | `/files/upload` | 上传文件到指定路径（通用） |
+| POST | `/files/upload` / `/upload-media` | 上传文件 / 上传媒体（按日期归档 `{DATA_ROOT}/uploads/YYYY/MM/DD/`） |
 | POST | `/files/move` | 移动文件/目录 |
 | PUT | `/files/rename` | 重命名 |
+| POST | `/files/create` | 创建文件/目录 |
 | DELETE | `/files/delete` | 删除 |
 
-### 手机端上传流程
+通用 `/files/*` 接口**不再接受服务器绝对路径**。调用方必须传 `root_id`（data 或 repositories.json 中的 repository id）和根目录内的 POSIX 相对 path。后端拒绝绝对路径、`..`、符号链接逃逸、根目录删除及跨 root 移动。
 
-```text
-POST /files/upload-media   → { "path": "{DATA_ROOT}/uploads/2026/03/26/20260326_143022.jpg" }
-POST /messages             → { "files": ["<上一步返回的 path>"], "text": "..." }
-```
+### 同步（Android）
 
-文件按日期自动落地到 `{DATA_ROOT}/uploads/YYYY/MM/DD/`，文件名为 `YYYYMMDD_HHMMSS.ext`，同秒冲突时追加 `_1`、`_2` 后缀。上传后经过 hash 去重，若与已有媒体重复则自动复用，不创建新的 Media 记录。
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/sync/changes?since=&since_id=` | 增量拉取（复合游标，超 `SYNC_LOG_RETENTION_DAYS=365` 返回 410） |
+| POST | `/api/sync/apply` | Outbox 批量推送，单事务应用，失败整体回滚 |
 
-## `#标签` 机制
+### 智能查询（CLIP 本地推理）
 
-创建或更新消息时，系统自动从 `text` 中提取 `#xxx` 格式的标签：
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/smart/status` | 模型可用性 |
+| POST | `/smart/tags/suggest` / `/tags/apply` | 给媒体推荐 Top-K tag / 应用 |
+| GET | `/smart/similar/{media_id}` | 图搜图 |
+| GET | `/smart/search?q=` | 文搜图 |
+| POST | `/smart/embeddings/rebuild` | 批量预计算 embedding |
 
-- 自动创建不存在的 Tag 记录
-- 全量替换当前消息的标签关联
-- 支持中文标签（如 `#风景` `#旅行`）
+模型文件放 `{DATA_ROOT}/models/clip/`（`visual.onnx` / `textual.onnx` / `tokenizer.json`，推荐从 OpenAI CLIP ViT-B/32 导出），缺失时 `/smart/*` 返回 503。Embedding 缓存于 `media_embedding` 表（float16 BLOB）。
+
+### 其他
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/transactions` | 账单列表（`/summary/monthly`、`/summary/range`、`/months`、`/categories`） |
+| PATCH | `/transactions/{id}` | 账单打标 |
+| GET/POST | `/todos` + PATCH/DELETE | 待办看板（含 `/todos/{id}/move`） |
+| GET/POST | `/issues` + PATCH/DELETE | 问题看板（含 `/issues/{id}/move`） |
+| GET | `/api/dashboard/stats` / `/heatmap` | 统计 / 日期热力图 |
+| GET | `/admin/stats` / `/sync-logs` | 管理统计 / 同步日志 |
+| GET | `/health` | 健康检查 |
 
 ## 分页方式
 
-所有列表接口统一使用**游标翻页**（cursor-based pagination）：
+统一**游标翻页**，响应 `{ items, next_cursor, has_more }`：
 
-- 游标为上一页最后一条记录的 `created_at`（ISO 格式字符串）
-- 响应包含 `next_cursor` 和 `has_more` 字段
-- `/messages/with-detail` 额外支持：
-  - `direction=forward` + `cursor` — 正向加载更新的消息（ASC 排序），返回 `prev_cursor` / `has_more_before`
+- 消息（简单 ISO 游标）：游标 = 上一条 `created_at` ISO 字符串；`/messages/with-detail` 支持 `direction=forward` + `cursor` 正向加载（返回 `prev_cursor` / `has_more_before`）和日历跳转
+- 媒体（复合游标）：格式 `"{created_at}|{position}"`，两个字段均 DESC，避免同毫秒多条记录丢失
+
+## 脚本（scripts/）
+
+- `init_data_root.py` — 初始化数据目录
+- `bills_*.py` — 月度账单分类流程（切月 / 打印待标 / 应用打标 / 注入 DB），真相之源 `scratch/bills_by_month/*.json`
+- `telegram_sync.py` — Telegram Saved Messages 拉取
+- `backfill_*.py` / `repair_*.py` / `import_*.py` / `rename_tag.py` / `transcode_gif_previews.py` — 数据修复与导入工具

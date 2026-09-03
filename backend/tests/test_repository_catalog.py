@@ -202,6 +202,45 @@ def test_folder_response_includes_named_cover_files(catalog_env):
         assert response.poster_file.name == "poster.jpg"
 
 
+def test_prefixed_covers_and_numbered_fanart_previews(catalog_env):
+    repo, session_factory = catalog_env
+    album = repo / "album"
+    album.mkdir()
+    names = ["Movie.mp4", "Movie-poster.jpg", "Movie-fanart.jpg",
+             "Movie-fanart1.jpg", "Movie-fanart2.jpg", "photo.jpg"]
+    for name in names:
+        (album / name).write_bytes(name.encode())
+
+    with session_factory() as db:
+        for index, name in enumerate(names):
+            db.add(Media(
+                repo_id="test",
+                file_path=f"album/{name}",
+                file_hash=f"prefixed-{index}",
+                file_size=len(name),
+                mime_type="video/mp4" if name.endswith(".mp4") else "image/jpeg",
+            ))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(RepositoryFolder).filter_by(rel_path="album").one()
+        location = db.query(FolderLocation).filter_by(repository_folder_id=folder.id).one()
+        response = get_folder(location.folder_id, db)
+
+        # 标题前缀的封面应被识别为主封面
+        assert response.fanart_file is not None
+        assert response.fanart_file.name == "Movie-fanart.jpg"
+        assert response.poster_file is not None
+        assert response.poster_file.name == "Movie-poster.jpg"
+        # 编号 fanart 作为 previews(章节条),poster 编号/普通图不进
+        preview_names = {(item.name, item.source) for item in response.previews}
+        assert ("Movie-fanart1.jpg", "kodi") in preview_names
+        assert ("Movie-fanart2.jpg", "kodi") in preview_names
+        assert all(item.name != "photo.jpg" for item in response.previews)
+
+
 def test_folder_detail_includes_named_and_video_child_previews(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"

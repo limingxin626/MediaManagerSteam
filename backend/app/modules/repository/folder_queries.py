@@ -9,6 +9,7 @@ from app.models import Folder, FolderLocation, Media, RepositoryFile, Tag, folde
 from app.modules.repository.folder_classifier import (
     ClassifiedEntry,
     Detection,
+    artwork_kind,
     classify_folder,
 )
 from app.modules.repository.folder_schemas import (
@@ -107,9 +108,11 @@ def _load_folder_file_summaries(
         .filter(
             FolderLocation.folder_id.in_(logical_ids),
             *completed,
+            # 超集预筛:fanart/poster 及其标题前缀变体("MovieName-fanart.jpg")都含这些词。
+            # 最终是否为封面由下方 artwork_kind() 决定(只取非编号的主封面)。
             or_(
-                func.lower(RepositoryFile.name).like("fanart.%"),
-                func.lower(RepositoryFile.name).like("poster.%"),
+                func.lower(RepositoryFile.name).like("%fanart%"),
+                func.lower(RepositoryFile.name).like("%poster%"),
             ),
         )
         .order_by(
@@ -123,9 +126,10 @@ def _load_folder_file_summaries(
     )
     covers: dict[int, dict[str, RepositoryFile]] = {}
     for logical_id, _role, row in cover_rows:
-        kind = row.name.rsplit(".", 1)[0].lower()
-        if kind in {"fanart", "poster"}:
-            covers.setdefault(logical_id, {}).setdefault(kind, row)
+        kind = artwork_kind(row.name)
+        # 主封面(非编号):fanart.jpg / poster.jpg / MovieName-fanart.jpg
+        if kind is not None and kind[1] is None:
+            covers.setdefault(logical_id, {}).setdefault(kind[0], row)
 
     return counts, previews, covers
 
@@ -232,12 +236,19 @@ def _folder_previews(
         and row.media_id is not None
         and row.materialize_status == "done"
     ]
+    def _is_named_kodi_preview(row: RepositoryFile) -> bool:
+        """Kodi 风格的命名预览图:文件名以 preview/preivew 开头,
+        或 fanart 的编号变体(fanart1.jpg / MovieName-fanart2.jpg)。"""
+        if row.media_type != "IMAGE":
+            return False
+        lower = row.name.lower()
+        if lower.startswith(("preview", "preivew")):
+            return True
+        kind = artwork_kind(row.name)
+        return kind is not None and kind[0] == "fanart" and kind[1] is not None
+
     named_rows = sorted(
-        (
-            row for row in completed_files
-            if row.media_type == "IMAGE"
-            and row.name.rsplit(".", 1)[0].lower().startswith(("preview", "preivew"))
-        ),
+        (row for row in completed_files if _is_named_kodi_preview(row)),
         key=lambda row: (
             row.folder_id != primary_id,
             row.name.lower(),

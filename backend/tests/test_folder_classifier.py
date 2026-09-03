@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from app.modules.repository.folder_classifier import classify_folder
+from app.modules.repository.folder_classifier import artwork_kind, classify_folder
 
 
 def media_file(file_id: int, name: str, media_type: str):
@@ -109,3 +109,28 @@ def test_mirror_duplicates_prefer_primary_physical_file():
     result = classify_folder("Movie", [mirror, primary], 1)
 
     assert [row.name for row in result.entries[0].files] == ["Movie.mp4"]
+
+
+def test_artwork_kind_matches_primary_and_prefixed_variants():
+    assert artwork_kind("fanart.jpg") == ("fanart", None)
+    assert artwork_kind("poster.PNG") == ("poster", None)
+    assert artwork_kind("MovieName-fanart.jpg") == ("fanart", None)
+    assert artwork_kind("Movie (2020).poster.jpg") == ("poster", None)
+    assert artwork_kind("MovieName_fanart1.jpg") == ("fanart", 1)
+    assert artwork_kind("MovieName-fanart2.jpg") == ("fanart", 2)
+    assert artwork_kind("fanart1.png") == ("fanart", 1)
+    assert artwork_kind("photo.jpg") is None
+    assert artwork_kind("fanart-wallpaper.jpg") is None  # 类型词不在末尾
+
+
+def test_prefixed_and_numbered_fanart_excluded_from_gallery():
+    result = classify_folder("Movie", [
+        media_file(1, "Movie.mp4", "VIDEO"),
+        media_file(2, "Movie-fanart.jpg", "IMAGE"),
+        media_file(3, "Movie-fanart1.jpg", "IMAGE"),
+        media_file(4, "Movie-poster.jpg", "IMAGE"),
+    ], 1)
+
+    assert result.kind == "movie"
+    assert [row.name for row in result.entries[0].files] == ["Movie.mp4"]
+    assert result.gallery == []

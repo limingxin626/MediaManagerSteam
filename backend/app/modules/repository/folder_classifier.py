@@ -15,6 +15,9 @@ from app.models import RepositoryFile
 
 
 ARTWORK_STEMS = {"poster", "fanart", "banner", "clearlogo", "logo", "landscape", "thumb"}
+# 识别 "fanart" / "poster" 及其标题前缀变体(如 "MovieName-fanart.jpg")与编号变体(如 "fanart1.jpg")。
+# 类型词必须是文件名的最后一个段(fanart|poster + 可选数字)。
+_ARTWORK_TAG_RE = re.compile(r"(?P<tag>fanart|poster)(?P<num>\d*)$")
 EXTRA_WORDS = {
     "trailer", "sample", "theme", "featurette", "extra", "extras",
     "behindthescenes", "behindscene", "makingof", "interview", "deletedscene",
@@ -58,6 +61,22 @@ class FolderClassification:
 
 def _stem(name: str) -> str:
     return os.path.splitext(name)[0]
+
+
+def artwork_kind(name: str) -> tuple[str, int | None] | None:
+    """判定 artwork 文件名属于哪类封面及其编号。
+
+    返回 (kind, index):kind ∈ {"fanart", "poster"};index 为 None 表示主封面
+    (如 ``fanart.jpg`` / ``MovieName-poster.jpg``),index >= 0 表示编号变体
+    (如 ``fanart1.jpg`` / ``MovieName-fanart2.jpg``)。非 artwork 名返回 None。
+    """
+    stem = _stem(name).casefold()
+    match = _ARTWORK_TAG_RE.search(stem)
+    if match is None:
+        return None
+    tag = match.group("tag")
+    num = match.group("num")
+    return tag, (int(num) if num else None)
 
 
 def _normalized(value: str) -> str:
@@ -114,7 +133,11 @@ def classify_folder(
     videos: list[RepositoryFile] = []
     for row in rows:
         stem = _stem(row.name).casefold()
-        if stem in ARTWORK_STEMS or stem.startswith(("preview", "preivew")):
+        if (
+            stem in ARTWORK_STEMS
+            or artwork_kind(row.name) is not None
+            or stem.startswith(("preview", "preivew"))
+        ):
             artwork_or_preview.append(row)
         elif row.media_type == "IMAGE":
             images.append(row)
