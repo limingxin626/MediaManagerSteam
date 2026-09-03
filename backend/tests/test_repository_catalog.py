@@ -170,6 +170,46 @@ def test_folder_media_is_read_directly_from_catalog(catalog_env):
         assert response.primary_entry_id is None
 
 
+def test_scan_persists_folder_kind_on_logical_folder(catalog_env):
+    repo, session_factory = catalog_env
+    album = repo / "album"
+    album.mkdir()
+    (album / "photo.jpg").write_bytes(b"image")
+    with session_factory() as db:
+        db.add(Media(repo_id="test", file_path="album/photo.jpg", file_hash="p-hash", file_size=5))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(RepositoryFolder).filter_by(rel_path="album").one()
+        location = db.query(FolderLocation).filter_by(repository_folder_id=folder.id).one()
+        logical = db.get(Folder, location.folder_id)
+        # The scan must persist the computed kind so /folders?kind= can filter.
+        assert logical.kind == "gallery"
+
+
+def test_scan_persists_movie_kind_for_cover_only_folder(catalog_env):
+    repo, session_factory = catalog_env
+    title = repo / "SNIS-752"
+    title.mkdir()
+    names = ["SNIS-752-fanart.jpg", "SNIS-752-poster.jpg", "fanart1.jpg"]
+    for index, name in enumerate(names):
+        (title / name).write_bytes(name.encode())
+    with session_factory() as db:
+        for index, name in enumerate(names):
+            db.add(Media(repo_id="test", file_path=f"SNIS-752/{name}", file_hash=f"h{index}", file_size=len(name)))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(RepositoryFolder).filter_by(rel_path="SNIS-752").one()
+        location = db.query(FolderLocation).filter_by(repository_folder_id=folder.id).one()
+        logical = db.get(Folder, location.folder_id)
+        assert logical.kind == "movie"
+
+
 def test_folder_response_includes_named_cover_files(catalog_env):
     repo, session_factory = catalog_env
     album = repo / "album"

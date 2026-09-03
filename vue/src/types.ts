@@ -191,6 +191,7 @@ export interface Folder {
   issue_id: number | null
   issue_title: string | null
   starred: boolean
+  kind: FolderKind
   location_count: number
   media_count: number
   primary_repo_id: string | null
@@ -204,7 +205,6 @@ export interface Folder {
 }
 
 export interface FolderDetail extends Folder {
-  kind: FolderKind
   artwork: FolderArtwork
   entries: FolderMediaEntry[]
   gallery: RepositoryFile[]

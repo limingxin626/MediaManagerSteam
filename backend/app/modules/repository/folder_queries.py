@@ -155,6 +155,7 @@ def _folder_response(
         issue_id=cast(int | None, folder.issue_id),
         issue_title=folder.issue.title if folder.issue else None,
         starred=bool(folder.starred),
+        kind=cast(str, folder.kind),
         location_count=len(folder.locations),
         media_count=counts.get(folder_id, 0),
         primary_repo_id=physical.repo_id if physical is not None else None,
@@ -314,6 +315,7 @@ def list_folders(
     limit: int = 20,
     starred: bool | None = None,
     tag_id: int | None = None,
+    kind: str | None = None,
 ):
     query = db.query(Folder).options(
         joinedload(Folder.collection),
@@ -327,6 +329,8 @@ def list_folders(
         query = query.filter(Folder.starred == (1 if starred else 0))
     if tag_id is not None:
         query = query.filter(Folder.tags.any(Tag.id == tag_id))
+    if kind:
+        query = query.filter(Folder.kind == kind)
     rows = query.order_by(Folder.id.desc()).limit(limit + 1).all()
     has_more = len(rows) > limit
     rows = rows[:limit]
@@ -390,9 +394,14 @@ def get_folder(folder_id: int, db: Session):
         files,
         primary.repository_folder_id if primary is not None else None,
     )
+    # Persist the freshly computed category so list filters (/folders?kind=) stay accurate.
+    if folder.kind != classification.kind:
+        folder.kind = classification.kind
+        db.commit()
+    payload = base.model_dump()
+    payload["kind"] = classification.kind
     return FolderDetailResponse(
-        **base.model_dump(),
-        kind=classification.kind,
+        **payload,
         artwork=FolderArtwork(poster=base.poster_file, fanart=base.fanart_file),
         entries=[_entry_response(entry) for entry in classification.entries],
         gallery=[_file_response(row) for row in classification.gallery],

@@ -91,6 +91,20 @@
 
       <div ref="scrollContainer" class="relative min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto w-full px-4 py-4 pb-6 sm:px-6 lg:px-8">
+          <div class="mb-3 flex flex-wrap items-center gap-1.5">
+            <button
+              class="flex items-center rounded-full px-3 py-1 text-xs transition-colors"
+              :class="selectedKind === '' ? activeFilterClass : inactiveFilterClass"
+              @click="selectKind('')"
+            >全部类型</button>
+            <button
+              v-for="option in kindOptions"
+              :key="option.value"
+              class="flex items-center rounded-full px-3 py-1 text-xs transition-colors"
+              :class="selectedKind === option.value ? activeFilterClass : inactiveFilterClass"
+              @click="selectKind(option.value)"
+            >{{ option.label }}</button>
+          </div>
           <div v-if="loading && !folders.length" class="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             <div v-for="index in 8" :key="index" class="animate-pulse overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
               <div class="bg-[var(--bg-secondary)]" :class="gridPreviewSizeClass"></div>
@@ -198,7 +212,7 @@ import { computed, defineComponent, h, nextTick, onActivated, onDeactivated, onM
 import { useRouter } from 'vue-router'
 import MediaPreview from '../components/MediaPreview.vue'
 import { api } from '../composables/useApi'
-import type { Folder, FolderTagCount, MessageMediaItem, RepositoryFile } from '../types'
+import type { Folder, FolderKind, FolderTagCount, MessageMediaItem, RepositoryFile } from '../types'
 import { resolveThumb } from '../utils/media'
 
 defineOptions({ name: 'Folder' })
@@ -226,6 +240,15 @@ const VideoBadge = defineComponent({
 const folders = ref<Folder[]>([])
 const tags = ref<FolderTagCount[]>([])
 const selectedTagId = ref<number | null>(null)
+const selectedKind = ref<'' | FolderKind>('')
+const kindOptions: { value: FolderKind; label: string }[] = [
+  { value: 'movie', label: '电影' },
+  { value: 'series', label: '剧集' },
+  { value: 'multi_part', label: '多部' },
+  { value: 'gallery', label: '图集' },
+  { value: 'mixed', label: '混合' },
+  { value: 'unknown', label: '未分类' },
+]
 const nextCursor = ref<number | null>(null)
 const hasMore = ref(false)
 const loading = ref(false)
@@ -309,6 +332,7 @@ async function loadFolders(reset = false) {
       cursor: reset ? undefined : nextCursor.value,
       limit: 40,
       tag_id: selectedTagId.value,
+      kind: selectedKind.value || undefined,
     })
     folders.value = reset ? data.items : [...folders.value, ...data.items]
     nextCursor.value = data.next_cursor
@@ -331,6 +355,13 @@ async function selectTag(tagId: number | null) {
   if (selectedTagId.value === tagId) return
   selectedTagId.value = tagId
   mobileTagsOpen.value = false
+  scrollContainer.value?.scrollTo({ top: 0 })
+  await loadFolders(true)
+}
+
+async function selectKind(kind: '' | FolderKind) {
+  if (selectedKind.value === kind) return
+  selectedKind.value = kind
   scrollContainer.value?.scrollTo({ top: 0 })
   await loadFolders(true)
 }

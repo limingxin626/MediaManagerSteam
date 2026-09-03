@@ -214,6 +214,8 @@ def _scan_repository(repo_id: str, root: str, other_roots: set[str], session_fac
         db.flush()
         from app.modules.repository.folder_service import ensure_folders
         ensure_folders(db, repo_id)
+        from app.modules.repository.folder_service import refresh_repository_folder_kinds
+        refresh_repository_folder_kinds(db, repo_id)
         db.commit()
         return {"scanned": len(folders) + len(files), "inserted": inserted, "updated": updated,
                 "unchanged": unchanged, "deleted": deleted, "matched": matched, "pending": pending}

@@ -134,3 +134,42 @@ def test_prefixed_and_numbered_fanart_excluded_from_gallery():
     assert result.kind == "movie"
     assert [row.name for row in result.entries[0].files] == ["Movie.mp4"]
     assert result.gallery == []
+
+
+def test_cover_only_folder_with_primary_poster_is_movie():
+    result = classify_folder("SNIS-752", [
+        media_file(1, "SNIS-752-poster.jpg", "IMAGE"),
+        media_file(2, "SNIS-752-fanart.jpg", "IMAGE"),
+        media_file(3, "fanart1.jpg", "IMAGE"),
+        media_file(4, "fanart2.jpg", "IMAGE"),
+    ], 1)
+
+    assert result.kind == "movie"
+    assert result.entries == []
+    assert result.detection.ambiguous is True
+    assert result.detection.confidence < 0.5
+
+
+def test_cover_only_folder_with_primary_fanart_is_movie():
+    result = classify_folder("Title", [
+        media_file(1, "fanart.jpg", "IMAGE"),
+        media_file(2, "fanart1.jpg", "IMAGE"),
+    ], 1)
+
+    assert result.kind == "movie"
+
+
+def test_artwork_without_primary_cover_stays_unknown():
+    # 只有编号 fanart、无主封面、无视频、无普通图 → 不能断言 movie。
+    result = classify_folder("Misc", [
+        media_file(1, "fanart1.jpg", "IMAGE"),
+        media_file(2, "fanart2.jpg", "IMAGE"),
+    ], 1)
+
+    assert result.kind == "unknown"
+
+
+def test_empty_folder_stays_unknown():
+    result = classify_folder("Empty", [], 1)
+
+    assert result.kind == "unknown"

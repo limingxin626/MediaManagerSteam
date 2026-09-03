@@ -129,6 +129,9 @@ def _process_row(db, row: RepositoryFile) -> bool:
         row.is_hdr = media_info.get("is_hdr")
         row.color_transfer = media_info.get("color_transfer")
         db.commit()
+        from app.modules.repository.folder_service import refresh_kind_for_repository_folder
+        refresh_kind_for_repository_folder(db, row.folder_id)
+        db.commit()
         logger.info(
             "[catalog-worker] %s Media id=%s for %s",
             "created" if result["is_new"] else "reused", media.id, absolute,

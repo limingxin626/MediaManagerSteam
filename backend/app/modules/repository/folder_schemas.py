@@ -70,6 +70,7 @@ class FolderResponse(TimestampMixin):
     issue_id: Optional[int] = None
     issue_title: Optional[str] = None
     starred: bool = False
+    kind: str = "unknown"
     location_count: int
     media_count: int
     primary_repo_id: Optional[str] = None
@@ -81,7 +82,6 @@ class FolderResponse(TimestampMixin):
 
 
 class FolderDetailResponse(FolderResponse):
-    kind: str = "unknown"
     artwork: FolderArtwork = Field(default_factory=FolderArtwork)
     entries: List[FolderMediaEntry] = Field(default_factory=list)
     gallery: List[RepositoryFileResponse] = Field(default_factory=list)

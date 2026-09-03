@@ -79,6 +79,19 @@ def artwork_kind(name: str) -> tuple[str, int | None] | None:
     return tag, (int(num) if num else None)
 
 
+def _has_primary_cover(rows: Iterable[RepositoryFile]) -> bool:
+    """rows 中是否含至少一张主封面(poster/fanart,非编号变体)。
+
+    主封面形如 ``poster.jpg`` / ``fanart.jpg`` / ``MovieName-fanart.jpg``
+    (``artwork_kind`` 返回 ``index=None``);编号变体(fanart1.jpg)不算。
+    """
+    return any(
+        kind is not None and kind[1] is None
+        for row in rows
+        if (kind := artwork_kind(row.name)) is not None
+    )
+
+
 def _normalized(value: str) -> str:
     value = unicodedata.normalize("NFKC", value).casefold()
     return "".join(character for character in value if character.isalnum())
@@ -278,6 +291,18 @@ def classify_folder(
         return FolderClassification(
             kind="mixed", entries=entries, gallery=images, extras=extras,
             detection=Detection(confidence=0.6, reason="multiple unrelated videos or mixed media", ambiguous=True),
+        )
+
+    # 封面集兜底:目录只有主封面(poster/fanart,无编号),既无正片视频也无普通图,
+    # 视为一个「影片封面条目」。常见于纯封面/截图索引库(JADB 这类),每目录即一部片。
+    if _has_primary_cover(artwork_or_preview):
+        return FolderClassification(
+            kind="movie", extras=extras,
+            detection=Detection(
+                source="filename", confidence=0.4,
+                reason="movie cover (poster/fanart) present but no playable video",
+                ambiguous=True,
+            ),
         )
 
     return FolderClassification(

@@ -26,6 +26,7 @@ class Folder(Base):
     collection_id = Column(Integer, ForeignKey("collection.id", ondelete="SET NULL"), nullable=True, index=True)
     issue_id = Column(Integer, ForeignKey("issue.id", ondelete="SET NULL"), nullable=True, index=True)
     starred = Column(Integer, default=0, nullable=False)
+    kind = Column(String(32), nullable=False, default="unknown", server_default="unknown", index=True)
     created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
