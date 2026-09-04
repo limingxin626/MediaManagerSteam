@@ -19,7 +19,7 @@
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto min-h-0">
+    <div ref="scrollContainer" class="flex-1 overflow-y-auto min-h-0">
       <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
         <!-- Loading -->
         <div v-if="loading" class="text-center py-20 text-[var(--text-muted)]">加载中...</div>
@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Person } from '../types'
 import PersonCard from '../components/PersonCard.vue'
@@ -85,6 +85,9 @@ const router = useRouter()
 const people = ref<Person[]>([])
 const loading = ref(false)
 const filterName = ref('')
+
+const scrollContainer = ref<HTMLElement | null>(null)
+let savedScrollTop = 0
 
 const showModal = ref(false)
 const editMode = ref(false)
@@ -163,6 +166,18 @@ const deletePerson = async () => {
 
 onMounted(() => {
   fetchPeople()
+})
+
+// 切到 PersonDetail 等其它路由时组件被 keep-alive 缓存，DOM 被摘除，
+// 内部的滚动容器位置会重置。这里在失活时保存、重新激活时恢复，回到列表不再跳到顶部。
+onDeactivated(() => {
+  savedScrollTop = scrollContainer.value?.scrollTop ?? savedScrollTop
+})
+
+onActivated(() => {
+  nextTick(() => {
+    scrollContainer.value?.scrollTo({ top: savedScrollTop })
+  })
 })
 </script>
 

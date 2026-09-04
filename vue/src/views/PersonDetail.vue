@@ -119,13 +119,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Folder, FolderKind, Person, RepositoryFile } from '../types'
 import PersonEditModal from '../components/PersonEditModal.vue'
 import { api } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { resolveCover, resolveThumb } from '../utils/media'
+
+defineOptions({ name: 'PersonDetail' })
 
 interface FolderCursorResponse {
   items: Folder[]
@@ -151,6 +153,7 @@ const scrollContainer = ref<HTMLElement | null>(null)
 const sentinel = ref<HTMLElement | null>(null)
 let infiniteObserver: IntersectionObserver | null = null
 let loadRequest = 0
+let savedScrollTop = 0
 
 const folderCount = computed(() => person.value?.folder_count ?? 0)
 const initial = computed(() => (person.value?.name ?? '?').charAt(0).toUpperCase())
@@ -288,9 +291,24 @@ watch(() => props.personId, async () => {
 })
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
   loadAll(true)
-  setupInfiniteScroll()
+})
+
+// PersonDetail 现已被 keep-alive 缓存:进作品目录再返回时组件不会重建,
+// 而是失活/重新激活。失活时保存内部滚动位置与监听状态,激活时恢复,
+// 避免回到页面顶部。onActivated 在首次挂载后也会触发,此时 savedScrollTop=0,无害。
+onActivated(() => {
+  window.addEventListener('keydown', handleKeydown)
+  nextTick(() => {
+    scrollContainer.value?.scrollTo({ top: savedScrollTop })
+    setupInfiniteScroll()
+  })
+})
+
+onDeactivated(() => {
+  savedScrollTop = scrollContainer.value?.scrollTop ?? savedScrollTop
+  infiniteObserver?.disconnect()
+  window.removeEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {

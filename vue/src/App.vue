@@ -7,7 +7,7 @@
       <Message v-show="route.path === '/messages'" />
       <router-view v-slot="{ Component }">
         <Transition name="route" mode="out-in">
-          <keep-alive :include="['Dashboard', 'Media', 'Folder', 'Collection', 'People']">
+          <keep-alive :include="['Dashboard', 'Media', 'Folder', 'Collection', 'People', 'PersonDetail']">
             <component :is="Component" />
           </keep-alive>
         </Transition>
