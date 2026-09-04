@@ -261,7 +261,7 @@ const kindOptions: { value: FolderKind; label: string }[] = [
   { value: 'unknown', label: '未分类' },
 ]
 // 目录排序:added=入库序(后端 id 倒序);released=按发行日期(coalesce released_at/created_at)
-const sortMode = ref<'added' | 'released'>('added')
+const sortMode = ref<'added' | 'released'>('released')
 const sortOptions: { value: 'added' | 'released'; label: string }[] = [
   { value: 'added', label: '新增' },
   { value: 'released', label: '发行' },

@@ -110,10 +110,10 @@
               <button
                 v-for="preview in folderPreviews"
                 :key="preview.id"
-                class="group relative aspect-video overflow-hidden rounded-[var(--radius-md)] bg-[#181818] text-left"
+                class="group relative aspect-square overflow-hidden rounded-[var(--radius-md)] text-left"
                 @click="openFolderPreview(preview)"
               >
-                <img v-if="resolveThumb(preview)" :src="resolveThumb(preview)" :alt="preview.name" class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" loading="lazy" />
+                <img v-if="resolveThumb(preview)" :src="resolveThumb(preview)" :alt="preview.name" class="h-full w-full object-contain transition-transform duration-200 group-hover:scale-[1.03]" loading="lazy" />
                 <div v-else class="grid h-full w-full place-items-center text-[var(--text-muted)]">
                   <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3" /></svg>
                 </div>
