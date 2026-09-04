@@ -20,6 +20,14 @@ def get_people(
     return service.list_people(db, name)
 
 
+@router.get("/{person_id}", response_model=PersonResponse)
+def get_person(person_id: int, db: Session = Depends(get_db)):
+    try:
+        return service.get(db, person_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.post("", response_model=PersonResponse, status_code=201)
 def create_person(data: PersonCreate, db: Session = Depends(get_db)):
     try:

@@ -1,14 +1,17 @@
 """Maintain logical folders independently from messages."""
 import os
+import re
 import shutil
 import uuid
+import xml.etree.ElementTree as ET
 from collections import defaultdict
-from typing import BinaryIO, cast
+from datetime import datetime
+from typing import BinaryIO, Optional, cast
 
 from sqlalchemy.orm import Session
 
 from app.config import config
-from app.models import Folder, FolderLocation, RepositoryFile, RepositoryFolder
+from app.models import Folder, FolderLocation, Person, RepositoryFile, RepositoryFolder
 from app.modules.repository.folder_classifier import FolderClassification, classify_folder
 
 
@@ -25,6 +28,126 @@ def repository_folder_has_nfo(physical: RepositoryFolder) -> bool:
         return any(name.lower().endswith(".nfo") for name in os.listdir(directory))
     except OSError:
         return False
+
+
+# Kodi/Emby 风格 .nfo 里携带发行日期的标签(按优先级)。前两个通常是完整日期
+# (YYYY-MM-DD,可能带时间),year 只给年份。
+_NFO_DATE_TAGS = ("premiered", "release", "aired")
+_NFO_YEAR_TAG = "year"
+# 解析 "2014-01-01" / "2014-01-01T00:00:00" 这类日期。
+_NFO_FULL_DATE_RE = re.compile(r"^\s*(\d{4})-(\d{1,2})-(\d{1,2})")
+# .nfo 中作品类型的根节点;只有这些才被当作人物/日期解析来源。
+_NFO_WORK_TAGS = ("movie", "tvshow", "episodedetails")
+
+
+def parse_folder_nfo_release_date(physical: RepositoryFolder) -> Optional[datetime]:
+    """从物理目录的 .nfo 里提取发行日期,没有 .nfo 或无可识别日期返回 None。
+
+    仅读取同目录的 .nfo(与影片证据规则一致,不递归)。优先取完整日期
+    (premiered/release/aired),取不到再退回 year 年份(默认 1 月 1 日)。
+    """
+    directory = config.resolve_to_absolute(physical.repo_id, physical.rel_path)
+    if directory is None or not os.path.isdir(directory):
+        return None
+    try:
+        entries = os.listdir(directory)
+    except OSError:
+        return None
+    nfo_names = [name for name in entries if name.lower().endswith(".nfo")]
+    if not nfo_names:
+        return None
+    for name in nfo_names:
+        path = os.path.join(directory, name)
+        try:
+            tree = ET.parse(path)
+        except (ET.ParseError, OSError):
+            continue
+        root = tree.getroot()
+        # 只认 movie/tvshow 这类作品根节点,避免误读其它 xml。
+        tag = _normalized_tag(root.tag)
+        if tag not in _NFO_WORK_TAGS:
+            continue
+        for date_tag in _NFO_DATE_TAGS:
+            match = _find_tag_text(root, date_tag)
+            if match:
+                parsed = _match_full_date(match)
+                if parsed is not None:
+                    return parsed
+        year_text = _find_tag_text(root, _NFO_YEAR_TAG)
+        if year_text:
+            year = re.match(r"^\s*(\d{4})", year_text)
+            if year:
+                return datetime(int(year.group(1)), 1, 1)
+    return None
+
+
+def parse_folder_nfo_actors(physical: RepositoryFolder) -> list[str]:
+    """从物理目录的 .nfo 提取演员名单(去重保序)。
+
+    仅读取同目录的 .nfo(与影片证据/发行日期规则一致,不递归)。取每个作品
+    (movie/tvshow/episodedetails)根节点下 ``<actor><name>…</name></actor>`` 的
+    name 文本;兼容个别 nfo 直接把演员名写在 ``<actor>`` 文本里。无 .nfo、
+    无可识别演员时返回空列表。
+    """
+    directory = config.resolve_to_absolute(physical.repo_id, physical.rel_path)
+    if directory is None or not os.path.isdir(directory):
+        return []
+    try:
+        entries = os.listdir(directory)
+    except OSError:
+        return []
+    nfo_names = [name for name in entries if name.lower().endswith(".nfo")]
+    actors: list[str] = []
+    seen: set[str] = set()
+    for name in nfo_names:
+        path = os.path.join(directory, name)
+        try:
+            tree = ET.parse(path)
+        except (ET.ParseError, OSError):
+            continue
+        root = tree.getroot()
+        if _normalized_tag(root.tag) not in _NFO_WORK_TAGS:
+            continue
+        for element in root.iter():
+            if _normalized_tag(element.tag) != "actor":
+                continue
+            actor_name = None
+            for child in element.iter():
+                if _normalized_tag(child.tag) == "name" and (child.text or "").strip():
+                    actor_name = child.text.strip()
+                    break
+            if not actor_name:
+                actor_name = (element.text or "").strip()
+            if actor_name and actor_name.casefold() not in seen:
+                seen.add(actor_name.casefold())
+                actors.append(actor_name)
+    return actors
+
+
+def _normalized_tag(tag: str) -> str:
+    # ElementTree 的 tag 可能是 "{namespace}movie" 形式。
+    return tag.rsplit("}", 1)[-1].strip().lower()
+
+
+def _find_tag_text(root: ET.Element, tag_name: str) -> Optional[str]:
+    """返回 root 下第一个匹配 tag(无论深浅、是否带命名空间)的文本,找不到返回 None。"""
+    for element in root.iter():
+        if _normalized_tag(element.tag) == tag_name:
+            text = (element.text or "").strip()
+            if text:
+                return text
+    return None
+
+
+def _match_full_date(text: str) -> Optional[datetime]:
+    match = _NFO_FULL_DATE_RE.match(text)
+    if match is None:
+        return None
+    year, month, day = (int(group) for group in match.groups())
+    try:
+        return datetime(year, month, day)
+    except ValueError:
+        return None
 
 
 def classify_logical_folder(db: Session, folder: Folder) -> FolderClassification:
@@ -94,6 +217,97 @@ def refresh_repository_folder_kinds(db: Session, repo_id: str) -> int:
         folder.kind = classification.kind
         refreshed += 1
     return refreshed
+
+
+def refresh_repository_folder_release_dates(db: Session, repo_id: str) -> int:
+    """从每个逻辑目录的 .nfo 填充 ``released_at``(仅填尚未设置的空值)。
+
+    入库的 folder 目前不自动抓取元数据;这里的唯一自动来源是随目录落盘的本地
+    .nfo。只补 ``released_at IS NULL`` 的行,避免覆盖手动设置的值。返回更新的
+    逻辑 folder 数量。调用方 commit。
+    """
+    links = (
+        db.query(RepositoryFolder, FolderLocation)
+        .join(FolderLocation, FolderLocation.repository_folder_id == RepositoryFolder.id)
+        .filter(RepositoryFolder.repo_id == repo_id)
+        .all()
+    )
+    # 每个逻辑 folder 用 PRIMARY(无则 id 最小)位置作为 .nfo 读取来源。
+    by_logical: dict[int, RepositoryFolder] = {}
+    for physical, location in links:
+        current = by_logical.get(location.folder_id)
+        if current is None or (location.role == "PRIMARY" and current.folder_location.role != "PRIMARY"):
+            by_logical[location.folder_id] = physical
+    if not by_logical:
+        return 0
+
+    filled = 0
+    for folder_id, physical in by_logical.items():
+        folder = db.get(Folder, folder_id)
+        if folder is None or folder.released_at is not None:
+            continue
+        released = parse_folder_nfo_release_date(physical)
+        if released is not None:
+            folder.released_at = released
+            filled += 1
+    return filled
+
+
+def _ensure_persons_by_name(db: Session, names: list[str], cache: dict[str, Person]) -> list[Person]:
+    """按名字 get-or-create ``Person`` 行(全局唯一,exact-name 去重)。
+
+    ``cache`` 在同一轮 refresh 里跨 folder 复用,避免对共用演员重复查询/新建。
+    返回与 ``names`` 同序的 person 列表。
+    """
+    missing = [name for name in names if name not in cache]
+    if missing:
+        existing = {p.name: p for p in db.query(Person).filter(Person.name.in_(missing))}
+        for name in missing:
+            person = existing.get(name)
+            if person is None:
+                person = Person(name=name, description=None)
+                db.add(person)
+                db.flush()  # 分配 id 以便后面赋值关联
+            cache[name] = person
+    return [cache[name] for name in names]
+
+
+def refresh_repository_folder_people(db: Session, repo_id: str) -> int:
+    """从影片目录的 .nfo 把 ``<actor>`` 自动解析为 ``Person`` 并挂到逻辑 folder。
+
+    只处理 ``kind == "movie"`` 的逻辑 folder —— 与判片规则一致,.nfo 的演员名单
+    仅对作品目录有意义。每个逻辑 folder 以 PRIMARY 物理目录为 .nfo 读取来源;
+    目录里没有 .nfo 或解析不出任何演员时跳过(不改动既有 people)。
+
+    一旦某目录成功解析出至少一位演员,就以 .nfo 名单为权威**整体替换**
+    folder.people(get-or-create 全局去重)。返回更新的逻辑 folder 数量。调用方 commit。
+    """
+    links = (
+        db.query(RepositoryFolder, FolderLocation)
+        .join(FolderLocation, FolderLocation.repository_folder_id == RepositoryFolder.id)
+        .filter(RepositoryFolder.repo_id == repo_id)
+        .all()
+    )
+    by_logical: dict[int, RepositoryFolder] = {}
+    for physical, location in links:
+        current = by_logical.get(location.folder_id)
+        if current is None or (location.role == "PRIMARY" and current.folder_location.role != "PRIMARY"):
+            by_logical[location.folder_id] = physical
+    if not by_logical:
+        return 0
+
+    updated = 0
+    cache: dict[str, Person] = {}
+    for folder_id, physical in by_logical.items():
+        folder = db.get(Folder, folder_id)
+        if folder is None or folder.kind != "movie":
+            continue
+        actors = parse_folder_nfo_actors(physical)
+        if not actors:
+            continue
+        folder.people = _ensure_persons_by_name(db, actors, cache)
+        updated += 1
+    return updated
 
 
 def refresh_kind_for_repository_folder(db: Session, repository_folder_id: int) -> bool:

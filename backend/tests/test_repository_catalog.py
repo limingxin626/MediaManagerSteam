@@ -3,11 +3,11 @@ from io import BytesIO
 
 import pytest
 
-from app.models import Folder, FolderLocation, Media, Message, MessageFolder, RepositoryFile, RepositoryFolder, Tag
+from app.models import Folder, FolderLocation, Media, Message, MessageFolder, Person, RepositoryFile, RepositoryFolder, Tag
 from app.modules.repository.folder_queries import get_folder, list_folder_tags, list_folders
 from app.modules.repository import catalog as repository_catalog
 from app.modules.repository import materializer as repository_materializer
-from app.modules.repository.folder_service import store_file_in_primary_folder
+from app.modules.repository.folder_service import refresh_repository_folder_people, store_file_in_primary_folder
 from app.modules.message.router import _build_detail_query
 from app.modules.message.queries import _like_search
 
@@ -168,6 +168,96 @@ def test_folder_media_is_read_directly_from_catalog(catalog_env):
         assert [item.media_id for item in response.gallery] == [file.media_id]
         assert response.gallery[0].starred is True
         assert response.primary_entry_id is None
+
+
+def test_scan_fills_released_at_from_nfo(catalog_env):
+    from datetime import datetime
+
+    repo, session_factory = catalog_env
+    album = repo / "SNIS-752"
+    album.mkdir()
+    (album / "cover.jpg").write_bytes(b"image")
+    (album / "SNIS-752.nfo").write_text(
+        '<?xml version="1.0"?><movie><title>SNIS-752</title>'
+        "<premiered>2021-12-24</premiered><release>2021-12-24</release></movie>",
+        encoding="utf-8",
+    )
+    with session_factory() as db:
+        db.add(Media(repo_id="test", file_path="SNIS-752/cover.jpg", file_hash="nfo-hash", file_size=5))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(Folder).one()
+        assert folder.released_at == datetime(2021, 12, 24)
+
+
+def test_scan_nfo_year_fallback_when_no_full_date(catalog_env):
+    from datetime import datetime
+
+    repo, session_factory = catalog_env
+    album = repo / "YEAR-ONLY"
+    album.mkdir()
+    (album / "cover.jpg").write_bytes(b"image")
+    (album / "YEAR-ONLY.nfo").write_text(
+        '<?xml version="1.0"?><movie><title>YEAR-ONLY</title><year>2014</year></movie>',
+        encoding="utf-8",
+    )
+    with session_factory() as db:
+        db.add(Media(repo_id="test", file_path="YEAR-ONLY/cover.jpg", file_hash="year-hash", file_size=5))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(Folder).one()
+        assert folder.released_at == datetime(2014, 1, 1)
+
+
+def test_scan_without_nfo_leaves_released_at_null(catalog_env):
+    repo, session_factory = catalog_env
+    album = repo / "album"
+    album.mkdir()
+    (album / "photo.jpg").write_bytes(b"image")
+    with session_factory() as db:
+        db.add(Media(repo_id="test", file_path="album/photo.jpg", file_hash="no-nfo-hash", file_size=5))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(Folder).one()
+        assert folder.released_at is None
+
+
+def test_scan_does_not_overwrite_existing_released_at(catalog_env):
+    from datetime import datetime
+
+    repo, session_factory = catalog_env
+    album = repo / "ALBUM"
+    album.mkdir()
+    (album / "cover.jpg").write_bytes(b"image")
+    (album / "ALBUM.nfo").write_text(
+        '<?xml version="1.0"?><movie><title>ALBUM</title><premiered>2010-01-01</premiered></movie>',
+        encoding="utf-8",
+    )
+    with session_factory() as db:
+        media = Media(repo_id="test", file_path="ALBUM/cover.jpg", file_hash="manual-hash", file_size=5)
+        db.add(media)
+        db.commit()
+
+    repository_catalog.rescan("test")
+    with session_factory() as db:
+        folder = db.query(Folder).one()
+        folder.released_at = datetime(1999, 5, 5)  # 手动设过
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(Folder).one()
+        assert folder.released_at == datetime(1999, 5, 5)
 
 
 def test_scan_persists_folder_kind_on_logical_folder(catalog_env):
@@ -759,3 +849,171 @@ def test_folder_rename_promotes_media_canonical_path(catalog_env, monkeypatch):
         assert file.media_id == media.id
         assert response.name == "renamed"
         assert response.media_count == 1
+
+
+def test_scan_parses_nfo_actors_into_movie_folder_people(catalog_env):
+    """影片目录的 .nfo <actor> 应被自动解析为 Person 并挂到 movie folder。"""
+    repo, session_factory = catalog_env
+    title = repo / "SNIS-752"
+    title.mkdir()
+    (title / "SNIS-752.mp4").write_bytes(b"video")
+    (title / "SNIS-752.nfo").write_text(
+        '<?xml version="1.0"?><movie><title>SNIS-752</title>'
+        "<actor><name>Alice</name><role>main</role></actor>"
+        "<actor><name>Bob</name></actor>"
+        "<actor><name>ALICE</name></actor>"  # 大小写不同名应去重保留首序
+        "</movie>",
+        encoding="utf-8",
+    )
+    with session_factory() as db:
+        db.add(Media(repo_id="test", file_path="SNIS-752/SNIS-752.mp4", file_hash="people-hash", file_size=5, mime_type="video/mp4"))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        logical = db.query(Folder).one()
+        assert logical.kind == "movie"
+        assert sorted(p.name for p in logical.people) == ["Alice", "Bob"]
+        # 全局 Person 行也已建立。
+        assert sorted(name for (name,) in db.query(Person.name)) == ["Alice", "Bob"]
+
+
+def test_scan_nfo_actor_parsing_is_idempotent(catalog_env):
+    """重复 rescan 不应重复创建 Person 行或重复关联。"""
+    repo, session_factory = catalog_env
+    title = repo / "SNIS-001"
+    title.mkdir()
+    (title / "SNIS-001.mp4").write_bytes(b"video")
+    (title / "SNIS-001.nfo").write_text(
+        '<?xml version="1.0"?><movie><actor><name>Carol</name></actor></movie>',
+        encoding="utf-8",
+    )
+    with session_factory() as db:
+        db.add(Media(repo_id="test", file_path="SNIS-001/SNIS-001.mp4", file_hash="idem-hash", file_size=5, mime_type="video/mp4"))
+        db.commit()
+
+    repository_catalog.rescan("test")
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        assert db.query(Person).count() == 1
+        logical = db.query(Folder).one()
+        assert [p.name for p in logical.people] == ["Carol"]
+        # folder_person 关联行只有一条。
+        from app.models.repository_catalog import folder_person
+        assert db.query(folder_person).count() == 1
+
+
+def test_scan_folder_without_nfo_actors_leaves_people_empty(catalog_env):
+    repo, session_factory = catalog_env
+    title = repo / "SNIS-002"
+    title.mkdir()
+    (title / "SNIS-002.mp4").write_bytes(b"video")
+    (title / "SNIS-002.nfo").write_text(
+        '<?xml version="1.0"?><movie><title>SNIS-002</title></movie>',
+        encoding="utf-8",
+    )
+    with session_factory() as db:
+        db.add(Media(repo_id="test", file_path="SNIS-002/SNIS-002.mp4", file_hash="noactor-hash", file_size=5, mime_type="video/mp4"))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        assert db.query(Folder).one().kind == "movie"
+        assert db.query(Person).count() == 0
+        assert db.query(Folder).one().people == []
+
+
+def test_folder_people_refresh_only_touches_movie_kind(catalog_env):
+    """refresh_repository_folder_people 只处理 kind == 'movie',其它 kind 不动。"""
+    repo, session_factory = catalog_env
+    title = repo / "SNIS-003"
+    title.mkdir()
+    (title / "SNIS-003.mp4").write_bytes(b"video")
+    (title / "SNIS-003.nfo").write_text(
+        '<?xml version="1.0"?><movie><actor><name>Dave</name></actor></movie>',
+        encoding="utf-8",
+    )
+    with session_factory() as db:
+        db.add(Media(repo_id="test", file_path="SNIS-003/SNIS-003.mp4", file_hash="gate-hash", file_size=5, mime_type="video/mp4"))
+        db.commit()
+
+    repository_catalog.rescan("test")  # 先扫成 movie 并挂上 Dave
+    with session_factory() as db:
+        assert [p.name for p in db.query(Folder).one().people] == ["Dave"]
+
+    # 把它降级为 gallery 并清空 people 再跑一次 refresh:有 .nfo 演员也不应补回。
+    with session_factory() as db:
+        logical = db.query(Folder).one()
+        logical.kind = "gallery"
+        logical.people = []
+        db.commit()
+        assert refresh_repository_folder_people(db, "test") == 0
+        db.commit()
+    with session_factory() as db:
+        assert db.query(Folder).one().people == []
+
+
+def test_folder_api_exposes_parsed_people(catalog_env):
+    """rescan 后 /folders 列表与详情都应带上从 .nfo 解析出的人物。"""
+    repo, session_factory = catalog_env
+    title = repo / "SNIS-004"
+    title.mkdir()
+    (title / "SNIS-004.mp4").write_bytes(b"video")
+    (title / "SNIS-004.nfo").write_text(
+        '<?xml version="1.0"?><movie><actor><name>Eve</name></actor></movie>',
+        encoding="utf-8",
+    )
+    with session_factory() as db:
+        db.add(Media(repo_id="test", file_path="SNIS-004/SNIS-004.mp4", file_hash="api-hash", file_size=5, mime_type="video/mp4"))
+        db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        folder = db.query(Folder).one()
+        assert [item.name for item in get_folder(folder.id, db).people] == ["Eve"]
+        listed = list_folders(db, kind="movie").items[0]
+        assert [item.name for item in listed.people] == ["Eve"]
+
+
+def test_list_folders_by_person_and_person_folder_count(catalog_env):
+    """list_folders(person_id=...) 只返回该人物参演的目录;Person.folder_count 计数正确。"""
+    from app.modules.person import service as person_service
+
+    repo, session_factory = catalog_env
+    # 两个目录都参演 Alice;另一个目录参演 Bob。
+    for name, actor in [("MOV-100", "Alice"), ("MOV-101", "Alice"), ("MOV-102", "Bob")]:
+        title = repo / name
+        title.mkdir()
+        (title / f"{name}.mp4").write_bytes(b"video")
+        (title / f"{name}.nfo").write_text(
+            f'<?xml version="1.0"?><movie><actor><name>{actor}</name></actor></movie>',
+            encoding="utf-8",
+        )
+        with session_factory() as db:
+            db.add(Media(repo_id="test", file_path=f"{name}/{name}.mp4", file_hash=f"h-{name}", file_size=5, mime_type="video/mp4"))
+            db.commit()
+
+    repository_catalog.rescan("test")
+
+    with session_factory() as db:
+        alice = db.query(Person).filter_by(name="Alice").one()
+        bob = db.query(Person).filter_by(name="Bob").one()
+
+        alice_folders = list_folders(db, person_id=alice.id).items
+        bob_folders = list_folders(db, person_id=bob.id).items
+        assert len(alice_folders) == 2
+        assert len(bob_folders) == 1
+
+        alice_resp = person_service.get(db, alice.id)
+        bob_resp = person_service.get(db, bob.id)
+        assert alice_resp.folder_count == 2
+        assert bob_resp.folder_count == 1
+        assert {p.name for p in alice_folders[0].people} == {"Alice"}
+
+        # 人物列表按参演作品(folder)数倒序:Alice(2) 排在 Bob(1) 前。
+        order = [p.name for p in person_service.list_people(db, None)]
+        assert order.index("Alice") < order.index("Bob")

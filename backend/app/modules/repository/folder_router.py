@@ -21,8 +21,8 @@ router = APIRouter(prefix="/folders", tags=["folders"])
 
 
 @router.get("", response_model=FolderCursorResponse)
-def list_folders(cursor: str | None = Query(None), limit: int = Query(20, ge=1, le=100), starred: bool | None = Query(None), tag_id: int | None = Query(None), kind: str | None = Query(None), sort: str | None = Query(None), db: Session = Depends(get_db)):
-    return query_folders(db, cursor=cursor, limit=limit, starred=starred, tag_id=tag_id, kind=kind, sort=sort)
+def list_folders(cursor: str | None = Query(None), limit: int = Query(20, ge=1, le=100), starred: bool | None = Query(None), tag_id: int | None = Query(None), kind: str | None = Query(None), sort: str | None = Query(None), person_id: int | None = Query(None, description="只返回该人物参演的目录"), db: Session = Depends(get_db)):
+    return query_folders(db, cursor=cursor, limit=limit, starred=starred, tag_id=tag_id, kind=kind, sort=sort, person_id=person_id)
 
 
 @router.get("/tags", response_model=list[FolderTagCount])

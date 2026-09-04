@@ -76,6 +76,12 @@ const routes = [
     component: () => import('../views/People.vue')
   },
   {
+    path: '/people/:id(\\d+)',
+    name: 'PersonDetail',
+    component: () => import('../views/PersonDetail.vue'),
+    props: (route: any) => ({ personId: Number(route.params.id) })
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('../views/NotFound.vue')

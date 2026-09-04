@@ -14,6 +14,8 @@ class PersonResponse(OrmBase):
     cover_url: str = ""
     cover_abs_path: str = ""
     media_count: int = 0
+    # 该人物参演的作品目录数(经 folder_person 关联到 folder)。
+    folder_count: int = 0
     created_at: str
     updated_at: str
 

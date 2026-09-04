@@ -19,6 +19,15 @@ folder_tag = Table(
 )
 
 
+# folder 级人物关联:一个影片目录(作品)对应多位演员;person 行仍由 media 与 folder 共享。
+folder_person = Table(
+    "folder_person",
+    Base.metadata,
+    Column("folder_id", Integer, ForeignKey("folder.id", ondelete="CASCADE"), primary_key=True),
+    Column("person_id", Integer, ForeignKey("person.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
 class Folder(Base):
     __tablename__ = "folder"
 
@@ -36,6 +45,7 @@ class Folder(Base):
     issue = relationship("Issue", back_populates="folders")
     locations = relationship("FolderLocation", back_populates="folder", cascade="all, delete-orphan")
     tags = relationship("Tag", secondary=folder_tag, back_populates="folders")
+    people = relationship("Person", secondary=folder_person, back_populates="folders")
 
 
 class FolderLocation(Base):

@@ -22,6 +22,11 @@ class FolderTagItem(BaseModel):
     category: Optional[str] = None
 
 
+class FolderPersonItem(BaseModel):
+    id: int
+    name: str
+
+
 class FolderTagCount(FolderTagItem):
     folder_count: int = 0
 
@@ -77,6 +82,8 @@ class FolderResponse(TimestampMixin):
     primary_repo_id: Optional[str] = None
     primary_folder_path: Optional[str] = None
     tags: List[FolderTagItem] = []
+    # 影片目录自动从 .nfo <actor> 解析出的人物(作品演员)。
+    people: List[FolderPersonItem] = []
     preview_files: List[RepositoryFileResponse] = []
     fanart_file: Optional[RepositoryFileResponse] = None
     poster_file: Optional[RepositoryFileResponse] = None

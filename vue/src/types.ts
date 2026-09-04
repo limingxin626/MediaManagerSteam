@@ -40,7 +40,8 @@ export type MessageDetail = _MessageDetail & {
 export type Collection = components['schemas']['CollectionResponse']
 
 // 人物相关（类 Mac 照片「人物」，标注在 media 上，多对多）
-export type Person = components['schemas']['PersonResponse']
+// OpenAPI 尚未重新生成，手动补 folder_count（参演的作品目录数）。
+export type Person = components['schemas']['PersonResponse'] & { folder_count?: number }
 export type MediaPersonItem = components['schemas']['MediaPersonItem']
 // 媒体相关 —— 后端新增 local_file_path / local_thumb_path 两个绝对本地路径字段
 // (Electron 走 file:// 直读),OpenAPI 尚未重新生成,手动扩展。
@@ -183,6 +184,12 @@ export interface FolderTagCount extends FolderTag {
   folder_count: number
 }
 
+// 人物(演员)——经 folder_person 关联到作品 folder;后端 FolderResponse.people 返回。
+export interface FolderPersonItem {
+  id: number
+  name: string
+}
+
 export interface Folder {
   id: number
   name: string
@@ -197,6 +204,7 @@ export interface Folder {
   primary_repo_id: string | null
   primary_folder_path: string | null
   tags: FolderTag[]
+  people?: FolderPersonItem[]
   preview_files: RepositoryFile[]
   fanart_file: RepositoryFile | null
   poster_file: RepositoryFile | null

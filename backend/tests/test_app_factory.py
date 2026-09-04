@@ -12,7 +12,7 @@ from app.modules.collection import service as collection_service
 from app.modules.issue import service as issue_service
 
 
-OPENAPI_SEMANTIC_SHA256 = "22ea0bac415346650c5b79cc41376a6df4edc6904c4e709b878c9c356f82e0c0"
+OPENAPI_SEMANTIC_SHA256 = "eae708bb6fffabcf55c972a9334c332b6fefdc8ebbaf86bd9bbe4fc8567d0b24"
 
 
 def _normalize_openapi(value):

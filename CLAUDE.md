@@ -31,7 +31,7 @@ Routers (registered via `backend/app/routers/__init__.py:all_routers`): `collect
 Services:
 - `media_service.py` — file hashing (Blake2b), deduplication, ffprobe info extraction, thumbnail generation. `process_file()` returns `{"media": Media, "is_new": bool}` — calls `db.flush()` (not commit) to get IDs; router commits.
 - `message_service.py` — tags are set explicitly via `tag_ids` on create/update; no auto-extraction from text. Also handles media position reordering.
-- `repository_catalog.py` + `folder_message_service.py` — `RepositoryFolder`/`RepositoryFile` 是文件系统事实来源；每个非空、非根 folder 自动拥有一个 folder-backed `Message`，物理空目录不写入 catalog，也不创建 message；已注册目录变空时同时清理其 folder 和受管 message，但保留核心 `Media`。`MessageMedia` 只由 folder 下已物化的 `RepositoryFile.media_id` 派生，可全量重建，folder-backed message 禁止直接增删/排序 media。上传使用 `POST /messages/{id}/files` 原子写入 PRIMARY folder，再由 scan → materializer → reconcile 自动出现。folder 以 `(repo_id, filesystem_id)` 保持改名/同盘移动后的身份；路径失效时 materializer 会把可用物理路径提升为 `Media` canonical path。纯文本 message 没有 `MessageFolder`。
+- `repository_catalog.py` + `folder_message_service.py` — `RepositoryFolder`/`RepositoryFile` 是文件系统事实来源；每个非空、非根 folder 自动拥有一个 folder-backed `Message`，物理空目录不写入 catalog，也不创建 message；已注册目录变空时同时清理其 folder 和受管 message，但保留核心 `Media`。`MessageMedia` 只由 folder 下已物化的 `RepositoryFile.media_id` 派生，可全量重建，folder-backed message 禁止直接增删/排序 media。上传使用 `POST /messages/{id}/files` 原子写入 PRIMARY folder，再由 scan → materializer → reconcile 自动出现。folder 以 `(repo_id, filesystem_id)` 保持改名/同盘移动后的身份；路径失效时 materializer 会把可用物理路径提升为 `Media` canonical path。纯文本 message 没有 `MessageFolder`。`folder_service.py` 每次 rescan 末尾从 PRIMARY 物理目录的 `.nfo` 自动回填:`refresh_repository_folder_release_dates` 填 `released_at`(仅补空)、`refresh_repository_folder_people` 把 `<actor>` 解析为 `Person` 并挂到 `kind == "movie"` 的 folder 上(`folder_person` 关联,能解析出演员即以 .nfo 名单为权威整体替换)。`/folders` 支持 `person_id` 筛选某人物参演的作品;`PersonResponse.folder_count` 计作品数,`GET /people/{id}` 取单人物详情(Vue PersonDetail 页列其作品目录)。存量可用 `scripts/backfill_folder_people.py`(默认 dry-run)。
 - `base.py` — static CRUD methods (`get_all`, `get_by_id`, `create`, `update`, `delete`) accepting SQLAlchemy model type.
 
 DB session: `get_db()` generator in `models/__init__.py`, injected via `Depends(get_db)`. Configured with `autocommit=False`, `autoflush=False`.
@@ -102,7 +102,7 @@ SwiftUI app with **direct read-only access** to the shared SQLite database via G
 
 ### Database Models
 
-`Message` → `MessageMedia` (junction with position) → `Media` (deduplicated by file_hash). `Tag` linked to Message via `message_tag`, to Media via `media_tag`. `Person` linked to Media via `media_person` (many-to-many, 类似 Mac 相册人物). `Collection`(原 Actor)linked to Message via FK (one-to-many). `starred` fields use Integer 0|1 (not boolean) for SQLite compatibility.
+`Message` → `MessageMedia` (junction with position) → `Media` (deduplicated by file_hash). `Tag` linked to Message via `message_tag`, to Media via `media_tag`. `Person` linked to Media via `media_person` (many-to-many, 类似 Mac 相册人物),也经 `folder_person` 挂到作品 Folder(kind=movie)上(作品演员,由 .nfo `<actor>` 自动解析)。`Collection`(原 Actor)linked to Message via FK (one-to-many). `starred` fields use Integer 0|1 (not boolean) for SQLite compatibility.
 
 > **Mac (`MyNote/`) / Android (`android/`) 尚未跟进本次 actor→collection 重命名 + people** —— 它们各有独立 schema 副本,不会因后端表名改动而立即编译报错,但同步/直读到旧 `actor` 表/`actor_id` 列会失效,需单独任务适配(`collection` 表、`message.collection_id`、`person`/`media_person`)。
 

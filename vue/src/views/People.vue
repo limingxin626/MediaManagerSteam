@@ -45,46 +45,12 @@
             v-for="person in filteredPeople"
             :key="person.id"
             :person="person"
-            @click="selectPerson(person)"
+            @click="openPerson"
             @edit="openEdit"
           />
         </div>
       </div>
     </div>
-
-    <!-- Person media placeholder panel (right slide-in) -->
-    <!--
-      TODO(person-media browsing):后端目前没有「按人物筛选 media」的接口。
-      GET /media 只按 message 层的东西过滤(tag / collection / starred / type),
-      没有 person_id 参数;客户端全量拉取再本地过滤在规模上不可行。
-      待后端补 GET /media?person_id=<id>(复用现有 cursor 分页 + MediaResponse.people)后,
-      这里可仿照 Media.vue 的 useVirtualGrid / 网格 + 无限滚动做人物媒体浏览。
-    -->
-    <Transition name="fade">
-      <div v-if="selectedPerson" class="fixed inset-0 z-40 flex justify-end">
-        <div class="absolute inset-0 bg-black/40" @click="selectedPerson = null"></div>
-        <div class="relative w-full max-w-md h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] shadow-2xl flex flex-col">
-          <div class="shrink-0 flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)]">
-            <h3 class="text-base font-semibold text-[var(--text-primary)] truncate">{{ selectedPerson.name }}</h3>
-            <button @click="selectedPerson = null" class="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg transition-colors">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <svg class="w-12 h-12 text-[var(--color-primary-500)]/40 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <p class="text-sm font-medium text-[var(--text-primary)]">该人物有 {{ selectedPerson.media_count }} 个媒体</p>
-            <p class="mt-2 text-xs text-[var(--text-muted)] max-w-xs">
-              按人物浏览媒体的功能即将上线（需要后端提供 <code class="px-1 rounded bg-[var(--bg-secondary)]">GET /media?person_id=</code> 接口）。
-              目前可在媒体预览中通过「标注人物」为媒体打上人物标签。
-            </p>
-          </div>
-        </div>
-      </div>
-    </Transition>
 
     <!-- Edit / Create Modal -->
     <PersonEditModal
@@ -101,6 +67,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import type { Person } from '../types'
 import PersonCard from '../components/PersonCard.vue'
 import PersonEditModal from '../components/PersonEditModal.vue'
@@ -113,12 +80,11 @@ defineOptions({ name: 'People' })
 
 const toast = useToast()
 const { confirm } = useConfirm()
+const router = useRouter()
 
 const people = ref<Person[]>([])
 const loading = ref(false)
 const filterName = ref('')
-
-const selectedPerson = ref<Person | null>(null)
 
 const showModal = ref(false)
 const editMode = ref(false)
@@ -142,8 +108,8 @@ const fetchPeople = async () => {
   }
 }
 
-const selectPerson = (person: Person) => {
-  selectedPerson.value = person
+const openPerson = (personId: number) => {
+  router.push({ name: 'PersonDetail', params: { id: personId } })
 }
 
 const openCreate = () => {

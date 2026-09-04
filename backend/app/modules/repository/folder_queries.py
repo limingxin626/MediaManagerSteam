@@ -5,7 +5,7 @@ from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.config import config
-from app.models import Folder, FolderLocation, Media, RepositoryFile, Tag, folder_tag
+from app.models import Folder, FolderLocation, Media, Person, RepositoryFile, Tag, folder_tag
 from app.modules.repository.folder_classifier import (
     ClassifiedEntry,
     Detection,
@@ -20,6 +20,7 @@ from app.modules.repository.folder_schemas import (
     FolderDetectionInfo,
     FolderLocationItem,
     FolderMediaEntry,
+    FolderPersonItem,
     FolderPreviewItem,
     FolderResponse,
     FolderTagCount,
@@ -162,6 +163,7 @@ def _folder_response(
         primary_repo_id=physical.repo_id if physical is not None else None,
         primary_folder_path=physical.rel_path if physical is not None else None,
         tags=[FolderTagItem(id=tag.id, name=tag.name, category=tag.category) for tag in folder.tags],
+        people=[FolderPersonItem(id=person.id, name=person.name) for person in folder.people],
         preview_files=[_file_response(row) for row in preview_rows],
         fanart_file=_file_response(fanart) if fanart is not None else None,
         poster_file=_file_response(poster) if poster is not None else None,
@@ -341,18 +343,21 @@ def list_folders(
     tag_id: int | None = None,
     kind: str | None = None,
     sort: str | None = None,
+    person_id: int | None = None,
 ):
     """Logical folder 列表。
 
     - 默认(``sort`` 为空或 ``"added"``):按入库/id 倒序(最新入库在前),cursor = ``str(id)``。
     - ``sort="released"``:按 ``coalesce(released_at, created_at)`` 倒序,空发行日期兜底到入库时间
       (混合混排,永不缺位);cursor = ``"ISO|id"`` 复合游标,与 media 页一致。
+    - ``person_id``:只返回该人物参演(folder.people 含此人)的目录。
     """
     query = db.query(Folder).options(
         joinedload(Folder.collection),
         joinedload(Folder.issue),
         selectinload(Folder.locations).joinedload(FolderLocation.repository_folder),
         selectinload(Folder.tags),
+        selectinload(Folder.people),
     )
     if starred is not None:
         query = query.filter(Folder.starred == (1 if starred else 0))
@@ -360,6 +365,8 @@ def list_folders(
         query = query.filter(Folder.tags.any(Tag.id == tag_id))
     if kind:
         query = query.filter(Folder.kind == kind)
+    if person_id is not None:
+        query = query.filter(Folder.people.any(Person.id == person_id))
 
     if sort == "released":
         release_time = func.coalesce(Folder.released_at, Folder.created_at)

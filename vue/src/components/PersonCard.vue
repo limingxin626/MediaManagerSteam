@@ -30,7 +30,8 @@
         </button>
       </div>
       <div class="text-sm text-gray-400">
-        {{ person.media_count }} 个媒体
+        <template v-if="(person.folder_count ?? 0) > 0">{{ person.folder_count }} 部作品</template>
+        <template v-else>{{ person.media_count }} 个媒体</template>
       </div>
     </div>
   </div>

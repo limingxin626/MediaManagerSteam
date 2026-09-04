@@ -69,6 +69,7 @@ class Person(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     media_items = relationship("Media", secondary=media_person, back_populates="people")
+    folders = relationship("Folder", secondary="folder_person", back_populates="people")
 
     __table_args__ = (
         UniqueConstraint("name", name="uq_person_name"),
@@ -201,5 +202,6 @@ from app.models.repository_catalog import (  # noqa: E402,F401
     MessageFolder,
     RepositoryFile,
     RepositoryFolder,
+    folder_person,
     folder_tag,
 )
